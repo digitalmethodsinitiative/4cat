@@ -41,7 +41,7 @@ We do not share any of this data with anyone else. Anonymised data may be used
 as part of research projects. All data is stored on a secure server.
 
 If you want to see or remove your personal data, please contact us at 
-[%%ADMIN_EMAIL%%](mailto:%%ADMIN_EMAIL%%). Please allow up to four weeks for us to 
+[%%ADMIN_EMAIL%%](mailto:%%ADMIN_EMAIL%%). Please allow some time for us to 
 respond to you. We may ask you for further information to help us accurately 
 respond to your request. 
 

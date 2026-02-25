@@ -134,19 +134,19 @@ const processor = {
      *
      * @param e  Event that triggered queueing
      */
-    queue: function (e) {
+    queue: function (e, extra_data=null, run=false) {
         e.preventDefault();
 
-        if ($(this).text().includes('Run')) {
-            const run_button = $(this);
-            let form = run_button.parents('form');
+        const form = find_parent(e.target, 'form');
+        const run_button = form.querySelector('.processor-queue-button');
 
+        if (run_button.innerText.includes('Run')) {
             // if it's a big dataset, ask if the user is *really* sure
-            let parent = run_button.parents('li.child-wrapper');
-            if (parent.length === 0) {
-                parent = $('.result-tree');
+            let parent = find_parent(run_button, 'li.child-wrapper');
+            if (!parent) {
+                parent = document.querySelector('.result-tree');
             }
-            let num_rows = parseInt($('#dataset-' + parent.attr('data-dataset-key') + '-result-count').attr('data-num-results'));
+            let num_rows = parseInt($('#dataset-' + parent.getAttribute('data-dataset-key') + '-result-count').attr('data-num-results'));
 
             if (num_rows > 500000) {
                 if (!confirm('You are about to start a processor for a dataset with over 500,000 items. This may take a very long time and block others from running the same type of analysis on their datasets.\n\nYou may be able to get useful analysis results with a smaller dataset instead. Are you sure you want to start this analysis?')) {
@@ -154,8 +154,19 @@ const processor = {
                 }
             }
 
+            run = true;
+        }
+
+        if(run) {
             let reset_form = true;
-            fetch(form.attr('data-async-action') + '?async', {method: form.attr('method'), body: new FormData(form[0])})
+            let request_body = new FormData(form);
+            if (extra_data) {
+                for (let key in extra_data) {
+                    request_body.set(key, extra_data[key]);
+                }
+            }
+
+            fetch(form.getAttribute('data-async-action') + '?async', {method: form.getAttribute('method'), body: request_body})
                 .then(function (response) {
                     if (!response.ok) {
                         throw response;
@@ -163,15 +174,43 @@ const processor = {
                     return response.json();
                 })
                 .then(function (response) {
-                    if (response.hasOwnProperty("messages") && response.messages.length > 0) {
-                        popup.alert(response.messages.join("\n\n"));
-                    } else if(response.hasOwnProperty('message')) {
-                        popup.alert(response.message);
+                    if (response.hasOwnProperty('message') && response.message instanceof Array) {
+                        response.message = response.message.join('\n\n');
                     }
 
-                    if(response.hasOwnProperty('status') && response['status'] === 'error') {
-                        reset_form = false;
-                        return;
+                    if(['confirm', 'error', 'extra-form'].includes(response.status)) {
+                        if (response['status'] === 'confirm') {
+                            reset_form = false;
+                            popup.confirm(response.message, 'Confirm', function () {
+                                // re-send, but this time for real
+                                processor.queue(e, {'frontend-confirm': true});
+                            });
+                            return;
+                        } else if (response['status'] === 'error') {
+                            reset_form = false;
+                            if (response.hasOwnProperty("message") && response.message) {
+                                popup.alert(response.message);
+                            }
+                            return;
+                        } else if (response['status'] === 'extra-form') {
+                            // new form elements to fill in
+                            // some fancy css juggling to make it obvious that these need to be completed
+                            reset_form = false;
+                            const options_container = form.querySelector('.processor-options');
+
+                            let extra_elements = $(response.html);
+                            extra_elements.addClass('datasource-extra-input').css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').appendTo(options_container);
+                            let targetHeight = extra_elements.height();
+                            extra_elements.css('position', '').css('display', '').css('visibility', '').css('height', 0);
+
+                            extra_elements.animate({'height': targetHeight}, 250, function () {
+                                $(this).css('height', '').addClass('flash-once');
+                            });
+
+                            return;
+                        } else if (response.hasOwnProperty('message')) {
+                            popup.alert(response.message);
+                        }
                     }
 
                     if (response.html.length > 0) {
@@ -227,44 +266,50 @@ const processor = {
                     }
                 })
                 .finally(() => {
-                    if (reset_form && run_button.data('original-content')) {
-                        run_button.html(run_button.data('original-content'));
-                        run_button.trigger('click');
-                        run_button.html(run_button.data('original-content'));
-                        form.trigger('reset');
+                    if (reset_form && run_button.getAttribute('original-content')) {
+                        run_button.innerHTML = run_button.getAttribute('original-content');
+                        run_button.click();
+                        run_button.innerHTML = run_button.getAttribute('original-content');
+                        form.querySelectorAll('.delegated-option').forEach(n => n.remove());
+                        form.reset();
                         ui_helpers.toggleButton({target: run_button});
                     }
                 });
         } else {
-            $(this).data('original-content', $(this).html());
-            $(this).find('.byline').html('Run');
-            $(this).find('.fa').removeClass('.fa-cog').addClass('fa-play');
-            ui_helpers.toggleButton({target: $(this)[0]});
+            run_button.setAttribute('original-content', run_button.innerHTML);
+            run_button.querySelector('.byline').innerText = 'Run';
+            run_button.querySelector('.fa').classList.remove('.fa-cog');
+            run_button.querySelector('.fa').classList.add('fa-play');
+            ui_helpers.toggleButton({target: run_button});
         }
     },
 
-    delete: function (e) {
+    delete: async function (e) {
         e.preventDefault();
+        let parent_with_key = $(this);
 
-        if (!confirm('Are you sure? Deleted data cannot be restored.')) {
-            return;
-        }
+        popup.confirm('Are you sure? Deleted data cannot be restored.', 'Confirm', function () {
+            while (!parent_with_key.attr('data-dataset-key') && parent_with_key.parent()) {
+                parent_with_key = parent_with_key.parent();
+            }
 
-        $.ajax(getRelativeURL('api/delete-dataset/' + $(this).attr('data-key') + '/'), {
-            method: 'DELETE',
-            data: {key: $(this).attr('data-key')},
-            success: function (json) {
+            const url = getRelativeURL('api/delete-dataset/' + parent_with_key.attr('data-dataset-key') + '/');
+            fetch(url, {
+                method: 'DELETE',
+                body: {key: parent_with_key.attr('data-dataset-key')}
+            }).then(function (response) {
+                return response.json();
+            }).then((json) => {
                 $('li#child-' + json.key).animate({height: 0}, 200, function () {
                     $(this).remove();
+                    if ($('.child-list.top-level li').length === 0) {
+                        $('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
+                    }
                 });
-                if ($('.child-list.top-level li').length === 0) {
-                    $('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
-                }
                 query.reset_form();
-            },
-            error: function (json) {
-                popup.alert('Could not delete dataset: ' + json.status, 'Error');
-            }
+            }).catch((e) => {
+                popup.alert('Could not delete dataset: ' + e, 'Error');
+            });
         });
     }
 };
@@ -319,6 +364,8 @@ const query = {
         $('.result-page .card h2.editable').each(query.label.init);
         $(document).on('click', '.edit-dataset-label', query.label.handle);
         $(document).on('keydown', '#new-dataset-label', query.label.handle);
+
+        $(document).on('click', '.result-page .card .annotation-fields-list .property-badge', query.annotation_label.handle);
 
         // convert dataset
         $(document).on('change', '#convert-dataset', query.convert_dataset)
@@ -471,7 +518,7 @@ const query = {
                     query.query_key = response['key'];
                     query.check(query.query_key);
 
-                    $('#query-status').append($('<button class="delete-link" data-key="' + query.query_key + '">Cancel</button>'));
+                    $('#query-status').append($('<button class="delete-link" data-dataset-key="' + query.query_key + '">Cancel</button>'));
 
                     // poll results every 2000 ms after submitting
                     query.poll_interval = setInterval(function () {
@@ -552,7 +599,7 @@ const query = {
             $.getJSON({
                 url: getRelativeURL('api/check-query/'),
                 data: {
-                    key: $(this).attr('data-key'),
+                    key: $(this).attr('data-dataset-key'),
                     block: block_type
                 },
                 success: function (json) {
@@ -877,6 +924,45 @@ const query = {
         }
     },
 
+    annotation_label: {
+        handle: function (e) {
+            e.preventDefault();
+            let target = e.target;
+            if (target.tagName !== 'SPAN') {
+                target = $(target).parents('span')[0];
+            }
+
+            const current_label = target.innerText;
+            const callback_url = find_parent(target, 'div').getAttribute('data-label-edit-href')
+
+            popup.dialog(
+                '<p>Edit the label for this annotation:</p>' +
+                '<label>Label: <input type="text" id="new-annotation-label" name="label" value="' + current_label + '"></label>',
+                'Edit annotation label',
+                function () {
+                    const new_label = document.querySelector('#new-annotation-label').value.trim();
+                    const payload = {'annotation_id': target.getAttribute('data-annotation-id'), 'label': new_label };
+                    fetch(callback_url, {
+                        method: 'POST',
+                        body: JSON.stringify(payload),
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                    })
+                        .then((response) => response.json())
+                        .then(response_json => {
+                            if(response_json.status && response_json.status === 'success') {
+                                target.childNodes[1].nodeValue = ' ' + new_label;
+                            }
+                        })
+                        .catch((error) => {
+                            popup.alert('There was an error changing the annotation label. Refresh and try again later.');
+                        })
+                }
+            );
+        }
+    },
+
     label: {
         init: function () {
             $(this).append('<button class="edit-dataset-label"><i class="fa fa-edit"></i><span class="sr-only">Edit label</span></button>');
@@ -1058,15 +1144,20 @@ const tooltip = {
             parent = this;
         }
 
+        // safe-get aria-controls
+        const ariaControls = $(parent).attr('aria-controls') || '';
+        if (!ariaControls) { return; }
+
         //determine target - last aria-controls value starting with 'tooltip-'
-        let targets = $(parent).attr('aria-controls').split(' ');
-        let tooltip_container = '';
+        let targets = ariaControls.split(' ');
+        let tooltip_container_id = '';
         targets.forEach(function (target) {
             if (target.split('-')[0] === 'tooltip') {
-                tooltip_container = target;
+                tooltip_container_id = target;
             }
         });
-        tooltip_container = $(document.getElementById(tooltip_container));
+
+        let tooltip_container = $(document.getElementById(tooltip_container_id));
         let is_standalone = tooltip_container.hasClass('multiple');
 
         if (tooltip_container.is(':hidden')) {
@@ -1098,7 +1189,7 @@ const tooltip = {
             let hor_position = Math.max(window.scrollX, position.left + (parent_width / 2) - (width / 2));
             if(hor_position + tooltip_container.width() - window.scrollX > document.documentElement.clientWidth) {
                 const scrollbar_width = window.innerWidth - document.documentElement.clientWidth;
-                console.log(scrollbar_width);
+                //console.log(scrollbar_width);
                 hor_position = document.documentElement.clientWidth + window.scrollX - tooltip_container.width() - 5 - scrollbar_width;
             }
             tooltip_container.css('left', hor_position + 'px');
@@ -1116,14 +1207,19 @@ const tooltip = {
         if (!parent) {
             parent = this;
         }
-        let targets = $(parent).attr('aria-controls');
-        let tooltip_container = '';
-        targets.split(' ').forEach(function (target) {
+
+        // safe-get aria-controls
+        const ariaControls = $(parent).attr('aria-controls') || '';
+        if (!ariaControls) { return; }
+
+        let tooltip_container_id = '';
+        ariaControls.split(' ').forEach(function (target) {
             if (target.split('-')[0] === 'tooltip') {
-                tooltip_container = target;
+                tooltip_container_id = target;
             }
         });
-        tooltip_container = $(document.getElementById(tooltip_container));
+
+        let tooltip_container = $(document.getElementById(tooltip_container_id));
         tooltip_container.hide();
     },
     /**
@@ -1131,7 +1227,16 @@ const tooltip = {
      * @param e  Event that triggered the toggle
      */
     toggle: function (e) {
-        let tooltip_container = $(document.getElementById($(this).attr('aria-controls')));
+        const ariaControls = $(this).attr('aria-controls') || '';
+        if (!ariaControls) { return; }
+
+        // pick last tooltip- id if multiple
+        let tooltip_id = '';
+        ariaControls.split(' ').forEach(function (t) {
+            if (t.split('-')[0] === 'tooltip') { tooltip_id = t; }
+        });
+
+        let tooltip_container = $(document.getElementById(tooltip_id));
         if (tooltip_container.is(':hidden')) {
             tooltip.show(e, this);
         } else {
@@ -1611,28 +1716,32 @@ const ui_helpers = {
         });
 
         // special case - admin user tags sorting
-        $('#tag-order').sortable({
-            cursor: 'ns-resize',
-            handle: '.handle',
-            items: '.implicit, .explicit',
-            axis: 'y',
-            update: function(e, ui) {
-                let tag_order = Array.from(document.querySelectorAll('#tag-order li[data-tag]')).map(t => t.getAttribute('data-tag')).join(',');
-                let body = new FormData();
-                body.append('order', tag_order);
-                fetch(document.querySelector('#tag-order').getAttribute('data-url'), {
-                    method: 'POST',
-                    body: body
-                }).then(response => {
-                    if(response.ok) {
-                        ui.item.addClass('flash-once');
-                    } else {
-                        ui.item.addClass('flash-once-error');
-                    }
-                });
-            }
-        });
-
+        const $tagOrder = $('#tag-order');
+        // Check tagOrder present and jQuery UI loaded
+        if ($tagOrder.length && $.fn && $.fn.sortable) {
+            $tagOrder.sortable({
+                cursor: 'ns-resize',
+                handle: '.handle',
+                items: '.implicit, .explicit',
+                axis: 'y',
+                update: function(e, ui) {
+                    let tag_order = Array.from(document.querySelectorAll('#tag-order li[data-tag]')).map(t => t.getAttribute('data-tag')).join(',');
+                    let body = new FormData();
+                    body.append('order', tag_order);
+                    fetch(document.querySelector('#tag-order').getAttribute('data-url'), {
+                        method: 'POST',
+                        body: body
+                    }).then(response => {
+                        if(response.ok) {
+                            ui.item.addClass('flash-once');
+                        } else {
+                            ui.item.addClass('flash-once-error');
+                        }
+                    });
+                }
+            });
+        }
+        
         // special case - restart 4cat front-end
         $('button[name=action][value=restart-frontend]').on('click', function(e) {
             e.preventDefault();
@@ -1900,7 +2009,10 @@ const ui_helpers = {
                     requirement = [null, element.getAttribute('data-requires'), '!=', ''];
                 }
 
-                const negate = requirement[2] === '!=';
+                const negate = requirement[2].startsWith('!');
+                if (negate) {
+                    requirement[2] = requirement[2].substring(1);
+                }
                 const other_field = 'option-' + requirement[1];
                 const other_element = form.querySelector("*[name='" + other_field + "']");
 
@@ -1935,6 +2047,10 @@ const ui_helpers = {
                     } else if(['==', '='].includes(requirement[2])) {
                         requirement_met = other_value === requirement[3];
                     }
+                }
+
+                if(negate) {
+                    requirement_met = !requirement_met
                 }
 
                 if (requirement_met) {
@@ -2042,6 +2158,7 @@ function hsv2hsl(h, s, v) {
 function find_parent(element, selector, start_self=false) {
     while(element.parentNode) {
         if(!start_self) { element = element.parentNode; }
+        if(element instanceof HTMLDocument) { return null; }
         if(element.matches(selector)) {
             return element;
         }

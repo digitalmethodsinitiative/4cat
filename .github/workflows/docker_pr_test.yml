@@ -37,15 +37,18 @@ jobs:
         run: |
           sleep 30
           echo "::group::Running module tests"
-          docker exec 4cat_backend pytest -v tests/test_modules.py
+          docker exec -e PYTHONPATH=/usr/src/app 4cat_backend pytest -v tests/test_modules.py
           echo "::endgroup::"
       - name: Print log on failure
         if: failure()
         run: |
           if [ "$(docker ps | grep 4cat)" ]; then 
-              docker cp 4cat_backend:/usr/src/app/logs/backend_4cat.log ./backend_4cat.log
+              docker cp 4cat_backend:/usr/src/app/data/logs/backend_4cat.log ./backend_4cat.log
               echo "::group::Backend logs"
               cat backend_4cat.log
+              echo "4cat.stderr logs"
+              docker cp 4cat_backend:/usr/src/app/data/logs/4cat.stderr ./4cat.stderr
+              cat 4cat.stderr
               echo "::endgroup::"
           else 
               echo "Docker containers not running; check logs in previous steps"

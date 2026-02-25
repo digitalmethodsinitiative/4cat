@@ -23,30 +23,9 @@ class HashSimilarityNetworker(BasicProcessor):
     """
     type = "hash-similarity-network"
     category = "Networks"
-    title = "Hash Similarity network to identify near duplicate hashes"
-    description = "Calculate similarity of hashes and create a GEXF network file."
+    title = "Hash similarity network"
+    description = "Calculate similarity of hashes and create a GEXF network file. Can identify near duplicate hashes."
     extension = "gexf"
-
-    options = {
-        "descriptor_column": {
-            "help": "Column containing ID or unique descriptor (e.g., URL, filename, etc.)",
-            "inline": True,
-        },
-        "choice_column": {
-            "help": "Column containing hashes",
-            "inline": True,
-            "tooltip": "Expects all hashes to be of the same length"
-        },
-        "percent_similar": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Minimum percentage for connection",
-            "tooltip": "Only create a connection if the two hashes are at least X percent similar (e.g. at least 75% of the two hashes must be identical). Use 0 to create weighted edges for all hash comparisons.",
-            "coerce_type": int,
-            "default": 90,
-            "min": 0,
-            "max": 100,
-        },
-    }
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -54,7 +33,26 @@ class HashSimilarityNetworker(BasicProcessor):
         Update column option with actual columns
         :param config:
         """
-        options = cls.options
+        options = {
+            "descriptor_column": {
+                "help": "Column containing ID or unique descriptor (e.g., URL, filename, etc.)",
+                "inline": True,
+            },
+            "choice_column": {
+                "help": "Column containing hashes",
+                "inline": True,
+                "tooltip": "Expects all hashes to be of the same length"
+            },
+            "percent_similar": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Minimum percentage for connection",
+                "tooltip": "Only create a connection if the two hashes are at least X percent similar (e.g. at least 75% of the two hashes must be identical). Use 0 to create weighted edges for all hash comparisons.",
+                "coerce_type": int,
+                "default": 90,
+                "min": 0,
+                "max": 100,
+            },
+        }
 
         # Get the columns for the select columns option
         if parent_dataset and parent_dataset.get_columns():
@@ -97,8 +95,7 @@ class HashSimilarityNetworker(BasicProcessor):
         bit_length = None
         for item in self.source_dataset.iterate_items(self):
             if column not in item:
-                self.dataset.update_status("Column %s not found in dataset" % column, is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error("Column %s not found in dataset" % column)
                 return
 
             # Process hash
@@ -111,28 +108,24 @@ class HashSimilarityNetworker(BasicProcessor):
                 if '0b' == original_hash[:2]:
                     item_hash = original_hash[2:]
             else:
-                self.dataset.update_status("Hash type %s currently not supported" % type(original_hash), is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error("Hash type %s currently not supported" % type(original_hash))
                 return
 
             try:
                 item_hash = [int(bit) for bit in item_hash]
             except ValueError:
-                self.dataset.update_status("Column %s not found in dataset" % column, is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error("Column %s not found in dataset" % column)
                 return
 
             if not all([bit == 1 or bit == 0 for bit in item_hash]):
                 # Note: this technically allows [True, False, 0, 1] "hashes"
-                self.dataset.update_status("Incorrect type of hash found in dataset (not a bit hash)", is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error("Incorrect type of hash found in dataset (not a bit hash)")
                 return
 
             item_id = item.pop(id_column)
 
             if item_id is None or item_id in identifiers:
-                self.dataset.update_status("ID Column is not unique for each hash", is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error("ID Column is not unique for each hash")
                 return
 
             # All hashes should be the same length
@@ -161,8 +154,8 @@ class HashSimilarityNetworker(BasicProcessor):
                     hash_metadata[item_id] = item
 
                 else:
-                    self.dataset.update_status("Hashes are not compatible for comparison", is_final=True)
-                    self.dataset.finish(0)
+                    self.dataset.finish_with_error("Hashes are not compatible for comparison")
+                    return
 
             collected += 1
             if collected % 500 == 0:
@@ -170,8 +163,8 @@ class HashSimilarityNetworker(BasicProcessor):
                 self.dataset.update_progress(collected / self.source_dataset.num_rows)
 
         if len(identifiers) != len(hashes):
-            self.dataset.update_status("Mismatch in hashes and IDs", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Mismatch in hashes and IDs")
+            return
 
         self.dataset.update_status("Adding nodes to network")
         for node in identifiers:
@@ -214,8 +207,7 @@ class HashSimilarityNetworker(BasicProcessor):
                     self.dataset.update_progress(comparisons / expected_comparisons)
 
         if not network.edges():
-            self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No edges could be created for the given parameters")
             return
 
         self.dataset.update_status("Writing network file")

@@ -20,8 +20,7 @@ class VectoriseByCategory(BasicProcessor):
 	type = "vectorise-tokens-by-category"  # job type ID
 	category = "Text analysis"  # category
 	title = "Count words by category"  # title displayed in UI
-	description = "Counts all tokens and categorizes them so they are transformed into category => token => frequency counts. " \
-				  "This is also known as a bag of words."  # description displayed in UI
+	description = "Counts all tokens per category."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	followups = ["wordcloud", "render-graphs-isometric", "render-rankflow"]
@@ -78,7 +77,7 @@ class VectoriseByCategory(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": 1,
 				"help": "Threshold (include if >= X occurrences)",
-				"coerce": int,
+				"coerce_type": int,
 				"min": 1,
 				"tooltip": "Only include words/tokens that occur at least this many times in a given category",
 				"requires": "threshold_type=true",
@@ -87,7 +86,7 @@ class VectoriseByCategory(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"default": 0,
 				"help": "Top N words/tokens per category",
-				"coerce": int,
+				"coerce_type": int,
 				"min": 0,
 				"tooltip": "Only include the top N words/tokens in a given category (0 includes all)",
 				"requires": "threshold_type=true",
@@ -170,6 +169,7 @@ class VectoriseByCategory(BasicProcessor):
 
 		# Get source dataset for categories
 		category_dataset = self.get_category_dataset(self.source_dataset)
+		self.for_cleanup.append(category_dataset)
 		if not category_dataset:
 			self.dataset.finish_with_error("No top dataset found; unable to identify categories")
 			return
@@ -211,13 +211,13 @@ class VectoriseByCategory(BasicProcessor):
 		index = 0
 		# Each file is a token set (Tokenize processor separates tokens by dates or all) and contains a list of tokens for each document
 		# A single item/post may have multiple documents (e.g., if it was seperated by sentance)
-		for token_file in self.iterate_archive_contents(self.source_file):
-			if token_file.name == '.token_metadata.json':
+		for packed_tokens in self.source_dataset.iterate_items():
+			if packed_tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
 
 			index += 1
-			vector_set_name = token_file.stem  # we don't need the full path
+			vector_set_name = packed_tokens.file.stem  # we don't need the full path
 			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
 			self.dataset.update_progress(index / self.source_dataset.num_rows)
 
@@ -232,19 +232,19 @@ class VectoriseByCategory(BasicProcessor):
 				vector_sets[vector_set_name] = {}
 
 			# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-			with token_file.open("rb") as binary_tokens:
+			with packed_tokens.file.open("rb") as binary_tokens:
 				# these were saved as pickle dumps so we need the binary mode
 				documents = token_unpacker.load(binary_tokens)
 
 				# Cycle through tokens
 				for i, document in enumerate(documents):
-					if (token_file.name, i) not in file_to_category_mapping:
+					if (packed_tokens.file.name, i) not in file_to_category_mapping:
 						# No category for this document
-						self.dataset.log("No category found for document %s-%s" % (token_file.name, i))
+						self.dataset.log("No category found for document %s-%s" % (packed_tokens.file.name, i))
 						continue
 
 					# Allow for multiple categories
-					categories = file_to_category_mapping[(token_file.name, i)]
+					categories = file_to_category_mapping[(packed_tokens.file.name, i)]
 					for category in categories:
 						if category not in vector_sets[vector_set_name]:
 							vector_sets[vector_set_name][category] = {}
@@ -262,7 +262,7 @@ class VectoriseByCategory(BasicProcessor):
 				sets_of_categories += 1
 
 		if not sets_of_categories:
-			self.dataset.finish_with_error("No tokens found")
+			self.dataset.finish_as_empty("No tokens found")
 			return
 
 		# Write vectors to file

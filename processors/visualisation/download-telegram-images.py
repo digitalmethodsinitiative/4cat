@@ -5,8 +5,6 @@ import asyncio
 import hashlib
 import json
 
-from pathlib import Path
-
 import telethon.errors
 from telethon import TelegramClient
 from telethon.errors import TimedOutError, BadRequestError
@@ -32,7 +30,7 @@ class TelegramImageDownloader(BasicProcessor):
     type = "image-downloader-telegram"  # job type ID
     category = "Visual"  # category
     title = "Download Telegram images"  # title displayed in UI
-    description = "Download images and store in a zip file. Downloads through the Telegram API might take a while. " \
+    description = "Download images and store in a ZIP file. Downloads through the Telegram API might take a while. " \
                   "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
@@ -101,6 +99,7 @@ class TelegramImageDownloader(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
+
         if type(module) is DataSet:
             # we need these to actually instantiate a telegram client and
             # download the images
@@ -126,7 +125,10 @@ class TelegramImageDownloader(BasicProcessor):
             json.dump(self.metadata, outfile)
 
         self.dataset.update_status("Compressing images")
-        self.write_archive_and_finish(self.staging_area)
+        warning = None
+        if not self.flawless:
+            warning = "Not all images could be downloaded. The the dataset logs for details."
+        self.write_archive_and_finish(self.staging_area, warning=warning)
 
     async def get_images(self):
         """
@@ -141,7 +143,7 @@ class TelegramImageDownloader(BasicProcessor):
         query = self.source_dataset.top_parent().parameters
         hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-        session_path = Path(self.config.get('PATH_ROOT')).joinpath(self.config.get('PATH_SESSIONS'), session_id + ".session")
+        session_path = self.config.get('PATH_SESSIONS').joinpath(session_id + ".session")
         amount = self.parameters.get("amount")
         with_thumbnails = self.parameters.get("video-thumbnails")
         with_websites = self.parameters.get("website-thumbnails")

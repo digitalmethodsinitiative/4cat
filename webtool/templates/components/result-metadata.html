@@ -5,7 +5,7 @@
 
 {% if dataset.is_expiring(config=__config) %}
     <i class="fa fa-trash tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-expires"></i> <span class="sr-only">This dataset will be deleted automatically in the future</span>
-    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-expires">This dataset will be deleted on {{ dataset.is_expiring()|datetime|safe }}</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-expires">This dataset will be deleted on {{ dataset.is_expiring(config=__config)|datetime|safe }}</span>
 {% endif %}
 
 {% if "pseudonymise" in dataset.parameters and (dataset.parameters.pseudonymise == True or dataset.parameters.pseudonymise == "pseudonymise") %}

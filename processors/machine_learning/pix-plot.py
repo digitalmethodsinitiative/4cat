@@ -154,8 +154,7 @@ class PixPlotGenerator(BasicProcessor):
 
         # Are there any available images?
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No images available to render to PixPlot.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No images available to render to PixPlot.")
             return
 
         # Unpack the images into a staging_area
@@ -171,9 +170,8 @@ class PixPlotGenerator(BasicProcessor):
 
         # Check to ensure enough photos will be uploaded to create a PixPlot
         if total_image_files < self.min_photos_needed:
-            self.dataset.update_status(
-                "Minimum of %i photos needed for a PixPlot to be created" % self.min_photos_needed, is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty(
+                f"Minimum of {self.min_photos_needed} photos needed for a PixPlot to be created")
             return
 
         # Gather metadata

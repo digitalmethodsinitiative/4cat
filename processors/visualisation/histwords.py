@@ -49,49 +49,60 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         "Truncated SVD: [Manning, C. D., Raghavan, P., & Schütze, H. (2008). Matrix decompositions and latent semantic indexing. *Introduction to information retrieval*, 403-417.](http://nlp.stanford.edu/IR-book/pdf/18lsi.pdf)"
     ]
 
-    options = {
-        "words": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Word(s)",
-            "tooltip": "Nearest neighbours for these words will be charted, and the position of the words will be highlighted"
-        },
-        "method": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Vector dimensionality reduction technique",
-            "options": {
-                "t-SNE": "t-SNE (learning rate: 150)",
-                "PCA": "PCA",
-                "TruncatedSVD": "Truncated SVD (randomised, 5 iterations)"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "words": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Word(s)",
+                "tooltip": "Nearest neighbours for these words will be charted, and the position of the words will be highlighted"
             },
-            "default": "tsne"
-        },
-        "num-words": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Amount of nearest neighbours",
-            "min": 1,
-            "default": 15,
-            "max": 100,
-            "tooltip": "Amount of neighbours to chart per model, per queried word"
-        },
-        "threshold": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Similarity threshold",
-            "tooltip": "Decimal value between 0 and 1; only neighbours with a higher similarity score than this will be included",
-            "default": "0.3"
-        },
-        "overlay": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Plot all models",
-            "default": True,
-            "tooltip": "Plot similar words for all models. If unchecked, only similar words for the most recent model will be plotted."
-        },
-        "all-words": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Always include all words",
-            "default": False,
-            "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model."
+            "method": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Vector dimensionality reduction technique",
+                "options": {
+                    "t-SNE": "t-SNE (learning rate: 150)",
+                    "PCA": "PCA",
+                    "TruncatedSVD": "Truncated SVD (randomised, 5 iterations)"
+                },
+                "default": "tsne"
+            },
+            "num-words": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Amount of nearest neighbours",
+                "min": 1,
+                "default": 15,
+                "max": 100,
+                "tooltip": "Amount of neighbours to chart per model, per queried word"
+            },
+            "threshold": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Similarity threshold",
+                "tooltip": "Decimal value between 0 and 1; only neighbours with a higher similarity score than this will be included",
+                "default": "0.3"
+            },
+            "overlay": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Plot all models",
+                "default": True,
+                "tooltip": "Plot similar words for all models. If unchecked, only similar words for the most recent model will be plotted."
+            },
+            "all-words": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Always include all words",
+                "default": False,
+                "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model."
+            }
         }
-    }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -107,8 +118,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # parse parameters
         input_words = self.parameters.get("words", "")
         if not input_words or not input_words.split(","):
-            self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No input words provided, cannot look for similar words.")
             return
 
         input_words = input_words.split(",")
@@ -181,8 +191,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
             for query in input_words:
                 if query not in model.key_to_index:
-                    self.dataset.update_status("Query '%s' was not found in model %s; cannot find nearest neighbours." % (query, model_name), is_final=True)
-                    self.dataset.finish(0)
+                    self.dataset.finish_as_empty(f"Query '{query}' was not found in model {model_name}; cannot find nearest neighbours.")
                     return
 
                 if self.interrupted:
@@ -249,8 +258,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             vectors = svd.fit_transform(vectors)
         else:
             shutil.rmtree(staging_area)
-            self.dataset.update_status("Invalid dimensionality reduction technique selected", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Invalid dimensionality reduction technique selected")
             return
 
         # also keep track of the boundaries of our 2D space, so we can plot

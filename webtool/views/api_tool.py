@@ -9,8 +9,6 @@ import time
 import csv
 import os
 
-from pathlib import Path
-
 from flask import Blueprint, current_app, jsonify, request, render_template, render_template_string, redirect, url_for, flash, \
 	get_flashed_messages, send_from_directory, g
 from flask_login import login_required, current_user
@@ -56,7 +54,7 @@ def openapi_specification(api_id="all"):
 
 	:return: OpenAPI-formatted API specification
 	"""
-	return jsonify(current_app.openapi.generate(api_id))
+	return jsonify(current_app.openapi.generate(g.config, api_id))
 
 
 @component.route('/api/status.json')
@@ -77,7 +75,7 @@ def api_status():
 	jobs_sorted["total"] = jobs_count
 
 	# determine if backend is live by checking if the process is running
-	lockfile = Path(g.config.get('PATH_ROOT'), g.config.get('PATH_LOCKFILE'), "4cat.pid")
+	lockfile = g.config.get('PATH_LOCKFILE').joinpath("4cat.pid")
 	if os.path.isfile(lockfile):
 		with lockfile.open() as pidfile:
 			pid = pidfile.read()
@@ -100,6 +98,99 @@ def api_status():
 
 	return jsonify(response)
 
+@component.route("/api/available-processors/<string:dataset_key>/")
+@login_required
+@current_app.openapi.endpoint("tool")
+def collect_available_processors(dataset_key):
+	"""
+	Get available processors for a given processor type and dataset
+	:param processor_type:  Processor type, as specified in processor class `type` attribute
+	:param dataset_id:  Dataset ID, as specified in the dataset class `key` attribute
+	:return: A JSON object with the `status`, `processor`, `dataset`, and `available_processors` for the processor.
+	"""
+	if not dataset_key:
+		return error(400, message="Dataset ID is required to get available processors.")
+	
+	# cover all bases - can only run processor on "parent" dataset
+	try:
+		dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
+	except DataSetException:
+		return error(404, error="Not a valid dataset key.")
+
+	if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not current_user.can_access_dataset(dataset):
+		return error(403, error="You do not have access to this dataset")
+
+	# check if processor is available for this dataset
+	available_processors = dataset.get_available_processors(config=g.config, exclude_hidden=True)
+
+	return jsonify({
+		"status": "success",
+		"dataset": dataset_key,
+		"available_processors": [{"type": processor_type, "title":processor.title, "description":processor.description, "category":processor.category, "extension":processor.get_extension()} for processor_type, processor in available_processors.items()],
+	})
+
+@component.route("/api/processor-options/<string:processor_type>/")
+@component.route("/api/processor-options/<string:processor_type>/<string:dataset_id>/")
+@login_required
+@current_app.openapi.endpoint("tool")
+def get_processor_options(processor_type, dataset_id=None):
+	"""
+	Get processor options
+
+	Optionally returns the options for a specific dataset as datasets may have
+	different options for the same processor type. Converts datasources to processor types
+	if the processor type is a datasource.
+
+	:param processor_type:  Processor type, as specified in processor class `type` attribute
+	:param dataset_id:  Dataset ID, as specified in the dataset class `key` attribute
+	:return: A JSON object with the `status`, `processor`, `dataset`, and `options` for the processor.
+	"""
+	if processor_type in g.modules.datasources:
+		# Datasources were poorly named
+		processor_type = processor_type + "-search"
+
+	if processor_type not in g.modules.processors:
+		return error(404, message="Processor '%s' does not exist" % processor_type)
+	
+	processor = g.modules.processors[processor_type]
+	
+	if not hasattr(processor, "get_options"):
+		return jsonify({
+			"status": "success",
+			"processor": processor_type,
+			"dataset": dataset_id,
+			"options": {},
+			"message": "Processor does not have options defined"
+		})
+
+	# get the options for the processor
+	if dataset_id:
+		try:
+			dataset = DataSet(key=dataset_id, db=g.db, modules=g.modules)
+		except DataSetException:
+			return error(404, message="Dataset '%s' does not exist" % dataset_id)
+		
+		# Check compatibility of processor with dataset
+		if hasattr(processor, "is_compatible_with") and not processor.is_compatible_with(dataset, g.config):
+			return error(422, message="Processor '%s' is not compatible with dataset '%s'" % (processor_type, dataset_id))
+
+		worker_options = processor.get_options(dataset, g.config)
+	else:
+		worker_options = processor.get_options(None, g.config)
+
+	for option_name, option in worker_options.items():
+		if "coerce_type" in option:
+			# if the processor has a coerce option, we need to convert it to a string
+			# so that it can be JSONified
+			option["coerce_type"] = str(option["coerce_type"])
+
+	return jsonify({
+		"status": "success",
+		"processor": processor_type,
+		"dataset": dataset_id,
+		"options": worker_options,
+		"message": "'type' defines form type (for frontend), 'help' provides help title text, 'tooltip' additional help information, 'default' the default value, 'choices' the possible choices for the field, 'min' is minimum (for numeric), 'max' is maximum (for numeric), 'coerce_type' the data type the value will be coerced to, and 'requires' denotes if field is only relevant given another option's value."
+	})
 
 @component.route("/api/datasource-form/<string:datasource_id>/")
 @login_required
@@ -257,7 +348,7 @@ def import_dataset():
 
 			outfile.write(chunk)
 
-	job = g.queue.add_job(worker_type, {"file": str(temporary_path)}, dataset.key)
+	job = g.queue.add_job(worker_or_type=worker, details={"file": str(temporary_path)}, dataset=dataset)
 	dataset.link_job(job)
 
 	return jsonify({
@@ -376,7 +467,7 @@ def queue_dataset():
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 
-	g.queue.add_job(jobtype=search_worker_id, remote_id=dataset.key, interval=0)
+	g.queue.add_job(worker_or_type=search_worker, dataset=dataset, interval=0)
 	new_job = Job.get_by_remote_ID(dataset.key, g.db)
 	dataset.link_job(new_job)
 
@@ -1028,40 +1119,84 @@ def queue_processor(key=None, processor=None):
 	except DataSetException:
 		return error(404, error="Not a valid dataset key.")
 
-	if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not current_user.can_access_dataset(dataset):
+	if not g.config.get(
+		"privileges.admin.can_manipulate_all_datasets"
+	) and not current_user.can_access_dataset(dataset):
 		return error(403, error="You cannot run processors on private datasets")
 
 	# check if processor is available for this dataset
-	available_processors = dataset.get_available_processors(config=g.config, exclude_hidden=True)
+	available_processors = dataset.get_available_processors(
+		config=g.config, exclude_hidden=True
+	)
 	if processor not in available_processors:
-		return error(404, error="This processor is not available for this dataset or has already been run.")
+		return error(
+			404,
+			error="This processor is not available for this dataset or has already been run.",
+		)
 
 	processor_worker = available_processors[processor]
 	try:
-		sanitised_query = UserInput.parse_all(processor_worker.get_options(dataset, g.config), request.form,
-                                              silently_correct=False)
+		sanitised_query = UserInput.parse_all(
+			processor_worker.get_options(dataset, g.config),
+			request.form,
+			silently_correct=False,
+		)
+
+		sanitised_query["frontend-confirm"] = bool(request.form.get("frontend-confirm", False))
 
 		if hasattr(processor_worker, "validate_query"):
 			# validate_query is optional for processors
-			sanitised_query = processor_worker.validate_query(sanitised_query, request, g.config)
+			sanitised_query = processor_worker.validate_query(
+				sanitised_query, request, g.config
+			)
 
 	except QueryParametersException as e:
 		# parameters need amending
-		return jsonify({"status": "error", "message": (str(e) if e else "Cannot run the processor with these settings.")})
+		return jsonify(
+			{
+				"status": "error",
+				"message": (
+					str(e) if e else "Cannot run the processor with these settings."
+				),
+			}
+		)
 
+	except QueryNeedsExplicitConfirmationException as e:
+		return jsonify({"status": "confirm", "message": str(e)})
+
+	except QueryNeedsFurtherInputException as e:
+		# ask the user for more input by returning a HTML snippet
+		# containing form fields to be added to the form before it is
+		# re-submitted
+		form = "\n".join(
+			[
+				render_template(
+					"components/processor-option.html",
+					option_override={k: v},
+					option=k,
+					dataset=dataset,
+					processor=processor_worker,
+				)
+				for k, v in e.config.items()
+			]
+		)
+		return jsonify({"status": "extra-form", "html": form})
 
 	if request.form.to_dict().get("email-complete", False):
-		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
+		sanitised_query["email-complete"] = request.form.to_dict().get(
+			"email-user", False
+		)
 
 	# private or not is inherited from parent dataset
-	analysis = DataSet(parent=dataset.key,
-					   parameters=sanitised_query,
-					   db=g.db,
-					   extension=available_processors[processor].get_extension(parent_dataset=dataset),
-					   type=processor,
-					   is_private=dataset.is_private,
-					   owner=current_user.get_id(),
-					   modules=g.modules
+	analysis = DataSet(
+		parent=dataset.key,
+		parameters=sanitised_query,
+		db=g.db,
+		extension=available_processors[processor].get_extension(parent_dataset=dataset),
+		type=processor,
+		is_private=dataset.is_private,
+		owner=current_user.get_id(),
+		modules=g.modules,
 	)
 
 	# give same ownership as parent dataset
@@ -1069,26 +1204,37 @@ def queue_processor(key=None, processor=None):
 
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
-		g.queue.add_job(jobtype=processor, remote_id=analysis.key)
+		g.queue.add_job(worker_or_type=g.modules.processors[processor], dataset=analysis)
 		job = Job.get_by_remote_ID(analysis.key, database=g.db)
 		analysis.link_job(job)
 		analysis.update_status("Queued")
 	else:
-		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
-			  available_processors[processor].title)
+		flash(
+			"This analysis (%s) is currently queued or has already been run with these parameters."
+			% available_processors[processor].title
+		)
 
 	if hasattr(processor_worker, "after_create"):
 		processor_worker.after_create(sanitised_query, analysis, request)
 
-	return jsonify({
-		"status": "success",
-		"container": "*[data-dataset-key=" + dataset.key + "]",
-		"key": analysis.key,
-		"html": render_template("components/result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
-                                processors=g.modules.processors) if analysis.is_new else "",
-		"messages": get_flashed_messages(),
-		"is_filter": available_processors[processor].is_filter()
-	})
+	return jsonify(
+		{
+			"status": "success",
+			"container": "*[data-dataset-key=" + dataset.key + "]",
+			"key": analysis.key,
+			"html": render_template(
+				"components/result-child.html",
+				child=analysis,
+				dataset=dataset,
+				parent_key=dataset.key,
+				processors=g.modules.processors,
+			)
+			if analysis.is_new
+			else "",
+			"message": get_flashed_messages(),
+			"is_filter": available_processors[processor].is_filter(),
+		}
+	)
 
 
 @component.route('/api/check-processors/')
@@ -1129,7 +1275,24 @@ def check_processor():
 		if not current_user.can_access_dataset(dataset):
 			continue
 
-		genealogy = dataset.get_genealogy()
+		if dataset.is_top_dataset():
+			if dataset.parameters.get("copied_from", None):
+				# Filter dataset - get original dataset for display
+				original_key = dataset.parameters.get("copied_from", None)
+				try:
+					original_dataset = DataSet(key=original_key, db=g.db, modules=g.modules)
+				except DataSetException:
+					# Cannot find original dataset; no longer has parent and cannot render child view
+					g.log.warning(f"Dataset {dataset.key} is a filter but original dataset {original_key} not found. Skipping...")
+					continue
+				genealogy = original_dataset.get_genealogy()
+			else:
+				# Top-level dataset; not a child, cannot render child view
+				g.log.warning(f"Dataset {dataset.key} is top-level; cannot render child view. Skipping...")
+				continue
+		else:
+			genealogy = dataset.get_genealogy()
+
 		parent = genealogy[-2]
 		top_parent = genealogy[0]
 

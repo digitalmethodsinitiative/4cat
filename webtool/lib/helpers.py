@@ -12,7 +12,6 @@ from calendar import monthrange
 from flask_login import current_user
 from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
-from pathlib import Path
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -230,7 +229,7 @@ def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="f
 	new_img.save(output_filepath)
 
 
-def generate_css_colours(config=None, force=False):
+def generate_css_colours(config, force=False):
 	"""
 	Write the colours.css CSS file based on configuration
 
@@ -298,7 +297,7 @@ def check_restart_request():
 	file. This ensures a restart is in progress and the request belongs to that
 	specific restart.
 	"""
-	lock_file = Path(g.config.get("PATH_ROOT"), "config/restart.lock")
+	lock_file = g.config.get("PATH_CONFIG").joinpath("restart.lock")
 	if not lock_file.exists():
 		return False
 
@@ -336,6 +335,7 @@ def setting_required(setting, required_value=True):
 
 
 def parse_markdown(text, trim_container=False):
+	text = text if text else ""
 	val = markdown2.markdown(text)
 	if trim_container:
 		val = re.sub(r"^<p>", "", val)

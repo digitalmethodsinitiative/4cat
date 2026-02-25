@@ -1,6 +1,6 @@
 <div class="parameters">
     <ul>
-        {% if item.get_extension() in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp") or item.get_own_processor().map_item %}
+        {% if not item.is_filter() and (item.get_extension() in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp", "mp4") or item.get_own_processor().map_item) and item.is_finished() and item.num_rows %}
             <li>
                 <a href="{{ url_for('dataset.preview_items', key=item.key) }}"
                    data-load-from="{{ url_for('dataset.preview_items', key=item.key) }}"
@@ -45,7 +45,7 @@
                 <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished() %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>
             </li>
             {% endif %}
-        {% if item.type in processors %}{% set processor_options = processors[item.type].get_options(config=__config) %}{% endif %}
+        {% if item.type in processors %}{% set processor_options = processors[item.type].get_options(parent_dataset=dataset, config=__config) %}{% endif %}
         {% for option in item.parameters %}
             {% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
                 {% include 'components/result-parameter.html' %}

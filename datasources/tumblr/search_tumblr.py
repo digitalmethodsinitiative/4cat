@@ -1038,7 +1038,7 @@ class SearchTumblr(Search):
 				image_urls.append(block["media"][0]["url"])
 			# Audio file
 			elif block_type == "audio":
-				audio_urls.append(block["url"] if "url" in block else block["media"]["url"])
+				audio_urls.append(block["url"] if block.get("url", "") else block["media"]["url"])
 				audio_artists.append(block.get("artist", ""))
 			# Video (embedded or hosted)
 			elif block_type == "video":
@@ -1115,6 +1115,12 @@ class SearchTumblr(Search):
 			body_reblogged.append("\n".join(reblogged_text))
 
 			reblog_trail.append(reblog_author)
+
+		# sometimes Nones somehow end up in these
+		audio_urls = [url for url in audio_urls if type(url) is str]
+		video_urls = [url for url in video_urls if type(url) is str]
+		video_thumb_urls = [url for url in video_thumb_urls if type(url) is str]
+		link_urls = [url for url in link_urls if type(url) is str]
 
 		return MappedItem({
 			"type": post["original_type"] if "original_type" in post else post["type"],
@@ -1241,14 +1247,14 @@ class SearchTumblr(Search):
 		Used to notify of potential API errors.
 
 		"""
-		super().after_process()
 		self.client = None
 		errors = []
 		if len(self.failed_notes) > 0:
 			errors.append("API error(s) when fetching notes %s" % ", ".join(self.failed_notes))
 		if len(self.failed_posts) > 0:
-			errors.append("API error(s) when fetching reblogs %s" % ", ".join(self.failed_posts))
+			errors.append("API error(s) when fetching reblogs %s" % ", ".join([str(pid) for pid in self.failed_posts]))
 		if errors:
 			self.dataset.log(";\n ".join(errors))
 			self.dataset.update_status(
-				"Dataset completed but failed to capture some notes/reblogs; see log for details")
+				"Dataset completed but failed to capture some notes/reblogs; see log for details", is_final=True)
+		super().after_process()

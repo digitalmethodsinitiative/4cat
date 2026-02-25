@@ -60,17 +60,13 @@ class AudioToText(BasicProcessor):
             "default": 0,
             "help": "Max number of audio files",
             "tooltip": "Use '0' to allow unlimited number"
+        },
+        "dmi-service-manager.be_whisper_gpu": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": True,
+            "help": "Use GPU for Whisper processing",
         }
     }
-
-    local_whisper = (
-        True
-        if (
-            config.get("dmi-service-manager.bc_whisper_enabled", False)
-            and config.get("dmi-service-manager.ab_server_address", False)
-        )
-        else False
-    )
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -85,6 +81,15 @@ class AudioToText(BasicProcessor):
         Collect maximum number of audio files from configuration and update options accordingly
         :param config:
         """
+        local_whisper = (
+            True
+            if (
+                config.get("dmi-service-manager.bc_whisper_enabled", False)
+                and config.get("dmi-service-manager.ab_server_address", False)
+            )
+            else False
+        )
+
         options = {
             "host_model_info": {
                 "type": UserInput.OPTION_INFO,
@@ -171,7 +176,7 @@ class AudioToText(BasicProcessor):
             }
         }
 
-        if cls.local_whisper:
+        if local_whisper:
             # Update the amount max and help from config
             max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100))
             if max_number_audio_files == 0:  # Unlimited allowed
@@ -206,14 +211,19 @@ class AudioToText(BasicProcessor):
         This takes a zipped set of audio files and uses a Whisper docker image to identify speech and convert to text,
         or calls the OpenAI API.
         """
-        if self.source_dataset.num_rows <= 1:
-            # 1 because there is always a metadata file
-            self.dataset.finish_with_error("No audio files found.")
-            return
 
         model_host = self.parameters.get("model_host", "external")
 
-        if model_host == "local" and not self.local_whisper:
+        local_whisper = (
+            True
+            if (
+                self.config.get("dmi-service-manager.bc_whisper_enabled", False)
+                and self.config.get("dmi-service-manager.ab_server_address", False)
+            )
+            else False
+        )
+
+        if model_host == "local" and not local_whisper:
             self.dataset.finish_with_error("Can't run a self-hosted Whisper model. Admins can configure this in the "
                                            "4CAT settings (settings -> DMI Service Manager).")
             return
@@ -244,7 +254,8 @@ class AudioToText(BasicProcessor):
         audio_filenames = [filename for filename in os.listdir(staging_area)
                            if filename.split('.')[-1] not in ["json", "log"]]
         if self.parameters.get("amount", 100) != 0:
-            audio_filenames = audio_filenames[:self.parameters.get("amount", 100)]
+            max_files = min(self.parameters.get("amount", 100), len(audio_filenames))
+            audio_filenames = audio_filenames[:max_files]
         total_audio_files = len(audio_filenames)
 
         prompt = self.parameters.get("prompt", "")
@@ -291,6 +302,8 @@ class AudioToText(BasicProcessor):
                              '--output_format', "json",
                              "--model", self.parameters.get("local_model")],
                     }
+            if not self.config.get("dmi-service-manager.be_whisper_gpu", True):
+                data["args"].append(["--device", "cpu"])
             if prompt:
                 data["args"].extend(["--initial_prompt", prompt])
             if translate:
@@ -340,21 +353,25 @@ class AudioToText(BasicProcessor):
 
             for i, audio_filename in enumerate(audio_filenames):
                 with open(os.path.join(staging_area, audio_filename), "rb") as f:
-
-                    if not translate:
-                        response = self.get_openai_api_transcription(
-                            f,
-                            model=external_model,
-                            prompt=prompt,
-                            language=language,
-                            client=client
-                        )
-                    else:
-                        response = self.get_openai_api_translation(
-                            f,
-                            prompt=prompt,
-                            client=client
-                        )
+                    try:
+                        if not translate:
+                            response = self.get_openai_api_transcription(
+                                f,
+                                model=external_model,
+                                prompt=prompt,
+                                language=language,
+                                client=client
+                            )
+                        else:
+                            response = self.get_openai_api_translation(
+                                f,
+                                prompt=prompt,
+                                client=client
+                            )
+                    except (openai.NotFoundError, openai.BadRequestError, openai.AuthenticationError,
+                            openai.RateLimitError, openai.APIConnectionError) as e:
+                        self.dataset.finish_with_error(e.message)
+                        return
 
                     transcription = {
                         "text": response.text,
@@ -407,8 +424,8 @@ class AudioToText(BasicProcessor):
                             "item_id": item_id,
                             "value": result_data.get("text", "")
                         })
-                    #annotated += 1
-                    processed += 1
+
+                processed += 1
 
         if save_annotations:
             self.save_annotations(annotations)
@@ -429,32 +446,15 @@ class AudioToText(BasicProcessor):
 
         returns: response
         """
-        try:
-            # Get response
-            response = client.audio.transcriptions.create(
-                file=input_file,
-                model=model,
-                temperature=0,
-                language=language,
-                response_format="json",
-                prompt=prompt
-            )
-        except openai.NotFoundError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.BadRequestError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.AuthenticationError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.RateLimitError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.APIConnectionError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-
+        # Get response
+        response = client.audio.transcriptions.create(
+            file=input_file,
+            model=model,
+            temperature=0,
+            language=language,
+            response_format="json",
+            prompt=prompt
+        )
         return response
 
     def get_openai_api_translation(self, input_file, client, language="",
@@ -471,31 +471,14 @@ class AudioToText(BasicProcessor):
 
         returns: response
         """
-        try:
-            # Get response
-            response = client.audio.translations.create(
-                file=input_file,
-                model="whisper-1",
-                temperature=0,
-                response_format="json",
-                prompt=prompt
-            )
-        except openai.NotFoundError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.BadRequestError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.AuthenticationError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.RateLimitError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-        except openai.APIConnectionError as e:
-            self.dataset.finish_with_error(e.message)
-            return
-
+        # Get response
+        response = client.audio.translations.create(
+            file=input_file,
+            model="whisper-1",
+            temperature=0,
+            response_format="json",
+            prompt=prompt
+        )
         return response
 
     @staticmethod

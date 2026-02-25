@@ -202,7 +202,8 @@ def first_run_dialog():
     if has_admin_user and not wants_phone_home:
         return error(403, message="The 'first run' page is not available")
 
-    version_file = Path(g.config.get("PATH_ROOT"), "config/.current-version")
+    version_file = g.config.get("PATH_CONFIG").joinpath(".current-version")
+
     if version_file.exists():
         with version_file.open() as infile:
             version = infile.readline().strip()
@@ -210,6 +211,7 @@ def first_run_dialog():
         version = "unknown"
 
     missing = []
+    
     # choose a random adjective to differentiate this 4CAT instance (this can
     # be edited by the user)
     adjective_file = Path(g.config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt")
@@ -277,16 +279,14 @@ def first_run_dialog():
             interface_hue = random.randrange(0, 360)
 
         g.config.set("4cat.layout_hue", interface_hue)
-        generate_css_colours(force=True)
+        generate_css_colours(config=g.config, force=True)
 
         # make user an admin
         g.db.update("users", where={"name": username}, data={"is_deactivated": False})
         g.db.commit()
 
-        flash("The admin user '%s' was created, you can now use it to log in." % username)
-
     if phone_home_url and request.form.get("phonehome"):
-        with Path(g.config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
+        with g.config.get("PATH_CONFIG").joinpath(".current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
         payload = {
@@ -306,8 +306,20 @@ def first_run_dialog():
     # don't ask phone home again until next update
     g.config.set("4cat.phone_home_asked", True)
 
-    redirect_path = "user.show_login" if not has_admin_user else "misc.show_frontpage"
-    return redirect(url_for(redirect_path))
+    message = "4CAT is now ready for use. You can log in to it with the account you just created."
+
+    if phone_home_url:
+        message += f"""\n\n
+While running, 4CAT will periodically fetch notifications about e.g. security issues and upgrade instructions from
+an <a href="{phone_home_url}">external server</a>. You can disable this functionality by going into the Control Panel's 
+'Settings' page, and setting the 'Phone home URL' under '4CAT Tool Settings' to an empty value. 4CAT will still let you 
+know when a new version is available if you do this; but you will not receive any other notifications, e.g. security 
+warnings or upgrade instructions, so we recommend leaving this enabled.
+"""
+
+    redirect_url = url_for("user.show_login" if not has_admin_user else "misc.show_frontpage")
+    return render_template("error.html", title="4CAT is ready", redirect=redirect_url,
+                           message=message, flashes=get_flashed_messages())
 
 
 @component.route('/login/', methods=['GET', 'POST'])
@@ -331,7 +343,7 @@ def show_login():
     if request.method == 'GET':
         return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email), 401
 
-    username = request.form['username']
+    username = request.form['username'].strip()
     password = request.form['password']
     registered_user = User.get_by_login(g.db, username, password)
 
@@ -548,12 +560,20 @@ def show_access_tokens():
 
     return render_template("access-tokens.html", tokens=tokens)
 
-@component.route("/dismiss-notification/<int:notification_id>")
+@component.route("/view-notification/<int:notification_id>")
+def view_notification(notification_id):
+    notification = g.db.fetchone("SELECT * FROM users_notifications WHERE id = %s", (notification_id,))
+    if not notification:
+        return render_template("error.html", message="No such notification."), 404
+
+    return render_template("account/notification.html", notification=notification)
+
+@component.route("/dismiss-notification/<int:notification_id>", methods=["GET", "POST"])
 def dismiss_notification(notification_id):
     current_user.dismiss_notification(notification_id)
 
     if not request.args.get("async"):
-        redirect_url = request.headers.get("Referer")
+        redirect_url = request.form.get("redirect") or request.headers.get("Referer")
         if not redirect_url:
             redirect_url = url_for("misc.show_frontpage")
 

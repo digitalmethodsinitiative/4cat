@@ -29,32 +29,6 @@ class DatasetMerger(BasicProcessor):
     description = "Merge this dataset with other datasets of the same format. A new dataset is " \
                   "created containing a combination of items from the original datasets."  # description displayed in UI
 
-    options = {
-        "source": {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Source dataset URLs",
-            "tooltip": "This should be the URL(s) of the result pages of the 4CAT dataset you want to merge with this "
-                       "dataset. Note that all datasets need to have the same format! Separate URLs with new lines or "
-                       "commas."
-        },
-        "merge": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Merge strategy",
-            "options": {
-                "remove": "Remove duplicates",
-                "keep": "Keep duplicates"
-            },
-            "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their "
-                       "`id` field is identical, regardless of the value of other properties.",
-            "default": "remove"
-        },
-        "label": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Dataset name",
-            "tooltip": "Name of the merged dataset. If left empty, a name will be generated."
-        }
-    }
-
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
@@ -96,7 +70,31 @@ class DatasetMerger(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Processor options
         """
-        options = cls.options
+        options = {
+            "source": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Source dataset URLs",
+                "tooltip": "This should be the URL(s) of the result pages of the 4CAT dataset you want to merge with this "
+                        "dataset. Note that all datasets need to have the same format! Separate URLs with new lines or "
+                        "commas."
+            },
+            "merge": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Merge strategy",
+                "options": {
+                    "remove": "Remove duplicates",
+                    "keep": "Keep duplicates"
+                },
+                "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their "
+                        "`id` field is identical, regardless of the value of other properties.",
+                "default": "remove"
+            },
+            "label": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Dataset name",
+                "tooltip": "Name of the merged dataset. If left empty, a name will be generated."
+            }
+        }
 
         if parent_dataset and isinstance(parent_dataset, DataSet):
             options["label"]["default"] = f"(Merged) {parent_dataset.get_label()}"
@@ -124,26 +122,26 @@ class DatasetMerger(BasicProcessor):
             try:
                 source_dataset = self.get_dataset_from_url(source_dataset_url, self.db, modules=self.modules)
             except DataSetException:
-                return self.dataset.finish_with_error(f"Dataset URL '{source_dataset_url} not found - cannot perform "
+                return self.dataset.finish_with_error(f"Dataset URL '{source_dataset_url} not found, cannot perform "
                                                       f"merge.")
 
             if not source_dataset.is_finished():
-                return self.dataset.finish_with_error(f"Dataset with URL {source_dataset_url} is unfinished - finish "
+                return self.dataset.finish_with_error(f"Dataset with URL {source_dataset_url} is unfinished, finish "
                                                       f"datasets before merging.")
 
             #if source_dataset.type != self.source_dataset.type:
             #    return self.dataset.finish_with_error(f"Dataset with URL {source_dataset_url} is not of the right "
-            #                                          f"type - all datasets must be of the type "
+            #                                          f"type, all datasets must be of the type "
             #                                          f"'{self.source_dataset.type}")
 
             if not set(source_dataset.get_owners_users("owner")).intersection(
                     set(self.source_dataset.get_owners_users("owner"))) and (
                     source_dataset.is_private or self.source_dataset.is_private):
-                return self.dataset.finish_with_error("Cannot merge datasets - all need to be public or have "
+                return self.dataset.finish_with_error("Cannot merge datasets, all need to be public or have "
                                                       "overlapping ownership.")
 
             if source_dataset.key in [d.key for d in source_datasets]:
-                self.dataset.update_status(f"Skipping dataset with URL {source_dataset_url} - already in list of "
+                self.dataset.update_status(f"Skipping dataset with URL {source_dataset_url}, already in list of "
                                            f"datasets to merge")
             else:
                 total_items += source_dataset.num_rows
@@ -220,6 +218,7 @@ class DatasetMerger(BasicProcessor):
 
         # log any raised warnings to dataset log
         num_warnings = sum([sum(w.values()) for w in warnings.values()])
+        final_warning = None
         if num_warnings > 0:
             for dataset, dataset_warnings in warnings.items():
                 if sum(dataset_warnings.values()) == 0:
@@ -228,15 +227,15 @@ class DatasetMerger(BasicProcessor):
                 self.dataset.log(f"The following warning(s) were raised while processing items from dataset {dataset}:")
                 for dataset_warning, num_items in dataset_warnings.items():
                     self.dataset.log(f"  {dataset_warning} ({num_items:,} item(s))")
+            final_warning = f". Found {num_warnings} warnings while merging; see logs for details."
 
-        # phew, finally done
-        self.dataset.update_status(f"Merged {processed:,} items ({merged:,} merged, {duplicates:,} skipped, {num_warnings:,} warnings). See dataset log for details.",
-                                   is_final=True)
-
-
+        final_status = f"Merged {processed:,} items ({merged:,} merged, {duplicates:,} skipped)"
         self.dataset.update_progress(1)
-
-        self.dataset.finish(processed)
+        if final_warning:
+            self.dataset.finish_with_warning(processed, final_status + final_warning)
+        else:
+            self.dataset.update_status(final_status, is_final=True)
+            self.dataset.finish(processed)
 
     def update_progress(self, processed, total, force=False):
         """

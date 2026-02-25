@@ -1,10 +1,14 @@
 """
 Worker class that all workers should implement
 """
+import subprocess
 import traceback
 import threading
+import shutil
 import time
 import abc
+
+from typing import Iterable
 
 from common.lib.queue import JobQueue
 from common.lib.database import Database
@@ -117,6 +121,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             self.db = Database(logger=self.log, appname=database_appname, dbname=self.config.DB_NAME, user=self.config.DB_USER, password=self.config.DB_PASSWORD, host=self.config.DB_HOST, port=self.config.DB_PORT)
             self.queue = JobQueue(logger=self.log, database=self.db) if not self.queue else self.queue
             self.work()
+
         except WorkerInterruptedException:
             self.log.info("Worker %s interrupted - cancelling." % self.type)
 
@@ -134,9 +139,29 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack]
             location = "->".join(frames)
             self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location), frame=stack)
+        finally:
+            # Clean up after work successfully completed or terminates
+            try:
+                self.clean_up()
+            except Exception as e:
+                self.log.error("Worker %s clean-up raised exception %s: %s" % (self.type, e.__class__.__name__, str(e)), frame=traceback.extract_tb(e.__traceback__))
 
-        # Clean up after work successfully completed or terminates
-        self.clean_up()
+            try:
+                # explicitly close database connection as soon as it's possible
+                self.db.close()
+            except Exception as e:
+                try:
+                    self.log.error("Worker %s database close raised exception %s: %s" % (self.type, e.__class__.__name__, str(e)), frame=traceback.extract_tb(e.__traceback__))
+                except Exception:
+                    pass  # log likely broken already
+            
+            # Explicitly close this thread's memcache client to avoid lingering sockets
+            try:
+                cfg = getattr(self.modules, "config", None)
+                if cfg:
+                    cfg.close_memcache()
+            except Exception:
+                pass
 
     def clean_up(self):
         """
@@ -170,6 +195,103 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         self.log.debug("Interrupt requested for worker %s/%s" % (self.job.data["jobtype"], self.job.data["remote_id"]))
         self.interrupted = level
 
+    def run_interruptable_process(self, command, exception_message: str="", wait_time: int=5, timeout: int=0, cleanup_paths: Iterable=[]) -> subprocess.CompletedProcess:
+        """
+        Run a process and monitor while worker is active
+
+        This runs the process and, while it is running, monitors the
+        worker's interrupt status; if the worker is interrupted, the process
+        is stopped or killed. An optional timeout can also be given after which
+        the process will be stopped or killed even if the worker has not been
+        interrupted.
+
+        When interrupted, a WorkerInterruptedException will be raised after
+        killing the process and, optionally, deleting any paths provided via
+        the `cleanup_paths` parameter. If the worker is not interrupted and the
+        command terminates normally, nothing is deleted.
+
+        Note that the WorkerInterruptedException will also be raised if the
+        worker times out - so processor code after it times out will not run
+        (unless the processor catches and handles the exception).
+
+        The process is stopped by sending a SIGTERM, and then if that does not
+        end the process after a brief wait (`wait_time`), a SIGKILL.
+
+        :param command:  Command to run
+        :param exception_message:  Message for the
+        ProcessorInterruptedException that is raised if the worker is
+        interrupted while the process is running.
+        :param int wait_time:  Seconds to wait for the process after sending
+        SIGTERM before sending a SIGKILL, and then to wait again before logging
+        an error if SIGKILL does not end the process.
+        :param int timeout:  Optional timeout, in seconds. 0 for no timeout.
+        :param Iterable cleanup_paths:  Paths to delete before raising a
+        WorkerInterruptedException. Will be deleted with shutil.rmtree.
+        :raise WorkerInterruptedException:  When the command cannot or does not
+        complete.
+        :return:
+        """
+        if type(command) is str:
+            raise TypeError("Command for run_interruptable_process must be an iterable (see documentation for "
+                            "subprocess.Popen)")
+
+        if not exception_message:
+            exception_message = f"Interrupted while running {command[0]}"
+
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+
+        start_time = time.time()
+        while process.poll() is None:
+            if self.interrupted > self.INTERRUPT_NONE or (timeout and time.time() > start_time + timeout):
+                if self.interrupted == self.INTERRUPT_NONE:
+                    self.log.info(f"Interruptable process {command[0]} for worker of type {self.type} timed out, "
+                                  f"terminating")
+                else:
+                    self.log.info(f"Worker of type {self.type} interrupted, asking interruptable process {command[0]} "
+                                  f"to terminate...")
+
+                # Try graceful stop first with SIGTERM
+                # Wait briefly, then force kill if needed
+                try:
+                    process.terminate()
+
+                    try:
+                        process.wait(wait_time)
+                        self.log.debug(f"Process {command[0]} for worker {self.type} terminated successfully")
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+
+                        try:
+                            process.wait(wait_time)
+                            self.log.debug(f"Process {command[0]} for worker {self.type} ended after sending kill "
+                                           f"signal")
+                        except subprocess.TimeoutExpired:
+                            self.log.error(f"Sent SIGKILL to process {process.pid} but process did not terminate! "
+                                           f"Process was started by worker {self.type} with command "
+                                           f"{' '.join(command)}")
+
+                except Exception as e:
+                    self.log.error(f"Failed to kill process {process.pid}: got exception {e}. Cleaning up and "
+                                   f"interrupting worker anyway.")
+
+                finally:
+                    if cleanup_paths:
+                        for path in cleanup_paths:
+                            shutil.rmtree(path, ignore_errors=True)
+
+                    raise WorkerInterruptedException(exception_message)
+            
+            time.sleep(0.1)
+
+        stdout, stderr = process.communicate()
+        return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+
     @abc.abstractmethod
     def work(self):
         """
@@ -180,6 +302,26 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         classes should implement this method.
         """
         pass
+
+    @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Get queue ID for this worker
+
+        The queue ID determines what other worker types are considered to see
+        if a job of this worker can run. By default it is set to the worker's
+        type (so all workers of the same type are in the same queue) but this
+        can be overridden by subclasses.
+
+        :param str remote_id:  Item reference for the job, e.g. a dataset key
+          or URL
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset object; if the worker does not work
+          with a dataset (e.g. if it is a processor) this is `None`.
+
+	    :return str:  Queue ID
+	    """
+        return cls.type
 
     @staticmethod
     def is_4cat_class():

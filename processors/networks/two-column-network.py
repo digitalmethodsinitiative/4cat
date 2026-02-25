@@ -2,6 +2,7 @@
 Generate network of values from two columns
 """
 from dateutil.relativedelta import relativedelta
+from functools import partial
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
@@ -26,72 +27,9 @@ class ColumnNetworker(BasicProcessor):
                   "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
     extension = "gexf"
 
-    options = {
-        "column-a": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Attribute A"
-        },
-        "column-b": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Attribute B"
-        },
-        "interval": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Make network dynamic by",
-            "default": "overall",
-            "options": {
-                "overall": "Do not make dynamic",
-                "year": "Year",
-                "month": "Month",
-                "week": "Week",
-                "day": "Day"
-            },
-            "tooltip": "Dynamic networks will record in which interval(s) nodes and edges were present. "
-                       "Weights will also be calculated per interval. Dynamic graphs can be opened in e.g. Gephi to "
-                       "visually analyse the evolution of the network over time."
-        },
-        "directed": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Directed edges?",
-            "default": True,
-            "tooltip": "If enabled, e.g. an edge from 'hello' in column 1 to 'world' in column 2 creates a different edge "
-                       "than from 'world' in column 1 to 'hello' in column 2. If disabled, these would be considered "
-                       "the same edge."
-        },
-        "allow-loops": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Allow loops?",
-            "default": False,
-            "tooltip": "If enabled, a looping edge (from a node to itself) is created if the two columns contain the same value."
-        },
-        "split-comma": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Split column values by comma?",
-            "default": False,
-            "tooltip": "If enabled, values separated by commas are considered separate nodes, and create separate "
-                       "edges. Useful if columns contain e.g. lists of hashtags."
-        },
-        "categorise": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Categorize nodes by column?",
-            "default": True,
-            "tooltip": "If enabled, the same values from different columns are treated as separate nodes. For "
-                       "example, the value 'hello' from the column 'user' is treated as a different node than the "
-                       "value 'hello' from the column 'subject'. If disabled, they would be considered a single node."
-        },
-        "to-lowercase": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Convert values to lowercase",
-            "tooltip": "Merges values with varying cases"
-        },
-        "ignore-nodes": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Nodes to ignore",
-            "tooltip": "Separate with commas if you want to ignore multiple nodes"
-        }
-    }
+    references = [
+        "Utilises [Networkx](https://networkx.org/)' built-in [Louvain](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html#networkx.algorithms.community.louvain.louvain_communities) and [greedy modularity](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.modularity_max.greedy_modularity_communities.html#networkx.algorithms.community.modularity_max.greedy_modularity_communities) community detection algorithms."
+    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -105,7 +43,72 @@ class ColumnNetworker(BasicProcessor):
         :param DataSet parent_dataset:  Parent dataset
         :return dict:  Processor options
         """
-        options = cls.options
+        options = {
+            "column-a": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Attribute A"
+            },
+            "column-b": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Attribute B"
+            },
+            "interval": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Make network dynamic by",
+                "default": "overall",
+                "options": {
+                    "overall": "Do not make dynamic",
+                    "year": "Year",
+                    "month": "Month",
+                    "week": "Week",
+                    "day": "Day"
+                },
+                "tooltip": "Dynamic networks will record in which interval(s) nodes and edges were present. "
+                        "Weights will also be calculated per interval. Dynamic graphs can be opened in e.g. Gephi to "
+                        "visually analyse the evolution of the network over time."
+            },
+            "directed": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Directed edges?",
+                "default": True,
+                "tooltip": "If enabled, e.g. an edge from 'hello' in column 1 to 'world' in column 2 creates a different edge "
+                        "than from 'world' in column 1 to 'hello' in column 2. If disabled, these would be considered "
+                        "the same edge."
+            },
+            "allow-loops": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Allow loops?",
+                "default": False,
+                "tooltip": "If enabled, a looping edge (from a node to itself) is created if the two columns contain the same value."
+            },
+            "split-comma": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Split column values by comma?",
+                "default": False,
+                "tooltip": "If enabled, values separated by commas are considered separate nodes, and create separate "
+                        "edges. Useful if columns contain e.g. lists of hashtags."
+            },
+            "categorise": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Categorize nodes by column?",
+                "default": True,
+                "tooltip": "If enabled, the same values from different columns are treated as separate nodes. For "
+                        "example, the value 'hello' from the column 'user' is treated as a different node than the "
+                        "value 'hello' from the column 'subject'. If disabled, they would be considered a single node."
+            },
+            "to-lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Convert values to lowercase",
+                "tooltip": "Merges values with varying cases"
+            },
+            "ignore-nodes": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Nodes to ignore",
+                "tooltip": "Separate with commas if you want to ignore multiple nodes"
+            }
+        }
         if parent_dataset is None:
             return options
 
@@ -125,6 +128,14 @@ class ColumnNetworker(BasicProcessor):
                 "help": "'To' column name",
                 "tooltip": "Name of the column of values at which edges terminate"
             }
+
+        options["detect-communities"] = {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Detect communities",
+			"tooltip": "Assign nodes to communities using two separate community detection algorithms (see processor "
+					   "references). Will never be done for networks with more than 50.000 edges."
+		}
 
         return options
 
@@ -153,6 +164,7 @@ class ColumnNetworker(BasicProcessor):
         interval_type = self.parameters.get("interval")
         to_lower = self.parameters.get("to-lowercase", False)
         ignoreable = [n.strip() for n in self.parameters.get("ignore-nodes", "").split(",") if n.strip()]
+        detect_communities = self.parameters.get("detect-communities", False)
 
         processed = 0
 
@@ -162,8 +174,7 @@ class ColumnNetworker(BasicProcessor):
         for item in self.source_dataset.iterate_items(self):
             if column_a not in item or column_b not in item:
                 missing = "'" + "' and '".join([c for c in (column_a, column_b) if c not in item]) + "'"
-                self.dataset.update_status(f"Column(s) {missing} not found in dataset", is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error(f"Column(s) {missing} not found in dataset")
                 return
 
             processed += 1
@@ -211,10 +222,10 @@ class ColumnNetworker(BasicProcessor):
 
             try:
                 interval = get_interval_descriptor(item, interval_type)
+                if interval == "unknown_date":
+                    raise ValueError(f"Date '{item.get('timestamp')}' cannot be parsed")
             except ValueError as e:
-                self.dataset.update_status(f"{e}, cannot count posts per {interval_type}", is_final=True)
-                self.dataset.update_status(0)
-                return
+                return self.dataset.finish_with_error(f"{e}, cannot count posts per {interval_type}")
             
             # Track nodes per item (categoise option adjusts node name to include column if True)
             processed_nodes = set()
@@ -280,8 +291,7 @@ class ColumnNetworker(BasicProcessor):
                         processed_edges.add(edge)
 
         if not network.edges():
-            self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No edges could be created for the given parameters")
             return
 
         # If the network is dynamic, now we calculate spells from the intervals
@@ -354,6 +364,29 @@ class ColumnNetworker(BasicProcessor):
         for component in (network.nodes, network.edges):
             for item in component:
                 del component[item]["intervals"]
+
+        # add community classes, as a treat
+        # static seed to make deterministic
+        community_types = {
+            "louvain_community": partial(nx.community.louvain_communities, seed=0),
+            "greedy_modularity_class": partial(nx.community.greedy_modularity_communities, weight="weight"),
+        }
+
+        if network.number_of_edges() > 50_000:
+            self.dataset.log("Network has more than 50.000 edges; skipping community detection.")
+            detect_communities = False
+
+        if not detect_communities:
+            community_types = {}
+
+        for community_prop, community_function in community_types.items():
+            self.dataset.update_status(f"Calculating node communities ({community_prop})")
+            community_id = 0
+            for community in community_function(network):
+                community_id += 1
+                for node_id in community:
+                    # needs to be string for Retina to recognise it as qualitative
+                    network.nodes[node_id][community_prop] = f"cluster-{community_id}"
 
         self.dataset.update_status("Writing network file")
         nx.write_gexf(network, self.dataset.get_results_path())

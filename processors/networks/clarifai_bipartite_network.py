@@ -24,16 +24,27 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
                   "labels if the label occurs for the image with that file name."
     extension = "gexf"  # extension of result file, used internally and in UI
 
-    options = {
-        "min_confidence": {
-            "type": UserInput.OPTION_TEXT,
-            "default": 0.5,
-            "help": "Min confidence",
-            "tooltip": "Value between 0 and 1; confidence required before the annotation is included. Note that the" \
-                       "confidence is not known for all annotation types (these will be included with confidence '-1'" \
-                       "in the output file)"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "min_confidence": {
+                "type": UserInput.OPTION_TEXT,
+                "default": 0.5,
+                "help": "Min confidence",
+                "tooltip": "Value between 0 and 1; confidence required before the annotation is included. Note that the" \
+                        "confidence is not known for all annotation types (these will be included with confidence '-1'" \
+                        "in the output file)"
+            }
         }
-    }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

@@ -24,6 +24,8 @@ class BaseFilter(BasicProcessor):
     title = "Base Filter"  # title displayed in UI
     description = "This should not be available."
 
+    item_ids = []
+
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
@@ -43,27 +45,41 @@ class BaseFilter(BasicProcessor):
         parent_extension = self.source_dataset.get_extension()
 
         # Filter posts
-        matching_posts = self.filter_items()
+        matching_items = self.filter_items()
 
         # Write the posts
         num_posts = 0
-        if parent_extension == "csv":
-            with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-                writer = None
-                for post in matching_posts:
-                    if not writer:
-                        writer = csv.DictWriter(outfile, fieldnames=post.keys())
-                        writer.writeheader()
-                    writer.writerow(post)
-                    num_posts += 1
-        elif parent_extension == "ndjson":
-            with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
-                for post in matching_posts:
+        kwargs = {"newline": ""} if parent_extension == "ndjson" else {}
 
-                    outfile.write(json.dumps(post) + "\n")
-                    num_posts += 1
-        else:
-            raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
+        # Check if we need to copy over annotations
+        copy_annotations = True if self.source_dataset.num_annotations() > 0 else False
+
+        with self.dataset.get_results_path().open("w", encoding="utf-8", **kwargs) as outfile:
+
+            writer = None
+            # Loop through all filtered posts. These ought to be the `original` object in case of a MappedItem; we're
+            # filtering, not changing the data (at least in principle).
+            for item in matching_items:
+
+                # We're only storing the original items here.
+                # We still need the mapped data for annotations.
+                item_original = item.original
+
+                # Save the actual item
+                if parent_extension == "csv":
+                    if not writer:
+                        writer = csv.DictWriter(outfile, fieldnames=item_original.keys())
+                        writer.writeheader()
+                    writer.writerow(item_original)
+                elif parent_extension == "ndjson":
+                    outfile.write(json.dumps(item_original) + "\n")
+                else:
+                    raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
+
+                if copy_annotations:
+                    self.item_ids.append(item.get("id", ""))
+
+                num_posts += 1
 
         if num_posts == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)
@@ -79,7 +95,7 @@ class BaseFilter(BasicProcessor):
         super().after_process()
 
         # Request standalone
-        self.create_standalone()
+        self.create_standalone(item_ids=self.item_ids)
 
     @classmethod
     def is_filter(cls):

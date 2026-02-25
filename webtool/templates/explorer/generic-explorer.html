@@ -1,0 +1,131 @@
+<!-- For the default template, we're registering a few common
+names for fields. The last encountered field in these lists will be used,
+so should be ordered in decreasing terms of importance. -->
+{%
+set all_known_fields = {
+	"author": ["author", "author_name", "author_fullname", "nickname"],
+	"time": ["created_utc", "timestamp", "time"],
+	"title": ["title", "subject"],
+	"body": ["body", "message"],
+	"media": ["image", "images", "image_url"],
+	"tags": ["hashtags", "tags"],
+	"views": ["views", "num_views"],
+	"likes": ["likes", "num_likes", "notes"],
+	"comments": ["num_comments", "reactions"],
+	"shares": ["shares", "num_shares"],
+	"url": ["url", "link_url", "item_url", "link"]
+}
+%}
+
+{% set fields = {} %}
+
+<!-- item ID and thread ID are always included -->
+{% set x=fields.__setitem__("id", item["id"]) %}
+{% set x=fields.__setitem__("thread_id", item["thread_id"]) %}
+
+<!-- Set all default field names for a item, as registered above -->
+{% for field, known_fields in all_known_fields.items() %}
+	{% for known_field in known_fields %}
+		{% if known_field in item and item[known_field] %}
+			{% set x=fields.__setitem__(field, item[known_field]) %}
+		{% endif %}
+	{% endfor %}
+{% endfor %}
+
+<!-- Possible external link, if not pseudonymised -->
+{% if fields.get("url") and pseudonymised %}
+	<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
+{% elif fields.get("url") and not pseudonymised %}
+	<a href="{{ fields.url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+{% endif %}
+
+
+<!-- item content-->
+<article>
+
+<!-- item header -->
+<header>
+	<span title="ID" class="id">{{ fields.get("id") }}</span>
+	{% if fields.get("thread_id") and fields["thread_id"] != fields.get("id") %}
+        <span title="Thread ID" class="thread_id">{{ fields["thread_id"] }}</span>
+    {% endif %}
+	
+	<!-- Author name -->
+	{% if pseudonymised %}
+		<span title="Pseudonymous author" class="author">
+		<i class="fa fa-user-secret tooltip-trigger"></i>
+	{% elif fields.get("author") %}
+		<span title="Author" class="author">
+		{{ fields["author"] }}
+	{% endif %}
+	</span>
+
+	<!-- item title -->
+	{% if "title" in item and item["title"] %}
+		<span class="title">{{item.title}}</span>
+	{% endif %}
+
+	<!-- item time -->
+	{% if fields.get("time") is integer %}
+		<span title="Date" class="datetime">{{ fields.get("time")|datetime('%Y-%m-%d %H:%M')|safe }}</span>
+	{% else %}
+		<span title="Date" class="datetime">{{ fields.get("time") }}</span>
+	{% endif %}
+
+</header>
+	<!-- Media item -->
+	{% if fields.get("media") %}
+	<!-- Split media urls if there's commas in the field -->
+	{% if fields["media"] is string and "," in fields["media"] %}
+		{% set media_urls = fields["media"].split(",") %}
+	{% else %}
+		{% set media_urls = [fields.get("media")] %}
+	{% endif %}
+	<div class="item-media">
+		{% for media_url in media_urls %}
+	        <a href="{{ media_url }}" target="_blank" rel="external">
+                <img src="{{ media_url }}"></a>
+	        </a>
+		{% endfor %}
+	</div>
+	{% endif %}
+
+	<!-- item body -->
+	<div class="item-content">
+        <p>
+		{{ fields.body }}
+        </p>
+	</div>
+
+	<!-- Tags -->
+	{% if fields.get("tags") %}
+		<div class="tags">
+			{{ fields.tags | safe }}
+		</div>
+	{% endif %}
+
+	<!-- Metrics: views, likes, shares, comments -->
+	<div class="metrics">
+		{% if fields.get("views") %}
+			<span class="views">
+				<i class="fa-solid fa-eye"></i> {{ fields.views | commafy }}
+			</span>
+		{% endif %}
+		{% if fields.get("likes") %}
+			<span class="likes">
+				<i class="fa-solid fa-heart"></i> {{ fields.likes | commafy }}
+			</span>
+		{% endif %}
+		{% if fields.get("shares") %}
+			<span class="shares">
+				<i class="fa-solid fa-share"></i> {{ fields.shares | commafy }}
+			</span>
+		{% endif %}
+		{% if fields.get("comments") %}
+			<span class="comments">
+				<i class="fa-solid fa-comment"></i> {{ fields.comments }}
+			</span>
+		{% endif %}
+	</div>
+
+</article>

@@ -1,6 +1,7 @@
 """
 Delete old items
 """
+
 import datetime
 import time
 import re
@@ -11,112 +12,181 @@ from common.lib.exceptions import DataSetNotFoundException, WorkerInterruptedExc
 
 from common.lib.user import User
 from common.config_manager import ConfigWrapper
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from common.lib.helpers import send_email
 
 
 class ThingExpirer(BasicWorker):
-	"""
-	Delete old items
+    """
+    Delete old items
 
-	Deletes expired datasets. This may be useful for two reasons: to conserve
-	disk space and if the user agreement of a particular data source does not
-	allow storing scraped or extracted data for longer than a given amount of
-	time, as is the case for e.g. Tumblr.
+    Deletes expired datasets. This may be useful for two reasons: to conserve
+    disk space and if the user agreement of a particular data source does not
+    allow storing scraped or extracted data for longer than a given amount of
+    time, as is the case for e.g. Tumblr.
 
-	Also deletes users that have an expiration date that is not zero. Users
-	with a close expiration date get a notification.
+    Also deletes users that have an expiration date that is not zero. Users
+    with a close expiration date get a notification.
 
-	Also deletes expired notifications.
-	"""
-	type = "expire-datasets"
-	max_workers = 1
+    Also deletes expired notifications.
+    """
 
-	ensure_job = {"remote_id": "localhost", "interval": 300}
+    type = "expire-datasets"
+    max_workers = 1
 
-	def work(self):
-		"""
-		Delete datasets, users and notifications
-		"""
+    expiry_notification_after_days = 7    
 
-		self.expire_datasets()
-		self.expire_users()
-		self.expire_notifications()
+    @classmethod
+    def ensure_job(cls, config=None):
+        """
+        Ensure that the expirer is always running
 
-		self.job.finish()
+        This is used to ensure that the expirer is always running, and if it is
+        not, it will be started by the WorkerManager.
 
-	def expire_datasets(self):
-		"""
-		Delete expired datasets
-		"""
-		# find candidates
-		# todo: make this better - this can be a lot of datasets!
-		datasets = self.db.fetchall("""
-			SELECT key FROM datasets
-			 WHERE parameters::json->>'keep' IS NULL
-		""")
+        :return:  Job parameters for the worker
+        """
+        return {"remote_id": "localhost", "interval": 1800}
 
-		for dataset in datasets:
-			if self.interrupted:
-				raise WorkerInterruptedException("Interrupted while expiring datasets")
+    def work(self):
+        """
+        Delete datasets, users and notifications
+        """
 
-			# the dataset creator's configuration context determines expiration
-			try:
-				dataset = DataSet(key=dataset["key"], db=self.db)
-				wrapper = ConfigWrapper(self.config, user=User.get_by_name(self.db, dataset.creator))
-				if dataset.is_expired(config=wrapper):
-					self.log.info(f"Deleting dataset {dataset.key} (expired)")
-					dataset.delete()
+        self.expire_datasets()
+        self.expire_users()
+        self.expire_notifications()
 
-			except DataSetNotFoundException:
-				# dataset already deleted I guess?
-				pass
+        self.job.finish()
 
-	def expire_users(self):
-		"""
-		Delete expired users
+    def expire_datasets(self):
+        """
+        Delete expired datasets
+        """
+        # find candidates
+        # todo: make this better - this can be a lot of datasets!
+        datasets = self.db.fetchall("""
+                                    SELECT *
+                                    FROM datasets
+                                    WHERE parameters::json->>'keep' IS NULL
+                                    AND key_parent = ''
+                                    """)
 
-		Users can have a `delete-after` parameter in their user data which
-		indicates a date or time after which the account should be deleted.
+        for dataset in datasets:
+            # we only check datasets with no parent, because child datasets
+            # inherit the ownership of the parent, and child datasets are
+            # deleted when the parent is deleted
+            if self.interrupted:
+                raise WorkerInterruptedException("Interrupted while expiring datasets")
 
-		The date can be in YYYY-MM-DD format or a unix (UTC) timestamp. If
-		the current date is after the given date the account is deleted. If the
-		expiration date is within 7 days a notification is added for the user
-		to warn them.
-		"""
-		expiring_users = self.db.fetchall("SELECT * FROM users WHERE userdata::json->>'delete-after' IS NOT NULL;")
-		now = datetime.datetime.now()
+            # the dataset creator's configuration context determines expiration
+            try:
+                dataset = DataSet(data=dataset, db=self.db, modules=self.modules)
+                wrapper = ConfigWrapper(
+                    self.config, user=User.get_by_name(self.db, dataset.creator)
+                )
+                if dataset.is_expired(config=wrapper):
+                    self.log.info(f"Deleting dataset {dataset.key} (expired)")
+                    dataset.delete(commit=False)
 
-		for expiring_user in expiring_users:
-			if self.interrupted:
-				raise WorkerInterruptedException("Interrupted while expiring users")
+            except DataSetNotFoundException:
+                # dataset already deleted I guess?
+                pass
 
-			user = User.get_by_name(self.db, expiring_user["name"], config=self.config)
-			username = user.data["name"]
+            finally:
+                self.db.commit()
 
-			# parse expiration date if available
-			delete_after = user.get_value("delete-after")
-			if not delete_after:
-				continue
+    def expire_users(self):
+        """
+        Delete expired users
 
-			if re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", str(delete_after)):
-				expires_at = datetime.datetime.strptime(delete_after, "%Y-%m-%d")
-			elif re.match(r"^[0-9]+$", str(delete_after)):
-				expires_at = datetime.datetime.fromtimestamp(int(delete_after))
-			else:
-				self.log.warning(f"User {username} has invalid expiration date {delete_after}")
-				continue
+        Users can have a `delete-after` parameter in their user data which
+        indicates a date or time after which the account should be deleted.
 
-			# check if expired...
-			if expires_at < now:
-				self.log.info(f"User {username} expired - deleting user and datasets")
-				user.delete()
-			else:
-				warning_notification = f"WARNING: This account will be deleted at <time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%-d %B %Y %H:%M')}</time>. Make sure to back up your data before then."
-				user.add_notification(warning_notification)
+        The date can be in YYYY-MM-DD format or a unix (UTC) timestamp. If
+        the current date is after the given date the account is deleted. If the
+        expiration date is within 7 days a notification is added for the user
+        to warn them.
+        """
+        expiring_users = self.db.fetchall(
+            "SELECT * FROM users WHERE userdata::json->>'delete-after' IS NOT NULL;"
+        )
+        now = datetime.datetime.now()
 
-	def expire_notifications(self):
-		"""
-		Delete expired notifications
+        for expiring_user in expiring_users:
+            if self.interrupted:
+                raise WorkerInterruptedException("Interrupted while expiring users")
 
-		Pretty simple!
-		"""
-		self.db.execute(f"DELETE FROM users_notifications WHERE timestamp_expires IS NOT NULL AND timestamp_expires < {time.time()}")
+            user = User(db=self.db, data=expiring_user, config=self.config)
+            username = user.data["name"]
+
+            # parse expiration date if available
+            delete_after = user.get_value("delete-after")
+            if not delete_after:
+                continue
+
+            if re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", str(delete_after)):
+                expires_at = datetime.datetime.strptime(delete_after, "%Y-%m-%d")
+            elif re.match(r"^[0-9]+$", str(delete_after)):
+                expires_at = datetime.datetime.fromtimestamp(int(delete_after))
+            else:
+                self.log.warning(
+                    f"User {username} has invalid expiration date {delete_after}"
+                )
+                continue
+
+            # check if expired...
+            if expires_at < now:
+                self.log.info(f"User {username} expired - deleting user and datasets")
+                user.delete(modules=self.modules)
+            else:
+                warning_notification = f'WARNING: This account will be deleted at <time datetime="{expires_at.strftime("%C")}">{expires_at.strftime("%-d %B %Y %H:%M")}</time>. Make sure to back up your data before then.'
+                user.add_notification(warning_notification)
+
+                # If the account will be deleted within 7 days, try sending an email
+                try:
+                    delta = expires_at - now
+                    if datetime.timedelta(0) <= delta <= datetime.timedelta(days=self.expiry_notification_after_days):
+                        if user.get_value("expiry-email-sent", default=False):
+                            # already sent
+                            continue
+
+                        # Ensure mail is configured on this server and username looks like an email
+                        if self.config.get('mail.server') and re.match(r"[^@]+@[^@]+\.[^@]+", username):
+                            msg = MIMEMultipart("alternative")
+                            msg["From"] = self.config.get('mail.noreply')
+                            msg["To"] = username
+                            msg["Subject"] = "4CAT account expiration warning"
+
+                            plain = (
+                                f"Your 4CAT account '{username}' is scheduled for deletion on {expires_at.strftime('%C')}.\n"
+                                "Please back up your data before then."
+                            )
+
+                            html = (
+                                f"<p>Your 4CAT account <strong>{username}</strong> is scheduled for deletion at "
+                                f"<time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%-d %B %Y %H:%M')}</time>.</p>"
+                                "<p>Please back up your data before then.</p>"
+                            )
+
+                            msg.attach(MIMEText(plain, "plain"))
+                            msg.attach(MIMEText(html, "html"))
+
+                            # send_email expects (recipient, message, mail_config)
+                            send_email([username], msg, self.config)
+                            # mark as sent
+                            user.set_value("expiry-email-sent", int(time.time()))
+                except Exception:
+                    # Don't let email failures interrupt the worker; just log
+                    self.log.warning(f"Failed to send expiration email to {username}")
+
+    def expire_notifications(self):
+        """
+        Delete expired notifications
+
+        Pretty simple!
+        """
+        self.db.execute(
+            f"DELETE FROM users_notifications WHERE timestamp_expires IS NOT NULL AND timestamp_expires < {time.time()}"
+        )

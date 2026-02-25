@@ -4,10 +4,13 @@ Import scraped RedNote data
 It's prohibitively difficult to scrape data from RedNote within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+import re
+
 from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.helpers import normalize_url_encoding
 
 
 class SearchRedNote(Search):
@@ -101,11 +104,13 @@ class SearchRedNote(Search):
 
         timestamp = item.get("time", None)
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item_id,
             "thread_id": item_id,
             "url": f"https://www.xiaohongshu.com/explore/{post['id']}{xsec_bit}",
             "title": item.get("display_title", ""),
             "body": item.get("desc", "") if "desc" in item else MissingMappedField(""),
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", item["desc"])) if "desc" in item else MissingMappedField(""),
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
             "author": item["user"]["nickname"],
             "author_avatar_url": item["user"]["avatar"],
@@ -136,14 +141,25 @@ class SearchRedNote(Search):
         image = note["imageList"][0]["urlDefault"]
         # permalinks need this token to work, else you get a 404 not found
         xsec_bit = f"?xsec_token={note['xsecToken']}"
-        timestamp = item.get("time", None)
+        timestamp = note.get("time", None)
+
+        if "interactInfo" in note:
+            likes = note["interactInfo"]["likedCount"]
+        elif "interact_info" in note:
+            likes = note["interact_info"]["liked_count"]
+        elif "likes" in note:
+            likes = note["likes"]
+        else:
+            likes = MissingMappedField("")
 
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item["id"],
             "thread_id": item["id"],
             "url": f"https://www.xiaohongshu.com/explore/{item['id']}{xsec_bit}",
             "title": note.get("title", ""),
             "body": note.get("desc", "") if "desc" in note else MissingMappedField(""),
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", note["desc"])) if "desc" in note else MissingMappedField(""),
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
             "author": note["user"]["nickname"],
             "author_avatar_url": note["user"]["avatar"],
@@ -151,7 +167,7 @@ class SearchRedNote(Search):
             "video_url": MissingMappedField(""),
             # only available when loading an individual post page, so skip
             # "tags": ",".join(t["name"] for t in item["tag_list"]),
-            "likes": item["interactInfo"]["likedCount"],
+            "likes": likes,
             # "collects": item["interact_info"]["collected_count"],
             # "comments": item["interact_info"]["comment_count"],
             # "shares": item["interact_info"]["share_count"],
@@ -169,11 +185,13 @@ class SearchRedNote(Search):
         :return MappedItem:
         """
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item["id"],
             "thread_id": item["id"],
             "url": f"https://www.xiaohongshu.com{item['url']}",
             "title": item["title"],
             "body": MissingMappedField(""),
+            "hashtags": MissingMappedField(""),
             "timestamp": MissingMappedField(""),
             "author": item["author_name"],
             "author_avatar_url": item["author_avatar_url"],

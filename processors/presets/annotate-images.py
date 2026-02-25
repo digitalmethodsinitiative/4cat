@@ -12,7 +12,7 @@ class AnnotateImages(ProcessorPreset):
     """
     type = "preset-annotate-images"  # job type ID
     category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Annotate images with Google Vision API"  # title displayed in UI
+    title = "Annotate images with Google Vision"  # title displayed in UI
     description = "Use the Google Vision API to extract labels detected in the most-linked images from the dataset. Note that " \
                   "this is a paid service and will count towards your API credit."
     extension = "csv"
@@ -22,39 +22,50 @@ class AnnotateImages(ProcessorPreset):
         "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)"
     ]
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Images to process (0 = all)",
-            "default": 10,
-            "tooltip": "Setting this to 0 (process all images) is NOT recommended unless you have infinite Google API"
-                       " credit."
-        },
-        "api_key": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "API Key",
-            "tooltip": "The API Key for your Google API account. You can generate and find this "
-                       "key on the API dashboard."
-        },
-        "features": {
-            "type": UserInput.OPTION_MULTI,
-            "help": "Features",
-            "options": {
-                "LABEL_DETECTION": "Label Detection",
-                "TEXT_DETECTION": "Text Detection",
-                "DOCUMENT_TEXT_DETECTION": "Document Text Detection",
-                "SAFE_SEARCH_DETECTION": "Safe Search Detection",
-                "FACE_DETECTION": "Facial Detection",
-                "LANDMARK_DETECTION": "Landmark Detection",
-                "LOGO_DETECTION": "Logo Detection",
-                "IMAGE_PROPERTIES": "Image Properties",
-                "CROP_HINTS": "Crop Hints",
-                "WEB_DETECTION": "Web Detection",
-                "OBJECT_LOCALIZATION": "Object Localization"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Images to process (0 = all)",
+                "default": 10,
+                "tooltip": "Setting this to 0 (process all images) is NOT recommended unless you have infinite Google API"
+                        " credit."
             },
-            "default": ["LABEL_DETECTION"]
+            "api_key": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "API Key",
+                "tooltip": "The API Key for your Google API account. You can generate and find this "
+                        "key on the API dashboard."
+            },
+            "features": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Features",
+                "options": {
+                    "LABEL_DETECTION": "Label Detection",
+                    "TEXT_DETECTION": "Text Detection",
+                    "DOCUMENT_TEXT_DETECTION": "Document Text Detection",
+                    "SAFE_SEARCH_DETECTION": "Safe Search Detection",
+                    "FACE_DETECTION": "Facial Detection",
+                    "LANDMARK_DETECTION": "Landmark Detection",
+                    "LOGO_DETECTION": "Logo Detection",
+                    "IMAGE_PROPERTIES": "Image Properties",
+                    "CROP_HINTS": "Crop Hints",
+                    "WEB_DETECTION": "Web Detection",
+                    "OBJECT_LOCALIZATION": "Object Localization"
+                },
+                "default": ["LABEL_DETECTION"]
+            }
         }
-    }
 
     @staticmethod
     def is_compatible_with(module=None, config=None):

@@ -33,52 +33,6 @@ class TfIdf(BasicProcessor):
 
 	followups = ["wordcloud"]
 
-	options = {
-		"library": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "scikit-learn",
-			"options": {"scikit-learn": "scikit-learn", "gensim": "gensim"},
-			"help": "Library",
-			"tooltip": "Which Python library should do the calculations? Gensim is better in optimising memory, so should be used for large datasets. Check the documentation in this module's references."
-		},
-		"max_output": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 10,
-			"min": 1,
-			"max": 100,
-			"help": "Words to return per timeframe"
-		},
-		"min_occurrences": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"min": 0,
-			"max": 10000,
-			"help": "[scikit-learn] Ignore terms that appear in less than this amount of documents",
-			"tooltip": "Useful for filtering out very sporadic terms. For instance, a value of 3 means that terms must appear in at least three documents (e.g. weekly data)."
-		},
-		"max_occurrences": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"min": 0,
-			"max": 10000,
-			"help": "[scikit-learn] Ignore terms that appear in more than this amount of documents",
-			"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months."
-		},
-		"n_size": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "",
-			"options": {"1":"unigrams (1)", "2": "bigrams (2)", "3": "trigrams", "1-2": "uni- and bigrams (1-2)", "1-3": "uni-, bi-, and trigrams (1-3)"},
-			"help": "[scikit-learn] Amount of words to return",
-			"tooltip":  "Selecting a range can be useful to e.g. extract multi-word nouns like names.",
-		},
-		"smartirs": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "nfc",
-			"help": "[gensim] SMART parameters",
-			"tooltip": "SMART is a mnemonic notation type for various tf-idf parameters. Check this module's references for more information."
-		}
-	}
-
 	references = [
 		"[Spärck Jones, Karen. 1972. \"A statistical interpretation of term specificity and its application in retrieval.\" *Journal of Documentation* (28), 1: 11–21.](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.115.8343&rep=rep1&type=pdf)",
 		"[Robertson, Stephen. 2004. \"Understanding Inverse Document value: On Theoretical arguments for IDF.\" *Journal of Documentation* (60), 5: 503–520](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.438.2284&rep=rep1&type=pdf)",
@@ -89,6 +43,67 @@ class TfIdf(BasicProcessor):
 		"[What is tf-idf? - William Scott](https://towardsdatascience.com/tf-idf-for-document-ranking-from-scratch-in-python-on-real-world-dataset-796d339a4089)",
 		"[SMART Information Retrieval System](https://en.wikipedia.org/wiki/SMART_Information_Retrieval_System)"
 	]
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"library": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "scikit-learn",
+				"options": {"scikit-learn": "scikit-learn", "gensim": "gensim"},
+				"help": "Library",
+				"tooltip": "Which Python library should do the calculations? Gensim is better in optimising memory, so should be used for large datasets. Check the documentation in this module's references."
+			},
+			"max_output": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 10,
+				"min": 1,
+				"max": 100,
+				"help": "Words to return per timeframe"
+			},
+			"min_occurrences": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"min": 0,
+				"max": 10000,
+				"help": "[scikit-learn] Ignore terms that appear in less than this amount of documents",
+				"tooltip": "Useful for filtering out very sporadic terms. For instance, a value of 3 means that terms must appear in at least three documents (e.g. weekly data).",
+				"requires": "library==scikit-learn"
+			},
+			"max_occurrences": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"min": 0,
+				"max": 10000,
+				"help": "[scikit-learn] Ignore terms that appear in more than this amount of documents",
+				"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months.",
+				"requires": "library==scikit-learn"
+			},
+			"n_size": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "",
+				"options": {"1":"unigrams (1)", "2": "bigrams (2)", "3": "trigrams", "1-2": "uni- and bigrams (1-2)", "1-3": "uni-, bi-, and trigrams (1-3)"},
+				"help": "[scikit-learn] Amount of words to return",
+				"tooltip":  "Selecting a range can be useful to e.g. extract multi-word nouns like names.",
+				"requires": "library==scikit-learn"
+			},
+			"smartirs": {
+				"type": UserInput.OPTION_TEXT,
+				"default": "nfc",
+				"help": "[gensim] SMART parameters",
+				"tooltip": "SMART is a mnemonic notation type for various tf-idf parameters. Check this module's references for more information.",
+				"requires": "library==gensim"
+			}
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):
@@ -116,7 +131,7 @@ class TfIdf(BasicProcessor):
 			n_size = (convert_to_int(n_size_split[0]), convert_to_int(n_size_split[1]))
 
 		min_occurrences = convert_to_int(self.parameters.get("min_occurrences", 1), 1)
-		max_occurrences = convert_to_int(self.parameters.get("min_occurrences", -1), -1)
+		max_occurrences = convert_to_int(self.parameters.get("max_occurrences", -1), -1)
 		max_output = convert_to_int(self.parameters.get("max_output", 10), 10)
 		smartirs = self.parameters.get("smartirs", "nfc")
 
@@ -126,31 +141,30 @@ class TfIdf(BasicProcessor):
 		dates = []
 
 		# Go through all archived token sets and generate collocations for each
-		for token_file in self.iterate_archive_contents(self.source_file):
-			if token_file.name == '.token_metadata.json':
+		for token_file in self.source_dataset.iterate_items():
+			if token_file.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
 			# Get the date
-			date_string = token_file.stem
+			date_string = token_file.file.stem
 			dates.append(date_string)
 
 			# we support both pickle and json dumps of vectors
-			token_unpacker = pickle if token_file.suffix == "pb" else json
+			token_unpacker = pickle if token_file.file.suffix == "pb" else json
 
 			try:
-				with token_file.open("rb") as binary_tokens:
+				with token_file.file.open("rb") as binary_tokens:
 					# these were saved as pickle dumps so we need the binary mode
-					post_tokens = token_unpacker.load(binary_tokens)
+					item_tokens = token_unpacker.load(binary_tokens)
 
 					# Flatten the list of list of tokens - we're treating the whole time series as one document.
-					post_tokens = list(itertools.chain.from_iterable(post_tokens))
+					item_tokens = list(itertools.chain.from_iterable(item_tokens))
 
 					# Add to all date's tokens
-					tokens.append(post_tokens)
+					tokens.append(item_tokens)
 
 			except UnicodeDecodeError:
-				self.dataset.update_status("Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.", is_final=True)
-				self.dataset.finish(0)
+				self.dataset.finish_with_error("Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.")
 				return
 
 		# Make sure `min_occurrences` and `max_occurrences` are valid
@@ -158,7 +172,8 @@ class TfIdf(BasicProcessor):
 			min_occurrences = len(tokens) - 1
 		if max_occurrences <= 0 or max_occurrences > len(tokens):
 			max_occurrences = len(tokens)
-
+		self.dataset.log(f"Running tf-idf with library {library}, n_size {n_size}, min_occurrences {min_occurrences}, max_occurrences {max_occurrences}, max_output {max_output}, smartirs {smartirs}")
+		
 		# Get the tf-idf matrix.
 		self.dataset.update_status("Generating tf-idf for token set")
 		try:
@@ -169,8 +184,7 @@ class TfIdf(BasicProcessor):
 				results = self.get_tfidf_sklearn(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
 								 max_occurrences=max_occurrences, top_n=max_output)
 			else:
-				self.dataset.update_status("Invalid library.")
-				self.dataset.finish(0)
+				self.dataset.finish_with_error("Invalid library.")
 				return
 
 			if results:
@@ -179,8 +193,8 @@ class TfIdf(BasicProcessor):
 				self.write_csv_items_and_finish(results)
 
 		except MemoryError:
-			self.dataset.update_status("Out of memory - dataset too large to run tf-idf analysis.")
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Out of memory - dataset too large to run tf-idf analysis.")
+			return
 
 	def get_tfidf_gensim(self, tokens, dates, top_n=25, smartirs="nfc"):
 		"""
@@ -240,15 +254,25 @@ class TfIdf(BasicProcessor):
 		"""
 
 		# Vectorise
-		self.dataset.update_status("Vectorizing")
-		tfidf_vectorizer = TfidfVectorizer(min_df=min_occurrences, max_df=max_occurrences, ngram_range=ngram_range,
-										   analyzer="word", token_pattern=None, tokenizer=lambda i: i, lowercase=False)
+		self.dataset.update_status("Vectorizing")\
+		# sklearn requires min_df >= 1 (int) or [0.0, 1.0] (float). Coerce 0 -> 1.
+		min_df = 1 if isinstance(min_occurrences, int) and min_occurrences <= 0 else min_occurrences
+
+		tfidf_vectorizer = TfidfVectorizer(
+			min_df=min_df, 
+			max_df=max_occurrences, 
+			ngram_range=ngram_range,
+			analyzer="word", 
+			token_pattern=None, 
+			tokenizer=lambda i: i, 
+			lowercase=False
+			)
 
 		try:
 			tfidf_matrix = tfidf_vectorizer.fit_transform(tokens)
-		except ValueError:
-			self.dataset.update_status("No tokens remain with these parameters. Set less strict constraints and try again.", is_final=True)
-			self.dataset.finish(0)
+		except ValueError as e:
+			self.dataset.log(f"sklearn ValueError: {e!r}")
+			self.dataset.finish_with_error("No tokens remain with these parameters. Set less strict constraints and try again.")
 			return
 
 		np.array(tfidf_vectorizer.get_feature_names_out())

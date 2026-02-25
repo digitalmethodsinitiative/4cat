@@ -12,9 +12,9 @@ class AnnotationMetadata(BasicProcessor):
 	"""
 	type = "annotation-metadata"  # job type ID
 	category = "Metrics"  # category
-	title = "Annotation metadata"  # title displayed in UI
-	description = ("Download metadata about annotations for this dataset. "
-				   "Includes information like annotation author, timestamp, type, etc.") # description displayed in UI
+	title = "Export annotations"  # title displayed in UI
+	description = ("Download annotations and their metadata for this dataset. "
+				   "Includes annotation author, timestamp, type, etc.") # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -33,7 +33,8 @@ class AnnotationMetadata(BasicProcessor):
 		annotation_metadata = self.source_dataset.get_annotation_metadata()
 
 		if not annotation_metadata:
-			self.dataset.finish_with_error("No annotations made for this dataset")
+			self.dataset.finish_as_empty("No annotations made for this dataset")
+			return
 
 		for row in annotation_metadata:
 			timestamp = row["timestamp"]

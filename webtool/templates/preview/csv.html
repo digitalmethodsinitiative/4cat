@@ -7,7 +7,7 @@
 </head>
 <body class="csv-preview">
 {% if dataset.num_rows > max_items %}
-<p class="warning">Note: only the first {{ "{:,}".format(max_items) }} of {{ "{:,}".format(dataset.num_rows) }} total items of this dataset are shown in this preview (~{{ ((max_items / dataset.num_rows) * 100)|round(0)|int }}%). Download the dataset file for the rest of the data.</p>
+<p class="warning-text">Note: only the first {{ "{:,}".format(max_items) }} of {{ "{:,}".format(dataset.num_rows) }} total items of this dataset are shown in this preview (~{{ ((max_items / dataset.num_rows) * 100)|round(0)|int }}%). Download the dataset file for the rest of the data.</p>
 {% endif %}
 <table>
     {% set ns = namespace(links=[]) %}
@@ -25,7 +25,9 @@
                     {% if column == "missing_fields" %} class="missing-field-meta tooltip-trigger" aria-controls="tooltip-missing-field-explainer"
                     {% elif column in row.missing_fields %} class="missing-field tooltip-trigger" aria-controls="tooltip-missing-field"{% endif %}
             >
-                {{ cell|e|add_ahref(ellipsiate=50)|add_colour|safe }}
+            {% autoescape false %}
+                {{ cell|e|replace("\n","<br>\n")|add_ahref(ellipsiate=50)|add_colour|safe }}
+            {% endautoescape %}
             </t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}>
         {% endfor %}
         </tr>

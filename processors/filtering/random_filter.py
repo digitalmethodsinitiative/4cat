@@ -5,6 +5,7 @@ import random
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -21,14 +22,24 @@ class RandomFilter(BaseFilter):
 	title = "Random sample"  # title displayed in UI
 	description = "Retain a pseudorandom set of posts. This creates a new dataset."  # description displayed in UI
 
-	# the following determines the options available to the user via the 4CAT interface
-	options = {
-		"sample_size": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Sample size",
-			"default": ""
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"sample_size": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Sample size",
+				"default": ""
+			}
 		}
-	}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):
@@ -56,6 +67,7 @@ class RandomFilter(BaseFilter):
 
 		if not dataset_size:
 			self.dataset.finish_with_error("Could not retrieve the amount of rows for the parent dataset")
+			return
 		dataset_size = int(dataset_size)
 
 		# Get the amount of rows to sample
@@ -64,16 +76,13 @@ class RandomFilter(BaseFilter):
 		try:
 			sample_size = int(sample_size)
 		except ValueError:
-			self.dataset.update_status("Use a valid integer as a sample size", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Use a valid integer as a sample size")
 			return
 		if not sample_size:
-			self.dataset.update_status("Invalid sample size %s" % sample_size, is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Invalid sample size %s" % sample_size)
 			return
 		elif sample_size > dataset_size:
-			self.dataset.update_status("The sample size can't be larger than the dataset size", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("The sample size can't be larger than the dataset size")
 			return
 
 		# keep some stats
@@ -83,7 +92,7 @@ class RandomFilter(BaseFilter):
 		match_row = posts_to_keep[0]  # The row count of the first matching row
 
 		# Iterate through posts and keep those in the match list
-		for mapped_item in self.source_dataset.iterate_items(processor=self):
+		for mapped_item in self.source_dataset.iterate_items(processor=self, get_annotations=False):
 
 			# Yield on match
 			if count == match_row:
@@ -91,9 +100,28 @@ class RandomFilter(BaseFilter):
 				if count != (dataset_size - 1) and written < sample_size:
 					match_row = posts_to_keep[written]
 
-				yield mapped_item.original
+				yield mapped_item
 
 				if written % max(int(sample_size/10), 1) == 0:
 					self.dataset.update_status("Wrote %i posts" % written)
 
 			count += 1
+
+
+	@staticmethod
+	def validate_query(query, request, config):
+		"""
+		Validate input
+
+		Checks if everything needed is filled in.
+
+		:param query:
+		:param request:
+		:param config:
+		:return:
+		"""
+
+		if not query["sample_size"] or not query["sample_size"].isnumeric() or not int(query["sample_size"]) > 0:
+			raise QueryParametersException("Please enter a valid sample size.")
+
+		return query

@@ -25,10 +25,20 @@ class TempFileCleaner(BasicWorker):
     type = "clean-temp-files"
     max_workers = 1
 
-    ensure_job = {"remote_id": "localhost", "interval": 10800}
-
     # Use tracking file to delay deletion of files that may still be in use
     days_to_keep = 7
+
+    @classmethod
+    def ensure_job(cls, config=None):
+        """
+        Ensure that the temp file cleaner is always running
+
+        This is used to ensure that the temp file cleaner is always running, and
+        if it is not, it will be started by the WorkerManager.
+
+        :return:  Job parameters for the worker
+        """
+        return {"remote_id": "localhost", "interval": 10800}
 
     def work(self):
         """
@@ -43,6 +53,9 @@ class TempFileCleaner(BasicWorker):
         else:
             tracked_files = json.loads(tracking_file.read_text())
 
+        # Get 4CAT paths to avoid if they are mapped inside PATH_DATA
+        fourcat_paths = [self.config.get(p) for p in self.config.get_all_setting_names() if p.startswith('PATH_')]
+
         result_files = Path(self.config.get('PATH_DATA')).glob("*")
         for file in result_files:
             if file.stem.startswith("."):
@@ -52,6 +65,10 @@ class TempFileCleaner(BasicWorker):
             if self.interrupted:
                 tracking_file.write_text(json.dumps(tracked_files))
                 raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")
+            
+            # Check if the file is inside any of the 4CAT paths
+            if any(file == fourcat_path or file.is_relative_to(fourcat_path) for fourcat_path in fourcat_paths):
+                continue
 
             # the key of the dataset files belong to can be extracted from the
             # file name in a predictable way.
@@ -65,7 +82,7 @@ class TempFileCleaner(BasicWorker):
             key = possible_keys.pop()
 
             try:
-                dataset = DataSet(key=key, db=self.db)
+                dataset = DataSet(key=key, db=self.db, modules=self.modules)
             except DataSetException:
                 # the dataset has been deleted since, but the result file still
                 # exists - should be safe to clean up

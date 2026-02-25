@@ -19,20 +19,31 @@ class TwitterUserVisibility(BasicProcessor):
     Collect User stats as both author and mention.
     """
     type = "twitter-user-visibility"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "User Visibility"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "User visibility"  # title displayed in UI
     description = "Collects usernames and totals how many tweets are authored by the user and how many tweets mention the user"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    options = {
-                  "timeframe": {
-                      "type": UserInput.OPTION_CHOICE,
-                      "default": "month",
-                      "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                                  "hour": "Hour", "minute": "Minute"},
-                      "help": "Produce counts per"
-                  }
-    }
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
+                            "hour": "Hour", "minute": "Minute"},
+                "help": "Produce counts per"
+            }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

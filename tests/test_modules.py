@@ -18,10 +18,11 @@ def mock_database():
     """
     Mock the database connection.
     """
-    with patch("common.config_manager.Database") as mock_database, \
-         patch("backend.lib.worker.Database") as mock_database:
+    with patch("common.config_manager.Database") as mock_cfg_db, \
+         patch("backend.lib.worker.Database") as mock_worker_db:
         mock_database_instance = MagicMock()
-        mock_database.return_value = mock_database_instance
+        mock_cfg_db.return_value = mock_database_instance
+        mock_worker_db.return_value = mock_database_instance
         yield mock_database_instance
 
 @pytest.fixture
@@ -37,6 +38,8 @@ def mock_basic_config(tmp_path, mock_database):
             "PATH_ROOT": PATH_ROOT,
             "PATH_DATA": PATH_ROOT,
             "PATH_LOGS": PATH_ROOT / "logs",
+            "PATH_EXTENSIONS": PATH_ROOT / "config/extensions",
+            "extensions.enabled": {},
         }.get(key, default))
     mocked_basic_config.load_user_settings = MagicMock()
     # Create necessary directories
@@ -217,6 +220,11 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
                 # Log the failure and add it to the failures list
                 logger.error(f"Processor {processor_name} failed in get_options: {e}")
                 failures.append((processor_name, str(e)))
+
+            # Check if processor Class has "options" attribute
+            if hasattr(processor_class, "options"):
+                logger.error(f"{processor_name} has deprecated 'options' attribute; use get_options() method instead.")
+                failures.append((processor_name, "'options' attribute is deprecated"))
 
             # Check if the processor can be instantiated
             try:

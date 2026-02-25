@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   id                     BIGSERIAL PRIMARY KEY,
   jobtype                text    DEFAULT 'misc',
   remote_id              text,
+  queue_id               text DEFAULT '',
   details                text,
   timestamp              integer,
   timestamp_after        integer DEFAULT 0,
@@ -36,6 +37,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
     remote_id
   );
 
+CREATE INDEX IF NOT EXISTS job_queue ON jobs (queue_id);
 
 -- queries
 CREATE TABLE IF NOT EXISTS datasets (
@@ -74,7 +76,6 @@ CREATE INDEX datasets_owners_key ON datasets_owners (key);
 CREATE TABLE IF NOT EXISTS annotations (
   id                SERIAL PRIMARY KEY,
   dataset           TEXT,
-  from_dataset      TEXT,
   field_id          TEXT,
   item_id           TEXT,
   timestamp         INT DEFAULT 0,
@@ -86,7 +87,8 @@ CREATE TABLE IF NOT EXISTS annotations (
   author            TEXT,
   author_original   TEXT,
   by_processor      BOOLEAN DEFAULT FALSE,
-  metadata          TEXT
+  metadata          TEXT,
+  from_dataset      TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS annotation_id
@@ -167,10 +169,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_favourite
 -- notifications
 CREATE TABLE IF NOT EXISTS users_notifications (
     id                  SERIAL PRIMARY KEY,
+    canonical_id        TEXT DEFAULT '',
+    version_match       TEXT DEFAULT '',
     username            TEXT,
     notification        TEXT,
+    notification_long   TEXT DEFAULT '',
     timestamp_expires   INTEGER,
-    allow_dismiss       BOOLEAN DEFAULT TRUE
+    allow_dismiss       BOOLEAN DEFAULT TRUE,
+    is_dismissed        BOOLEAN DEFAULT FALSE
 );
 
 CREATE INDEX IF NOT EXISTS users_notifications_name
@@ -180,7 +186,7 @@ CREATE INDEX IF NOT EXISTS users_notifications_name
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_notifications_unique
   ON users_notifications (
-    username, notification
+    canonical_id, username, notification
   );
 
 -- used to quickly update table counts
@@ -202,5 +208,6 @@ INSERT INTO settings (name, value, tag) VALUES
   ('privileges.admin.can_manage_tags', 'true', 'admin'),
   ('privileges.admin.can_restart', 'true', 'admin'),
   ('privileges.admin.can_manipulate_all_datasets', 'true', 'admin'),
+  ('privileges.admin.can_manage_extensions', 'true', 'admin'),
   ('privileges.can_view_all_datasets', 'true', 'admin'),
   ('privileges.can_view_private_datasets', 'true', 'admin');

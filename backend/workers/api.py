@@ -3,6 +3,8 @@ import time
 import json
 
 from backend.lib.worker import BasicWorker
+from common.lib.job import Job
+from common.lib.exceptions import JobNotFoundException
 
 
 class InternalAPI(BasicWorker):
@@ -12,10 +14,20 @@ class InternalAPI(BasicWorker):
 	type = "api"
 	max_workers = 1
 
-	ensure_job = {"remote_id": "localhost"}
-
 	host = None
 	port = None
+
+	@classmethod
+	def ensure_job(cls, config=None):
+		"""
+		Ensure that the API worker is always running
+
+		This is used to ensure that the API worker is always running, and if it
+		is not, it will be started by the WorkerManager.
+
+		:return:  Job parameters for the worker
+		"""
+		return {"remote_id": "localhost"}
 
 	def work(self):
 		"""
@@ -159,11 +171,13 @@ class InternalAPI(BasicWorker):
 		if request == "cancel-job":
 			# cancel a running job
 			payload = payload.get("payload", {})
-			remote_id = payload.get("remote_id")
-			jobtype = payload.get("jobtype")
 			level = payload.get("level", BasicWorker.INTERRUPT_RETRY)
+			try:
+				job = Job.get_by_remote_ID(jobtype=payload.get("jobtype"), remote_id=payload.get("remote_id"), database=self.db)
+			except JobNotFoundException:
+				return {"error": "Job not found"}
 
-			self.manager.request_interrupt(remote_id=remote_id, jobtype=jobtype, interrupt_level=level)
+			self.manager.request_interrupt(job=job, interrupt_level=level)
 			return "OK"
 
 		elif request == "workers":
@@ -219,22 +233,36 @@ class InternalAPI(BasicWorker):
 			# all jobs plus, for those that are currently active, some worker
 			# info as well as related datasets. useful to monitor server
 			# activity and judge whether 4CAT can safely be interrupted
-			open_jobs = self.db.fetchall("SELECT jobtype, timestamp, timestamp_claimed, timestamp_lastclaimed, interval, remote_id FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
+			open_jobs = self.db.fetchall(
+				"SELECT jobtype, queue_id, timestamp, timestamp_claimed, timestamp_lastclaimed, interval, remote_id "
+				"FROM jobs ORDER BY queue_id ASC, jobtype ASC, timestamp ASC, remote_id ASC"
+			)
 			running = []
 			queue = {}
 
 			for job in open_jobs:
-				try:
-					worker = list(filter(lambda worker: worker.job.data["jobtype"] == job["jobtype"] and worker.job.data["remote_id"] == job["remote_id"], self.manager.worker_pool.get(job["jobtype"], [])))[0]
-				except IndexError:
-					worker = None
+				# find the worker for this job, if it exists
+				queue_key = job["queue_id"]
+				jobtype = job["jobtype"]
 
-				if not bool(worker):
-					if job["jobtype"] not in queue:
-						queue[job["jobtype"]] = 0
-
-					queue[job["jobtype"]] += 1
+				worker = None
+				for candidate in self.manager.worker_pool.get(queue_key, []):
+					candidate_data = candidate.job.data
+					if (
+						candidate_data.get("remote_id") == job["remote_id"]
+						# can be various jobtypes in same queue (and theoretically remote_id could be same across jobtypes)
+						and candidate_data.get("jobtype") == jobtype
+					):
+						worker = candidate
+						break
+				
+				is_claimed = job["timestamp_claimed"] > 0
+				if not is_claimed and not worker:
+					if jobtype not in queue:
+						queue[jobtype] = 0
+					queue[jobtype] += 1
 				else:
+					# Claimed or has worker
 					if hasattr(worker, "dataset") and worker.dataset:
 						running_key = worker.dataset.key
 						running_user = worker.dataset.creator
@@ -245,17 +273,19 @@ class InternalAPI(BasicWorker):
 						running_parent = None
 
 					running.append({
-						"type": job["jobtype"],
-						"is_claimed": job["timestamp_claimed"] > 0,
+						"type": jobtype,
+						"queue_id": queue_key,
+						"is_claimed": is_claimed,
 						"is_running": bool(worker),
 						"is_processor": hasattr(worker, "dataset"),
 						"is_recurring": (int(job["interval"]) > 0),
-						"is_maybe_crashed": job["timestamp_claimed"] > 0 and not worker,
+						"is_maybe_crashed": is_claimed and not bool(worker),
 						"dataset_key": running_key,
 						"dataset_user": running_user,
 						"dataset_parent_key": running_parent,
 						"timestamp_queued": job["timestamp"],
-						"timestamp_claimed": job["timestamp_lastclaimed"]
+						"timestamp_claimed": job["timestamp_claimed"],
+						"timestamp_lastclaimed": job["timestamp_lastclaimed"],
 					})
 
 			return {

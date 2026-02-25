@@ -64,7 +64,7 @@ class ModuleCollector:
                 if hasattr(worker, "config") and type(worker.config) is dict:
                     module_config.update(worker.config)
 
-            with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+            with config.get("PATH_CONFIG").joinpath("module_config.bin").open("wb") as outfile:
                 pickle.dump(module_config, outfile)
 
         # load from cache
@@ -102,70 +102,84 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
-        extension_path = Path(self.config.get('PATH_ROOT'), "extensions")
+        extension_path = self.config.get('PATH_EXTENSIONS')
+        enabled_extensions = [e for e, s in self.config.get("extensions.enabled").items() if s["enabled"]]
 
-        paths = [Path(self.config.get('PATH_ROOT'), "processors"),
-                 Path(self.config.get('PATH_ROOT'), "backend", "workers"),
+        paths = [self.config.get('PATH_ROOT').joinpath("processors"),
+                 self.config.get('PATH_ROOT').joinpath("backend/workers"),
                  extension_path,
                  *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
 
         root_match = re.compile(r"^%s" % re.escape(str(self.config.get('PATH_ROOT'))))
-        root_path = Path(self.config.get('PATH_ROOT'))
+        root_path = self.config.get('PATH_ROOT')
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
             is_extension = extension_path in folder.parents or folder == extension_path
-            for file in folder.rglob("*.py"):
-                # determine module name for file
-                # reduce path to be relative to 4CAT root
-                module_name = ".".join(file.parts[len(root_path.parts):-1] + (file.stem,))
-
-                # check if we've already loaded this module
-                if module_name in self.ignore:
-                    continue
-
-                if module_name in sys.modules:
-                    # This skips processors/datasources that were loaded by others and may not yet be captured
-                    pass
-
-                # try importing
-                try:
-                    module = importlib.import_module(module_name)
-                except (SyntaxError, ImportError) as e:
-                    # this is fine, just ignore this data source and give a heads up
-                    self.ignore.append(module_name)
-                    key_name = e.name if hasattr(e, "name") else module_name
-                    if key_name not in self.missing_modules:
-                        self.missing_modules[key_name] = [module_name]
-                    else:
-                        self.missing_modules[key_name].append(module_name)
-                    continue
-
-                # see if module contains the right type of content by looping
-                # through all of its members
-                components = inspect.getmembers(module, predicate=self.is_4cat_class)
-                for component in components:
-                    if component[1].type in self.workers:
-                        # already indexed
+            for root, dirs, files in os.walk(folder, followlinks=True):
+                for filename in files:
+                    if not filename.endswith('.py'):
                         continue
 
-                    # extract data that is useful for the scheduler and other
-                    # parts of 4CAT
-                    relative_path = root_match.sub("", str(file))
+                    file = Path(root) / filename
 
-                    self.workers[component[1].type] = component[1]
-                    self.workers[component[1].type].filepath = relative_path
-                    self.workers[component[1].type].is_extension = is_extension
+                    # determine module name for file
+                    # reduce path to be relative to 4CAT root
+                    module_name = ".".join(file.parts[len(root_path.parts):-1] + (file.stem,))
+                    extension_name = file.parts[len(extension_path.parts):][0] if is_extension else None
 
-                    # we can't use issubclass() because for that we would need
-                    # to import BasicProcessor, which would lead to a circular
-                    # import
-                    if self.is_4cat_class(component[1], only_processors=True):
-                        self.processors[component[1].type] = self.workers[component[1].type]
+                    # check if we've already loaded this module
+                    if module_name in self.ignore:
+                        continue
+
+                    if module_name in sys.modules:
+                        # This skips processors/datasources that were loaded by others and may not yet be captured
+                        pass
+
+                    if is_extension and len(module_name.split(".")) > 1 and extension_name not in enabled_extensions:
+                        continue
+
+                    # try importing
+                    try:
+                        module = importlib.import_module(module_name)
+                    except (SyntaxError, ImportError) as e:
+                        # this is fine, just ignore this data source and give a heads up
+                        self.ignore.append(module_name)
+                        key_name = e.name if hasattr(e, "name") else module_name
+                        if key_name not in self.missing_modules:
+                            self.missing_modules[key_name] = [module_name]
+                        else:
+                            self.missing_modules[key_name].append(module_name)
+                        continue
+
+                    # see if module contains the right type of content by looping
+                    # through all of its members
+                    components = inspect.getmembers(module, predicate=self.is_4cat_class)
+                    for component in components:
+                        if component[1].type in self.workers:
+                            # already indexed
+                            continue
+
+                        # extract data that is useful for the scheduler and other
+                        # parts of 4CAT
+                        relative_path = root_match.sub("", str(file))
+
+                        self.workers[component[1].type] = component[1]
+                        self.workers[component[1].type].filepath = relative_path
+                        self.workers[component[1].type].is_extension = is_extension
+                        if is_extension:
+                            self.workers[component[1].type].extension_name = extension_name
+
+                        # we can't use issubclass() because for that we would need
+                        # to import BasicProcessor, which would lead to a circular
+                        # import
+                        if self.is_4cat_class(component[1], only_processors=True):
+                            self.processors[component[1].type] = self.workers[component[1].type]
 
         # sort by category for more convenient display in interfaces
         sorted_processors = {id: self.processors[id] for id in
                              sorted(self.processors)}
+
         categorised_processors = {id: sorted_processors[id] for id in
                                   sorted(sorted_processors,
                                          key=lambda item: "0" if sorted_processors[item].category == "Presets" else
@@ -196,7 +210,7 @@ class ModuleCollector:
             Load a single datasource
             """
             # determine module name (path relative to 4CAT root w/ periods)
-            module_name = ".".join(subdirectory.relative_to(Path(self.config.get("PATH_ROOT"))).parts)
+            module_name = ".".join(subdirectory.relative_to(self.config.get("PATH_ROOT")).parts)
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
@@ -215,20 +229,25 @@ class ModuleCollector:
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
                 "init": datasource.init_datasource,
-                "config": {} if not hasattr(datasource, "config") else datasource.config
+                "config": {} if not hasattr(datasource, "config") else datasource.config,
+                "explorer-templates": self.load_datasource_explorer_templates(datasource_id, subdirectory)
             }
-
-        expiration = self.config.get("datasources.expiration", {})
 
         # Load 4CAT core datasources
         expiration = self.config.get("datasources.expiration", {})
-        for subdirectory in Path(self.config.get('PATH_ROOT'), "datasources").iterdir():
+        for subdirectory in self.config.get('PATH_ROOT').joinpath("datasources").iterdir():
             if subdirectory.is_dir():
                 _load_datasource(subdirectory, expiration)
 
         # Load extension datasources
         # os.walk is used to allow for the possibility of multiple extensions, with nested "datasources" folders
-        for root, dirs, files in os.walk(Path(self.config.get('PATH_ROOT'), "extensions"), followlinks=True):
+        enabled_extensions = [e for e, s in self.config.get("extensions.enabled").items() if s["enabled"]]
+        extensions_root = self.config.get('PATH_EXTENSIONS')
+        for root, dirs, files in os.walk(extensions_root, followlinks=True):
+            relative_root = Path(root).relative_to(extensions_root)
+            if relative_root.parts and relative_root.parts[0] not in enabled_extensions:
+                continue
+
             if "datasources" in dirs:
                 for subdirectory in Path(root, "datasources").iterdir():
                     if subdirectory.is_dir():
@@ -254,6 +273,57 @@ class ModuleCollector:
                                                                       "%s-search" % datasource_id].get_options(
                                                                  config=self.config))
             self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_zeeschuimer") and worker.is_from_zeeschuimer
+
+    def load_datasource_explorer_templates(self, datasource_id, datasource_path):
+        """
+        Find CSS and HTML template file paths for a datasource
+        
+        Looks for templates in multiple locations:
+        - Within the datasource folder itself
+        - In config/extensions/ (for extensions)
+        
+        :param datasource_id: The datasource identifier
+        :param datasource_path: Path to the datasource folder
+        :return: Dictionary with 'css' and 'html' keys containing template file paths
+        """
+        templates = {"css": None, "html": None}
+        
+        # Look for CSS template
+        css_filename = f"{datasource_id}-explorer.css"
+        
+        # Check within datasource folder
+        datasource_css = datasource_path / css_filename
+        if datasource_css.exists():
+            templates["css"] = datasource_css
+        
+        # Check extensions folder
+        if not templates["css"]:
+            extensions_path = self.config.get('PATH_EXTENSIONS')
+            if extensions_path.exists():
+                for root, dirs, files in os.walk(extensions_path, followlinks=True):
+                    if css_filename in files:
+                        templates["css"] = Path(root) / css_filename
+                        break
+        
+        # Look for HTML template
+        html_filename = f"{datasource_id}-explorer.html"
+        
+        # Check within datasource folder
+        datasource_html = datasource_path / html_filename
+        if datasource_html.exists():
+            templates["html"] = datasource_html
+            return templates
+
+        # Check extensions folder
+        if not templates["html"]:
+            extensions_path = self.config.get('PATH_EXTENSIONS')
+            if extensions_path.exists():
+                for root, dirs, files in os.walk(extensions_path, followlinks=True):
+                    if html_filename in files:
+                        templates["html"] = Path(root) / html_filename
+                        break
+        
+        return templates
 
     def load_worker_class(self, worker):
         """

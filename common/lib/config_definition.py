@@ -39,6 +39,19 @@ config_definition = {
                    "setting.",
         "indirect": True
     },
+    # Extensions
+    "extensions._intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT extensions can be disabled and disabled via the control below. When enabled, extensions may "
+                "define further settings that can typically be configured via the extension's tab on the left side of "
+                "this page. **Note that 4CAT needs to be restarted for this to take effect!**"
+    },
+    "extensions.enabled": {
+        "type": UserInput.OPTION_EXTENSIONS,
+        "default": {},
+        "help": "Extensions",
+        "global": True
+    },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
     # notice may also show up in the web interface regardless of the value entered here.
@@ -151,6 +164,12 @@ config_definition = {
         "help": "Can restart/upgrade",
         "tooltip": "Controls whether users can restart, upgrade, and manage extensions 4CAT via the Control Panel"
     },
+    "privileges.admin.can_manage_extensions": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can manage extensions",
+        "tooltip": "Controls whether users can install and uninstall 4CAT extensions via the Control Panel"
+    },
     "privileges.can_upgrade_to_dev": {
         # this is NOT an admin privilege, because all admins automatically
         # get all admin privileges! users still need the above privilege
@@ -189,9 +208,10 @@ config_definition = {
         "type": UserInput.OPTION_TEXT,
         "default": "https://ping.4cat.nl",
         "help": "Phone home URL",
-        "tooltip": "This URL is called once - when 4CAT is installed. If the installing user consents, information "
-                   "is sent to this URL to help the 4CAT developers (the Digital Methods Initiative) keep track of how "
-                   "much it is used. There should be no need to change this URL after installation.",
+        "tooltip": "This URL is called when 4CAT is installed, if the user consents, to help the 4CAT developers (the "
+                   "Digital Methods Initiative) keep track of how much it is used. Later, notifications for 4CAT "
+                   "admins are fetched from this URL to inform them about important changes and update procedures. If "
+                   "you want to disable this functionality, leave this field empty.",
         "global": True
     },
     "4cat.phone_home_asked": {
@@ -281,6 +301,12 @@ config_definition = {
         "tooltip": "Per proxy, this many requests can run concurrently per host. Should be lower than or equal to the "
                    "overall limit."
     },
+    "proxies.allow-localhost-fallback": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Fall back to localhost",
+        "tooltip": "If all proxies are down, allow falling back to direct requests (i.e., no proxy)."
+    },
     # logging
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
@@ -357,17 +383,17 @@ config_definition = {
     "explorer.max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
-        "help": "Amount of posts",
+        "help": "Amount of items",
         "coerce_type": int,
-        "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
+        "tooltip": "Maximum number of items to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
     "explorer.posts_per_page": {
         "type": UserInput.OPTION_TEXT,
         "default": 50,
-        "help": "Posts per page",
+        "help": "Items per page",
         "coerce_type": int,
-        "tooltip": "Number of posts to display per page"
+        "tooltip": "Number of items to display per page"
     },
     "explorer.config_explanation": {
         "type": UserInput.OPTION_INFO,
@@ -394,12 +420,11 @@ config_definition = {
     },
     "flask.server_name": {
         "type": UserInput.OPTION_TEXT,
-        "default": "4cat.local:5000",
+        "default": "localhost:5000",
         "help": "Host name",
-        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost; when running 4CAT in Docker this "
-                   "setting is ignored as any domain/port binding should be handled outside of the Docker container"
-                   "; the Docker container itself will serve on any domain name on the port configured in the .env "
-                   "file.",
+        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Include a port when not using 80 (HTTP) or 443 (HTTPS), or "
+                   "when your reverse proxy forwards on a non-standard port. This value is passed to Flask’s SERVER_NAME. "
+                   "Restart the front-end for changes to apply.",
         "global": True
     },
     "flask.autologin.hostnames": {
@@ -530,6 +555,69 @@ config_definition = {
         },
         "global": True
     },
+
+    # LLM Server settings
+    # allows 4CAT LLM processors to connect to a local or remote LLM server
+    "llm.intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "4CAT LLM processors allow users to utilize common APIs (e.g. OpenAI, Google, Anthropic) as well as connect "
+                "to local or remote LLM servers. You can also set up your own LLM server using open source software such as "
+                "[Ollama](https://ollama.com/) and connect 4CAT to it using the settings below for your users."
+    },
+    "llm.host_name": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "4CAT LLM Server",
+        "help": "Name of LLM Server in UI",
+        "tooltip": "The name that will be shown to users in the interface when selecting an LLM server (or API or custom).",
+        "global": True
+    },
+    "llm.provider_type": {
+        "type": UserInput.OPTION_CHOICE,
+        "help": "LLM Provider Type",
+        "default": "none",
+        "options": {
+            "ollama": "Ollama",
+            "none": "None",
+        },
+        "global": True,
+    },
+    "llm.server": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "LLM Server URL",
+        "tooltip": "The URL of the LLM server, e.g. http://localhost:5000",
+        "global": True
+    },
+    "llm.auth_type": {
+        "type": UserInput.OPTION_TEXT,
+        "help": "LLM Server Authentication Type",
+        "default": "",
+        "tooltip": "The authentication type required to connect to the server (e.g. 'X-API-KEY', 'Authorization'). Passed in the request header with the API key.",
+        "global": True,
+    },
+    "llm.api_key": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "LLM Server API Key",
+        "tooltip": "The API key to access the LLM server, if required.",
+        "global": True
+    },
+    "llm.available_models": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": {},
+        "help": "Available LLM models",
+        "tooltip": "A JSON dictionary of available LLM models on the server. 4CAT will query the LLM server for available models periodically.",
+        "indirect": True,
+        "global": True
+    },
+    "llm.access": {
+        "type": UserInput.OPTION_TOGGLE,
+        "help": "LLM Access",
+        "default": False,
+        "tooltip": "Use tags or individual users to allow access to the LLM server (or set True in global for all).",
+    },
+    # TODO: add setting to restrict models per user/group?
+    
     # UI settings
     # this configures what the site looks like
     "ui.homepage": {
@@ -608,6 +696,14 @@ config_definition = {
         "help": "Show email when complete option",
         "tooltip": "If a mail server is set up, enabling this allow users to request emails when datasets and processors are completed."
     },
+    "image-visuals.max_images": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 1000,
+        "coerce_type": int,
+        "help": "Maximum images to show",
+        "tooltip": "Maximum number of images to show in the image visualization tab of a dataset. This is to prevent "
+                   "issues with large datasets.",
+    }
 }
 
 # These are used in the web interface for more readable names
@@ -627,4 +723,6 @@ categories = {
     "ui": "User interface",
     "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
+    "extensions": "Extensions",
+    "llm": "LLM Server Settings"
 }

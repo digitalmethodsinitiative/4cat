@@ -22,8 +22,9 @@ class ExportDatasets(BasicProcessor):
 	"""
 	type = "export-datasets"  # job type ID
 	category = "Conversion"  # category
-	title = "Export Dataset and All Analyses"  # title displayed in UI
-	description = "Creates a ZIP file containing the dataset and all analyses to be archived and uploaded to a 4CAT instance in the future. Filters are *not* included and must be exported separately as new datasets. Results automatically expire after 1 day, after which you must run again."  # description displayed in UI
+	title = "Export dataset and processor results"  # title displayed in UI
+	description = ("Creates a ZIP file containing the dataset and all processor results. This can also be uploaded to "
+				   "another 4CAT instance. Filters are not included. Results expire after one day.")  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -56,7 +57,7 @@ class ExportDatasets(BasicProcessor):
 			self.dataset.log(f"Exporting dataset {dataset_key}.")
 
 			try:
-				dataset = DataSet(key=dataset_key, db=self.db)
+				dataset = DataSet(key=dataset_key, db=self.db, modules=self.modules)
 			except DataSetException:
 				self.dataset.update_status(f"Dataset {dataset_key} not found: it may have been deleted prior to export; skipping.")
 				failed_exports.append(dataset_key)
@@ -109,4 +110,7 @@ class ExportDatasets(BasicProcessor):
 		self.dataset.__setattr__("expires-after", (datetime.datetime.now() + datetime.timedelta(days=1)).timestamp())
 
 		# done!
-		self.write_archive_and_finish(results_path, len(exported_datasets))
+		warning = None
+		if failed_exports:
+			warning = f"Failed to export {len(failed_exports)} dataset(s)"
+		self.write_archive_and_finish(results_path, len(exported_datasets), warning=warning)

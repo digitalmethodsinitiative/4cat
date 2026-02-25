@@ -1,0 +1,115 @@
+/*
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+
+ */
+
+@import url('colours.css');
+
+@font-face {
+    font-family: 'Open Sans';
+    src: url("../fonts/OpenSans-Regular.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    src: url("../fonts/OpenSans-Bold.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-style: italic;
+    src: url("../fonts/OpenSans-Italic.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    font-style: italic;
+    src: url("../fonts/OpenSans-BoldItalic.ttf")
+}
+
+/** --------------------- *
+     items
+  * --------------------- */
+.item {
+    font-family: "Open Sans", sans-serif;
+    list-style: none;
+    padding: 0;
+}
+
+.items li.item {
+    position: relative;
+    background: var(--gray-light);
+    padding: 1em;
+    min-width: 640px;
+    max-width: 860px;
+    margin: 0 auto 1em auto;
+}
+
+.items header {
+    display: inline;
+    border-bottom: 1px solid #000;
+    cursor: default;
+}
+
+.items article {
+    margin-top: 0.5em;
+}
+
+.items article .item-content {
+    margin: 10px 0;
+}
+
+.items header .author {
+    font-weight: bold;
+}
+
+.items header span {
+    display: inline-block;
+}
+
+.items header span:not(:last-child)::after {
+    content: '\2022';
+    margin-left: 0.5em;
+}
+
+.tags,
+.metrics,
+.external-url {
+
+}
+
+.items li.item .item-content a {
+
+}
+
+.items .external-url {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 10px;
+}
+
+.items .external-url.deactivated {
+    color: #cbcbcb;
+    cursor: not-allowed;
+}
+
+.item-media img {
+    width: 100%;
+    max-width: 300px;
+}
+
+.media-item > img, .media-item > audio, .media-item > video {
+    max-width: 100%;
+    max-height: 500px;
+    margin: 0 auto;
+}
+
+span.divider {
+    font-size: 16px;
+    color: var(--gray-darker);
+    cursor: default;
+}

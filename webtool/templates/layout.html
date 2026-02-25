@@ -63,6 +63,9 @@
     {% for notification in __notifications %}
         <div class="site-announcement">
             {{ notification.notification|markdown|safe }}
+            {% if notification.notification_long %}
+                (<a href="{{ url_for("user.view_notification", notification_id=notification.id) }}">read more...</a>)
+            {% endif %}
             {% if notification.allow_dismiss %}
                 <a href="{{ url_for("user.dismiss_notification", notification_id=notification.id) }}"><i class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Dismiss notification</span></a>
             {% endif %}

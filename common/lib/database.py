@@ -48,6 +48,10 @@ class Database:
 
 		if self.log is None:
 			self.log = logging
+			# add debug2 to use debug functionality
+			def debug2(msg):
+				self.log.debug(msg)
+			self.log.debug2 = debug2
 
 	def reconnect(self, tries=3, wait=10):
 		"""
@@ -86,7 +90,7 @@ class Database:
 		if not cursor:
 			cursor = self.get_cursor()
 
-		self.log.debug("Executing query %s" % cursor.mogrify(query, replacements))
+		self.log.debug2("Executing query %s" % cursor.mogrify(query, replacements))
 		try:
 			cursor.execute(query, replacements)
 		except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
@@ -378,7 +382,7 @@ class Database:
 			cursor = self._execute_query(query, cursor=cursor, *args)
 		except psycopg2.extensions.QueryCanceledError:
 			# interrupted with cancellation worker (or manually)
-			self.log.debug("Query in connection %s was interrupted..." % self.appname)
+			self.log.debug2("Query in connection %s was interrupted..." % self.appname)
 			self.rollback()
 			cursor.close()
 			raise DatabaseQueryInterruptedException("Interrupted while querying database")

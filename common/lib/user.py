@@ -49,7 +49,7 @@ class User:
         use a global configuration manager.
         :return:  User object, or `None` if login was invalid
         """
-        user = db.fetchone("SELECT * FROM users WHERE name = %s", (name,))
+        user = db.fetchone("SELECT * FROM users WHERE LOWER(name) = LOWER(%s)", (name,))
         if not user or not user.get("password", None):
             # registration not finished yet
             return None
@@ -71,7 +71,7 @@ class User:
         use a global configuration manager.
         :return:  User object, or `None` for invalid user name
         """
-        user = db.fetchone("SELECT * FROM users WHERE name = %s", (name,))
+        user = db.fetchone("SELECT * FROM users WHERE LOWER(name) = LOWER(%s)", (name,))
         if not user:
             return None
         else:
@@ -432,18 +432,24 @@ class User:
 
         :param int notification_id:  ID of the notification to dismiss
         """
-        current_notifications = [n["id"] for n in self.get_notifications() if n["allow_dismiss"]]
-        if notification_id not in current_notifications:
+        all_notifications = {n["id"]: n for n in self.get_notifications() if n["allow_dismiss"]}
+        if notification_id not in all_notifications:
             return
 
-        self.db.delete("users_notifications", where={"id": notification_id})
+        # notifications with a canonical ID are just hidden, not deleted
+        # this is because they are received from a notification server, and
+        # deleting them would just re-add them on the next sync
+        if all_notifications[notification_id]["canonical_id"]:
+            self.db.update("users_notifications", data={"is_dismissed": True}, where={"id": notification_id})
+        else:
+            self.db.delete("users_notifications", where={"id": notification_id})
 
     def get_notifications(self):
         """
         Get all notifications for this user
 
         That is all the user's own notifications, plus those for the groups of
-        users this user belongs to
+        users this user belongs to. Dismissed notifications are ignored.
 
         :return list:  Notifications, as a list of dictionaries
         """
@@ -460,7 +466,8 @@ class User:
         notifications = self.db.fetchall(
             "SELECT n.* FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s "
-            "AND (u.name = n.username OR n.username IN %s)", (self.get_id(), tuple(tag_recipients)))
+            "AND (u.name = n.username OR n.username IN %s)"
+            "AND n.is_dismissed = FALSE", (self.get_id(), tuple(tag_recipients)))
 
         return notifications
 
@@ -475,6 +482,7 @@ class User:
         if tag not in self.data["tags"]:
             self.data["tags"].append(tag)
             self.sort_user_tags()
+            self.config.uncache_user_tags([self.get_id()])
 
     def remove_tag(self, tag):
         """
@@ -487,6 +495,7 @@ class User:
         if tag in self.data["tags"]:
             self.data["tags"].remove(tag)
             self.sort_user_tags()
+            self.config.uncache_user_tags([self.get_id()])
 
     def sort_user_tags(self):
         """
@@ -519,7 +528,7 @@ class User:
         self.data["tags"] = sorted_tags
         self.db.update("users", where={"name": self.get_id()}, data={"tags": json.dumps(sorted_tags)})
 
-    def delete(self, also_datasets=True):
+    def delete(self, also_datasets=True, modules=None):
         from common.lib.dataset import DataSet
 
         username = self.data["name"]
@@ -533,9 +542,11 @@ class User:
 
         # delete any datasets and jobs related to deleted datasets
         if datasets:
+            if modules is None:
+                raise ValueError("To delete a user and their datasets, the 'modules' parameter must be provided.")
             for dataset in datasets:
                 try:
-                    dataset = DataSet(key=dataset["key"], db=self.db)
+                    dataset = DataSet(key=dataset["key"], db=self.db, modules=modules)
                 except DataSetException:
                     # dataset already deleted?
                     continue

@@ -25,54 +25,58 @@ class OvertimeAnalysis(BasicProcessor):
     followups = []
 
     references = [
-        "[Hatebase.org](https://hatebase.org)"
         "[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
     ]
 
-    # the following determines the options available to the user via the 4CAT
-    # interface.
-    options = {
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-            "help": "Count frequencies per"
-        },
-        "partition": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Track vocabularies separately",
-            "tooltip": "Provide separate frequencies per vocabulary."
-        },
-        "vocabulary": {
-            "type": UserInput.OPTION_MULTI,
-            "default": [],
-            "options": {
-                "hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
-                "hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
-                "hatebase-it-unambiguous": "Hatebase.org hate speech list (Italian, unambiguous terms)",
-                "hatebase-it-ambiguous": "Hatebase.org hate speech list (italian, ambiguous terms)",
-                "oilab-extreme-other": "OILab Extreme Speech Lexicon (other)",
-                "oilab-extreme-anticon": "OILab Extreme Speech Lexicon (anti-conservative)",
-                "oilab-extreme-antileft": "OILab Extreme Speech Lexicon (anti-left)",
-                "oilab-extreme-antilowerclass": "OILab Extreme Speech Lexicon (anti-lowerclass)",
-                "oilab-extreme-antisemitism": "OILab Extreme Speech Lexicon (antisemitic)",
-                "oilab-extreme-antidisability": "OILab Extreme Speech Lexicon (anti-disability)",
-                "oilab-extreme-homophobia": "OILab Extreme Speech Lexicon (homophobic)",
-                "oilab-extreme-islamophobia": "OILab Extreme Speech Lexicon (islamophobic)",
-                "oilab-extreme-misogyny": "OILab Extreme Speech Lexicon (misogynistic)",
-                "oilab-extreme-racism": "OILab Extreme Speech Lexicon (racist)",
-                "oilab-extreme-sexual": "OILab Extreme Speech Lexicon (sexual)",
-                "wildcard": "Match everything (useful as comparison, only has effect when tracking separately)"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+                "help": "Count frequencies per"
             },
-            "help": "Vocabularies to detect. For explanation, see hatebase.org for the hatebase lexicon and the references of this module for the OILab extreme speech lexicon"
-        },
-        "vocabulary-custom": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Custom vocabulary (separate with commas)"
+            "partition": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Track vocabularies separately",
+                "tooltip": "Provide separate frequencies per vocabulary."
+            },
+            "vocabulary": {
+                "type": UserInput.OPTION_MULTI,
+                "default": [],
+                "options": {
+                    "oilab-extreme-other": "OILab Extreme Speech Lexicon (other)",
+                    "oilab-extreme-anticon": "OILab Extreme Speech Lexicon (anti-conservative)",
+                    "oilab-extreme-antileft": "OILab Extreme Speech Lexicon (anti-left)",
+                    "oilab-extreme-antilowerclass": "OILab Extreme Speech Lexicon (anti-lowerclass)",
+                    "oilab-extreme-antisemitism": "OILab Extreme Speech Lexicon (antisemitic)",
+                    "oilab-extreme-antidisability": "OILab Extreme Speech Lexicon (anti-disability)",
+                    "oilab-extreme-homophobia": "OILab Extreme Speech Lexicon (homophobic)",
+                    "oilab-extreme-islamophobia": "OILab Extreme Speech Lexicon (islamophobic)",
+                    "oilab-extreme-misogyny": "OILab Extreme Speech Lexicon (misogynistic)",
+                    "oilab-extreme-racism": "OILab Extreme Speech Lexicon (racist)",
+                    "oilab-extreme-sexual": "OILab Extreme Speech Lexicon (sexual)",
+                    "wildcard": "Match everything (useful as comparison, only has effect when tracking separately)"
+                },
+                "help": "Vocabularies to detect. For explanation, the references of this module for the OILab extreme speech lexicon"
+            },
+            "vocabulary-custom": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Custom vocabulary (separate with commas)"
+            }
         }
-    }
 
     @staticmethod
     def is_compatible_with(module=None, config=None):
@@ -87,7 +91,7 @@ class OvertimeAnalysis(BasicProcessor):
 
     def process(self):
         """
-        Reads a CSV file, counts occurences of chosen values over all posts,
+        Reads a CSV file, counts occurrences of chosen values over all posts,
         and aggregates the results per chosen time frame
         """
 
@@ -168,8 +172,7 @@ class OvertimeAnalysis(BasicProcessor):
                 try:
                     interval = get_interval_descriptor(post, timeframe)
                 except ValueError as e:
-                    self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
-                    self.dataset.update_status(0)
+                    self.dataset.finish_with_error("%s, cannot count posts per %s" % (str(e), timeframe))
                     return
 
                 if interval not in activity[vocabulary_id]:
@@ -194,4 +197,4 @@ class OvertimeAnalysis(BasicProcessor):
         if rows:
             self.write_csv_items_and_finish(rows)
         else:
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No word counts")

@@ -5,7 +5,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import shutil
-import subprocess
 import oslex
 
 from backend.lib.processor import BasicProcessor
@@ -33,29 +32,40 @@ class VideoFrames(BasicProcessor):
 
 	followups = ["video-timelines"] + VideoDownloaderPlus.followups
 
-	options = {
-		"frame_interval": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Number of frames extracted per second to extract from video",
-			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
-					   "pass 5, and so on. Use '0' to only capture the first frame of the video.",
-			"coerce_type": float,
-			"default": 1,
-			"min": 0,
-			"max": 5,
-		},
-		"frame_size": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "medium",
-			"options": {
-				"no_modify": "Do not modify",
-				"144x144": "Tiny (144x144)",
-				"432x432": "Medium (432x432)",
-				"1026x1026": "Large (1026x1026)",
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"frame_interval": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Number of frames extracted per second to extract from video",
+				"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
+						   "pass 5, and so on. Use '0' to only capture the first frame of the video.",
+				"coerce_type": float,
+				"default": 1,
+				"min": 0,
+				"max": 5,
 			},
-			"help": "Size of extracted frames"
-		},
-	}
+			"frame_size": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "medium",
+				"options": {
+					"no_modify": "Do not modify",
+					"144x144": "Tiny (144x144)",
+					"432x432": "Medium (432x432)",
+					"1026x1026": "Large (1026x1026)",
+				},
+				"help": "Size of extracted frames"
+			},
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):
@@ -65,8 +75,8 @@ class VideoFrames(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
 		"""
 		return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-			   config.get("video-downloader.ffmpeg_path") and \
-			   shutil.which(config.get("video-downloader.ffmpeg_path"))
+			config.get("video-downloader.ffmpeg_path") and \
+			shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	def process(self):
 		"""
@@ -75,8 +85,7 @@ class VideoFrames(BasicProcessor):
 		"""
 		# Check processor able to run
 		if self.source_dataset.num_rows == 0:
-			self.dataset.update_status("No videos from which to extract frames.", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("No videos from which to extract frames.")
 			return
 
 		# Collect parameters
@@ -95,22 +104,22 @@ class VideoFrames(BasicProcessor):
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for i, path in enumerate(self.iterate_archive_contents(self.source_file, staging_area)):
+		for i, video in enumerate(self.source_dataset.iterate_items()):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
 			# Check for 4CAT's metadata JSON and copy it
-			if path.name == '.metadata.json':
-				shutil.copy(path, output_directory)
+			if video.file.name == '.metadata.json':
+				shutil.copy(video.file, output_directory)
 				continue
 
-			vid_name = path.stem
+			vid_name = video.file.stem
 			video_dir = output_directory.joinpath(vid_name)
 			video_dir.mkdir(exist_ok=True)
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
-				"-i", oslex.quote(str(path))
+				"-y", "-nostdin", "-i", str(video.file),
 			]
 
 			if frame_interval != 0:
@@ -120,11 +129,11 @@ class VideoFrames(BasicProcessor):
 
 			if frame_size != 'no_modify':
 				command += ['-s', oslex.quote(frame_size)]
-			command += [oslex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
+			command += [str(video_dir.joinpath("/video_frame_%07d.jpeg"))]
 
 			self.dataset.log(" ".join(command))
 
-			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			result = self.run_interruptable_process(command, cleanup_paths=(staging_area,))
 
 			# Capture logs
 			ffmpeg_output = result.stdout.decode("utf-8")
@@ -140,10 +149,12 @@ class VideoFrames(BasicProcessor):
 
 			if result.returncode != 0:
 				self.dataset.update_status(f"Unable to extract frames from video {vid_name} (see logs for details)")
-				self.dataset.log('Error Return Code (%s) with video %s: %s' % (str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
+				self.dataset.log('Error Return Code (%s) with video %s: %s' % (
+					str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
 			else:
 				processed_videos += 1
-				self.dataset.update_status("Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
+				self.dataset.update_status(
+					"Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
 
 			self.dataset.update_progress(i / total_possible_videos)
 
@@ -157,7 +168,9 @@ class VideoFrames(BasicProcessor):
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
 
-		# Remove staging area
-		shutil.rmtree(staging_area)
-
-		self.dataset.finish(processed_videos)
+		if processed_videos < total_possible_videos:
+			warning = "Could not extract frames for all videos. See the dataset log for details."
+			self.dataset.finish_with_warning(processed_videos, warning)
+		else:
+			self.dataset.finish(processed_videos)
+		return

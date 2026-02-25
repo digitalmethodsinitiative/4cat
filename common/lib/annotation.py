@@ -63,17 +63,20 @@ class Annotation:
 
         new_or_updated = False
 
-        # Get the annotation data if the ID is given; if an annotation has
-        # an ID, it is guaranteed to be in the database.
-        # IDs can both be explicitly given or present in the data dict.
         if annotation_id is not None or "id" in data:
             if data and "id" in data:
                 annotation_id = data["id"]
             self.id = annotation_id  # IDs correspond to unique serial numbers in the database.
-            current = self.get_by_id(annotation_id)
-            if not current:
-                raise AnnotationException(
-                    "Annotation() requires a valid ID for an existing annotation, %s given" % id)
+
+            # Only fetch from db if we don't already have the data
+            if not data:
+                current = self.get_by_id(annotation_id)
+                if not current:
+                    raise AnnotationException(
+                        "Annotation() requires a valid ID for an existing annotation, %s given" % annotation_id)
+            else:
+                # We already have the data, use it directly
+                current = data
 
         # If an ID is not given, get or create an Annotation object from its data.
         # First check if required fields are present in `data`.
@@ -217,25 +220,40 @@ class Annotation:
 
 
     @staticmethod
-    def get_annotations_for_dataset(db: Database, dataset_key: str, item_id=None) -> list:
+    def get_annotations_for_dataset(db: Database, dataset_key: str, item_id=None, before=0) -> list:
         """
         Returns all annotations for a dataset.
-        :param db:                  Database object.
-        :param str dataset_key:     A dataset key.
-        :param str item_id:         An optional item ID to only get annotations from one item (i.g. social media post).
+        :param db:                          Database object.
+        :param str dataset_key:             A dataset key.
+        :param str | list | None item_id:   An optional item ID or multiple item IDs to only get annotations from specific
+                                            items
+        :param int before:                  The upper timestamp for annotations to retrieve.
 
         :return list: List with annotations.
         """
         if not dataset_key:
             return []
 
+        if not before:
+            before = int(time.time())
+
         if item_id:
+            # Normalise to strings so the ANY operator receives a proper text[]
+            if isinstance(item_id, (list, tuple, set)):
+                iterable_ids = item_id
+            else:
+                iterable_ids = [item_id]
+
+            item_ids = [str(i) for i in iterable_ids if i is not None]
+            if not item_ids:
+                return []
+
             data = db.fetchall(
-                "SELECT * FROM annotations WHERE dataset = %s AND item_id = %s",
-                (dataset_key, str(item_id),)
+                "SELECT * FROM annotations WHERE dataset = %s AND item_id = ANY(%s::text[]) AND timestamp <= %s",
+                (dataset_key, item_ids, before,)
             )
         else:
-            data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s", (dataset_key,))
+            data = db.fetchall("SELECT * FROM annotations WHERE dataset = %s AND timestamp <= %s", (dataset_key, before,))
         if not data:
             return []
 

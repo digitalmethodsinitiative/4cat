@@ -1,0 +1,111 @@
+* {
+	color: black;
+}
+
+.items li.item {
+	margin: 0 auto;
+	max-width: 500px;
+	position: relative;
+	background-color: white;
+	font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	font-size: 14px;
+	border-bottom: 1px solid #e3e3e3;
+	list-style-type: none;
+	padding: 0;
+}
+
+.items header {
+	border: none;
+}
+
+.items header i.verified {
+	color: #0095f6;
+}
+
+.items header .location {
+	font-size: 12px;
+}
+
+.items article {
+	min-width: auto;
+}
+
+.items .media-container {
+    width: 100%;
+    position: relative;
+}
+
+.items .media-container img {
+    width: 100%;
+}
+
+.items .media-container .media-bullets {
+    position: absolute;
+    width: 100%;
+    bottom: 5px;
+    text-align: center;
+    font-size: 22px;
+    color: white;
+    opacity: .6;
+}
+
+.items header, .items .item-content {
+	padding: 20px;
+}
+
+.items .item .body a, .items .item a:hover {
+    color: #00376B;
+    text-decoration: none;
+}
+
+.time, .items .item .comments a {
+	color: #7b7b7b;
+}
+
+.items .external-url {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    padding: 10px;
+}
+
+.items .item-image {
+	max-width: 200px;
+	margin: 0 auto;
+	margin-top: 30px;
+	margin-bottom: 30px;
+}
+
+/** --------------------- *
+     Annotation item elements
+  * --------------------- */
+.item-annotations {
+	border-top: 1px solid #e3e3e3;
+}
+
+.item-annotation {
+    padding: 15px;
+}
+
+.item-annotation > .annotation-label {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: right;
+    min-width: 150px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
+}
+
+.item-annotation.checkbox > .item-annotation-options {
+    display: inline-block;
+}
+
+.item-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.item-annotation-options > input {
+    display: inline-block;
+}

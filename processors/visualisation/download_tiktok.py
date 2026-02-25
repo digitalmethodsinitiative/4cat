@@ -12,7 +12,7 @@ import requests
 
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
+from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper, RepeatedFailure
 from processors.visualisation.download_videos import VideoDownloaderPlus
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
 from processors.visualisation.download_images import ImageDownloader
@@ -28,23 +28,12 @@ __email__ = "4cat@oilab.eu"
 class TikTokVideoDownloader(BasicProcessor):
     type = "video-downloader-tiktok"  # job type ID
     category = "Visual"  # category
-    title = "Download TikTok Videos"  # title displayed in UI
+    title = "Download TikTok videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
     extension = "zip"
     media_type = "video"
 
     followups = VideoDownloaderPlus.followups
-
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of videos (max 1000)",
-            "default": 100,
-            "min": 0,
-            "max": 1000,
-            "tooltip": "Due to simultaneous downloads, you may end up with a few extra videos."
-        },
-    }
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -61,7 +50,16 @@ class TikTokVideoDownloader(BasicProcessor):
         the processor would be run on can be used to show some options only to
         privileges users.
         """
-        options = cls.options
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of videos (max 1000)",
+                "default": 100,
+                "min": 0,
+                "max": 1000,
+                "tooltip": "Due to simultaneous downloads, you may end up with a few extra videos."
+            },
+        }
 
         # Update the amount max and help from config
         max_number_videos = int(config.get('video-downloader.max', 1000))
@@ -95,8 +93,7 @@ class TikTokVideoDownloader(BasicProcessor):
         creates a new dataset containing the matching values
         """
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No videos to download.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No videos to download.")
             return
 
         # Process parameters
@@ -112,7 +109,7 @@ class TikTokVideoDownloader(BasicProcessor):
         results_path = self.dataset.get_staging_area()
 
         self.dataset.update_status("Downloading TikTok media")
-        video_ids_to_download = []
+        video_ids_to_download = set()
         for mapped_item in self.source_dataset.iterate_items(self):
             post_id = mapped_item.get(column)
             if not post_id:
@@ -124,19 +121,31 @@ class TikTokVideoDownloader(BasicProcessor):
                 self.dataset.finish_with_error(f"Column {column} must contain TikTok post IDs")
                 return
             
-            video_ids_to_download.append(post_id)
+            video_ids_to_download.add(post_id)
 
         # the downloader is an asynchronous method because we want to be able
         # to run multiple downloads in parallel
+
         tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
-        results = loop.run_until_complete(
-            tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
+        try:
+            results = loop.run_until_complete(
+                tiktok_scraper.download_videos(list(video_ids_to_download), results_path, max_amount)
+            )
+        except RepeatedFailure as e:
+            if self.source_dataset.type == "upload-search":
+                self.dataset.finish_with_error(f"TikTok video downloader failed repeatedly. Please check that the column '{column}' contains valid TikTok post IDs. Error: {e}")
+            else:
+                self.log.warning(f"TikTok video downloader ({self.dataset.key}) failed repeatedly; may be parsing issue: {e}")
+                self.dataset.finish_with_error(f"TikTok video downloader failed repeatedly: {e}")
+            return
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
 
-        self.write_archive_and_finish(results_path, len([True for result in results.values() if result.get("success")]))
+        downloads =  len([True for result in results.values() if result.get("success")])
+        warning = None if downloads >= max_amount else "Not all videos downloaded."
+        self.write_archive_and_finish(results_path, downloads, warning=warning)
 
     @staticmethod
     def map_metadata(video_id, data):
@@ -163,32 +172,12 @@ class TikTokVideoDownloader(BasicProcessor):
 class TikTokImageDownloader(BasicProcessor):
     type = "image-downloader-tiktok"  # job type ID
     category = "Visual"  # category
-    title = "Download TikTok Images"  # title displayed in UI
+    title = "Download TikTok images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
     media_type = "image"
 
     followups = ImageDownloader.followups
-
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of items (max 1000)",
-            "default": 100,
-            "min": 0,
-            "max": 1000
-        },
-        "thumb_type": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Media type",
-            "options": {
-                "thumbnail": "Video Thumbnail",
-                "music": "Music Thumbnail",
-                "author_avatar": "User avatar"
-            },
-            "default": "thumbnail"
-        }
-    }
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -206,7 +195,25 @@ class TikTokImageDownloader(BasicProcessor):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
-        options = cls.options
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of items (max 1000)",
+                "default": 100,
+                "min": 0,
+                "max": 1000
+            },
+            "thumb_type": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Media type",
+                "options": {
+                    "thumbnail": "Video Thumbnail",
+                    "music": "Music Thumbnail",
+                    "author_avatar": "User avatar"
+                },
+                "default": "thumbnail"
+            }
+        }
 
         # Update the amount max, min, tooltip, and help from config
         max_number_images = int(config.get("image-downloader.max", 1000))
@@ -237,8 +244,7 @@ class TikTokImageDownloader(BasicProcessor):
         creates a new dataset containing the matching values
         """
         if self.source_dataset.num_rows == 0:
-            self.dataset.update_status("No images to download.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No images to download.")
             return
 
         # Process parameters
@@ -251,8 +257,7 @@ class TikTokImageDownloader(BasicProcessor):
         elif self.parameters.get("thumb_type") == "author_avatar":
             url_column = "author_avatar"
         else:
-            self.dataset.update_status("No image column selected.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No image column selected.")
             return
 
         # Prepare staging area for downloads
@@ -302,8 +307,8 @@ class TikTokImageDownloader(BasicProcessor):
                         # Stop checking and refresh all remaining URLs
                         max_fails_exceeded += 1
                     else:
-                        self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1
+                        self.dataset.update_status(f"Downloaded image {downloaded_media}/{max_amount}")
 
                         metadata[url] = {
                                 "filename": filename,
@@ -390,7 +395,11 @@ class TikTokImageDownloader(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
-        self.write_archive_and_finish(results_path, downloaded_media)
+        warning = None
+        if downloaded_media < max_amount:
+            warning = "Could not download all images."
+
+        self.write_archive_and_finish(results_path, downloaded_media, warning=warning)
 
     @staticmethod
     def save_image(image, image_name, directory_path):

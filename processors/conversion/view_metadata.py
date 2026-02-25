@@ -27,14 +27,25 @@ class ViewMetadata(BasicProcessor):
 	description = "Reformats the .metadata.json file and calculates analytics"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	options = {
-		"include_failed": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Included failed datapoints",
-			"default": False,
-			"tooltip": "If enabled, rows that failed will also be included (e.g., due to errors et cetera)."
-		},
-	}
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"include_failed": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Included failed datapoints",
+				"default": False,
+				"tooltip": "If enabled, rows that failed will also be included (e.g., due to errors et cetera)."
+			},
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):
@@ -54,8 +65,7 @@ class ViewMetadata(BasicProcessor):
 		with zipfile.ZipFile(self.source_file, "r") as archive_file:
 			archive_contents = sorted(archive_file.namelist())
 			if '.metadata.json' not in archive_contents:
-				self.dataset.update_status("Unable to identify metadata file", is_final=True)
-				self.dataset.finish(0)
+				self.dataset.finish_with_error("Unable to identify metadata file")
 				return
 
 			staging_area = self.dataset.get_staging_area()
@@ -68,8 +78,7 @@ class ViewMetadata(BasicProcessor):
 		if parent_processor is None or not hasattr(parent_processor, "map_metadata"):
 			if parent_processor is not None:
 				self.log.warning(f"Metadata formatter processor cannot run on {parent_processor.type}; map_metadata method not implemented")
-			self.dataset.update_status("Cannot reformat metadata for this dataset", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Cannot reformat metadata for this dataset")
 			return
 		self.dataset.log(f"Collecting metadata created by {parent_processor.type}")
 
@@ -87,5 +96,9 @@ class ViewMetadata(BasicProcessor):
 					num_posts += 1
 
 		# Finish up
-		self.dataset.update_status('Read metadata for %i items.' % num_posts)
-		self.write_csv_items_and_finish(rows)
+		self.dataset.update_status(f"Read metadata for {num_posts:,} item(s).")
+	
+		if rows:
+			self.write_csv_items_and_finish(rows)
+		else:
+			return self.dataset.finish_with_error("No valid metadata could be read from the dataset.")

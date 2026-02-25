@@ -20,26 +20,37 @@ class VectorRanker(BasicProcessor):
 	type = "vector-ranker"  # job type ID
 	category = "Metrics" # category
 	title = "Extract top words"  # title displayed in UI
-	description = "Ranks most used tokens per tokenset (overall or per timeframe). " \
+	description = "Ranks most used tokens per token set (overall or per timeframe). " \
 				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	followups = ["wordcloud"]
 
-	options = {
-		"top": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 25,
-			"help": "Cut-off for top list"
-		},
-		"top-style": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "per-item",
-			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (only include overall top items in the timeframe)"},
-			"help": "Determine top items",
-			"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
-		},
-	}
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"top": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 25,
+				"help": "Cut-off for top list"
+			},
+			"top-style": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "per-item",
+				"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (only include overall top items in the timeframe)"},
+				"help": "Determine top items",
+				"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
+			},
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):
@@ -83,16 +94,16 @@ class VectorRanker(BasicProcessor):
 		# now rank the vectors by most prevalent per "file" (i.e. interval)
 		overall_top = {}
 		index = 0
-		for vector_file in self.iterate_archive_contents(self.source_file):
+		for packed_vectors in self.source_dataset.iterate_items():
 			# we support both pickle and json dumps of vectors
-			vector_unpacker = pickle if vector_file.suffix == "pb" else json
+			vector_unpacker = pickle if packed_vectors.file.suffix == "pb" else json
 
 			index += 1
-			vector_set_name = vector_file.stem  # we don't need the full path
+			vector_set_name = packed_vectors.file.stem  # we don't need the full path
 			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
 			self.dataset.update_progress(index / self.source_dataset.num_rows)
 
-			with vector_file.open("rb") as binary_tokens:
+			with packed_vectors.file.open("rb") as binary_tokens:
 				# these were saved as pickle dumps so we need the binary mode
 				vectors = vector_unpacker.load(binary_tokens)
 

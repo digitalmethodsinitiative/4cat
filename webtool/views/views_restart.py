@@ -18,6 +18,7 @@ import os
 
 from pathlib import Path
 from flask import Blueprint, current_app, render_template, request, flash, get_flashed_messages, jsonify, g
+from packaging.specifiers import SpecifierSet
 
 from flask_login import login_required
 from webtool.lib.helpers import setting_required, check_restart_request
@@ -42,12 +43,13 @@ def trigger_restart():
     common in e.g. mod_wsgi) it should trigger a reload.
     """
     # figure out the versions we are dealing with
-    current_version_file = Path(g.config.get("PATH_ROOT"), "config/.current-version")
+    current_version_file = g.config.get("PATH_CONFIG").joinpath(".current-version")
     if current_version_file.exists():
         current_version = current_version_file.open().readline().strip()
     else:
         current_version = "unknown"
 
+    current_version_compare = packaging.version.parse(current_version)
     code_version = Path(g.config.get("PATH_ROOT"), "VERSION").open().readline().strip()
     try:
         github_version = get_github_version(g.config.get("4cat.github_url"), timeout=5)
@@ -59,10 +61,9 @@ def trigger_restart():
 
     # upgrade is available if we have all info and the release is newer than
     # the currently checked out code
-    can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
-        current_version) >= packaging.version.parse(github_version))
+    can_upgrade = not (github_version == "unknown" or code_version == "unknown" or current_version_compare >= packaging.version.parse(github_version))
 
-    lock_file = Path(g.config.get("PATH_ROOT"), "config/restart.lock")
+    lock_file = g.config.get("PATH_CONFIG").joinpath("restart.lock")
     if request.method == "POST" and lock_file.exists():
         flash("A restart is already in progress. Wait for it to complete. Check the process log for more details.")
 
@@ -81,7 +82,7 @@ def trigger_restart():
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
-        restart_log_file = Path(g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log")
+        restart_log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
         with restart_log_file.open("w") as outfile:
             outfile.write(
                 f"{mode.capitalize().replace('-', ' ')} initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
@@ -95,13 +96,22 @@ def trigger_restart():
 
         # from here on, the back-end takes over
         details = {} if not request.form.get("branch") else {"branch": request.form["branch"]}
-        g.queue.add_job("restart-4cat", details, mode)
+        g.queue.add_job("restart-4cat", details=details, remote_id=mode)
         flash(f"{mode.capitalize().replace('-', ' ')} initiated. Check process log for progress.")
+
+    version_notes = []
+    for notification in g.db.fetchall("SELECT * FROM users_notifications WHERE canonical_id != '' AND version_match != ''"):
+        version_match = SpecifierSet(notification["version_match"])
+        if current_version_compare in version_match:
+            version_notes.append(notification)
+        else:
+            print(notification)
+        
 
     current_branch = get_git_branch()
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version,
-                           release_notes=release_notes, current_branch=current_branch)
+                           release_notes=release_notes, current_branch=current_branch, version_notes=version_notes)
 
 
 @component.route("/admin/trigger-frontend-upgrade/", methods=["POST"])
@@ -126,8 +136,8 @@ def upgrade_frontend():
     if not g.config.get("USING_DOCKER") or not check_restart_request():
         return current_app.login_manager.unauthorized()
 
-    restart_log_file = Path(g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log")
-    frontend_version_file = Path(g.config.get("PATH_ROOT"), "config/.current-version-frontend")
+    restart_log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
+    frontend_version_file = g.config.get("PATH_CONFIG").joinpath(".current-version-frontend")
     if not frontend_version_file.exists():
         return jsonify({"status": "error", "message": "No version file found"})
 
@@ -282,7 +292,7 @@ def restart_log():
 
     :return:
     """
-    log_file = Path(g.config.get("PATH_ROOT"), g.config.get("PATH_LOGS"), "restart.log")
+    log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
     if log_file.exists():
         with open(log_file, encoding="utf-8") as infile:
             return infile.read()

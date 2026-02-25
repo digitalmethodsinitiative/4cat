@@ -131,12 +131,12 @@
 
                     {% set annotation_fields = dataset.annotation_fields %}
                     {% if annotation_fields %}
-                    <div class="fullwidth annotation-fields-list">
+                    <div class="fullwidth annotation-fields-list" data-label-edit-href="{{ url_for('explorer.explorer_save_annotation_label', dataset_key=dataset.key) }}">
                         <dt>Annotations</dt>
                         <dd>
                             <ul>
-                                {% for annotation_field in dataset.annotation_fields.items() %}
-                                <li><span class="property-badge"><i class="fa-solid fa-tag"></i> {{ annotation_field[1].label }}</span></li>
+                                {% for field_id, field_settings in dataset.annotation_fields.items() %}
+                                <li><span class="property-badge" data-annotation-id="{{ field_id }}"><i class="fa-solid fa-tag"></i> {{ field_settings.label }}</span></li>
                                 {% endfor %}
                             </ul>
                             <a class="button-like-small" id="edit-annotation-fields" href="{{ url_for('explorer.explorer_dataset', dataset_key=dataset.key) }}?edit=true"><i class="fas fa-edit" aria-hidden="true"></i> Edit fields</a>
@@ -173,7 +173,7 @@
 
                     <div class="fullwidth" id="dataset-result">
                         <dt>Result</dt>
-                        <dd data-key="{{ dataset.key }}" class="{% if not dataset.is_finished() %}dataset-unfinished{% endif %}">
+                        <dd data-dataset-key="{{ dataset.key }}" class="{% if not dataset.is_finished() %}dataset-unfinished{% endif %}">
                             {% include "components/result-result-row.html" %}
                         </dd>
                     </div>

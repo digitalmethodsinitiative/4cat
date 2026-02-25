@@ -7,7 +7,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend, and
 assumes that ffprobe is also present in the same location.
 """
 import shutil
-import subprocess
 import oslex
 
 from packaging import version
@@ -37,56 +36,67 @@ class VideoStack(BasicProcessor):
                   "videos. Videos are stacked by length, i.e. the longest video is at the 'bottom' of the stack."  # description displayed in UI
     extension = "mp4"  # extension of result file, used internally and in UI
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Number of videos to stack.",
-            "default": 10,
-            "max": 50,
-            "min": 2,
-        },
-        "transparency": {
-            "type": UserInput.OPTION_TEXT,
-            "coerce_tye": float,
-            "default": 0.15,
-            "min": 0,
-            "max": 1,
-            "help": "Layer transparency",
-            "tooltip": "Transparency of each layer in the stack, between 0 (opaque) and 1 (fully transparent). "
-                       "As a rule of thumb, for 10 videos use 90% opacity (0.10), for 20 use 80% (0.20), and so on."
-        },
-        "eof-action": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "pass": "Remove video from stack once it ends",
-                "repeat": "Keep displaying final frame until end of stack video",
-                "endall": "Stop stack video when first video ends"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Number of videos to stack.",
+                "default": 10,
+                "max": 50,
+                "min": 2,
             },
-            "help": "Length handling",
-            "tooltip": "How to handle videos of different length (i.e. when not all videos in the stack are equally "
-                       "long)",
-            "default": "pass"
-        },
-        "audio": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Audio handling",
-            "options": {
-                "longest": "Use audio from longest video in stack",
-                "none": "Remove audio"
+            "transparency": {
+                "type": UserInput.OPTION_TEXT,
+                "coerce_type": float,
+                "default": 0.15,
+                "min": 0,
+                "max": 1,
+                "help": "Layer transparency",
+                "tooltip": "Transparency of each layer in the stack, between 0 (opaque) and 1 (fully transparent). "
+                        "As a rule of thumb, for 10 videos use 90% opacity (0.10), for 20 use 80% (0.20), and so on."
             },
-            "default": "longest"
-        },
-        "max-length": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Cut video after",
-            "default": 60,
-            "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
-                       "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
-                       "processor run times and is not recommended.",
-            "coerce_type": int,
-            "min": 0
+            "eof-action": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "pass": "Remove video from stack once it ends",
+                    "repeat": "Keep displaying final frame until end of stack video",
+                    "endall": "Stop stack video when first video ends"
+                },
+                "help": "Length handling",
+                "tooltip": "How to handle videos of different length (i.e. when not all videos in the stack are equally "
+                        "long)",
+                "default": "pass"
+            },
+            "audio": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Audio handling",
+                "options": {
+                    "longest": "Use audio from longest video in stack",
+                    "none": "Remove audio"
+                },
+                "default": "longest"
+            },
+            "max-length": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Cut video after",
+                "default": 60,
+                "tooltip": "In seconds. Set to 0 or leave empty to use full video length; otherwise, videos will be "
+                        "limited to the given amount of seconds. Not setting a limit can lead to extremely long "
+                        "processor run times and is not recommended.",
+                "coerce_type": int,
+                "min": 0
+            }
         }
-    }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -114,8 +124,7 @@ class VideoStack(BasicProcessor):
         """
         # Check processor able to run
         if self.source_dataset.num_rows < 3:
-            self.dataset.update_status("Not enough videos to stack (need at least 2)", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Not enough videos to stack (need at least 2)")
             return
 
         # Collect parameters
@@ -139,9 +148,8 @@ class VideoStack(BasicProcessor):
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
             return self.dataset.finish_with_error("Video data missing. Cannot stack videos.")
 
-        # a staging area to store the videos we're reading from
-        video_staging_area = self.dataset.get_staging_area()
-
+        self.for_cleanup.append(video_dataset)
+        
         # determine ffmpeg version
         # -fps_mode is not in older versions and we can use -vsync instead
         # but -vsync will be deprecated so only use it if needed
@@ -164,37 +172,33 @@ class VideoStack(BasicProcessor):
         videos = []
 
         # unpack videos and determine length of the video (for sorting)
-        for video in self.iterate_archive_contents(video_dataset.get_results_path(), staging_area=video_staging_area,
-                                                   immediately_delete=False):
+        for video in video_dataset.iterate_items(immediately_delete=False):
             if self.interrupted:
-                shutil.rmtree(video_staging_area, ignore_errors=True)
                 return ProcessorInterruptedException("Interrupted while unpacking videos")
 
             # skip JSON
-            if video.name == '.metadata.json':
+            if video.file.name == '.metadata.json':
                 continue
 
             if len(videos) >= max_videos:
                 break
 
-            video_path = oslex.quote(str(video))
+            video_path = oslex.quote(str(video.file))
 
             # determine length if needed
             length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
                               "default=noprint_wrappers=1:nokey=1", video_path]
-            length = subprocess.run(length_command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+            length = self.run_interruptable_process(length_command)
 
             length_output = length.stdout.decode("utf-8")
             length_error = length.stderr.decode("utf-8")
             if length_error:
-                shutil.rmtree(video_staging_area, ignore_errors=True)
                 return self.dataset.finish_with_error("Cannot determine length of video {video.name}. Cannot stack "
                                                       "videos without knowing the video lengths.")
             else:
-                lengths[video.name] = float(length_output)
+                lengths[video.file.name] = float(length_output)
 
-            videos.append(video)
+            videos.append(video.file)
 
         # sort videos by length
         videos = sorted(videos, key=lambda v: lengths[v.name], reverse=True)
@@ -256,11 +260,10 @@ class VideoStack(BasicProcessor):
         self.dataset.log(f"Using ffmpeg filter {ffmpeg_filter}")
 
         if self.interrupted:
-            shutil.rmtree(video_staging_area, ignore_errors=True)
             return ProcessorInterruptedException("Interrupted while stacking videos")
 
         self.dataset.update_status("Merging video files with ffmpeg (this can take a while)")
-        result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = self.run_interruptable_process(command)
 
         # Capture logs
         ffmpeg_output = result.stdout.decode("utf-8")
@@ -276,13 +279,11 @@ class VideoStack(BasicProcessor):
             for line in ffmpeg_error.split("\n"):
                 self.dataset.log("  " + line)
 
-        shutil.rmtree(video_staging_area, ignore_errors=True)
-
         if result.returncode != 0:
             return self.dataset.finish_with_error(
                 f"Could not stack videos (error {result.returncode}); check the dataset log for details.")
 
         if with_errors:
-            self.dataset.update_status("Stack created, but with errors. Check dataset log for details.", is_final=True)
-
-        self.dataset.finish(1)
+            self.dataset.finish_with_warning(1, "Stack created, but with errors. Check dataset log for details.")
+        else:
+            self.dataset.finish(1)

@@ -1,0 +1,73 @@
+<div class="item-content">
+	<header>
+		{% if item.inclusion_context %}
+			<div class="inclusion-context">{{ item.inclusion_context }}</div>
+		{% endif %}
+
+		<div class="metadata">
+		{% if not pseudonymised %}
+			<!-- Possible external link, if not pseudonymised -->
+			<a href="{{ item.item_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+			
+			<!-- Profile pic -->
+			{% if item["author_avatar_url"] %}
+				<div class="author-avatar">
+					<a href="https://linkedin.com/{{ item.get('author') }}" target="_blank">
+						<img src="{{ item.get('author_avatar_url') }}">
+					</a>
+				</div>
+			{% endif %}
+			
+			<!-- Author info and time -->
+			<div class="author">
+				<div class="author-name"><a href="https://linkedin.com/{{ item.get('author') }}" target="_blank"><strong>{{ item.get("author_name") }}</strong></a></div>
+				<div class="author-description">{{ item.get("author_description") }}</div>
+				<div class="time">{{ item.get("timestamp") }}</div>
+			</div>
+
+		{% else %}
+			<div class="author">
+				<div class="author-name"><span title="Pseudonymous author" class="author"><i class="fa fa-user-secret tooltip-trigger"></i></span></div>
+				<div class="time">{{ item.get("timestamp") }}</div>
+			</div>
+		{% endif %}
+		</div>
+	</header>
+
+	<!-- item text content -->
+	<div class="body">{{ item.get("body") | social_mediafy(datasource='linkedin') | safe }}</div>
+
+	<!-- Media item -->
+	{% if item["image_urls"] or item["video_thumb_url"] %}
+		<div class="media-container">
+		{% if item["image_urls"] %}
+			{% for image_url in item["image_urls"].split(",") %}
+				<img src="{{ image_url }}">
+			{% endfor %}
+		{% elif item["video_thumb_url"] %}
+			<div class="video-thumb"><img src="{{ item.video_thumb_url }}"></div>
+			<div class="play-button"><i class="fa-solid fa-play"></i></div>
+		{% endif %}
+		</div>
+	{% endif %}
+	
+
+	<!-- item metrics -->
+	<div class="metrics">
+		{% for reaction_type in ["reaction_like","reaction_empathy","reaction_praise","reaction_entertainment","reaction_appreciation","reaction_interest"] %}
+			{% if reaction_type in item and item[reaction_type] > 0 %}
+				<span><img src="{{ url_for('static', filename='explorer-assets/linkedin_' + reaction_type + '.svg') }}"></img> {{ item[reaction_type] }}</span>
+			{% endif %}
+		{% endfor %}
+		<span class="shares-and-comments">
+			{% if item.get("shares") and item["shares"] > 0 %}
+				<span class="shares">{{ item.get("shares") | numberify }} reitems</span>
+			{% endif %}
+			{% if (item.get("shares") and item["shares"] > 0) and (item.get("comments") and item["comments"] > 0) %} • {% endif %}
+			{% if item.get("comments") and item["comments"] > 0 %}
+				<span class="comments">{{ item.get("comments") | numberify }} comments</span>
+			{% endif %}
+		</span>
+	</div>
+
+</div>

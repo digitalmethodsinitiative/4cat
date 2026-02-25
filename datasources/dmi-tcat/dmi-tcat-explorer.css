@@ -1,0 +1,84 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
+body {
+	background-color: white;
+}
+
+.items .item {
+	position: relative;
+	background-color: white;
+	max-width: 620px;
+	border: 1px solid #d6d6d6;
+	border-radius: 10px;
+	min-height: 50px;
+}
+
+.items .item header {
+	display: inline-block;
+	line-height: 1.7em;
+	margin-bottom: 5px;
+	border: none;
+	color: rgb(104, 119, 130);
+}
+
+.items .item header .item_id {
+	display: none;
+}
+
+.items .item header .author {
+	color: black;
+}
+
+.items .item header .profile_picture {
+	float: left;
+	margin-right: 15px;
+}
+
+.items .item header .profile_picture img {
+	border-radius: 100px;
+	width: 50px;
+}
+
+.items .item header .profile_picture:after {
+	display: none;
+}
+
+.items .item article {
+	margin: 0;
+	padding: 0;
+}
+
+.items .item.op {
+	background-color: white;
+	color: black;
+}
+
+.items .item .item-content {
+	display: inline-block;
+}
+
+.items .item .item-image {
+	margin-bottom: 10px;
+}
+
+.items .item .item-image img {
+	border-radius: 10px;
+}
+
+.items .external-url {
+	color: rgb(104, 119, 130);
+}
+
+.items .item.op .item-annotations, .items .item .item-annotations {
+	border-radius: 10px;
+	background-color: rgb(241, 249, 255);
+	color: #474747;
+}
+
+span.hashtag {
+	color: rgb(29, 155, 240);
+}

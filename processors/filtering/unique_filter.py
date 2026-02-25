@@ -21,35 +21,6 @@ class UniqueFilter(BaseFilter):
     title = "Filter for unique items"  # title displayed in UI
     description = "Only keeps the first encounter of an item. This creates a new dataset."  # description displayed in UI
 
-    # the following determines the options available to the user via the 4CAT
-    # interface.
-    options = {
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Item attributes to consider for uniqueness",
-            "inline": True,
-            "default": "body"
-        },
-        "match-multiple": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Match multiple values",
-            "default": "all",
-            "options": {
-                "all": "Consider duplicate if all selected values are identical",
-                "any": "Consider duplicate if any selected values are identical"
-            },
-            "tooltip": "When matching on multiple values, you can choose to discard items if all provided values "
-                       "match a similar combination of values in another item, or if any single value has been "
-                       "seen before. Ignored when matching on a single value."
-        },
-        "fold-case": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Case insensitive",
-            "default": False,
-            "tooltip": "Selecting this will e.g. consider 'Cat' and and 'cat' as identical."
-        },
-    }
-
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
@@ -115,7 +86,7 @@ class UniqueFilter(BaseFilter):
 
             if unique_item:
                 unique += 1
-                yield mapped_item.original
+                yield mapped_item
 
             if processed % 500 == 0:
                 self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))
@@ -141,7 +112,32 @@ class UniqueFilter(BaseFilter):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
-        options = cls.options
+        options = {
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Columns to consider for uniqueness",
+                "inline": True,
+                "default": "body"
+            },
+            "match-multiple": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Match multiple values",
+                "default": "all",
+                "options": {
+                    "all": "Consider duplicate if all selected values are identical",
+                    "any": "Consider duplicate if any selected values are identical"
+                },
+                "tooltip": "When matching on multiple values, you can choose to discard items if all provided values "
+                        "match a similar combination of values in another item, or if any single value has been "
+                        "seen before. Ignored when matching on a single value."
+            },
+            "fold-case": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Case insensitive",
+                "default": False,
+                "tooltip": "Selecting this will e.g. consider 'Cat' and and 'cat' as identical."
+            },
+        }
 
 		# Get the columns for the select columns option
         if parent_dataset and parent_dataset.get_columns():

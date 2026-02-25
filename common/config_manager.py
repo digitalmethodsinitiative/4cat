@@ -22,21 +22,29 @@ class CacheMiss:
     """
     pass
 
+class BaseConfigReader:
+    """
+    Helper class to unify various types of configuration readers
+    """
+    pass
 
-class ConfigManager:
+class ConfigManager(BaseConfigReader):
     db = None
     dbconn = None
     cache = {}
-    memcache = None
+    logger = None
 
     core_settings = {}
     config_definition = {}
+    # Thread-local storage for a singleton memcache client per thread.
+    # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
+    _memcache_tls = threading.local()
 
     def __init__(self, db=None):
         # ensure core settings (including database config) are loaded
         self.load_core_settings()
         self.load_user_settings()
-        self.memcache = self.load_memcache()
+        # Do not create a memcache client here; get_memcache() will lazily create per-thread.
 
         # establish database connection if none available
         if db:
@@ -52,13 +60,28 @@ class ConfigManager:
         :param db:  Database object. If None, initialise it using the core config
         """
         if db or not self.db:
+            if db and db.log and not self.logger:
+                # borrow logger from database
+                self.with_logger(db.log)
+
             # Replace w/ db if provided else only initialise if not already
-            self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
+            self.db = db if db else Database(logger=self.logger, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
                                          password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
                                          port=self.get("DB_PORT"), appname="config-reader")
         else:
             # self.db already initialized and no db provided
             pass
+
+    def with_logger(self, logger):
+        """
+        Attach logger to config manager
+
+        4CAT's logger has some features on top of the basic Python logger that
+        are needed for further operation, e.g. the Debug2 log level.
+
+        :param Logger logger:
+        """
+        self.logger = logger
 
     def load_user_settings(self):
         """
@@ -73,7 +96,7 @@ class ConfigManager:
         # module settings can't be loaded directly because modules need the
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
-        module_config_path = self.get("PATH_ROOT").joinpath("config/module_config.bin")
+        module_config_path = self.get("PATH_CONFIG").joinpath("module_config.bin")
         if module_config_path.exists():
             try:
                 with module_config_path.open("rb") as infile:
@@ -112,7 +135,6 @@ class ConfigManager:
         :return:
         """
         config_file = Path(__file__).parent.parent.joinpath("config/config.ini")
-
         config_reader = configparser.ConfigParser()
         in_docker = False
         if config_file.exists():
@@ -123,6 +145,10 @@ class ConfigManager:
         else:
             # config should be created!
             raise ConfigException("No config/config.ini file exists! Update and rename the config.ini-example file.")
+        
+        # Set up core settings
+        # Using Path.joinpath() will ensure paths are relative to ROOT_PATH or absolute (if /some/path is provided)
+        root_path = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve() # better don"t change this
 
         self.core_settings.update({
             "CONFIG_FILE": config_file.resolve(),
@@ -136,34 +162,42 @@ class ConfigManager:
             "API_HOST": config_reader["API"].get("api_host"),
             "API_PORT": config_reader["API"].getint("api_port"),
 
-            "MEMCACHE_SERVER": config_reader.get("MEMCACHE", option="memcache_host", fallback={}),
+            "MEMCACHE_SERVER": config_reader.get("MEMCACHE", option="memcache_host", fallback=None),
 
-            "PATH_ROOT": Path(os.path.abspath(os.path.dirname(__file__))).joinpath(
-                "..").resolve(),  # better don"t change this
-            "PATH_LOGS": Path(config_reader["PATHS"].get("path_logs", "")),
-            "PATH_IMAGES": Path(config_reader["PATHS"].get("path_images", "")),
-            "PATH_DATA": Path(config_reader["PATHS"].get("path_data", "")),
-            "PATH_LOCKFILE": Path(config_reader["PATHS"].get("path_lockfile", "")),
-            "PATH_SESSIONS": Path(config_reader["PATHS"].get("path_sessions", "")),
+            "PATH_ROOT": root_path,
+            "PATH_CONFIG": root_path.joinpath("config"), # .current-version, config.ini are hardcoded here via docker/docker_setup.py and helper-scripts/migrate.py
+            "PATH_EXTENSIONS": root_path.joinpath("config/extensions"), # Must match setup.py and migrate.py
+            "PATH_LOGS": root_path.joinpath(config_reader["PATHS"].get("path_logs", "")),
+            "PATH_IMAGES": root_path.joinpath(config_reader["PATHS"].get("path_images", "")),
+            "PATH_DATA": root_path.joinpath(config_reader["PATHS"].get("path_data", "")),
+            "PATH_LOCKFILE": root_path.joinpath(config_reader["PATHS"].get("path_lockfile", "")),
+            "PATH_SESSIONS": root_path.joinpath(config_reader["PATHS"].get("path_sessions", "")),
 
             "ANONYMISATION_SALT": config_reader["GENERATE"].get("anonymisation_salt"),
             "SECRET_KEY": config_reader["GENERATE"].get("secret_key")
         })
 
 
-    def load_memcache(self):
+    def get_memcache(self):
         """
-        Initialise memcache client
+        Get (or create) a thread-local memcache client
 
         The config reader can optionally use Memcache to keep fetched values in
         memory.
         """
-        if self.get("MEMCACHE_SERVER"):
+        # Reuse per-thread client if already initialised.
+        existing = getattr(self._memcache_tls, "client", None)
+        if existing:
+            return existing
+
+        server = self.get("MEMCACHE_SERVER")
+        if server:
             try:
+                memcache = MemcacheClient(server, serde=serde.pickle_serde, key_prefix=b"4cat-config")
                 # do one test fetch to test if connection is valid
-                memcache = MemcacheClient(self.get("MEMCACHE_SERVER"), serde=serde.pickle_serde, key_prefix=b"4cat-config")
                 memcache.set("4cat-init-dummy", time.time())
                 memcache.init_thread_id = threading.get_ident()
+                self._memcache_tls.client = memcache
                 return memcache
             except (SystemError, ValueError, MemcacheError, ConnectionError, OSError):
                 # we have no access to the logger here so we simply pass
@@ -173,6 +207,25 @@ class ConfigManager:
                 pass
 
         return None
+
+    def close_memcache(self):
+        """Close and dispose this thread's memcache client.
+
+        Call from gunicorn worker_exit or application teardown to ensure
+        sockets are closed explicitly instead of relying on GC/process exit.
+        """
+        client = getattr(self._memcache_tls, "client", None)
+        if client:
+            try:
+                client.close()
+            except Exception:
+                pass
+            finally:
+                try:
+                    del self._memcache_tls.client
+                except AttributeError:
+                    pass
+        
 
     def ensure_database(self):
         """
@@ -251,8 +304,7 @@ class ConfigManager:
         with the given tag, and returns that if one exists. First matching tag
         wins.
         :param bool with_core:  Also include core (i.e. config.ini) settings
-        :param MemcacheClient memcache:  Memcache client. If `None` and
-        `self.memcache` exists, use that instead.
+        :param MemcacheClient memcache:  Memcache client. If `None`, a thread-local client will be used.
 
         :return dict: Setting value, as a dictionary with setting names as keys
         and setting values as values.
@@ -277,8 +329,7 @@ class ConfigManager:
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
-        :param MemcacheClient memcache:  Memcache client. If `None` and
-        `self.memcache` exists, use that instead.
+    :param MemcacheClient memcache:  Memcache client. If `None`, a thread-local client will be used.
 
         :return:  Setting value, or the provided fallback, or `None`.
         """
@@ -309,9 +360,9 @@ class ConfigManager:
         # end to fall back to the global value if no specific one exists.
         tags.append("")
 
-        # short-circuit via memcache if appropriate
-        if not memcache and self.memcache:
-            memcache = self.memcache
+        # Obtain thread-local memcache client if not explicitly given.
+        if not memcache:
+            memcache = self.get_memcache()
 
         # first check if we have all the values in memcache, in which case we
         # do not need a database query
@@ -366,7 +417,7 @@ class ConfigManager:
                 value = cached_values[tag]
                 break
         else:
-            value = default if default else None
+            value = None
 
         # parse some values...
         if not is_json and value is not None:
@@ -392,8 +443,7 @@ class ConfigManager:
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
-        :param MemcacheClient memcache:  Memcache client. If `None` and
-        `self.memcache` exists, use that instead.
+    :param MemcacheClient memcache:  Memcache client. If `None`, a thread-local client will be used.
         :return list:  List of tags
         """
         # be flexible about the input types here
@@ -411,8 +461,8 @@ class ConfigManager:
         if user:
             user_tags = CacheMiss
             
-            if not memcache and self.memcache:
-                memcache = self.memcache
+            if not memcache:
+                memcache = self.get_memcache()
                 
             if memcache:
                 memcache_id = f"_usertags-{user}"
@@ -447,8 +497,7 @@ class ConfigManager:
                           be serialised into a JSON string
         :param bool overwrite_existing: True will overwrite existing setting, False will do nothing if setting exists
         :param str tag:  Tag to write setting for
-        :param MemcacheClient memcache:  Memcache client. If `None` and
-        `self.memcache` exists, use that instead.
+    :param MemcacheClient memcache:  Memcache client. If `None`, a thread-local client will be used.
 
         :return int: number of updated rows
         """
@@ -476,8 +525,8 @@ class ConfigManager:
         updated_rows = self.db.cursor.rowcount
         self.db.log.debug(f"Updated setting for {attribute_name}: {value} (tag: {tag})")
 
-        if not memcache and self.memcache:
-            memcache = self.memcache
+        if not memcache:
+            memcache = self.get_memcache()
 
         if memcache:
             # invalidate any cached value for this setting
@@ -496,10 +545,9 @@ class ConfigManager:
         """
         self.db.delete("settings", where={"name": attribute_name, "tag": tag})
         updated_rows = self.db.cursor.rowcount
-
-        if self.memcache:
-            self.memcache.delete(self._get_memcache_id(attribute_name, tag))
-
+        client = self.get_memcache()
+        if client:
+            client.delete(self._get_memcache_id(attribute_name, tag))
         return updated_rows
 
     def clear_cache(self):
@@ -508,10 +556,10 @@ class ConfigManager:
 
         Called when the backend restarts - helps start with a blank slate.
         """
-        if not self.memcache:
+        client = self.get_memcache()
+        if not client:
             return
-
-        self.memcache.flush_all()
+        client.flush_all()
 
     def uncache_user_tags(self, users):
         """
@@ -523,10 +571,11 @@ class ConfigManager:
 
         :param list users:  List of users, as usernames or User objects
         """
-        if self.memcache:
+        client = self.get_memcache()
+        if client:
             for user in users:
                 user = self._normalise_user(user)
-                self.memcache.delete(f"_usertags-{user}")
+                client.delete(f"_usertags-{user}")
 
     def _normalise_user(self, user):
         """
@@ -597,7 +646,7 @@ class ConfigManager:
             return self.get(attr)
 
 
-class ConfigWrapper:
+class ConfigWrapper(BaseConfigReader):
     """
     Wrapper for the config manager
 
@@ -624,17 +673,12 @@ class ConfigWrapper:
             self.tags = tags if tags else config.tags
             self.request = request if request else config.request
             self.config = config.config
-            self.memcache = config.memcache
+            # legacy: previous versions cached a per-request memcache client; now resolved inside ConfigManager
         else:
             self.config = config
             self.user = user
             self.tags = tags
             self.request = request
-
-            # this ensures we use our own memcache client, important in threaded
-            # contexts because pymemcache is not thread-safe. Unless we get a
-            # prepared connection...
-            self.memcache = self.config.load_memcache()
 
         # this ensures the user object in turn reads from the wrapper
         if self.user:
@@ -652,7 +696,7 @@ class ConfigWrapper:
         if "tag" not in kwargs and self.tags:
             kwargs["tag"] = self.tags
 
-        kwargs["memcache"] = self.memcache
+        # ConfigManager resolves thread-local memcache internally
 
         return self.config.set(*args, **kwargs)
 
@@ -675,7 +719,7 @@ class ConfigWrapper:
             kwargs["tags"] = self.tags if self.tags else []
             kwargs["tags"] = self.request_override(kwargs["tags"])
 
-        kwargs["memcache"] = self.memcache
+        # ConfigManager resolves thread-local memcache internally
 
         return self.config.get_all(*args, **kwargs)
 
@@ -698,7 +742,7 @@ class ConfigWrapper:
             kwargs["tags"] = self.tags if self.tags else []
             kwargs["tags"] = self.request_override(kwargs["tags"])
 
-        kwargs["memcache"] = self.memcache
+        # ConfigManager resolves thread-local memcache internally
 
         return self.config.get(*args, **kwargs)
 
@@ -714,10 +758,9 @@ class ConfigWrapper:
         :param tags:
         :return list:
         """
-        active_tags = self.config.get_active_tags(user, tags, self.memcache)
+        active_tags = self.config.get_active_tags(user, tags)
         if not tags:
             active_tags = self.request_override(active_tags)
-
         return active_tags
 
     def request_override(self, tags):
@@ -741,8 +784,8 @@ class ConfigWrapper:
         # use self.config.get here, not self.get, because else we get infinite
         # recursion (since self.get can call this method)
         if self.request and self.request.headers.get("X-4Cat-Config-Tag") and \
-            self.config.get("flask.proxy_secret", memcache=self.memcache) and \
-            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret", memcache=self.memcache):
+            self.config.get("flask.proxy_secret") and \
+            self.request.headers.get("X-4Cat-Config-Via-Proxy") == self.config.get("flask.proxy_secret"):
             # need to ensure not just anyone can add this header to their
             # request!
             # to this end, the second header must be set to the secret value;

@@ -12,7 +12,7 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	type = "preset-histogram"  # job type ID
 	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
 	title = "Histogram"  # title displayed in UI
-	description = "Visualize graphically the number of posts over time."  # description displayed in UI
+	description = "Create a histogram that shows the number of items over time."  # description displayed in UI
 	extension = "svg"
 
 	@staticmethod
@@ -44,10 +44,10 @@ class MonthlyHistogramCreator(ProcessorPreset):
 		query = self.parameters.copy()
 		header = self.source_dataset.get_label() + f": Items per {query['timeframe']}"
 		if len(header) > 40:
-			header = "Items per month"
+			header = f"Items per {query['timeframe']}"
 
 		pipeline = [
-			# first, count activity per month
+			# first, count activity per timeframe
 			{
 				"type": "count-posts",
 				"parameters": {

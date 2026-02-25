@@ -25,6 +25,7 @@ from pathlib import Path
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
 from urllib.parse import urlparse, urlunparse
+from dateutil import parser as dateutil_parser
 from calendar import monthrange
 from packaging import version
 from PIL import Image
@@ -239,7 +240,7 @@ def get_software_version():
 
     :return str:  Software version, for example `1.37`.
     """
-    current_version_file = core_config.get("PATH_ROOT").joinpath("config/.current-version")
+    current_version_file = core_config.get("PATH_CONFIG").joinpath(".current-version")
     if not current_version_file.exists():
         return ""
 
@@ -303,10 +304,10 @@ def find_extensions():
     :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
     dictionary, and a list of (str) errors encountered while loading
     """
-    extension_path = core_config.get("PATH_ROOT").joinpath("extensions")
+    extension_path = core_config.get("PATH_EXTENSIONS")
     errors = []
     if not extension_path.exists() or not extension_path.is_dir():
-        return [], None
+        return {}, errors
 
     # each folder in the extensions folder is an extension
     extensions = {
@@ -315,8 +316,8 @@ def find_extensions():
             "version": "",
             "url": "",
             "git_url": "",
-            "is_git": False
-        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir()
+            "is_git": False,
+        } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir() and not extension.name.startswith("__")
     }
 
     # collect metadata for extensions
@@ -446,6 +447,21 @@ def timify(number, short=False):
 
     return time_str + last_str
 
+def nthify(integer: int) -> str:
+    """
+    Takes an integer and returns a string with 'st', 'nd', 'rd', or 'th' as suffix, depending on the number.
+    """
+    int_str = str(integer).strip()
+    if int_str.endswith("1"):
+        suffix = "st"
+    elif int_str.endswith("2"):
+        suffix = "nd"
+    elif int_str.endswith("3"):
+        suffix = "rd"
+    else:
+        suffix = "th"
+    return int_str + suffix
+
 def andify(items):
     """
     Format a list of items for use in text
@@ -455,10 +471,13 @@ def andify(items):
     :param items:  Iterable list
     :return str:  Formatted string
     """
+
+    items = items.copy()
+
     if len(items) == 0:
         return ""
     elif len(items) == 1:
-        return str(items[1])
+        return str(items[0])
 
     result = f" and {items.pop()}"
     return ", ".join([str(item) for item in items]) + result
@@ -486,36 +505,120 @@ def ellipsiate(text, length, inside=False, ellipsis_str="&hellip;"):
         after = len(text) - before
         return text[:before] + ellipsis_str + text[after:]
 
-def hash_file(image_file, hash_type="file-hash"):
-    """
-    Generate an image hash
+def stringify_hash(hash_obj, hash_type: str) -> str:
+    """Convert a hash object to a stable string for storage."""
+    if hash_type == "file-hash":
+        # Allow raw bytes or precomputed hex
+        if isinstance(hash_obj, (bytes, bytearray)):
+            return bytes(hash_obj).hex()
+        if isinstance(hash_obj, str):
+            return hash_obj
+        raise TypeError("file-hash must be bytes or hex string")
+    if hash_type == "crhash":
+        comps = normalize_crhash_components(hash_obj)
+        return json.dumps(sorted(str(h) for h in comps))
+    return str(hash_obj)
 
-    :param Path image_file:  Image file to hash
-    :param str hash_type:  Hash type, one of `file-hash`, `colorhash`,
-    `phash`, `average_hash`, `dhash`
-    :return str:  Hexadecimal hash value
+
+def normalize_crhash_components(hash_obj):
     """
-    if not image_file.exists():
+    Normalize a crop-resistant hash object to a non-empty list of component ImageHash objects.
+
+    Strict mode: we support exactly the shape we use in this project and the CSV round-trip:
+    - ImageMultiHash with 'segment_hashes' (attribute or method) returning an iterable of ImageHash components.
+    - A list/tuple of ImageHash components (used when reconstructing from CSV).
+
+    Any other shape is an error.
+    """
+    # Preferred: ImageMultiHash exposes 'segment_hashes'
+    if hasattr(hash_obj, "segment_hashes"):
+        attr = getattr(hash_obj, "segment_hashes")
+        comps = attr() if callable(attr) else attr
+        comps_list = list(comps or [])
+        if not comps_list:
+            raise TypeError("segment_hashes returned empty components")
+        return comps_list
+
+    # CSV/regrouper pathway: a concrete list/tuple of components
+    if isinstance(hash_obj, (list, tuple)):
+        if len(hash_obj) == 0:
+            raise TypeError("component list is empty")
+        return list(hash_obj)
+
+    # Anything else is not supported by our contract
+    obj_type = type(hash_obj).__name__
+    raise TypeError(f"Unsupported crhash object type: {obj_type}; expected ImageMultiHash with 'segment_hashes' or a list of ImageHash components")
+
+
+def compute_hash(path: Path, hash_type: str = "file-hash", *, size: int | None = None, mode: str | None = None, as_string: bool = True):
+    """
+    General-purpose file/image hashing with sensible defaults.
+
+    - file-hash: SHA-1 over bytes.
+    - average_hash/dhash/phash: hash_size defaults to 16.
+    - whash-haar/whash-db4 (or 'whash' + mode): hash_size defaults to 16, mode defaults to 'db4'.
+    - colorhash: uses binbits (defaults to 3). If size is given, treated as binbits.
+    - crhash: crop_resistant_hash object; no size.
+
+    Set as_string=False to get raw hash objects for direct comparisons.
+    """
+    if not path.exists():
         raise FileNotFoundError()
-
+    
     if hash_type == "file-hash":
         hasher = hashlib.sha1()
-
-        # Open the file in binary mode
-        with image_file.open("rb") as infile:
-            # Read and update hash in chunks to handle large files
-            while chunk := infile.read(1024):
+        with path.open("rb") as infile:
+            for chunk in iter(lambda: infile.read(65536), b""):
                 hasher.update(chunk)
+        return hasher.hexdigest() if as_string else hasher.digest()
 
-        return hasher.hexdigest()
+    with Image.open(path) as img:
+        # convert to RGB for consistent hashing (ignores alpha channel changes)
+        img = img.convert("RGB")
 
-    elif hash_type in ("colorhash", "phash", "average_hash", "dhash"):
-        image = Image.open(image_file)
+        if hash_type == "phash":
+            result = imagehash.phash(img, hash_size=(size or 16))
 
-        return str(getattr(imagehash, hash_type)(image))
+        elif hash_type == "average_hash":
+            result = imagehash.average_hash(img, hash_size=(size or 16))
 
-    else:
-        raise NotImplementedError(f"Unknown hash type '{hash_type}'")
+        elif hash_type == "dhash":
+            result = imagehash.dhash(img, hash_size=(size or 16))
+
+        elif hash_type in ("whash", "whash-haar", "whash-db4"):
+            wave_mode = mode or ("haar" if hash_type == "whash-haar" else "db4")
+            result = imagehash.whash(img, hash_size=(size or 16), mode=wave_mode)
+
+        elif hash_type == "colorhash":
+            # imagehash.colorhash uses binbits, not hash_size
+            result = imagehash.colorhash(img, binbits=(size if size is not None else 3))
+
+        elif hash_type == "crhash":
+            if size is not None:
+                raise ValueError("hash_size is not applicable for crop-resistant hashes")
+            result = imagehash.crop_resistant_hash(img)
+
+        else:
+            raise NotImplementedError(f"Unknown hash type '{hash_type}'")
+
+    return stringify_hash(result, hash_type) if as_string else result
+
+def hash_file(image_file: Path, hash_type: str = "file-hash", hash_size: int | None = None) -> str:
+    """
+    Legacy wrapper returning a string. Supports:
+    'file-hash', 'colorhash', 'phash', 'average_hash', 'dhash', 'whash-haar', 'whash-db4', 'crhash'
+    """
+    return compute_hash(image_file, hash_type, size=hash_size, as_string=True)
+
+
+def hash_image(image_path: Path, hash_type: str, hash_size: int | None = None, *, as_string: bool = False):
+    """
+    Unified image hashing helper.
+
+    - Omitting hash_size is fine; defaults are applied per type.
+    - Returns raw hash objects by default (as_string=False).
+    """
+    return compute_hash(image_path, hash_type, size=hash_size, as_string=as_string)
 
 def get_yt_compatible_ids(yt_ids):
     """
@@ -699,12 +802,16 @@ def get_interval_descriptor(item, interval, item_column="timestamp"):
         try:
             timestamp = datetime.datetime.fromtimestamp(timestamp)
         except (ValueError, TypeError):
-            raise ValueError("Invalid timestamp '%s'" % str(item["timestamp"]))
+            raise ValueError("Invalid timestamp '%s'" % str(item[item_column]))
     except (TypeError, ValueError):
         try:
-            timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
+            timestamp = datetime.datetime.strptime(item[item_column], "%Y-%m-%d %H:%M:%S")
         except (ValueError, TypeError):
-            raise ValueError("Invalid date '%s'" % str(item["timestamp"]))
+            try:
+                # Brute force with dateutil
+                timestamp = dateutil_parser.parse(item[item_column])
+            except (ValueError, TypeError, dateutil_parser.ParserError):
+                raise ValueError("Invalid date '%s'" % str(item[item_column]))
 
     if interval == "year":
         return str(timestamp.year)
@@ -1067,7 +1174,7 @@ def send_email(recipient, message, mail_config):
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     """
     Return a flattened dictionary where nested dictionary objects are given new
-    keys using the partent key combined using the seperator with the child key.
+    keys using the parent key combined using the seperator with the child key.
 
     Lists will be converted to json strings via json.dumps()
 
@@ -1117,8 +1224,12 @@ def sets_to_lists(d: MutableMapping):
 
 def url_to_hash(url, remove_scheme=True, remove_www=True):
     """
-    Convert a URL to a filename; some URLs are too long to be used as filenames, this keeps the domain and hashes the
-    rest of the URL.
+    Convert a URL to a hash. Allows removing scheme and www prefix before hashing.
+    
+    :param url: URL to hash
+    :param remove_scheme: If True, removes the scheme from URL before hashing
+    :param remove_www: If True, removes the www. prefix from URL before hashing
+    :return: Hash of the URL
     """
     parsed_url = urlparse(url.lower())
     if parsed_url:
@@ -1127,23 +1238,75 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
         if remove_www:
             netloc = re.sub(r"^www\.", "", parsed_url.netloc)
             parsed_url = parsed_url._replace(netloc=netloc)
-
-        url = re.sub(r"[^0-9a-z]+", "_", urlunparse(parsed_url).strip("/"))
+        
+        # Hash the normalized URL directly
+        normalized_url = urlunparse(parsed_url).strip("/")
     else:
-        # Unable to parse URL; use regex
+        # Unable to parse URL; use regex normalization
+        normalized_url = url.lower().strip("/")
         if remove_scheme:
-            url = re.sub(r"^https?://", "", url)
+            normalized_url = re.sub(r"^https?://", "", normalized_url)
         if remove_www:
             if not remove_scheme:
-                scheme = re.match(r"^https?://", url).group()
-                temp_url = re.sub(r"^https?://", "", url)
-                url = scheme + re.sub(r"^www\.", "", temp_url)
+                scheme_match = re.match(r"^https?://", normalized_url)
+                if scheme_match:
+                    scheme = scheme_match.group()
+                    temp_url = re.sub(r"^https?://", "", normalized_url)
+                    normalized_url = scheme + re.sub(r"^www\.", "", temp_url)
             else:
-                url = re.sub(r"^www\.", "", url)
+                normalized_url = re.sub(r"^www\.", "", normalized_url)
 
-        url = re.sub(r"[^0-9a-z]+", "_", url.lower().strip("/"))
+    return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
 
-    return hashlib.blake2b(url.encode("utf-8"), digest_size=24).hexdigest()
+def normalize_url_encoding(url):
+    """
+    Normalize URL encoding for display and linking
+
+    Takes a URL that may or may not already be percent-encoded and returns
+    a properly encoded version suitable for both display and use as a link.
+    Only query parameters and fragments are encoded; the scheme, domain, and
+    path remain human-readable.
+
+    Examples:
+        - "https://example.com/search?q=hello world" → "https://example.com/search?q=hello%20world"
+        - "https%3A//example.com/search%3Fq%3Dhello" → "https://example.com/search?q=hello"
+        - "https://example.com/search?q=hello%20world" → "https://example.com/search?q=hello%20world"
+
+    :param str url: URL to normalize (may be encoded or not)
+    :return str: Properly encoded URL, or empty string if invalid
+    """
+    from urllib.parse import unquote, urlencode, parse_qs
+
+    if not url:
+        return ""
+
+    try:
+        # Unquote the entire URL first to normalize
+        decoded_url = unquote(url)
+        # Parse the URL into components
+        parsed = urlparse(decoded_url)
+
+        # Re-encode the query string properly
+        if parsed.query:
+            query_params = parse_qs(parsed.query, keep_blank_values=True)
+            # Flatten single-value lists and encode
+            encoded_query = urlencode({k: v[0] if len(v) == 1 else v for k, v in query_params.items()})
+            # Reconstruct URL with encoded query
+            result = urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                encoded_query,
+                parsed.fragment
+            ))
+        else:
+            result = decoded_url
+
+        return result
+    except (ValueError, AttributeError):
+        # If URL parsing fails, return the original URL
+        return url
 
 def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """
@@ -1153,14 +1316,20 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         always be possible or be an actual filename. Also, avoid using the same
         filename multiple times. Ensures filenames don't exceed max_bytes.
 
+        Check both in-memory existing filenames and on-disk filenames in the
+        staging area (if provided) to avoid collisions. Note: With a new staging
+        area, only in-memory checks are beneficial; leave as None to skip on-disk checks.
+
         :param str url:  URLs to determine filenames for
         :param Path staging_area:  Path to the staging area where files are saved
-        (to avoid collisions); if None, no collision avoidance is done.
+        (to avoid collisions with existing files); if None, no disk checks are done.
         :param str default_name:  Default name to use if no filename can be
         extracted from the URL
         :param str default_ext:  Default extension to use if no filename can be
         extracted from the URL
         :param int max_bytes:  Maximum number of bytes for the filename
+        :param set existing_filenames:  Set of existing filenames to avoid
+        collisions with (in addition to those in the staging area, if provided).
         :return str:  Suitable file name
         """
         clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
@@ -1169,8 +1338,14 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         else:
             base_filename = default_name + default_ext
 
-        if not existing_filenames:
-            existing_filenames = []
+        # remove some problematic characters
+        base_filename = re.sub(r"[:~]", "", base_filename)
+
+        if existing_filenames is None:
+            existing_filenames = set()
+        if type(existing_filenames) is not set:
+            # Could force set() here, but likely would be forcing in a loop
+            raise TypeError("existing_filenames must be a set")
 
         # Split base filename into name and extension
         if '.' in base_filename:
@@ -1202,12 +1377,14 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
 
         filename = base_filename
 
-        if staging_area:
+        if staging_area or existing_filenames:
             # Ensure the filename is unique in the staging area
-            file_path = staging_area.joinpath(filename)
             file_index = 1
+
+            file_path = staging_area.joinpath(filename) if staging_area else None
             
-            while file_path.exists() or filename in existing_filenames:
+            # Loop while collision in-memory OR on disk (if staging_area given)
+            while (filename in existing_filenames) or (staging_area and file_path.exists()):
                 # Calculate space needed for index suffix
                 index_suffix = f"-{file_index}"
                 
@@ -1232,7 +1409,8 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
                     filename = test_filename
                 
                 file_index += 1
-                file_path = staging_area.joinpath(filename)
+                if staging_area:
+                    file_path = staging_area.joinpath(filename)
 
         return filename
 

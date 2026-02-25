@@ -62,34 +62,70 @@ def make_version_comparable(version):
 	return version[0].zfill(3) + "." + version[1].zfill(3)
 
 
-def check_for_nltk():
+def check_for_nltk(logger):
 	# ---------------------------------------------
 	#        Check for and install packages
 	# ---------------------------------------------
 	# NLTK
+	logger.info("\nChecking for NLTK data...")
 	import nltk
 	try:
 		nltk.data.find('tokenizers/punkt_tab')
 	except LookupError:
-		print("Downloading NLTK punkt data...")	
+		logger.info("Downloading NLTK punkt data...")
 		nltk.download('punkt_tab', quiet=True)
 	try:
 		nltk.data.find('corpora/wordnet')
 	except LookupError:
-		print("Downloading NLTK wordnet data...")	
+		logger.info("Downloading NLTK wordnet data...")
 		nltk.download("wordnet", quiet=True)
 	
 	nltk.download("omw-1.4", quiet=True)
 
-def install_extensions(no_pip=True):
+def install_extensions(logger, no_pip=True):
 	"""
 	Check for extensions and run any installation scripts found.
 
 	Note: requirements texts are handled by setup.py
+
+	:param bool no_pip:  Do not run pip when running extension install script
+	(because migrate runs pip itself)
 	"""
+	if os.path.isdir("extensions") and not os.path.islink("extensions"):
+		# User already has existing extensions folder (and not a symbolic link)
+		# but it is in the wrong place (4CAT root rather than /config)
+		logger.info("Migrating extensions folder...")
+		if not os.path.isdir("config/extensions"):
+			# No config/extensions folder, so we move the existing extensions folder
+			shutil.move("extensions", "config/extensions")
+		else:
+			# Both extensions and config/extensions exist, so we need to merge them
+			for root, dirs, files in os.walk("extensions"):
+				for file in files:
+					# Do not overwrite existing files
+					if not os.path.exists(os.path.join("config/extensions", root, file)):
+						try:
+							shutil.move(os.path.join(root, file), os.path.join("config/extensions", root, file))
+						except FileNotFoundError:
+							# this can happen with temporary OS files like .DS_Store
+							pass
+
+			shutil.rmtree("extensions")
+
+	if not os.path.isdir("config/extensions"):
+		os.makedirs("config/extensions")
+
+	if not os.path.islink("extensions"):
+		# Create symbolic link to extensions folder
+		# os.path.abspath necessary for Windows
+		try:
+			os.symlink(os.path.abspath("config/extensions"), os.path.abspath("extensions"))
+		except OSError:
+			pass
+
 	# Check for extension packages
-	if os.path.isdir("extensions"):
-		for root, dirs, files in os.walk("extensions"):
+	if os.path.isdir("config/extensions"):
+		for root, dirs, files in os.walk("config/extensions"):
 			for file in files:
 				if file == "fourcat_install.py":
 					command = [interpreter, os.path.join(root, file)]
@@ -103,14 +139,14 @@ def install_extensions(no_pip=True):
 					if no_pip:
 						command.append("--no-pip")
 
-					print(f"Installing extension: {os.path.join(root, file)}")
+					logger.info(f"\nRunning extension setup: {os.path.join(root, file)}")
 					result = subprocess.run(command, stdout=subprocess.PIPE,
 											stderr=subprocess.PIPE)
 					if result.returncode != 0:
-						print("Error while running extension installation script: " + os.path.join(root, file))
+						logger.error("Error while running extension installation script: " + os.path.join(root, file))
 
-					print(result.stdout.decode("utf-8")) if result.stdout else None
-					print(result.stderr.decode("utf-8")) if result.stderr else None
+					logger.info(result.stdout.decode("utf-8")) if result.stdout else None
+					logger.info(result.stderr.decode("utf-8")) if result.stderr else None
 
 
 def finish(args, logger, no_pip=True):
@@ -121,8 +157,8 @@ def finish(args, logger, no_pip=True):
 	this is made a function that can be called from any point in the script to
 	wrap up and exit.
 	"""
-	check_for_nltk()
-	install_extensions(no_pip=no_pip)
+	check_for_nltk(logger=logger)
+	install_extensions(no_pip=no_pip, logger=logger)
 	logger.info("\nMigration finished. You can now safely restart 4CAT.\n")
 
 	if args.restart:
@@ -147,10 +183,12 @@ cli.add_argument("--release", "-l", default=False, action="store_true", help="Pu
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
 cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
+cli.add_argument("--no-pip", "-p", default=False, action="store_true", help="Do not update dependencies with pip.")
 cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
 cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate ('both', 'backend', 'frontend'). Skips check for if 4CAT is running when set to 'frontend'. Also used by extensions w/ fourcat_install.py")
 cli.add_argument("--branch", "-b", default=False, help="Which branch to check out from GitHub. By default, check out the latest release.")
+cli.add_argument("--stream_log", "-s", default=True, help="Stream logs from the 4CAT daemon. (Always streams if no output file is set)")
 args = cli.parse_args()
 
 print("")
@@ -168,10 +206,13 @@ logger.setLevel(logging.INFO)
 if args.output:
 	# Add *only* a file handler if output is set
 	# i.e. script will not output to stdout!
+	os.makedirs(os.path.dirname(args.output), exist_ok=True)
 	handler = logging.FileHandler(args.output)
-else:
+	logger.addHandler(handler)
+
+if args.stream_log or not args.output:
 	handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
+	logger.addHandler(handler)
 
 logger.info("           4CAT migration agent           ")
 logger.info("------------------------------------------")
@@ -188,9 +229,12 @@ logger.info(f"Current Datetime:        {time.strftime('%Y-%m-%d %H:%M:%S')}")
 # ---------------------------------------------
 target_version_file = cwd.joinpath("VERSION")
 current_version_file = cwd.joinpath(args.current_version)
-if not current_version_file.exists() and cwd.joinpath(".current-version").exists():
-	logger.info("Moving .current-version to new location")
-	cwd.joinpath(".current-version").rename(current_version_file)
+if not current_version_file.exists():
+	os.makedirs(os.path.dirname(current_version_file), exist_ok=True)
+	# Check for old locations of .current-version
+	if cwd.joinpath(".current-version").exists():
+		logger.info("Moving .current-version to new location")
+		shutil.move(cwd.joinpath(".current-version"), current_version_file)
 
 if not current_version_file.exists():
 	logger.info("Creating .current-version file ")
@@ -208,7 +252,7 @@ logger.info("\nWARNING: Migration can take quite a while. 4CAT will not be avail
 logger.info("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
 
 if not args.yes:
-	print("  ...do you want to continue [y/n]? ", end="")
+	print("  ...do you want to continue [y/N]? ", end="")
 	if input("").lower() != "y":
 		exit(0)
 
@@ -391,25 +435,28 @@ if config and config.get("USING_DOCKER"):
 # ---------------------------------------------
 #                    Run pip
 # ---------------------------------------------
-def log_pip_output(logger, output):
-	for line in output.decode("utf-8").split("\n"):
-		if line.startswith("Requirement already satisfied:"):
-			# eliminate some noise in the output
-			continue
-		logger.info("  " + line)
+if args.no_pip:
+	print("- Skipping dependencie update with pip")
+else:
+	def log_pip_output(logger, output):
+		for line in output.decode("utf-8").split("\n"):
+			if line.startswith("Requirement already satisfied:"):
+				# eliminate some noise in the output
+				continue
+			logger.info("  " + line)
 
-logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
-logger.info("  (this could take a moment)...")
-try:
-	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
-								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
-	log_pip_output(logger, pip.stdout)
-	pip_ran = True
-except subprocess.CalledProcessError as e:
-	log_pip_output(logger, e.output)
-	logger.info(f"\n Error running pip: {e}")
-	exit(1)
-logger.info("  ...done")
+	logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
+	logger.info("  (this could take a moment)...")
+	try:
+		pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
+									stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
+		log_pip_output(logger, pip.stdout)
+		pip_ran = True
+	except subprocess.CalledProcessError as e:
+		log_pip_output(logger, e.output)
+		logger.info(f"\n Error running pip: {e}")
+		exit(1)
+	logger.info("  ...done")
 
 # ---------------------------------------------
 #       Run individual migration scripts

@@ -25,65 +25,8 @@ class ConsolidateURLs(BasicProcessor):
     type = "consolidate-urls"  # job type ID
     category = "Conversion"  # category
     title = "Consolidate URLs"  # title displayed in UI
-    description = "Retain only domain (and optionally path) of URLs; used for Custom Networks (e.g. author + domains)"
+    description = "Retain only the domain (and optionally path) of URLs; used for custom networks (e.g. author + domains)"
     extension = "csv"
-
-    options = {
-        "column": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "URL column to consolidate",
-            "default": "url",
-            "inline": True,
-            "tooltip": "Accepts column with comma seperated URLs",
-        },
-        "expand_urls": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Expand shortened URLs",
-            "tooltip": "This can take a long time for large datasets and it is NOT recommended to run this processor on datasets larger than 10,000 items.",
-        },
-        "method": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Method of URL consolidation",
-            "options": {
-                "domain": "Domain only",
-                "custom": "Customize rules (use settings below)",
-                "social_media": "Social Media rules; overrides other options",
-            },
-            "default": "domain",
-            "tooltip": "Social Media rules are predefined and available via GitHub link."
-        },
-        "remove_scheme": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Remove scheme (e.g., 'http', 'https', etc.)",
-            "requires": "method==custom"
-        },
-        "remove_path": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Remove path (e.g., '/path/to/article')",
-            "requires": "method==custom"
-        },
-        "remove_query": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Remove query (e.g., '?query=search_term' or '?ref=newsfeed')",
-            "requires": "method==custom"
-        },
-        "remove_parameters": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Remove parameters (e.g., ';key1=value1')",
-            "requires": "method==custom"
-        },
-        "remove_fragments": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Remove fragments (e.g., '#fragment')",
-            "requires": "method==custom"
-        },
-    }
 
     # Common domain prefaces to remove
     domain_prefaces = ["m", "www"]
@@ -233,14 +176,74 @@ class ConsolidateURLs(BasicProcessor):
         Update "columns" option with parent dataset columns
         :param config:
         """
-        options = cls.options
+        options = {
+            "column": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "URL column to consolidate",
+                "default": "url",
+                "inline": True,
+                "tooltip": "Accepts column with comma seperated URLs",
+            },
+            "expand_urls": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Expand shortened URLs",
+                "tooltip": "This can take a long time for large datasets and it is NOT recommended to run this processor on datasets larger than 10,000 items.",
+            },
+            "method": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Method of URL consolidation",
+                "options": {
+                    "domain": "Domain only",
+                    "custom": "Customize rules (use settings below)",
+                    "social_media": "Social Media rules; overrides other options",
+                },
+                "default": "domain",
+                "tooltip": "Social Media rules are predefined and available via GitHub link."
+            },
+            "remove_scheme": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Remove scheme (e.g., 'http', 'https', etc.)",
+                "requires": "method==custom"
+            },
+            "remove_path": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Remove path (e.g., '/path/to/article')",
+                "requires": "method==custom"
+            },
+            "remove_query": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Remove query (e.g., '?query=search_term' or '?ref=newsfeed')",
+                "requires": "method==custom"
+            },
+            "remove_parameters": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Remove parameters (e.g., ';key1=value1')",
+                "requires": "method==custom"
+            },
+            "remove_fragments": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": False,
+                "help": "Remove fragments (e.g., '#fragment')",
+                "requires": "method==custom"
+            },
+        }
+        
         # Get the columns for the select columns option
-        if parent_dataset and parent_dataset.get_columns():
-            columns = parent_dataset.get_columns()
-            options["column"]["type"] = UserInput.OPTION_CHOICE
-            options["column"]["options"] = {v: v for v in columns}
-            options["column"]["default"] = "4CAT_extracted_urls" if "4CAT_extracted_urls" in columns else sorted(columns,
-                                                                                    key=lambda k: any([name in k for name in ["url", "urls", "link"]])).pop()
+        if parent_dataset:
+            columns = parent_dataset.get_columns()  # call once
+            if columns:
+                options["column"]["type"] = UserInput.OPTION_CHOICE
+                options["column"]["options"] = {v: v for v in columns}
+                if "4CAT_extracted_urls" in columns:
+                    options["column"]["default"] = "4CAT_extracted_urls"
+                else:
+                    # first column with url, urls, or link in name (if any), otherwise first column
+                    options["column"]["default"] = sorted(columns, key=lambda k: any([name in k.lower() for name in ["url", "urls", "link"]]), reverse=True)[0]
 
         return options
 
@@ -259,8 +262,7 @@ class ConsolidateURLs(BasicProcessor):
         url_parsing_issues = []
         column = self.parameters.get("column", False)
         if not method or not column:
-            self.dataset.update_status("Invalid parameters; ensure column and method are correct", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Invalid parameters; ensure column and method are correct")
             return
         expand_urls = self.parameters.get("expand_urls", False)
 

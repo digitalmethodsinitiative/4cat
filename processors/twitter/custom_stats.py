@@ -16,34 +16,45 @@ class TwitterCustomStats(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-1-custom-stats"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Custom Statistics"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "Custom statistics"  # title displayed in UI
     description = "Group tweets by category and count tweets per timeframe to collect aggregate group statistics.\nFor retweets and quotes, hashtags, mentions, URLs, and images from the original tweet are included in the retweet/quote. Data on public metrics (e.g., number of retweets or likes of tweets) are as of the time the data was collected."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     sorted = 'Number of Tweets'
 
-    options = {
-        "category": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "user",
-            "options": {
-                "user": "Tweet Author",
-                "type": "Tweet type (tweet, quote, retweet, reply)",
-                "source": "Source of Tweet",
-                "place": "Place Name (if known)",
-                "language": "Language (Twitter's guess)",
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "category": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "user",
+                "options": {
+                    "user": "Tweet Author",
+                    "type": "Tweet type (tweet, quote, retweet, reply)",
+                    "source": "Source of Tweet",
+                    "place": "Place Name (if known)",
+                    "language": "Language (Twitter's guess)",
+                },
+                "help": "Group by"
             },
-            "help": "Group by"
-        },
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                        "hour": "Hour", "minute": "Minute"},
-            "help": "Produce counts per"
-        },
-    }
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
+                            "hour": "Hour", "minute": "Minute"},
+                "help": "Produce counts per"
+            },
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

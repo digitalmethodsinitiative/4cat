@@ -2,7 +2,6 @@
 VK keyword search
 """
 import datetime
-from pathlib import Path
 
 import vk_api
 
@@ -46,7 +45,7 @@ class SearchVK(Search):
                       "[wrapper](https://github.com/python273/vk_api) to request information from VK using your "
                       "username and password.")
 
-        options = {
+        return {
             "intro-1": {
                 "type": UserInput.OPTION_INFO,
                 "help": intro_text
@@ -109,8 +108,6 @@ class SearchVK(Search):
                 "help": "Date range"
             },
         }
-
-        return options
 
     def get_items(self, query):
         """
@@ -176,7 +173,7 @@ class SearchVK(Search):
         """
         vk_session = vk_api.VkApi(username,
                                   password,
-                                  config_filename=Path(self.config.get("PATH_ROOT")).joinpath(self.config.get("PATH_SESSIONS"), username+"-vk_config.json"))
+                                  config_filename=self.config.get("PATH_SESSIONS").joinpath(username+"-vk_config.json"))
         vk_session.auth()
 
         return vk_session

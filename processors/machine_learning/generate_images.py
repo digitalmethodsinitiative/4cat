@@ -25,7 +25,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
     type = "image-downloader-stable-diffusion"  # job type ID
     category = "Visual"  # category
     title = "Generate images from text prompts"  # title displayed in UI
-    description = "Given a list of prompts, generates images for those prompts using the Stable Diffusion XL image model."  # description displayed in UI
+    description = "Given a list of prompts, generates images using the Stable Diffusion XL image model."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
     followups = ImageDownloader.followups
@@ -55,28 +55,6 @@ class StableDiffusionImageGenerator(BasicProcessor):
         },
     }
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "coerce_type": int,
-            "help": "Number of images to generate",
-            "default": 20,
-        },
-        "prompt-column": {
-            "type": UserInput.OPTION_TEXT,
-            "default": False,
-            "help": "Dataset field containing prompt",
-            "tooltip": "Prompts will be truncated to 70 characters"
-        },
-        "negative-prompt-column": {
-            "type": UserInput.OPTION_TEXT,
-            "default": False,
-            "help": "Dataset field containing negative prompt",
-            "tooltip": "The model will try to avoid generating an image that fits the negative prompt. Prompts will be "
-                       "truncated to 70 characters"
-        }
-    }
-
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """
@@ -89,7 +67,27 @@ class StableDiffusionImageGenerator(BasicProcessor):
         :param DataSet parent_dataset:  Parent dataset
         :return dict:  Processor options
         """
-        options = cls.options
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "coerce_type": int,
+                "help": "Number of images to generate",
+                "default": 20,
+            },
+            "prompt-column": {
+                "type": UserInput.OPTION_TEXT,
+                "default": False,
+                "help": "Dataset field containing prompt",
+                "tooltip": "Prompts will be truncated to 70 characters"
+            },
+            "negative-prompt-column": {
+                "type": UserInput.OPTION_TEXT,
+                "default": False,
+                "help": "Dataset field containing negative prompt",
+                "tooltip": "The model will try to avoid generating an image that fits the negative prompt. Prompts will be "
+                        "truncated to 70 characters"
+            }
+        }
         if parent_dataset is None:
             return options
 

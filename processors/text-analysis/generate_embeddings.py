@@ -25,7 +25,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 	type = "generate-embeddings"  # job type ID
 	category = "Text analysis"  # category
 	title = "Generate word embedding models"  # title displayed in UI
-	description = "Generates Word2Vec or FastText word embedding models (overall or per timeframe). " \
+	description = "Generates word2vec or FastText word embedding models (overall or per timeframe). " \
 				  "These calculate coordinates (vectors) per word on the basis of their context. The " \
 				  "coordinates are positioned in a \"vector space\" with a large amount of dimensions (so a coordinate can " \
 				  "e.g. exist of 100 numbers). These numeric word representations can be used to extract words with similar contexts. " \
@@ -35,73 +35,84 @@ class GenerateWordEmbeddings(BasicProcessor):
 	followups = ["similar-word2vec", "histwords-vectspace"]
 
 	references = [
-		"Word2Vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
-		"Word2Vec: [Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” *ICLR Workshop Papers*, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
-		"Word2Vec: [A Beginner's Guide to Word Embedding with Gensim Word2Vec Model - Towards Data Science](https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92)",
+		"word2vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
+		"word2vec: [Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” *ICLR Workshop Papers*, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
+		"word2vec: [A Beginner's Guide to Word Embedding with Gensim Word2Vec Model - Towards Data Science](https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92)",
 		"FastText: [Bojanowski, P., Grave, E., Joulin, A., & Mikolov, T. (2017). Enriching word vectors with subword information. *Transactions of the Association for Computational Linguistics*, 5, 135-146.](https://www.mitpressjournals.org/doi/abs/10.1162/tacl_a_00051)"
 	]
 
-	options = {
-		"model-type": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "Word2Vec",
-			"options": {
-				"Word2Vec": "Word2Vec",
-				"FastText": "FastText"
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"model-type": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "Word2Vec",
+				"options": {
+					"Word2Vec": "Word2Vec",
+					"FastText": "FastText"
+				},
+				"help": "Model type"
 			},
-			"help": "Model type"
-		},
-		"algorithm": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "cbow",
-			"options": {
-				"cbow": "Continuous Bag of Words (CBOW)",
-				"skipgram": "Skip-gram"
+			"algorithm": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "cbow",
+				"options": {
+					"cbow": "Continuous Bag of Words (CBOW)",
+					"skipgram": "Skip-gram"
+				},
+				"help": "Training algorithm",
+				"tooltip": "See processor references for a more detailed explanation."
 			},
-			"help": "Training algorithm",
-			"tooltip": "See processor references for a more detailed explanation."
-		},
-		"window": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "5",
-			"options": {"3": 3, "4": 4, "5": 5, "6": 6, "7": 7},
-			"help": "Window",
-			"tooltip": "This sets the length of word sequences taken as the context. For instance, " \
-					   "a window of 3 with the sentence \"the quick brown fox\" will \"slide\" over \"the quick brown\" " \
-					   "and \"quick brown fox\"."
-		},
-		"dimensionality": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 100,
-			"min": 50,
-			"max": 1000,
-			"help": "Dimensionality of the vectors"
-		},
-		"min_count": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 5,
-			"help": "Minimum word occurrence",
-			"tooltip": "How often a word should occur in the corpus to be included"
-		},
-		"max_words": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"min": 0,
-			"help": "Retain top n words",
-			"tooltip": "'0' retains all words, other values will discard less frequent words"
-		},
-		"negative": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Use negative sampling"
-		},
-		"detect-bigrams": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Detect bigrams",
-			"tooltip": "If checked, commonly occurring word combinations ('New York') will be replaced with a single-word combination ('New_York')"
+			"window": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "5",
+				"options": {"3": 3, "4": 4, "5": 5, "6": 6, "7": 7},
+				"help": "Window",
+				"tooltip": "This sets the length of word sequences taken as the context. For instance, " \
+						"a window of 3 with the sentence \"the quick brown fox\" will \"slide\" over \"the quick brown\" " \
+						"and \"quick brown fox\"."
+			},
+			"dimensionality": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 100,
+				"min": 50,
+				"max": 1000,
+				"help": "Dimensionality of the vectors"
+			},
+			"min_count": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 5,
+				"help": "Minimum word occurrence",
+				"tooltip": "How often a word should occur in the corpus to be included"
+			},
+			"max_words": {
+				"type": UserInput.OPTION_TEXT,
+				"default": 0,
+				"min": 0,
+				"help": "Retain top n words",
+				"tooltip": "'0' retains all words, other values will discard less frequent words"
+			},
+			"negative": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Use negative sampling"
+			},
+			"detect-bigrams": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": True,
+				"help": "Detect bigrams",
+				"tooltip": "If checked, commonly occurring word combinations ('New York') will be replaced with a single-word combination ('New_York')"
+			}
 		}
-	}
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):
@@ -141,8 +152,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 
 		# go through all archived token sets and vectorise them
 		models = 0
-		for temp_file in self.iterate_archive_contents(self.source_file):
-			if temp_file.name == '.token_metadata.json':
+		for tokens in self.source_dataset.iterate_items():
+			if tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
 			# use the "list of lists" as input for the word2vec model
@@ -150,13 +161,13 @@ class GenerateWordEmbeddings(BasicProcessor):
 			# post... which may actually be preferable for short
 			# 4chan-style posts. But alternatively it could generate one
 			# list per sentence - this processor is agnostic in that regard
-			token_set_name = temp_file.name
+			token_set_name = tokens.file.name
 			self.dataset.update_status("Extracting bigrams from token set %s..." % token_set_name)
 			self.dataset.update_progress(models / self.source_dataset.num_rows)
 
 			try:
 				if detect_bigrams:
-					bigram_transformer = Phrases(self.tokens_from_file(temp_file, staging_area))
+					bigram_transformer = Phrases(self.tokens_from_file(tokens.file, staging_area))
 					bigram_transformer = Phraser(bigram_transformer)
 				else:
 					bigram_transformer = None
@@ -169,8 +180,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 					# because we are using a generator, which exhausts, while
 					# Word2Vec needs to iterate over the sentences twice
 					# https://stackoverflow.com/a/57632747
-					model.build_vocab(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer))
-					model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=1, total_examples=model.corpus_count)
+					model.build_vocab(self.tokens_from_file(tokens.file, staging_area, phraser=bigram_transformer))
+					model.train(self.tokens_from_file(tokens.file, staging_area, phraser=bigram_transformer), epochs=1, total_examples=model.corpus_count)
 
 				except RuntimeError as e:
 					if "you must first build vocabulary before training the model" in str(e):
@@ -181,10 +192,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 						raise e
 
 			except UnicodeDecodeError:
-				self.dataset.update_status(
-					"Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.",
-					is_final=True)
-				self.dataset.finish(0)
+				self.dataset.finish_with_error(
+					"Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.")
 				return
 
 			# save - we only save the KeyedVectors for the model, this
@@ -197,9 +206,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 			models += 1
 
 		if models == 0:
-			self.dataset.update_status("Not enough data in source file to train %s models." % model_builder.__name__)
 			shutil.rmtree(staging_area)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Not enough data in source file to train %s models." % model_builder.__name__)
 			return
 
 		# create another archive with all model files in it

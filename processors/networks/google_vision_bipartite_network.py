@@ -19,36 +19,47 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
     """
     type = "vision-bipartite-network"  # job type ID
     category = "Networks"  # category
-    title = "Google Vision Bipartite Annotation Network"  # title displayed in UI
+    title = "Google Vision bipartite annotation network"  # title displayed in UI
     description = "Create a GEXF network file comprised of all annotations returned by the Google Vision API. Labels " \
                   "returned by the API, and image file names, are nodes. Edges are created between file names and " \
                   "labels if the label occurs for the image with that file name."
     extension = "gexf"  # extension of result file, used internally and in UI
 
-    options = {
-        "min_confidence": {
-            "type": UserInput.OPTION_TEXT,
-            "default": 0.5,
-            "help": "Min confidence",
-            "tooltip": "Value between 0 and 1; confidence required before the annotation is included. Note that the" \
-                       "confidence is not known for all annotation types (these will be included with confidence '-1'" \
-                       "in the output file)"
-        },
-        "include": {
-            "type": UserInput.OPTION_MULTI,
-            "options": {
-                "labelAnnotations": "Label Detection",
-                "landmarkAnnotations": "Landmark Detection",
-                "logoAnnotations": "Logo Detection",
-                "webDetection": "Web Detection",
-                "localizedObjectAnnotations": "Object Localization"
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "min_confidence": {
+                "type": UserInput.OPTION_TEXT,
+                "default": 0.5,
+                "help": "Min confidence",
+                "tooltip": "Value between 0 and 1; confidence required before the annotation is included. Note that the" \
+                        "confidence is not known for all annotation types (these will be included with confidence '-1'" \
+                        "in the output file)"
             },
-            "default": ["labelAnnotations", "landmarkAnnotations", "logoAnnotations", "webDetection",
-                        "localizedObjectAnnotations"],
-            "help": "Features to map",
-            "tooltip": "Note that only those features that were in the original API response can be mapped"
+            "include": {
+                "type": UserInput.OPTION_MULTI,
+                "options": {
+                    "labelAnnotations": "Label Detection",
+                    "landmarkAnnotations": "Landmark Detection",
+                    "logoAnnotations": "Logo Detection",
+                    "webDetection": "Web Detection",
+                    "localizedObjectAnnotations": "Object Localization"
+                },
+                "default": ["labelAnnotations", "landmarkAnnotations", "logoAnnotations", "webDetection",
+                            "localizedObjectAnnotations"],
+                "help": "Features to map",
+                "tooltip": "Note that only those features that were in the original API response can be mapped"
+            }
         }
-    }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

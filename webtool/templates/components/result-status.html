@@ -5,21 +5,21 @@
 {% elif not dataset.is_finished() %}
         {% if not no_icons %}<i class="fas fa-arrow-down scroll" aria-label="Query in progress..."></i>{% endif %}
 {% elif dataset.is_finished() and not no_icons %}
-    {% if dataset.num_rows == 0 %}
-        <i class="fa fa-skull" aria-hidden="true"></i> <em>No results.</em>
-    {% elif dataset.num_rows < 0 %}
-        <i class="fa fa-warning" aria-hidden="true"></i> <em>Error while capturing data.</em>
+    {% if dataset.status_type == "empty" %}
+        <i class="fa fa-xmark" aria-hidden="true"></i> <em>No results.</em>
+
+    {% elif dataset.status_type == "warning" %}
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> <em>Warning.</em>
+    {% elif dataset.status_type == "error" or dataset.num_rows < 0 %}
+        <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> <em>Failed.</em>
     {% else %}
         <i class="fa fa-check" aria-hidden="true"></i>
     {% endif %}
 {% endif %}
 {% if dataset.get_place_in_queue() <= 0 %}
     {% if dataset.get_status() %}
-        {{ dataset.get_status()|markdown(True)|safe }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}
+        {{ dataset.get_status()|safe }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}
     {% elif not dataset.is_finished() %}
         Creating dataset
-    {% endif %}
-    {% if dataset.is_finished() and dataset.num_rows > 0 %}
-        {{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %} captured.
     {% endif %}
 {% endif %}

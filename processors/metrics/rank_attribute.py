@@ -36,79 +36,6 @@ class AttributeRanker(BasicProcessor):
 
     include_missing_data = True
 
-    # the following determines the options available to the user via the 4CAT
-    # interface.
-    options = {
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Column(s) to count",
-            "default": "body",
-            "tooltip": "Items will be counted if one of the selected columns matches the criteria defined below"
-        },
-        "split-comma": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Columns can contain multiple comma-sepearated values",
-            "tooltip": "When enabled, if a column contains multiple values separated by commas, they will be counted separately",
-            "default": True
-        },
-        "extract": {
-            "type": UserInput.OPTION_CHOICE,
-            "options": {
-                "none": "Use column value",
-                "urls": "URLs",
-                "hostnames": "Host names",
-                "hashtags": "Hashtags (words starting with #)",
-                "emoji": "Emoji (each used emoji in the column is counted individually)"
-            },
-            "help": "Extract from column",
-            "tooltip": "This can be used to extract more specific values from the value of the selected column(s); for "
-                       "example, to count the hashtags embedded in a post's text"
-        },
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "all",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-            "help": "Count values per"
-        },
-        "top": {
-            "type": UserInput.OPTION_TEXT,
-            "default": 15,
-            "help": "Limit to this amount of results"
-        },
-        "top-style": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "per-item",
-            "options": {"per-item": "per timeframe (separate ranking per timeframe)",
-                        "overall": "overall (only include overall top items in the timeframe)"},
-            "help": "Determine top items",
-            "tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
-        },
-        "filter": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Item filter",
-            "tooltip": "Only items matching this will be included in the result. You can use Python regular expressions here."
-        },
-        "weigh": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Weigh frequencies by column",
-            "tooltip": "Frequencies will be multiplied by the value in this column (e.g. 'views')."
-        },
-        "to-lowercase": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Convert values to lowercase",
-            "tooltip": "Merges values with varying cases"
-        },
-        "count_missing": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Include missing data",
-            "tooltip": "Blank fields are counted as blank (i.e. \"\") and missing fields as \"missing_data\""
-        }
-    }
-
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
@@ -119,6 +46,111 @@ class AttributeRanker(BasicProcessor):
         """
 
         return module.get_extension() in ("csv", "ndjson")
+    
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None):
+
+        """
+        Get processor options
+
+        This method by default returns the class's "options" attribute, or an
+        empty dictionary. It can be redefined by processors that need more
+        fine-grained options, e.g. in cases where the availability of options
+        is partially determined by the parent dataset's parameters.
+
+        :param config:
+        :param DataSet parent_dataset:  An object representing the dataset that
+        the processor would be run on
+        :param User user:  Flask user the options will be displayed for, in
+        case they are requested for display in the 4CAT web interface. This can
+        be used to show some options only to privileges users.
+        """
+        options = {
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Column(s) to count",
+                "default": "body",
+                "tooltip": "Items will be counted if one of the selected columns matches the criteria defined below"
+            },
+            "split-comma": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Columns can contain multiple comma-sepearated values",
+                "tooltip": "When enabled, if a column contains multiple values separated by commas, they will be counted separately",
+                "default": True
+            },
+            "extract": {
+                "type": UserInput.OPTION_CHOICE,
+                "options": {
+                    "none": "Use column value",
+                    "urls": "URLs",
+                    "hostnames": "Domain names",
+                    "level2-hostnames": "Second-level domain names (e.g. m.youtube.com -> youtube.com)",
+                    "hashtags": "Hashtags (words starting with #)",
+                    "emoji": "Emoji (each used emoji in the column is counted individually)"
+                },
+                "help": "Extract from column",
+                "tooltip": "This can be used to extract more specific values from the value of the selected column(s); for "
+                        "example, to count the hashtags embedded in a post's text"
+            },
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "all",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+                "help": "Count values per"
+            },
+            "top": {
+                "type": UserInput.OPTION_TEXT,
+                "default": 25,
+                "help": "Limit to this amount of results"
+            },
+            "top-style": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "per-item",
+                "options": {"per-item": "per timeframe (separate ranking per timeframe)",
+                            "overall": "overall (only include overall top items in the timeframe)"},
+                "help": "Determine top items",
+                "tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
+            },
+            "filter": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Item filter",
+                "tooltip": "Only items matching this will be included in the result. You can use Python regular expressions here."
+            },
+            "negate-filter": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": "",
+                "help": "Negate filter",
+                "tooltip": "Only match items that do *not* match the filter configured above"
+            },
+            "weigh": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Weigh frequencies by column",
+                "tooltip": "Frequencies will be multiplied by the value in this column (e.g. 'views')."
+            },
+            "to-lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Convert values to lowercase",
+                "tooltip": "Merges values with varying cases"
+            },
+            "count_missing": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Include missing data",
+                "tooltip": "Blank fields are counted as blank (i.e. \"\") and missing fields as \"missing_data\""
+            }
+        }
+
+        if parent_dataset and parent_dataset.get_columns():
+            columns = parent_dataset.get_columns()
+            options["columns"]["type"] = UserInput.OPTION_MULTI
+            options["columns"]["inline"] = True
+            options["columns"]["options"] = {v: v for v in columns}
+            options["columns"]["default"] = ["body"]
+
+        return options
 
     def process(self):
         """
@@ -144,9 +176,9 @@ class AttributeRanker(BasicProcessor):
                 filter = re.compile(".*" + self.parameters.get("filter") + ".*")
             else:
                 filter = None
+            negate_filter = self.parameters.get("negate-filter", False)
         except (TypeError, re.error):
-            self.dataset.update_status("Could not complete: regular expression invalid")
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Could not complete: regular expression invalid")
             return
 
         # we need to be able to order the values later, chronologically, so use
@@ -170,7 +202,7 @@ class AttributeRanker(BasicProcessor):
             else:
                 self.dataset.update_status("Determining overall top items")
             for post in self.source_dataset.iterate_items(self, map_missing=missing_value_placeholder if self.include_missing_data else "default"):
-                values = self.get_values(post, columns, filter, split_comma, extract)
+                values = self.get_values(post, columns, filter, negate_filter, split_comma, extract)
                 for value in values:
                     if to_lowercase:
                         value = str(value).lower()
@@ -199,7 +231,7 @@ class AttributeRanker(BasicProcessor):
                 items[time_unit] = OrderedDict()
 
             # get values from post
-            values = self.get_values(post, columns, filter, split_comma, extract)
+            values = self.get_values(post, columns, filter, negate_filter, split_comma, extract)
 
             # keep track of occurrences of found items per relevant time period
             for value in values:
@@ -250,16 +282,16 @@ class AttributeRanker(BasicProcessor):
         if rows:
             self.write_csv_items_and_finish(rows)
         else:
-            self.dataset.update_status("No items contain the requested attributes.")
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No items contain the requested values.")
 
-    def get_values(self, post, attributes, filter, split_comma, extract):
+    def get_values(self, post, attributes, filter, negate_filter, split_comma, extract):
         """
         Get relevant values for attribute per post
 
         :param dict post:  Post dictionary
         :param list attributes:  Attribute to extract from post body
         :param filter:  A compiled regular expression to filter values with, or None
+        :param negate_filter: If item matches filter, exclude rather than include
         :param bool split_comma:  Split values by comma?
         :return list:  Items found for attribute
         """
@@ -282,7 +314,10 @@ class AttributeRanker(BasicProcessor):
         if not values:
             return []
         else:
-            return set([value for value in values if not filter or filter.match(value)])
+            if negate_filter:
+                return set([value for value in values if not filter or not filter.match(value)])
+            else:
+                return set([value for value in values if not filter or filter.match(value)])
 
     def extract(self, value, look_for):
         """
@@ -299,14 +334,17 @@ class AttributeRanker(BasicProcessor):
         www_regex = re.compile(r"^www\.")
         values = []
 
-        if look_for in ("urls", "hostnames"):
+        if look_for in ("urls", "hostnames", "level2-hostnames"):
             links = link_regex.findall(value)
 
-            if look_for == "hostnames":
+            if look_for in ("hostnames", "level2-hostnames"):
                 for urlbits in links:
                     urlbits = urlbits.split("/")
                     if len(urlbits) >= 3:
-                        values.append(www_regex.sub("", urlbits[2]))
+                        if look_for == "hostnames":
+                            values.append(www_regex.sub("", urlbits[2]))
+                        else:
+                            values.append(".".join(urlbits[2].split(".")[-2:]))
             else:
                 values += list(links)
 
@@ -321,32 +359,3 @@ class AttributeRanker(BasicProcessor):
 
         else:
             return [value]
-
-    @classmethod
-    def get_options(cls, parent_dataset=None, config=None):
-
-        """
-        Get processor options
-
-        This method by default returns the class's "options" attribute, or an
-        empty dictionary. It can be redefined by processors that need more
-        fine-grained options, e.g. in cases where the availability of options
-        is partially determined by the parent dataset's parameters.
-
-        :param config:
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
-        be used to show some options only to privileges users.
-        """
-        options = cls.options
-
-        if parent_dataset and parent_dataset.get_columns():
-            columns = parent_dataset.get_columns()
-            options["columns"]["type"] = UserInput.OPTION_MULTI
-            options["columns"]["inline"] = True
-            options["columns"]["options"] = {v: v for v in columns}
-            options["columns"]["default"] = ["body"]
-
-        return options

@@ -3,7 +3,7 @@ Twitter APIv2 aggregated user statistics
 """
 import datetime
 import numpy as np
-from scipy import stats
+import statistics
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
@@ -20,41 +20,51 @@ class TwitterAggregatedStats(BasicProcessor):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-aggregated-stats"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Aggregated Statistics"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "Aggregated statistics"  # title displayed in UI
     description = "Group tweets by category and count tweets per timeframe and then calculate aggregate group statistics (i.e. min, max, average, Q1, median, Q3, and trimmed mean): number of tweets, urls, hashtags, mentions, etc. \nUse for example to find the distribution of the number of tweets per author and compare across time."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     num_of_different_categories = None
 
-    options = {
-        "category": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "user",
-            "options": {
-                        "user": "Tweet Author",
-                        "type": "Tweet type (tweet, quote, retweet, reply)",
-                        "source": "Source of Tweet",
-                        "place": "Place Name (if known)",
-                        "language": "Language (Twitter's guess)",
-                        },
-            "help": "Group by"
-        },
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                        "hour": "Hour", "minute": "Minute"},
-            "help": "Produce counts per"
-        },
-        "pad": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Include dates where the count is zero",
-            "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
-        }
-    }
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
 
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "category": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "user",
+                "options": {
+                            "user": "Tweet Author",
+                            "type": "Tweet type (tweet, quote, retweet, reply)",
+                            "source": "Source of Tweet",
+                            "place": "Place Name (if known)",
+                            "language": "Language (Twitter's guess)",
+                            },
+                "help": "Group by"
+            },
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
+                            "hour": "Hour", "minute": "Minute"},
+                "help": "Produce counts per"
+            },
+            "pad": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Include dates with zero items",
+                "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
+            }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -66,6 +76,23 @@ class TwitterAggregatedStats(BasicProcessor):
         """
         return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
+    def trim_mean(self, values, cut_pct):
+        """
+        Return mean of array after trimming a specified fraction of extreme values
+
+        Removes the specified proportion of elements from each end of the sorted
+        array, then computes the mean of the remaining elements.
+        
+        :param values:  Values to calculate mean of
+        :param float cut_pct:  Percentage to cut (0.0-1.0)
+        :return float:  Mean value
+        """
+        cuttable = int(len(values) * cut_pct)
+        if cuttable:
+            values = values[cuttable:-cuttable]
+
+        return statistics.mean(values)
+
     def process(self):
         """
         This takes a 4CAT twitter dataset file as input, and outputs a csv.
@@ -76,8 +103,7 @@ class TwitterAggregatedStats(BasicProcessor):
         try:
             data_types, intervals = self.collect_intervals()
         except ProcessorException as e:
-            self.dataset.update_status(str(e), is_final=True)
-            self.dataset.update_status(0)
+            self.dataset.finish_with_error(str(e))
             return
 
         # Format header
@@ -105,7 +131,7 @@ class TwitterAggregatedStats(BasicProcessor):
                 row['Q1'] = np.percentile(values, 25)
                 row['Q2'] = np.median(values)
                 row['Q3'] = np.percentile(values, 75)
-                row['25%_trimmed_mean'] = stats.trim_mean(values, 0.25)
+                row['25%_trimmed_mean'] = self.trim_mean(values, 0.25)
 
                 rows.append({**{"date": interval, 'category': header_category, "data_type": data_type}, **row})
 
@@ -244,7 +270,7 @@ class TwitterAggregatedStatsVis(TwitterAggregatedStats):
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
-        options = cls.options.copy()
+        options = TwitterAggregatedStats.get_options(parent_dataset=parent_dataset, config=config)
 
         options["show_outliers"] = {
             "type": UserInput.OPTION_TOGGLE,

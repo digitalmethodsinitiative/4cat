@@ -23,23 +23,35 @@ class CoTaggerPreset(ProcessorPreset):
                   "are weighted by how often the tag appears in the dataset."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
 
-    options = {
-        "to-lowercase": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Convert tags to lowercase",
-            "tooltip": "Merges tags with varying cases"
-        },
-        "ignore-tags": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "Tags to ignore",
-            "tooltip": "Separate with commas if you want to ignore multiple tags. Do not include the '#' "
-                       "character."
-        }
-    }
 
     possible_tag_columns = {"tags", "hashtags", "groups"}
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "to-lowercase": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Convert tags to lowercase",
+                "tooltip": "Merges tags with varying cases"
+            },
+            "ignore-tags": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Tags to ignore",
+                "tooltip": "Separate with commas if you want to ignore multiple tags. Do not include the '#' "
+                        "character."
+            }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

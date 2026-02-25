@@ -15,31 +15,42 @@ class TwitterHashtagStats(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-hashtag-stats"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Hashtag Statistics"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "Hashtag statistics"  # title displayed in UI
     description = "Lists by hashtag how many tweets contain hashtags, how many times those tweets have been retweeted/replied to/liked/quoted, and information about unique users and hashtags used alongside each hashtag.\nFor retweets and quotes, hashtags from the original tweet are included in the retweet/quote."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     sorted = 'Number of Tweets containing Hashtag'
 
-    options = {
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "month",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
-                        "hour": "Hour", "minute": "Minute"},
-            "help": "Produce counts per"
-        },
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
 
-        # Padding would require padding for all authors/users to make any sense! That's a bit more complex that existing code allows
-        # Disabling for now
-        # "pad": {
-        #     "type": UserInput.OPTION_TOGGLE,
-        #     "default": True,
-        #     "help": "Include dates where the count is zero",
-        #     "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
-        # }
-    }
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "month",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day",
+                            "hour": "Hour", "minute": "Minute"},
+                "help": "Produce counts per"
+            },
+
+            # Padding would require padding for all authors/users to make any sense! That's a bit more complex that existing code allows
+            # Disabling for now
+            # "pad": {
+            #     "type": UserInput.OPTION_TOGGLE,
+            #     "default": True,
+            #     "help": "Include dates where the count is zero",
+            #     "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
+            # }
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

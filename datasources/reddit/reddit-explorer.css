@@ -1,0 +1,91 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
+
+*, body, code, select, input, textarea {
+	font-family: normal x-small verdana, arial, helvetica, sans-serif;
+}
+
+body {
+	background-color: #ebf9ff;
+}
+
+#metadata {
+	color: black;
+}
+
+.content article {
+	font-size: 13px;
+    font-weight: 400;
+    line-height: 21px;
+    word-break: break-word;
+}
+
+.content .items .item header {
+	text-decoration: none;
+	border: none;
+	color: #858585;
+	font-size: 14px;
+}
+
+.content .items .item header .flair {
+	font-size: 10px;
+	color: black;
+	background-color: #EDEFF1;
+	border-radius: 2px;
+	padding: 2px;
+	vertical-align: middle;
+}
+
+.content .items .item {
+	display: table;
+	min-height: auto;
+	min-width: auto;
+	margin-left: 10px;
+	border-radius: 5px;
+	background-color: white;
+}
+
+.content .items .item.op {
+	color: black;
+	background-color: white;
+}
+
+.content .items .item.op .subject {
+	display: block;
+	font-size: 16px;
+	color: black;
+	font-weight: bold;
+	margin-top: 10px;
+}
+
+.content .items .item.op .subject:after {
+	display: none;
+}
+
+.content .items .item.op .subject_url {
+	
+}
+
+.content .items .item .item-image {
+	
+}
+
+.content .items .item blockquote {
+	border-left: 2px solid #c5c1ad;
+	margin: 10px;
+	padding-left: 20px;
+}
+
+.items .item .item-annotations {
+	border-radius: 5px;
+	background-color: #f1f8fd;
+	color: #474747;
+}
+
+footer p {
+
+}

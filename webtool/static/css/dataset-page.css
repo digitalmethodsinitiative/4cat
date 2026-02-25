@@ -216,6 +216,10 @@ article.result > section:first-child {
     position: relative;
 }
 
+.result-page .annotation-fields-list .property-badge {
+    cursor: pointer;
+}
+
 .annotation-fields-list ul {
     list-style: none;
     margin: 0;
@@ -346,6 +350,16 @@ article.result > section:first-child {
     color: var(--always-white);
 }
 
+.warning {
+    background: var(--accent-warning);
+    color: var(--always-white);
+}
+
+.empty {
+    background: var(--gray-light);
+    color: var(--gray-darker);
+}
+
 .child-wrapper .button-wrap.processor-result-indicator a {
     display: inline-block;
     color: inherit;
@@ -418,8 +432,8 @@ article.result > section:first-child {
     display: inline-block;
 }
 
-.child-list:not(.processor-list) li:not(.inline) > .processor-header header:after {
-    content: ':';
+.child-list:not(.processor-list) li:not(.inline) > .processor-header header {
+    margin-right: 0.2em;
 }
 
 .child-list .processor-details {
@@ -580,7 +594,13 @@ article.result > section:first-child {
 
 .processor-options textarea {
     min-width: 25em;
-    min-height: 6em;
+    min-height: 7.5em;
+    flex-grow: 0.95;
+}
+
+.processor-options select {
+    max-width: 100%;
+    flex-grow: 0.9;
 }
 
 .multi-select-search {
@@ -745,6 +765,14 @@ embed.details-only {
     margin: 0;
     min-width: 100%;
     border: 0;
+    border-collapse: separate; /* helps sticky work reliably */
+}
+
+/* scrollable table */
+.csv-preview th {
+  position: sticky;
+  top: 0;
+  z-index: 2;       /* keep above cells */
 }
 
 .csv-preview td:first-child, th:first-child {
@@ -905,7 +933,7 @@ body.image-preview {
 
 
 #edit-annotation-fields #input-warning {
-    color: var(--accent-warning)
+    color: var(--accent-error)
 }
 
 /* Remove all styles for Explorer posts */
@@ -935,7 +963,7 @@ body.image-preview {
 }
 
 .annotation-field-label.invalid, .option-field > input.invalid {
-    border: 1px solid var(--accent-warning);
+    border: 1px solid var(--accent-error);
 }
 
 #edit-annotation-fields {

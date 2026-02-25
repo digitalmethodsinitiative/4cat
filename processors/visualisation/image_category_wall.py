@@ -219,6 +219,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
         # Organize posts into categories
         category_type = None
         mixed_types = False
+        self.for_cleanup.append(category_dataset)
         self.dataset.update_status("Collecting categories")
         for _i in range(2):
             if mixed_types or category_type is None:
@@ -345,7 +346,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
         offset_y = - row_height
         complete_categories = []
         category_widths = {}
-        self.dataset.update_status("Creating Image wall")
+        self.dataset.update_status("Creating image wall")
         for category, images in categories.items():
             if not complete_categories:
                 offset_y += fontsize * 2  # add some space at the top for header

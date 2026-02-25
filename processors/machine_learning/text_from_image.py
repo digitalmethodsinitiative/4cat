@@ -9,7 +9,7 @@ import json
 import os
 
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException, DsmConnectionError
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, hash_to_md5
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
@@ -60,23 +60,34 @@ class ImageTextDetector(BasicProcessor):
         },
     }
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Images to process (0 = all)",
-            "default": 0,
-            "coerce_type": int,
-        },
-        # "model_type": {
-        #     "type": UserInput.OPTION_CHOICE,
-        #     "default": "paddle_ocr",
-        #     "options": {
-        #         "paddle_ocr": "Paddle OCR model",
-        #         "keras_ocr": "Keras OCR model",
-        #     },
-        #     "help": "See references for additional information about models and their utility"
-        # },
-    }
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Images to process (0 = all)",
+                "default": 0,
+                "coerce_type": int,
+            },
+            # "model_type": {
+            #     "type": UserInput.OPTION_CHOICE,
+            #     "default": "paddle_ocr",
+            #     "options": {
+            #         "paddle_ocr": "Paddle OCR model",
+            #         "keras_ocr": "Keras OCR model",
+            #     },
+            #     "help": "See references for additional information about models and their utility"
+            # },
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -97,7 +108,7 @@ class ImageTextDetector(BasicProcessor):
         """
         model_type = self.parameters.get("model_type", "paddle_ocr")
         if self.source_dataset.num_rows == 0:
-            self.dataset.finish_with_error("No images available.")
+            self.dataset.finish_as_empty("No images available.")
             return
 
         # Unpack the images into a staging_area
@@ -108,26 +119,26 @@ class ImageTextDetector(BasicProcessor):
         else:
             max_images = None
 
-        staging_area = self.dataset.get_staging_area()
         # Collect filenames and metadata
         image_filenames = []
         skipped_images = 0
         metadata_file = None
-        for image in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
+        staging_area = self.dataset.get_staging_area()
+        for image in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=False):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unzipping images")
 
-            if image.name == ".metadata.json":
-                metadata_file = image.name
+            if image.file.name == ".metadata.json":
+                metadata_file = image.file.name
                 continue
-            elif image.name.split('.')[-1]  in ["json", "log"]:
+            elif image.file.name.split('.')[-1]  in ["json", "log"]:
                 continue
-            elif image.name.split('.')[-1] == "svg":
-                self.dataset.log(f"SVG files are not supported, skipping {image.name}")
+            elif image.file.name.split('.')[-1] == "svg":
+                self.dataset.log(f"SVG files are not supported, skipping {image.file.name}")
                 skipped_images += 1
                 continue
 
-            image_filenames.append(image.name)
+            image_filenames.append(image.file.name)
 
             if max_images and len(image_filenames) >= max_images:
                 break
@@ -254,12 +265,15 @@ class ImageTextDetector(BasicProcessor):
 
                     processed += 1
 
-        detected_message = f"Detected text in {processed} of {total_image_files} images.{(' Skipped ' + str(skipped_images) + ' images; see log for details.') if skipped_images else ''}"
+        warning = '' if not skipped_images else f' Skipped {skipped_images} images; see log for details.'
+        detected_message = f"Detected text in {processed} of {total_image_files} images."
         if self.parameters.get("save_annotations", False) and not save_annotations:
-            self.dataset.update_status(f"{detected_message} No metadata file found, unable to update original dataset.", is_final=True)
+            warning = " No metadata file found, unable to update original dataset." + warning
+        if warning:
+            self.dataset.finish_with_warning(processed, detected_message + warning)
         else:
             self.dataset.update_status(detected_message)
-        self.dataset.finish(processed)
+            self.dataset.finish(processed)
 
     @staticmethod
     def map_item(item):
@@ -267,6 +281,7 @@ class ImageTextDetector(BasicProcessor):
         For preview frontend
         """
         return MappedItem({
+            "id": hash_to_md5(item.get("filename").get("filename")),
             "image_filename": item.get("filename"),
             "model_type": item.get("model_type"),
             "text": item.get("simplified_text", {}).get("raw_text"),

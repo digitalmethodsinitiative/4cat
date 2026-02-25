@@ -36,7 +36,7 @@ class ImageDownloader(BasicProcessor):
     category = "Visual"  # category
     title = "Download images"  # title displayed in UI
     description = (
-        "Download images and store in a a zip file. May take a while to complete as images are retrieved "
+        "Download images and store in a a ZIP file. May take a while to complete as images are retrieved "
         "externally. Note that not always all images can be saved. For imgur galleries, only the first "
         "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file "
         "is included in the output archive."
@@ -56,27 +56,6 @@ class ImageDownloader(BasicProcessor):
         "google-vision-api",
     ]
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "default": 100,
-        },
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Column to get image links from",
-            "default": "image_url",
-            "inline": True,
-            "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
-        },
-        "split-comma": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Split column values by comma?",
-            "default": True,
-            "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-            "separately",
-        },
-    }
-
     config = {
         "image-downloader.max": {
             "type": UserInput.OPTION_TEXT,
@@ -87,6 +66,8 @@ class ImageDownloader(BasicProcessor):
             "very long-running processors and large datasets. Set to 0 for no limit.",
         }
     }
+
+    warning_message = None
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -104,7 +85,26 @@ class ImageDownloader(BasicProcessor):
         case they are requested for display in the 4CAT web interface. This can
         be used to show some options only to privileges users.
         """
-        options = cls.options
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "default": 100,
+            },
+            "columns": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Column to get image links from",
+                "default": "image_url",
+                "inline": True,
+                "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
+            },
+            "split-comma": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Split column values by comma?",
+                "default": True,
+                "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+                "separately",
+            },
+        }
 
         # Update the amount max and help from config
         max_number_images = int(config.get("image-downloader.max", 1000))
@@ -126,11 +126,13 @@ class ImageDownloader(BasicProcessor):
             # Pick a good default
             if "image_url" in columns:
                 options["columns"]["default"] = "image_url"
-            elif "image" in "".join(columns):
+            elif any("image" in (col or "").lower() for col in columns):
                 # Any image will do
-                options["columns"]["default"] = sorted(
-                    columns, key=lambda k: "image" in k
-                ).pop()
+                image_cols = sorted(
+                    [col for col in columns if "image" in (col or "").lower()],
+                    key=lambda c: (len(c), c.lower()),
+                )
+                options["columns"]["default"] = image_cols[0] if image_cols else "body"
             else:
                 options["columns"]["default"] = "body"
 
@@ -172,6 +174,7 @@ class ImageDownloader(BasicProcessor):
 
         if amount == 0:
             amount = self.config.get("image-downloader.max", 1000)
+
         columns = self.parameters.get("columns")
         if type(columns) is str:
             columns = [columns]
@@ -240,7 +243,7 @@ class ImageDownloader(BasicProcessor):
                 urls.append(item_url)
 
         if not urls:
-            return self.dataset.finish_with_error(
+            return self.dataset.finish_as_empty(
                 "No download URLs could be extracted from the dataset within the given parameters."
             )
         else:
@@ -258,36 +261,55 @@ class ImageDownloader(BasicProcessor):
         failures = []
         metadata = {}
 
+        self.dataset.log(f"Filename prep for {len(urls)} URLs")
         # prepare filenames for each url
         self.filenames = CaseInsensitiveDict()
         self.url_redirects = {}
 
-        url_filenames = []
-        for url in urls:
-            url_filename = url_to_filename(url, staging_area=self.staging_area, default_name="file", default_ext=".png", existing_filenames=url_filenames)
+        # Use a set for O(1) membership during filename uniqueness checks
+        url_filenames_seen = set()
+        for i, url in enumerate(urls):
+            url_filename = url_to_filename(
+                url,
+                staging_area=None,  # we do not check on-disk here as we know we have a new empty staging area
+                default_name="file",
+                default_ext=".png",
+                existing_filenames=url_filenames_seen,  # set instead of list
+            )
+            
             self.filenames[url] = url_filename
-            url_filenames.append(url_filename)
+            url_filenames_seen.add(url_filename)  # record membership
+            if i in (0, 9, 49) or ((i + 1) % 200 == 0):
+                # Log progress every 10, 50, then every 200
+                self.dataset.log(f"Filename progress {i+1}/{len(urls)} filenames done")
 
+        max_images = min(len(urls), amount) if amount > 0 else len(urls)
+        self.dataset.log(f"Starting download of up to {max_images:,} image(s).")
         for url, response in self.iterate_proxied_requests(
-            urls,
-            preserve_order=False,
-            headers={"User-Agent": ua},
-            hooks={
-                # use hooks to download the content (stream=True) in parallel
-                "response": self.stream_url
-            },
-            verify=False,
-            timeout=20,
-            stream=True,
-        ):
+                urls,
+                preserve_order=False,
+                headers={"User-Agent": ua},
+                hooks={
+                    # use hooks to download the content (stream=True) in parallel
+                    "response": self.stream_url
+                },
+                verify=False,
+                timeout=20,
+                stream=True,
+            ):
             downloaded_file = self.staging_area.joinpath(self.filenames[url])
             failure = False
 
             if self.interrupted:
-                self.completed = True
+                self.complete = True
                 self.flush_proxied_requests()
-                shutil.rmtree(self.staging_area)
-                raise ProcessorInterruptedException()
+                if downloaded_files > 0:
+                    # Some files downloaded, wrap up
+                    self.warning_message = "Processor was interrupted; partial results have been saved."
+                    break
+                else:
+                    shutil.rmtree(self.staging_area)
+                    raise ProcessorInterruptedException()
 
             if type(response) is FailedProxiedRequest:
                 if type(response.context) is requests.exceptions.Timeout:
@@ -375,6 +397,8 @@ class ImageDownloader(BasicProcessor):
                     try:
                         extension = self.get_valid_file_extension(downloaded_file)
                         downloaded_file.rename(downloaded_file.with_suffix(extension))
+                        # update filename mapping to reflect new extension
+                        self.filenames[url] = self.filenames[url].rsplit(".", 1)[0] + extension
 
                     except InvalidDownloadedFileException as e:
                         self.dataset.log(
@@ -386,9 +410,9 @@ class ImageDownloader(BasicProcessor):
                     if len(downloaded_files) < amount or amount == 0:
                         downloaded_files.add(url)
                         self.dataset.update_status(
-                            f"Downloaded {len(downloaded_files):,} of {amount:,} file(s)"
+                            f"Downloaded {len(downloaded_files):,} of {max_images:,} file(s)"
                         )
-                        self.dataset.update_progress(len(downloaded_files) / amount)
+                        self.dataset.update_progress(len(downloaded_files) / max_images)
 
                     if len(downloaded_files) >= amount and amount != 0:
                         # parallel requests may still be running so halt these
@@ -422,12 +446,21 @@ class ImageDownloader(BasicProcessor):
             url_file = self.staging_area.joinpath(filename)
             if url_file.exists() and url not in downloaded_files:
                 url_file.unlink()
-
+                
         # finish up
         self.dataset.update_progress(1.0)
         self.write_archive_and_finish(
-            self.staging_area, len([x for x in metadata.values() if x.get("success")])
+            self.staging_area, len([x for x in metadata.values() if x.get("success")]),
+            finish=False
         )
+        if self.warning_message:
+            # Interrupted but some files downloaded
+            self.dataset.finish_with_warning(len(downloaded_files), self.warning_message)
+        else:
+            # Successful or empty completion
+            if len(downloaded_files) == 0:
+                self.dataset.update_status("No results.", is_final=True)
+            self.dataset.finish(len(downloaded_files))
 
     def clean_url(self, url):
         # always lower case domain
@@ -495,7 +528,7 @@ class ImageDownloader(BasicProcessor):
             else:
                 yield url
 
-    def stream_url(self, response, *args, **kwargs):
+    def stream_url(self, response, fourcat_original_url=None, *args, **kwargs):
         """
         Helper function for iterate_proxied_requests
 
@@ -504,25 +537,30 @@ class ImageDownloader(BasicProcessor):
 
         :param requests.Response response: requests response object
         """
+        if fourcat_original_url is None:
+            raise KeyError("Missing fourcat_original_url for response hook; proxied requests must pass it")
+
+        # Final URL after requests has handled redirects
         response_url = self.clean_url(response.url)
 
-        # we have a problem here which is determining the file name to write
-        # this URL to - and no context that would contain that file name is
-        # passed to the hook!
-        # we do have the URL of the request but it may not be the same as the
-        # one the request started with on account of redirects, etc
-        # so do two things - detect redirects and use them to map URLs, and for
-        # non-redirects, use some heuristics to find the original URL
-        if redirect := response.headers.get("location"):
-            if redirect.startswith("/"):
-                # URLs without a domain - add it
-                redirect = "/".join(response_url.split("/")[:3]) + redirect
+        # Strict requirement: we must have a filename for the original URL
+        original_url = fourcat_original_url
+        if original_url not in self.filenames:
+            raise KeyError(
+                f"Missing filename for original request URL: {original_url}"
+            )
 
-            redirect = self.clean_url(redirect)
-            if redirect != response_url:
-                self.url_redirects[response_url] = redirect
-                self.filenames[redirect] = self.filenames[response_url]
-                return
+        # Record redirect mapping from original -> final, if any
+        final_url = response_url
+        # If requests followed redirects, response.history contains prior responses
+        if response.history:
+            # Trust the current response URL as final; record mapping only if different
+            final_url = response_url
+
+        if final_url != original_url:
+            self.url_redirects[original_url] = final_url
+
+        destination = self.staging_area.joinpath(self.filenames[original_url])
 
         while chunk := response.raw.read(1024, decode_content=True):
             if not response.ok or self.interrupted or self.complete:
@@ -533,7 +571,6 @@ class ImageDownloader(BasicProcessor):
                 response.raw.close()
                 return
 
-            destination = self.staging_area.joinpath(self.filenames[response_url])
             with destination.open("ab") as outfile:
                 try:
                     outfile.write(chunk)

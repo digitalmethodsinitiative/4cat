@@ -31,7 +31,7 @@ class ImageTextWallGenerator(BasicProcessor):
     """
     type = "image-text-wall"  # job type ID
     category = "Visual"  # category
-    title = "Visualise images with captions"  # title displayed in UI
+    title = "Image wall with captions"  # title displayed in UI
     description = "Combine images into a single image including text"  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
@@ -172,11 +172,11 @@ class ImageTextWallGenerator(BasicProcessor):
                     max_text_len = max(max_text_len, len(image_text))
                     filename_to_text_mapping[item.get("image_filename", item.get("filename"))] = image_text
 
-		# Create SVG with categories and images
+        # Create SVG with categories and images
 		# Base sizes for each image
         base_height = self.parameters.get("size", 100)
         fontsize = 12
-		#Note: SVG files are "documents" and so this is actually not direct to pixels but instead the fontsize is HTML/CSS style dependent
+        #Note: SVG files are "documents" and so this is actually not direct to pixels but instead the fontsize is HTML/CSS style dependent
         fontsize_to_pixels_multiplier = 0.56 # this is a rough multiplier and somehow ought to be variable based on width
         characters_per_line = math.ceil(base_height / (fontsize * fontsize_to_pixels_multiplier)) # this is a rough estimate as width can be longer than height (works for square formats)
         rows_of_text = min(math.ceil(max_text_len / characters_per_line), 6) # max of 6 rows of text
@@ -191,18 +191,18 @@ class ImageTextWallGenerator(BasicProcessor):
         load_errors = []
         self.dataset.update_status("Creating Image wall")
         self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
-        for image_path in self.iterate_archive_contents(image_dataset.get_results_path()):
-            if image_path.name in [".metadata.json"]:
+        for image in image_dataset.iterate_items():
+            if image.file.name in [".metadata.json"]:
                 if convert_to_int(self.parameters.get("amount"), 100) == 0:
                     max_images = max_images - 1
                 continue
 
-			# Check image loads prior to any modifications to canvas space
+            # Check image loads prior to any modifications to canvas space
             try:
-                frame = Image.open(str(image_path))
+                frame = Image.open(str(image.file))
             except UnidentifiedImageError as e:
-                load_errors.append(image_path.name)
-                self.dataset.log(f"Unable to open image {image_path.name}: {e}")
+                load_errors.append(image.file.name)
+                self.dataset.log(f"Unable to open image {image.file.name}: {e}")
                 continue
 
             if total_images_collected == 0:
@@ -218,15 +218,15 @@ class ImageTextWallGenerator(BasicProcessor):
                 offset_w = 0
 
             if tile_type == "square":
-				# resize to square
+                # resize to square
                 frame_width = base_height
                 frame.thumbnail((frame_width, base_height))
             elif tile_type == "fill-square":
-			    # fill square
+                # fill square
                 frame_width = base_height
                 frame = ImageOps.fit(frame, (frame_width, base_height), method=Image.BILINEAR)
             else:
-				# resize to height
+                # resize to height
                 frame_width = int(base_height * frame.width / frame.height)
                 frame.thumbnail((frame_width, base_height))
 
@@ -245,7 +245,7 @@ class ImageTextWallGenerator(BasicProcessor):
             category_image.add(frame_element)
 
             # Add text label
-            filename = image_path.name
+            filename = image.file.name
             if filename in filename_to_text_mapping:
                 image_text = textwrap.wrap(filename_to_text_mapping[filename],
                                            int(frame_width / (fontsize * fontsize_to_pixels_multiplier)))

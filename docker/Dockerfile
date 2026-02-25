@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# FROM python:3.11-slim
+FROM python:3.11-slim-trixie
 
 RUN apt-get update && apt install -y \
     # General requirements:
@@ -26,7 +27,6 @@ ENV PYTHONUNBUFFERED=1
 
 # Set up environment for Python setup.py
 COPY ./requirements.txt /usr/src/app/requirements.txt
-COPY ./extensions /usr/src/app/extensions
 COPY ./setup.py /usr/src/app/setup.py
 COPY ./VERSION /usr/src/app/VERSION
 COPY ./README.md /usr/src/app/README.md
@@ -34,7 +34,7 @@ RUN mkdir /usr/src/app/backend
 RUN mkdir /usr/src/app/webtool
 RUN mkdir /usr/src/app/datasources
 # Install python dependencies; gunicorn is needed for 4cat_frontend
-RUN python3 -m pip install --upgrade pip && python3 -m pip install --no-cache-dir setuptools==78.1.0 wheel==0.46.1 && python3 -m pip install -r requirements.txt && python3 -m pip install gunicorn
+RUN python3 -m pip install --upgrade pip && python3 -m pip install -r requirements.txt && python3 -m pip install gunicorn "yt-dlp[default]"
 
 # Copy project
 COPY . /usr/src/app/

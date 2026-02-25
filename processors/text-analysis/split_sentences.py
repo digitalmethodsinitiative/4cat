@@ -19,8 +19,8 @@ class SplitSentences(BasicProcessor):
     """
     type = "sentence-split"  # job type ID
     category = "Text analysis"  # category
-    title = "Sentence split"  # title displayed in UI
-    description = "Split a body of posts into discrete sentences. Output file has one row per sentence, containing the sentence and post ID."  # description displayed in UI
+    title = "Split text into sentences"  # title displayed in UI
+    description = "Split a body of posts into discrete sentences. Output file has one row per sentence, containing the sentence and item ID."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     followups = []

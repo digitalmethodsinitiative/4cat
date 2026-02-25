@@ -12,25 +12,36 @@ class TopHashtags(ProcessorPreset):
     """
     type = "preset-top-hashtags"  # job type ID
     category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Find top hashtags"  # title displayed in UI
+    title = "Top hashtags"  # title displayed in UI
     description = "Count how often each hashtag occurs in the dataset and sort by this value"
     extension = "csv"
 
-    options = ({
-        "timeframe": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": "all",
-            "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-            "help": "Find top hashtags per"
-        },
-        "top": {
-            "type": UserInput.OPTION_TEXT,
-            "default": 0,
-            "help": "Include this many top hashtags",
-            "tooltip": "For no limit, use '0'",
-            "coerce_type": int,
-        },
-    })
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        """
+        Get processor options
+
+        :param parent_dataset DataSet:  An object representing the dataset that
+            the processor would be or was run on. Can be used, in conjunction with
+            config, to show some options only to privileged users.
+        :param config ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:   Options for this processor
+        """
+        return {
+            "timeframe": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "all",
+                "options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+                "help": "Find top hashtags per"
+            },
+            "top": {
+                "type": UserInput.OPTION_TEXT,
+                "default": 0,
+                "help": "Include this many top hashtags",
+                "tooltip": "For no limit, use '0'",
+                "coerce_type": int,
+            },
+        }
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

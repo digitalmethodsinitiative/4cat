@@ -15,28 +15,40 @@ class SimilarWords(ProcessorPreset):
 	type = "preset-similar-words"  # job type ID
 	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
 	title = "Find similar words"  # title displayed in UI
-	description = "Uses Word2Vec models (Mikolov et al.) to find words used in a similar context as the queried word(s). Note that this will usually not give useful results for small (<100.000 items) datasets."
+	description = ("Create a word2vec model to find words used in a similar context as the queried word(s). Only works "
+				   "with large datasets (e.g. 100,000+ items).")
 	extension = "csv"
 
-	options = {
-		"words": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Words",
-			"tooltip": "Separate with commas."
-		},
-		"timeframe": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "all",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-			"help": "Calculate similarities per"
-		},
-		"language": {
-			"type": UserInput.OPTION_CHOICE,
-			"options": {language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
-			"default": "english",
-			"help": "Language"
+	@classmethod
+	def get_options(cls, parent_dataset=None, config=None) -> dict:
+		"""
+		Get processor options
+
+		:param parent_dataset DataSet:  An object representing the dataset that
+			the processor would be or was run on. Can be used, in conjunction with
+			config, to show some options only to privileged users.
+		:param config ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:   Options for this processor
+		"""
+		return {
+			"words": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Words",
+				"tooltip": "Separate with commas."
+			},
+			"timeframe": {
+				"type": UserInput.OPTION_CHOICE,
+				"default": "all",
+				"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+				"help": "Calculate similarities per"
+			},
+			"language": {
+				"type": UserInput.OPTION_CHOICE,
+				"options": {language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+				"default": "english",
+				"help": "Language"
+			}
 		}
-	}
 
 	@staticmethod
 	def is_compatible_with(module=None, config=None):
