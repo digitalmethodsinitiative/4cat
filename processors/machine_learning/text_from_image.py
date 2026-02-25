@@ -281,7 +281,7 @@ class ImageTextDetector(BasicProcessor):
         For preview frontend
         """
         return MappedItem({
-            "id": hash_to_md5(item.get("filename").get("filename")),
+            "id": hash_to_md5(item.get("filename")),
             "image_filename": item.get("filename"),
             "model_type": item.get("model_type"),
             "text": item.get("simplified_text", {}).get("raw_text"),
