@@ -217,8 +217,8 @@ def get_result_legacy(query_file):
     # Handle favicon relative requests that get caught by this broad route
     if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
         return redirect(url_for('static', filename='img/favicon/favicon.ico'))
-    
-    if g.config.get("privileges.allow_legacy_result_links", False):
+
+    if g.config.get("4cat.allow_legacy_result_links", False):
         return send_from_directory(directory=g.config.get('PATH_DATA'), path=query_file)
     else:
         return error(404, error="This link format is no longer supported. Please use the updated link from the dataset page.")
