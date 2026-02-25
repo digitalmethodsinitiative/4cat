@@ -625,7 +625,7 @@ class VideoWallGenerator(BasicProcessor):
         if skipped:
              self.dataset.finish_with_warning(1, f"Rendering finished. {skipped} item(s) were skipped. See dataset log for details.")
         else:
-             self.dataset.update_status("Rendering finished.", final=True)
+             self.dataset.update_status("Rendering finished.", is_final=True)
              self.dataset.finish(1)
         return
 
