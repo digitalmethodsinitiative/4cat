@@ -163,7 +163,7 @@ def get_result(query_file, dataset_key, dataset=None):
     :param dataset:  Optional DataSet object, if already available
     :return:  Result file
     """
-     # Handle favicon relative requests that get caught by this broad route
+    # Handle favicon relative requests that get caught by this broad route
     if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
         return redirect(url_for('static', filename='img/favicon/favicon.ico'))
     
@@ -206,6 +206,22 @@ def get_result(query_file, dataset_key, dataset=None):
     # Send related file (Flask can handle file not found w/ 404 error)
     return send_from_directory(directory=data_root, path=query_file)
 
+@component.route('/result/<path:query_file>')
+def get_result_legacy(query_file):
+    """
+    Legacy route for backward compatibility to maintain compatibility with old links that don't include the dataset key.
+    
+    :param str query_file:  name of the result file
+    :return:  Result file or error
+    """
+    # Handle favicon relative requests that get caught by this broad route
+    if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
+        return redirect(url_for('static', filename='img/favicon/favicon.ico'))
+    
+    if g.config.get("privileges.allow_legacy_result_links", False):
+        return send_from_directory(directory=g.config.get('PATH_DATA'), path=query_file)
+    else:
+        return error(404, error="This link format is no longer supported. Please use the updated link from the dataset page.")
 
 @component.route('/mapped-result/<string:key>/')
 def get_mapped_result(key):

@@ -193,6 +193,12 @@ config_definition = {
         "help": "Can view worker status",
         "tooltip": "Controls whether users can view worker status via the Control Panel"
     },
+    "privileges.allow_legacy_result_links": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Allow legacy result links",
+        "tooltip": "Controls whether old links to dataset results without the dataset key are still supported. These links utilized security through obscurity; datasets are available to anyone with link."
+    },
     # The following option should be set to ensure that every analysis step can
     # be traced to a specific version of 4CAT. This allows for reproducible
     # research. The output of "git show" in PATH_ROOT will be used to determine
