@@ -5,8 +5,6 @@
 
 <!-- Media header -->
 <header>
-	<span title="ID" class="id">{{ item.get("id") }}</span>
-
 	<!-- Filename -->
 	{% if item.get("filename") %}
 		<span title="Filename" class="filename">
@@ -14,22 +12,17 @@
 		</span>
 	{% endif %}
 
-	<!-- File size -->
-	{% if item.get("file_size") %}
-		<span title="File size" class="file-size">
-			{{ item["file_size"] | filesizeformat }}
-		</span>
-	{% endif %}
-
 </header>
 
 <!-- Media content -->
 <article>
-	<div class="media-container">
-        {% set dataset_key = dataset.key %}
-        {% set filename = item.filename %}
-        {% include 'explorer/media.html' %}
-	</div>
+    <div class="carousel-wrapper">
+        <div class="media-wrapper">
+            {% set dataset_key = dataset.key %}
+            {% set filename = item.filename %}
+            {% include 'explorer/media.html' %}
+        </div>
+    </div>
 
 	<!-- File metadata -->
 	<div class="file-metadata">

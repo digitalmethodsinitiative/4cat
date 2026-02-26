@@ -23,7 +23,7 @@
 </header>
 
 <div class="carousel-wrapper" id="carousel-{{ item.id }}">
-    <div class="item-media">
+    <div class="media-wrapper">
 
         {% if item.id in media_files %}
             {% set total_media = media_files[item.id]|length %}
@@ -38,8 +38,8 @@
             {% endfor %}
 
             {% if total_media > 1 %}
-                <button class="carousel-btn prev" onclick="moveSlide('{{ item.id }}', -1)">&#10094;</button>
-                <button class="carousel-btn next" onclick="moveSlide('{{ item.id }}', 1)">&#10095;</button>
+                <button class="carousel-btn prev" data-item-id="{{ item.id }}" data-step="-1">&#10094;</button>
+                <button class="carousel-btn next" data-item-id="{{ item.id }}" data-step="1">&#10095;</button>
 
                 <div class="media-bullets">
                    {% for i in range(total_media) %}
@@ -69,33 +69,3 @@
        {% endif %}
     {% endif %}
 </article>
-
-<script>
-function moveSlide(itemId, step) {
-    // Find the specific carousel container
-    const carousel = document.getElementById('carousel-' + itemId);
-    const slides = carousel.getElementsByClassName('carousel-slide');
-    const dots = carousel.getElementsByClassName('dot');
-
-    let currentIndex = 0;
-
-    // Find currently active slide
-    for (let i = 0; i < slides.length; i++) {
-        if (slides[i].classList.contains('active')) {
-            currentIndex = i;
-            slides[i].classList.remove('active');
-            if(dots[i]) dots[i].classList.remove('active');
-            break;
-        }
-    }
-
-    // Calculate new index (wrap around if needed)
-    let newIndex = currentIndex + step;
-    if (newIndex >= slides.length) newIndex = 0;
-    if (newIndex < 0) newIndex = slides.length - 1;
-
-    // Set the new active slide and dot
-    slides[newIndex].classList.add('active');
-    if(dots[newIndex]) dots[newIndex].classList.add('active');
-}
-</script>

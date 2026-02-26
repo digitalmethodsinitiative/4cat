@@ -2270,8 +2270,12 @@ class DataSet(FourcatModule):
                             if not post_ids:
                                 continue
 
+                            # Make sure we're matching and passing strings
+                            post_ids = [str(p_id) for p_id in post_ids]
+                            item_ids = [str(i_id) for i_id in item_ids]
+
                             # Skip items that are not in the requested item_ids
-                            if item_ids and not any(pid in item_ids for pid in post_ids):
+                            if item_ids and not any(p_id in item_ids for p_id in post_ids):
                                 continue
 
                             # Single file (images usually format like this)
