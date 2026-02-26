@@ -197,12 +197,13 @@ class TelegramVideoDownloader(BasicProcessor):
                         if hasattr(message.media, "document"):
                             await message.download_media(str(path))
 
-                        msg_id = message.id
+                        msg_id = f"{entity}-{message.id}"
                         success = True
                     except (AttributeError, RuntimeError, ValueError, TypeError, BadRequestError) as e:
                         filename = f"{entity}-index-{media_done}"
-                        msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
-                        self.dataset.log(f"Could not download video for message {msg_id} ({e})")
+                        msg_id = f"{entity}-{message.id}" if hasattr(message, "id") else None
+                        msg_id_log = msg_id if msg_id else f"with index {media_done:,}"
+                        self.dataset.log(f"Could not download video for message {msg_id_log} ({e})")
                         self.flawless = False
 
                     media_done += 1
@@ -210,7 +211,7 @@ class TelegramVideoDownloader(BasicProcessor):
                         "filename": filename,
                         "success": success,
                         "from_dataset": self.source_dataset.key,
-                        "post_ids": [msg_id]
+                        "post_ids": [msg_id] if msg_id else []
                     }
 
             except FloodError as e:
