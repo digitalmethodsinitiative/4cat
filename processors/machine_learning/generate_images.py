@@ -56,6 +56,19 @@ class StableDiffusionImageGenerator(BasicProcessor):
     }
 
     @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Shared queue for locally hosted models
+
+        :param str remote_id:  Job item ID
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset to run job for
+        :return:
+        """
+        # Unique queue for locally hosted models; used by other local model processors as well
+        return "local_models" 
+
+    @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options

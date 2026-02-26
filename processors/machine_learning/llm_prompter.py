@@ -50,10 +50,17 @@ class LLMPrompter(BasicProcessor):
         :param DataSet dataset:  Dataset to run job for
         :return:
         """
+        # Unique queue for locally hosted models; used by other local model processors as well
+        local_queue = "local_models" 
         if not dataset:
-            return cls.type
-
-        return f"{cls.type}-{dataset.parameters.get('api_or_local', 'api')}"
+            return local_queue
+        else:
+            if dataset.parameters.get('api_or_local', 'api') in ["local", "hosted"]:
+                # Hosted models also go in the local queue since they use the same shared LLM server
+                return local_queue
+        
+        # Queue per model/API type
+        return f"{cls.type}-{dataset.parameters.get('api_or_local', 'api')}-{dataset.parameters.get('api_model', 'none')}"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
