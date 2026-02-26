@@ -153,23 +153,75 @@ def show_results(page):
 """
 Downloading results
 """
-
-
-@component.route('/result/<path:query_file>')
-def get_result(query_file):
+@component.route('/result/<string:dataset_key>/<path:query_file>')
+def get_result(query_file, dataset_key, dataset=None):
     """
     Get dataset result file
 
     :param str query_file:  name of the result file
+    :param str dataset_key:  dataset key
+    :param dataset:  Optional DataSet object, if already available
     :return:  Result file
-    :rmime: text/csv
     """
     # Handle favicon relative requests that get caught by this broad route
     if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
         return redirect(url_for('static', filename='img/favicon/favicon.ico'))
     
-    return send_from_directory(directory=g.config.get('PATH_DATA'), path=query_file)
+    if dataset and type(dataset) is DataSet:
+        # dataset is already a DataSet object
+        if dataset.key != dataset_key:
+            return error(400, error="Dataset key does not match dataset provided.")
+    else:
+        # Check if dataset is valid key
+        try:
+            dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
+        except DataSetException:
+            return error(404, error="Dataset not found.")
+    
+    # Ensure dataset available to user
+    if dataset.is_private and not (
+            g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+        return error(403, error="This dataset is private.")
+    
+    # Security: Build and validate the full path
+    data_root = g.config.get('PATH_DATA')
+    requested_file = data_root.joinpath(query_file)
+    
+    try:
+        # Resolve the path to ensure it is within the data directory
+        resolved_path = requested_file.resolve(strict=True)
 
+        # Check if it's the main results file
+        if resolved_path == dataset.get_results_path().resolve():
+            if not dataset.get_results_path().exists():
+                return error(404, error="Result file not found.")
+        else:
+            # Check if it's within the dataset's results folder
+            # relative_to() raises ValueError if not relative
+            resolved_path.relative_to(dataset.get_results_folder_path().resolve())
+
+    except (OSError, ValueError, FileNotFoundError):
+        return error(404, error="File not found.")
+
+    # Send related file (Flask can handle file not found w/ 404 error)
+    return send_from_directory(directory=data_root, path=query_file)
+
+@component.route('/result/<path:query_file>')
+def get_result_legacy(query_file):
+    """
+    Legacy route for backward compatibility to maintain compatibility with old links that don't include the dataset key.
+    
+    :param str query_file:  name of the result file
+    :return:  Result file or error
+    """
+    # Handle favicon relative requests that get caught by this broad route
+    if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
+        return redirect(url_for('static', filename='img/favicon/favicon.ico'))
+
+    if g.config.get("4cat.allow_legacy_result_links", False):
+        return send_from_directory(directory=g.config.get('PATH_DATA'), path=query_file)
+    else:
+        return error(404, error="This link format is no longer supported. Please use the updated link from the dataset page.")
 
 @component.route('/mapped-result/<string:key>/')
 def get_mapped_result(key):
@@ -374,7 +426,7 @@ def preview_items(key):
         )
 
 @component.route(
-    "/result/<string:key>/archive/<string:filename>"
+    "/result/<string:key>/archive/<path:filename>"
 )
 def show_archive_file(key: str, filename: str):
     """
@@ -394,9 +446,7 @@ def show_archive_file(key: str, filename: str):
         return error(404, error="No filename given.")
 
     # Locate the archive file
-    archive_path = (
-        Path(g.config.get("PATH_DATA")) / dataset.get_results_path()
-    )
+    archive_path = dataset.get_results_path()
 
     if not archive_path.is_file():
         return error(404, error="Archive not found.")

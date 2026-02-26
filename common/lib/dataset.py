@@ -2256,13 +2256,23 @@ class DataSet(FourcatModule):
         SERVER_HTTPS) plus hardcoded '/result/'.
         TODO: create more dynamic method of obtaining url.
         """
-        filename = self.get_results_path().name
+        from flask import has_app_context, url_for
 
-        # we cheat a little here by using the modules' config reader, but these
-        # will never be context-dependent values anyway
-        url_to_file = ('https://' if self.modules.config.get("flask.https") else 'http://') + \
-                      self.modules.config.get("flask.server_name") + '/result/' + filename
-        return url_to_file
+        query_file = self.get_results_path().name
+        
+        # Use Flask's url_for if possible, to ensure we get the correct server name and protocol (e.g., if behind a reverse proxy)
+        if has_app_context():
+            return url_for(
+                "dataset.get_result",
+                dataset_key=self.key,
+                query_file=query_file,
+                _external=True
+            )
+
+        # Fallback for non-Flask contexts (e.g., backend and workers)
+        scheme = "https" if self.modules.config.get("flask.https") else "http"
+        server = self.modules.config.get("flask.server_name")
+        return f"{scheme}://{server}/result/{self.key}/{query_file}"
 
     def warn_unmappable_item(
             self, item_count, processor=None, error_message=None, warn_admins=True
