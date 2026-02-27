@@ -2232,6 +2232,87 @@ class DataSet(FourcatModule):
         # Default to text
         return self.parameters.get("media_type", "text")
 
+    def get_media_from_children(self, item_ids=[]) -> dict:
+        """ Returns a list of media filenames that have been downloaded
+            via video or image download child processors
+
+        :param list item_ids:   A list of item IDs to limit the filename retrieval to.
+        returns dict: item_id as key and a list of tuples (child dataset key -> filename) as items
+        """
+        children = self.get_children()
+
+        if not children:
+            return {}
+
+        media_map = {}
+
+        # Get children that are image/video downloaders
+        media_datasets = [
+            p for p in children
+            if ("video-downloader" in p.type or "image-downloader" in p.type) and p.data.get("num_rows", 0) > 0 and p.is_finished()
+        ]
+
+        # Loop through media datasets and create a map of dataset key -> filenames
+        # Skip files that were downloaded multiple times
+        seen_files = set()
+
+        for media_dataset in media_datasets:
+            for item in media_dataset.iterate_items():
+
+                if item.file.name == ".metadata.json":
+                    with item.file.open() as infile:
+                        metadata = json.load(infile)
+
+                        for url_key, item_metadata in metadata.items():
+                            media_items = set()
+                            post_ids = item_metadata.get("post_ids", [])  # Required
+
+                            if not post_ids:
+                                continue
+
+                            # Make sure we're matching and passing strings
+                            post_ids = [str(p_id) for p_id in post_ids]
+                            item_ids = [str(i_id) for i_id in item_ids]
+
+                            # Skip items that are not in the requested item_ids
+                            if item_ids and not any(p_id in item_ids for p_id in post_ids):
+                                continue
+
+                            # Single file (images usually format like this)
+                            is_success = item_metadata.get("success", True)
+
+                            if is_success and "filename" in item_metadata:
+                                media_info = (media_dataset.key, item_metadata["filename"])
+                                media_items.add(media_info)
+
+                            # Multiple files (videos with the 'files' array)
+                            if item_metadata.get("files"):
+                                for file in item_metadata["files"]:
+                                    if file.get("success") and "filename" in file:
+                                        media_info = (media_dataset.key, file["filename"])
+                                        media_items.add(media_info)
+
+                            if not media_items:
+                                continue
+
+                            # Append to post_id list
+                            for post_id in post_ids:
+                                if post_id not in media_map:
+                                    media_map[post_id] = []
+
+                                for media_item in media_items:
+                                    if media_item not in media_map[post_id]:
+                                        # Don't add post_id -> filename couplings that we've already seen
+                                        media_ref = (post_id, media_item[1])
+                                        if media_ref not in seen_files:
+                                            media_map[post_id].append(media_item)
+                                        seen_files.add(media_ref)
+
+                    # break after .metadata.json
+                    break
+
+        return media_map
+
     def get_metadata(self):
         """
         Get dataset metadata

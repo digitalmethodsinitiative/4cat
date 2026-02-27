@@ -774,31 +774,31 @@ function init() {
 
 const page_functions = {
 	init: function() {
-		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseover', function() {
+		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseover', function () {
 			let item = 'item-' + this.getAttribute('href').split('-').pop();
 			document.querySelector('#' + item).classList.add('highlight');
 		}));
-		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseout', function() {
+		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseout', function () {
 			document.querySelectorAll('.thread li').forEach(link => link.classList.remove('highlight'));
 		}));
 
 		// Change timestamps to the client's timezone
-		document.querySelectorAll(".timestamp-to-convert").forEach(function(el){
+		document.querySelectorAll(".timestamp-to-convert").forEach(function (el) {
 			el.innerText = getLocalTimeStr(el.innerText);
 		});
 
 		// Make annotation field editor sortable with jQuery UI.
 		$('#annotation-field-settings').sortable({
-            cursor: "s-resize",
-            handle: ".handle",
-            items: "li.annotation-field",
-            axis: "y",
-			change: function() {
+			cursor: "s-resize",
+			handle: ".handle",
+			items: "li.annotation-field",
+			axis: "y",
+			change: function () {
 			}
-        });
+		});
 
 		// Reorder the dataset when the sort type is changed
-		$(".sort-select").on("change", function(){
+		$(".sort-select").on("change", function () {
 
 			// Get the column to sort on, and whether we should sort in reverse.
 			let selected = $("#column-sort-select").find("option:selected").val();
@@ -807,10 +807,9 @@ const page_functions = {
 			let queryParams = new URLSearchParams(window.location.search);
 			let dataset_key = $("#dataset-key").text();
 			queryParams.set("sort", selected)
-			if (order === "reverse"){
+			if (order === "reverse") {
 				queryParams.set("order", "reverse");
-			}
-			else {
+			} else {
 				queryParams.delete("order");
 			}
 			window.location.href = getRelativeURL("results/" + dataset_key + "/explorer/?" + queryParams.toString());
@@ -853,6 +852,40 @@ const page_functions = {
 		if (sort_order) {
 			$("#column-sort-order").find("option[value='" + sort_order + "']").attr("selected", "selected");
 		}
+
+		// Listen to carousel clicks
+		$(document).on('click', '.carousel-btn', function() {
+           let itemId = $(this).data('item-id');
+           let step = $(this).data('step');
+           page_functions.moveSlide(itemId, step);
+       });
+	},
+	moveSlide: function(itemId, step) {
+		// Find the specific carousel container
+		const carousel = document.getElementById('carousel-' + itemId);
+		const slides = carousel.getElementsByClassName('carousel-slide');
+		const dots = carousel.getElementsByClassName('dot');
+
+		let currentIndex = 0;
+
+		// Find currently active slide
+		for (let i = 0; i < slides.length; i++) {
+			if (slides[i].classList.contains('active')) {
+				currentIndex = i;
+				slides[i].classList.remove('active');
+				if(dots[i]) dots[i].classList.remove('active');
+				break;
+			}
+		}
+
+		// Calculate new index (wrap around if needed)
+		let newIndex = currentIndex + step;
+		if (newIndex >= slides.length) newIndex = 0;
+		if (newIndex < 0) newIndex = slides.length - 1;
+
+		// Set the new active slide and dot
+		slides[newIndex].classList.add('active');
+		if(dots[newIndex]) dots[newIndex].classList.add('active');
 	}
 };
 
