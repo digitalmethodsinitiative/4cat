@@ -2231,7 +2231,7 @@ class DataSet(FourcatModule):
         # Default to text
         return self.parameters.get("media_type", "text")
 
-    def get_media_files_from_children(self, item_ids=[]) -> dict:
+    def get_media_from_children(self, item_ids=[]) -> dict:
         """ Returns a list of media filenames that have been downloaded
             via video or image download child processors
 
@@ -2248,8 +2248,7 @@ class DataSet(FourcatModule):
         # Get children that are image/video downloaders
         media_datasets = [
             p for p in children
-            if (p.type.startswith("video-downloader") or p.type.startswith("image-downloader"))
-               and p.data.get("num_rows", 0) > 0 and p.is_finished()
+            if ("video-downloader" in p.type or "image-downloader" in p.type) and p.data.get("num_rows", 0) > 0 and p.is_finished()
         ]
 
         # Loop through media datasets and create a map of dataset key -> filenames

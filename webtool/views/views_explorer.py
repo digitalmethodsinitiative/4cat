@@ -140,7 +140,7 @@ def explorer_dataset(dataset_key: str, page=1):
         return error(404, error="No items or items could not be displayed")
 
     # If there are media items downloaded for these posts, we're going to retrieve them
-    media_files = dataset.get_media_files_from_children(item_ids=item_ids)
+    media_files = dataset.get_media_from_children(item_ids=item_ids)
 
     # Check whether there's already annotations made for these items.
     # We're not using `get_annotations()` because we don't need *all* annotations.
@@ -160,7 +160,7 @@ def explorer_dataset(dataset_key: str, page=1):
         dataset=dataset,
         datasource=datasource,
         items=items,
-        media_files = media_files,
+        media_files=media_files,
         annotation_fields=annotation_fields,
         annotations=item_annotations,
         processors=current_app.fourcat_modules.processors,
