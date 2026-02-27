@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-Please first look through the [readme](https://github.com/digitalmethodsinitiative/zeeschuimer/blob/master/README.md) and [how to use](https://github.com/digitalmethodsinitiative/zeeschuimer/blob/master/README.md#how-to-use) sections to see if your issue is addressed there.
+Please first look through the [4CAT readme](https://github.com/digitalmethodsinitiative/4cat/blob/master/README.md) and [wiki](https://github.com/digitalmethodsinitiative/4cat/wiki) sections to see if your issue is addressed there.
 
 **Describe the bug**
 A clear and concise description of what the bug is. What are you trying to do and what is not working?
