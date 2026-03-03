@@ -80,15 +80,49 @@ class SophisticatedFuturesProxy:
     MAX_CONCURRENT_PER_HOST = 0
 
     def __init__(
-        self, url, log=None, cooloff=3, concurrent_overall=5, concurrent_host=2
+        self,
+        url,
+        log=None,
+        cooloff=3,
+        concurrent_overall=5,
+        concurrent_host=2,
+        healthcheck_url=None,
+        healthcheck_timeout=5,
     ):
         self.proxy_url = url
         self.hostnames = {}
         self.log = log
+        self.healthcheck_url = healthcheck_url
+        self.healthcheck_timeout = healthcheck_timeout
 
         self.COOLOFF = cooloff
         self.MAX_CONCURRENT_OVERALL = concurrent_overall
         self.MAX_CONCURRENT_PER_HOST = concurrent_host
+
+    def probe(self):
+        """
+        Probe proxy health via a known-good endpoint.
+
+        :return bool: True if probe succeeds, False otherwise.
+        """
+        if not self.healthcheck_url:
+            return False
+
+        proxy_definition = (
+            {"http": self.proxy_url, "https": self.proxy_url}
+            if self.proxy_url != DelegatedRequestHandler.PROXY_LOCALHOST
+            else None
+        )
+
+        try:
+            response = requests.get(
+                self.healthcheck_url,
+                timeout=self.healthcheck_timeout,
+                proxies=proxy_definition,
+            )
+            return response.ok
+        except requests.exceptions.RequestException:
+            return False
 
     def know_hostname(self, url):
         """
@@ -277,6 +311,16 @@ class DelegatedRequestHandler:
             k: config.get(k) for k in ("proxies.urls", "proxies.cooloff", "proxies.concurrent-overall",
                                             "proxies.concurrent-host", "proxies.allow-localhost-fallback")
         }
+
+        # Probe target for proxy health checks; defaults to local frontend robots endpoint
+        healthcheck_url = config.get("proxies.healthcheck-url")
+        if not healthcheck_url:
+            server_name = config.get("flask.server_name")
+            if server_name:
+                scheme = "https" if config.get("flask.https") else "http"
+                healthcheck_url = f"{scheme}://{server_name}/robots.txt"
+        new_proxy_settings["proxies.healthcheck-url"] = healthcheck_url
+        new_proxy_settings["proxies.healthcheck-timeout"] = config.get("proxies.healthcheck-timeout") or 5
         
         # Normalize empty config to localhost
         if not new_proxy_settings["proxies.urls"]:
@@ -434,6 +478,8 @@ class DelegatedRequestHandler:
                 proxy_obj.COOLOFF = self.proxy_settings["proxies.cooloff"]
                 proxy_obj.MAX_CONCURRENT_OVERALL = self.proxy_settings["proxies.concurrent-overall"]
                 proxy_obj.MAX_CONCURRENT_PER_HOST = self.proxy_settings["proxies.concurrent-host"]
+                proxy_obj.healthcheck_url = self.proxy_settings.get("proxies.healthcheck-url")
+                proxy_obj.healthcheck_timeout = self.proxy_settings.get("proxies.healthcheck-timeout", 5)
         
         # Add new proxies
         for proxy_url in proxies_to_add:
@@ -460,6 +506,8 @@ class DelegatedRequestHandler:
             self.proxy_settings.get("proxies.cooloff", 0.1),
             self.proxy_settings.get("proxies.concurrent-overall", 5),
             self.proxy_settings.get("proxies.concurrent-host", 2),
+            self.proxy_settings.get("proxies.healthcheck-url"),
+            self.proxy_settings.get("proxies.healthcheck-timeout", 5),
         )
         self.proxy_pool[proxy_url].last_used = 0
         self.proxy_health[proxy_url] = True
@@ -600,23 +648,32 @@ class DelegatedRequestHandler:
                         url_metadata.proxied.result = response
 
                     except requests.exceptions.ProxyError as e:
-                        # Proxy connection issue - mark proxy as unhealthy and requeue
+                        # Proxy connection issue - validate proxy with health probe first
                         proxy_url = url_metadata.proxied.proxy.proxy_url
-                        
-                        # Mark this proxy as unhealthy
-                        self.proxy_health[proxy_url] = False
-                        
-                        # Log warning once per proxy
-                        if proxy_url not in self.proxy_warnings_logged:
-                            self.proxy_warnings_logged.add(proxy_url)
-                            self.log.warning(
-                                f"Proxy {proxy_url} marked as unhealthy due to connection failure: {str(e)}"
+
+                        probe_succeeded = url_metadata.proxied.proxy.probe()
+                        if probe_succeeded:
+                            self.log.debug(
+                                f"Proxy {proxy_url} returned a proxy error for {url}, "
+                                f"but health probe to {url_metadata.proxied.proxy.healthcheck_url} succeeded; "
+                                f"passing original error back to requester"
                             )
-                        
-                        # Reset URL to queued so it will retry with a different proxy
-                        url_metadata.status = self.REQUEST_STATUS_QUEUED
-                        url_metadata.proxied = None
-                        # Don't set to WAITING_FOR_YIELD - let it retry in the normal flow
+                            url_metadata.proxied.result = FailedProxiedRequest(
+                                e, proxy_url
+                            )
+                        else:
+                            self.proxy_health[proxy_url] = False
+
+                            if proxy_url not in self.proxy_warnings_logged:
+                                self.proxy_warnings_logged.add(proxy_url)
+                                self.log.warning(
+                                    f"Proxy {proxy_url} marked as unhealthy due to connection failure and failed health probe "
+                                    f"({url_metadata.proxied.proxy.healthcheck_url}): {str(e)}"
+                                )
+
+                            # Retry with a different proxy
+                            url_metadata.status = self.REQUEST_STATUS_QUEUED
+                            url_metadata.proxied = None
                     
                     except (
                         ConnectionError,
