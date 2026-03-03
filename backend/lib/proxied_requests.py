@@ -1,5 +1,7 @@
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
+import threading
+from functools import wraps
 
 import time
 import urllib3
@@ -9,6 +11,18 @@ import requests
 from collections import namedtuple
 from asyncio import CancelledError as asyncioCancelledError
 from concurrent.futures import CancelledError as futureCancelledError
+
+
+def synchronized_method(func):
+    """
+    A decorator to synchronize access to a method using a lock.
+    """
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        with self.lock:
+            return func(self, *args, **kwargs)
+
+    return wrapper
 
 class FailedProxiedRequest:
     """
@@ -106,7 +120,7 @@ class SophisticatedFuturesProxy:
         
         :return bool: True if proxy has requests that are claimed or running
         """
-        for hostname, metadata in self.hostnames.values():
+        for metadata in self.hostnames.values():
             for request in metadata.running:
                 if request.status in (ProxyStatus.CLAIMED, ProxyStatus.RUNNING):
                     return True
@@ -233,6 +247,7 @@ class DelegatedRequestHandler:
         pool = ThreadPoolExecutor()
         self.session = FuturesSession(executor=pool)
         self.log = log
+        self.lock = threading.RLock()
         
         # Proxy health tracking
         self.proxy_health = {}
@@ -244,6 +259,7 @@ class DelegatedRequestHandler:
 
         self.refresh_settings(config)
 
+    @synchronized_method
     def refresh_settings(self, config):
         """
         Load proxy settings
@@ -306,62 +322,64 @@ class DelegatedRequestHandler:
         :param kwargs: Other keyword arguments will be passed on to
         `requests.get()`
         """
-        if queue_name in self.halted or "_" in self.halted:
-            # do not add URLs while delegator is shutting down
-            return
+        with self.lock:
+            if queue_name in self.halted or "_" in self.halted:
+                # do not add URLs while delegator is shutting down
+                return
 
-        if queue_name not in self.queue:
-            self.queue[queue_name] = []
+            if queue_name not in self.queue:
+                self.queue[queue_name] = []
 
-        for i, url in enumerate(urls):
-            url_metadata = namedtuple(
-                "UrlForDelegatedRequest", ("url", "args", "status", "proxied")
-            )
-            url_metadata.url = url
-            # Make a per-URL copy of kwargs to avoid shared mutation across entries
-            per_kwargs = {**kwargs} if kwargs else {}
-            url_metadata.index = self.index
-            url_metadata.proxied = None
-            url_metadata.status = self.REQUEST_STATUS_QUEUED
-            self.index += 1
+            for i, url in enumerate(urls):
+                url_metadata = namedtuple(
+                    "UrlForDelegatedRequest", ("url", "args", "status", "proxied")
+                )
+                url_metadata.url = url
+                # Make a per-URL copy of kwargs to avoid shared mutation across entries
+                per_kwargs = {**kwargs} if kwargs else {}
+                url_metadata.index = self.index
+                url_metadata.proxied = None
+                url_metadata.status = self.REQUEST_STATUS_QUEUED
+                self.index += 1
 
-            # If a response hook is provided, wrap it to inject the original URL
-            try:
-                hooks = per_kwargs.get("hooks")
-                if hooks and "response" in hooks:
-                    # Copy hooks dict to avoid shared mutation
-                    hooks = {**hooks}
-                    original_hook = hooks["response"]
-                    # Support a single callable or a list of callables
-                    def wrap(h, original_url):
-                        def _wrapped(resp, *a, **k):
-                            # Inject FourCAT-specific original URL in kwargs once
-                            if "fourcat_original_url" not in k:
-                                k["fourcat_original_url"] = original_url
-                            return h(resp, *a, **k)
-                        return _wrapped
+                # If a response hook is provided, wrap it to inject the original URL
+                try:
+                    hooks = per_kwargs.get("hooks")
+                    if hooks and "response" in hooks:
+                        # Copy hooks dict to avoid shared mutation
+                        hooks = {**hooks}
+                        original_hook = hooks["response"]
+                        # Support a single callable or a list of callables
+                        def wrap(h, original_url):
+                            def _wrapped(resp, *a, **k):
+                                # Inject FourCAT-specific original URL in kwargs once
+                                if "fourcat_original_url" not in k:
+                                    k["fourcat_original_url"] = original_url
+                                return h(resp, *a, **k)
+                            return _wrapped
 
-                    if isinstance(original_hook, list):
-                        hooks["response"] = [wrap(h, url) for h in original_hook]
-                    else:
-                        hooks["response"] = wrap(original_hook, url)
+                        if isinstance(original_hook, list):
+                            hooks["response"] = [wrap(h, url) for h in original_hook]
+                        else:
+                            hooks["response"] = wrap(original_hook, url)
 
-                    # Persist modified hooks back into per-URL kwargs
-                    per_kwargs["hooks"] = hooks
-            except Exception:
-                # If wrapping fails for any reason, proceed without modification
-                pass
+                        # Persist modified hooks back into per-URL kwargs
+                        per_kwargs["hooks"] = hooks
+                except Exception:
+                    # If wrapping fails for any reason, proceed without modification
+                    pass
 
-            # Assign the isolated kwargs to this metadata entry
-            url_metadata.kwargs = per_kwargs
+                # Assign the isolated kwargs to this metadata entry
+                url_metadata.kwargs = per_kwargs
 
-            if position == -1:
-                self.queue[queue_name].append(url_metadata)
-            else:
-                self.queue[queue_name].insert(position + i, url_metadata)
+                if position == -1:
+                    self.queue[queue_name].append(url_metadata)
+                else:
+                    self.queue[queue_name].insert(position + i, url_metadata)
 
         self.manage_requests()
 
+    @synchronized_method
     def get_queue_length(self, queue_name="_"):
         """
         Get the length, of the queue
@@ -370,12 +388,13 @@ class DelegatedRequestHandler:
         :return int: Amount of URLs in the queue (regardless of status)
         """
         queue_length = 0
-        for queue in self.queue:
+        for queue in list(self.queue.keys()):
             if queue == queue_name or queue_name == "_":
-                queue_length += len(self.queue[queue_name])
+                queue_length += len(self.queue.get(queue, []))
 
         return queue_length
 
+    @synchronized_method
     def _update_proxy_pool(self):
         """
         Update proxy pool when settings change
@@ -425,6 +444,7 @@ class DelegatedRequestHandler:
             self.log.info(f"Proxy pool updated: {len(self.proxy_pool)} total proxies "
                          f"({len(proxies_to_add)} added, {len([p for p in proxies_to_remove if p not in self.proxy_pool])} removed)")
     
+    @synchronized_method
     def _add_proxy_to_pool(self, proxy_url):
         """
         Add a proxy to the pool
@@ -444,6 +464,7 @@ class DelegatedRequestHandler:
         self.proxy_pool[proxy_url].last_used = 0
         self.proxy_health[proxy_url] = True
     
+    @synchronized_method
     def claim_proxy(self, url):
         """
         Find a proxy to do the request with
@@ -496,6 +517,7 @@ class DelegatedRequestHandler:
         # All proxies busy
         return None
     
+    @synchronized_method
     def _initialize_proxy_pool(self):
         """
         Initialize the proxy pool with configured proxies
@@ -521,6 +543,7 @@ class DelegatedRequestHandler:
 
         self.log.debug(f"Proxy pool initialized with {len(self.proxy_pool)} proxies.")
 
+    @synchronized_method
     def manage_requests(self):
         """
         Manage requests asynchronously
@@ -535,7 +558,10 @@ class DelegatedRequestHandler:
         finished requests in the original queue order (`get_results()`).
         """
         # go through queue and look at the status of each URL
-        for queue_name in self.queue:
+        for queue_name in list(self.queue.keys()):
+            if queue_name not in self.queue:
+                continue
+
             for i, url_metadata in enumerate(self.queue[queue_name]):
                 url = url_metadata.url
 
@@ -553,7 +579,7 @@ class DelegatedRequestHandler:
                     
                     # Clean up proxies pending removal if they have no more active requests
                     proxy_url = url_metadata.proxied.proxy.proxy_url
-                    if proxy_url in self.proxies_pending_removal:
+                    if proxy_url in self.proxies_pending_removal and proxy_url in self.proxy_pool:
                         proxy_obj = self.proxy_pool[proxy_url].proxy
                         # Check if proxy has truly active requests (not just cooling off)
                         if not proxy_obj.has_active_requests():
@@ -709,25 +735,27 @@ class DelegatedRequestHandler:
         """
         self.manage_requests()
 
-        # no results, no return
-        if queue_name not in self.queue:
-            return
-
-        # use list comprehensions here to avoid having to modify the
-        # lists while iterating through them
-        for url_metadata in [u for u in self.queue[queue_name]]:
-            # for each URL in the queue...
-            if url_metadata.status == self.REQUEST_STATUS_WAITING_FOR_YIELD:
-                # see if a finished request is available...
-                self.queue[queue_name].remove(url_metadata)
-                yield url_metadata.url, url_metadata.proxied.result
-
-            elif preserve_order:
-                # ...but as soon as a URL has no finished result, return
-                # unless we don't care about the order, then continue and yield
-                # as much as possible
+        with self.lock:
+            # no results, no return
+            if queue_name not in self.queue:
                 return
 
+            # use list comprehensions here to avoid having to modify the
+            # lists while iterating through them
+            for url_metadata in [u for u in self.queue[queue_name]]:
+                # for each URL in the queue...
+                if url_metadata.status == self.REQUEST_STATUS_WAITING_FOR_YIELD:
+                    # see if a finished request is available...
+                    self.queue[queue_name].remove(url_metadata)
+                    yield url_metadata.url, url_metadata.proxied.result
+
+                elif preserve_order:
+                    # ...but as soon as a URL has no finished result, return
+                    # unless we don't care about the order, then continue and yield
+                    # as much as possible
+                    return
+
+    @synchronized_method
     def _halt(self, queue_name="_"):
         """
         Interrupt fetching of results
@@ -745,11 +773,11 @@ class DelegatedRequestHandler:
         """
         self.halted.add(queue_name)
 
-        for queue in self.queue:
+        for queue in list(self.queue.keys()):
             if queue_name == "_" or queue_name == queue:
                 # use a list comprehension here to avoid having to modify the
                 # list while iterating through it
-                for url_metadata in [u for u in self.queue[queue]]:
+                for url_metadata in [u for u in self.queue.get(queue, [])]:
                     if url_metadata.status != self.REQUEST_STATUS_STARTED:
                         self.queue[queue].remove(url_metadata)
                     else:
@@ -771,5 +799,6 @@ class DelegatedRequestHandler:
             # exhaust generator without doing something w/ results
             all(self.get_results(queue_name, preserve_order=False))
 
-        if queue_name in self.queue:
-            del self.queue[queue_name]
+        with self.lock:
+            if queue_name in self.queue:
+                del self.queue[queue_name]
