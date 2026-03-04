@@ -41,7 +41,7 @@
 		<div class="item-content {% if new_author or new_day %}new-group{% endif %}">
 			<div class="author">
 			{% if not pseudonymised %}
-				<a href="https://t.me/{{ author }}" target="_blank">{{ author }}</a>
+				<a href="https://t.me/{{ author | urlencode }} }}" target="_blank">{{ author }}</a>
 			{% else %}
 				<span title="Pseudonymous author" class="author"><i class="fa fa-user-secret tooltip-trigger"></i></span>
 			{% endif %}
@@ -51,17 +51,54 @@
 		<div class="item-content {% if new_author or new_day %}new-group{% endif %}">
 		{% endif %}
 			{% if item.attachment_type %}
-			<div class="media-container">
-				<!-- Media item -->
-				<a href="https://t.me/{{ item.chat }}/{{ item.id.split('-')[-1] }}" target="_blank"><img src="{{ url_for('static', filename='img/go-to-media.jpg') }}">
-				</a>
-			</div>
+                <div class="carousel-wrapper" id="carousel-{{ item.id }}">
+                    <div class="media-wrapper">
+                        {% if item.id in media_files %}
+                            {% set total_media = media_files[item.id]|length %}
+
+                            {% for media_file in media_files[item.id] %}
+                                {% set filename = media_file[1] %}
+                                {% set file_ext = filename.split(".")[-1].lower() %}
+                                {% set dataset_key = media_file[0] %}
+                                <div class="carousel-slide {% if loop.first %}active{% endif %}">
+                                    {% include 'explorer/media.html' %}
+                                </div>
+                            {% endfor %}
+
+                            {% if total_media > 1 %}
+                                <button class="carousel-btn prev" data-item-id="{{ item.id }}" data-step="-1">&#10094;</button>
+                                <button class="carousel-btn next" data-item-id="{{ item.id }}" data-step="1">&#10095;</button>
+
+                                <div class="media-bullets">
+                                   {% for i in range(total_media) %}
+                                      <span class="dot {% if loop.first %}active{% endif %}"></span>
+                                   {% endfor %}
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            {% if dataset.parameters["save-session"] %}
+                                <div class="no-media">
+                                    <i class="fa-solid fa-video-slash"></i> Use the <a href="/results/{{ dataset.key }}/#processor-list-item-image-downloader-telegram">Download Telegram images</a> processor to display media here.
+                                </div>
+                            {% else %}
+                                <div class="no-media">Cannot show Telegram media without 'Save session' at dataset creation</div>
+                            {% endif %}
+                        {% endif %}
+                        </div>
+                    </div>
 			{% endif %}
 			<div class="body">
 				{% if item.reply_to %}
-					<div class="reply_to">{% if not pseudonymised %}<a href="https://t.me/{{ item.chat }}/{{ item.reply_to }}" target="_blank">{% endif %}#{{ item.reply_to }}{% if not pseudonymised %}</a>{% endif %}</div>
+					<div class="reply_to">
+                        {% if not pseudonymised %}
+                            <a href="https://t.me/{{ item.chat }}/{{ item.reply_to }}" target="_blank">#{{ item.reply_to }}</a>
+                        {% else %}
+                            #{{ item.reply_to }}
+                        {% endif %}
+                    </div>
 				{% endif %}
-				{{ item.body | markdown | social_mediafy(datasource="telegram") | safe }}
+                {% set body = item.body.replace("#", "\#") %}
+				{{ body | markdown | social_mediafy(datasource="telegram") | safe }}
 			</div>
 
 			{% if item.reactions %}

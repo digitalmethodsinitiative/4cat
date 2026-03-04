@@ -307,6 +307,21 @@ config_definition = {
         "help": "Fall back to localhost",
         "tooltip": "If all proxies are down, allow falling back to direct requests (i.e., no proxy)."
     },
+    "proxies.healthcheck-url": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Proxy health check URL",
+        "tooltip": "Known-good URL used to validate whether a proxy is actually down when a proxied request fails. "
+                   "Leave empty to auto-use this 4CAT frontend's /robots.txt URL based on Flask host and scheme."
+    },
+    "proxies.healthcheck-timeout": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": float,
+        "default": 5,
+        "min": 0.1,
+        "help": "Proxy health check timeout",
+        "tooltip": "Timeout in seconds for the proxy health check request."
+    },
     # logging
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,

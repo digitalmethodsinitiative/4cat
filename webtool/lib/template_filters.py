@@ -248,7 +248,6 @@ def _jinja2_filter_extension_to_noun(ext):
 def _jinja2_filter_ellipsiate(*args, **kwargs):
     return ellipsiate(*args, **kwargs)
 
-
 @current_app.template_filter('chan_image')
 def _jinja2_filter_chan_image(tim, ext, board):
 
@@ -260,79 +259,63 @@ def _jinja2_filter_chan_image(tim, ext, board):
     else:
         return f"https://desu-usergeneratedcontent.xyz/{board}/image/{tim[:4]}/{tim[4:6]}/{tim}{ext}"
 
-@current_app.template_filter('social_mediafy')
+@current_app.template_filter("social_mediafy")
 def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
     """
     Adds links to a text body with hashtags, @-mentions, and URLs.
     A data source must be given to generate the correct URLs.
-
-    :param str body:  Text to parse
-    :param str datasource:  Name of the data source (e.g. "twitter")
-
-    :return str:  Parsed text
     """
 
-    if not datasource:
-        return body
-
-    if not body:
+    if not datasource or not body:
         return body
 
     # Base URLs after which tags and @-mentions follow, per platform
     base_urls = {
-        "twitter": {
-            "hashtag": "https://x.com/hashtag/",
-            "mention": "https://x.com/"
-        },
+        "twitter": {"hashtag": "https://x.com/hashtag/", "mention": "https://x.com/"},
         "tiktok": {
             "hashtag": "https://tiktok.com/tag/",
-            "mention": "https://tiktok.com/@"
+            "mention": "https://tiktok.com/@",
         },
         "instagram": {
-            "hasthag": "https://instagram.com/explore/tags/",
-            "mention": "https://instagram.com/"
+            "hashtag": "https://instagram.com/explore/tags/",
+            "mention": "https://instagram.com/",
         },
-        "tumblr": {
-            "mention": "https://tumblr.com/",
-            "markdown": True
-            # Hashtags aren't linked in the post body
-        },
+        "tumblr": {"mention": "https://tumblr.com/", "markdown": True},
         "linkedin": {
             "hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
-            "mention": "https://linkedin.com/in/"
+            "mention": "https://linkedin.com/in/",
         },
-        "telegram": {
-            "mention": "https://t.me/"
-        },
+        "telegram": {"mention": "https://t.me/"},
         "bsky": {
             "hashtag": "https://bsky.app/hashtag/",
             "mention": "https://bsky.app/profile/",
-        }
+        },
     }
 
-    # Supported data sources
-    known_datasources = list(base_urls.keys())
     datasource = datasource.replace("-search", "").replace("-import", "")
 
-    if datasource not in known_datasources:
+    if datasource not in base_urls:
         return body
+
+    lookbehind = r'(?<!["\'>])'
 
     # Add URL links
     if not base_urls[datasource].get("markdown"):
-        for url in urls_from_text(body):
-            body = re.sub(url, "<a href='%s' target='_blank'>%s</a>" % (url, url), body)
+        for raw_url in urls_from_text(body):
+            clean_url = raw_url.split("<")[0]
+            safe_url_pattern = lookbehind + re.escape(clean_url)
+            replacement = f"<a href='{clean_url}' target='_blank'>{clean_url}</a>"
+
+            body = re.sub(safe_url_pattern, replacement, body)
 
     # Add hashtag links
     if "hashtag" in base_urls[datasource]:
         tags = re.findall(r"#[\w0-9]+", body)
-        # We're sorting tags by length so we don't incorrectly
-        # replace tags that are a substring of another, longer tag.
-        tags = sorted(tags, key=lambda x: len(x), reverse=True)
+        tags = sorted(tags, key=len, reverse=True)
         for tag in tags:
-            # Match the string, but not if it's preceded by a >, which indicates that we've already added an anchor tag.
-            body = re.sub(r"(?<!'>)(" + tag + ")",
-                          "<a href='%s' target='_blank'>%s</a>" % (base_urls[datasource]["hashtag"] + tag[1:], tag),
-                          body)
+            tag_pattern = lookbehind + f"({tag})"
+            replacement = f"<a href='{base_urls[datasource]['hashtag']}{tag[1:]}' target='_blank'>{tag}</a>"
+            body = re.sub(tag_pattern, replacement, body)
 
     # Add @-mention links
     if "mention" in base_urls[datasource]:
@@ -340,10 +323,12 @@ def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
             mentions = re.findall(r"@[\w0-9-.]+", body)
         else:
             mentions = re.findall(r"@[\w0-9-]+", body)
-        mentions = sorted(mentions, key=lambda x: len(x), reverse=True)
+
+        mentions = sorted(mentions, key=len, reverse=True)
         for mention in mentions:
-            body = re.sub(r"(?<!>)(" + mention + ")", "<a href='%s' target='_blank'>%s</a>" % (
-                base_urls[datasource]["mention"] + mention[1:], mention), body)
+            mention_pattern = lookbehind + f"({mention})"
+            replacement = f"<a href='{base_urls[datasource]['mention']}{mention[1:]}' target='_blank'>{mention}</a>"
+            body = re.sub(mention_pattern, replacement, body)
 
     return body
 

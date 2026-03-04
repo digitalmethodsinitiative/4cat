@@ -73,22 +73,36 @@ set all_known_fields = {
 	{% endif %}
 
 </header>
-	<!-- Media item -->
-	{% if fields.get("media") %}
-	<!-- Split media urls if there's commas in the field -->
-	{% if fields["media"] is string and "," in fields["media"] %}
-		{% set media_urls = fields["media"].split(",") %}
-	{% else %}
-		{% set media_urls = [fields.get("media")] %}
-	{% endif %}
-	<div class="item-media">
-		{% for media_url in media_urls %}
-	        <a href="{{ media_url }}" target="_blank" rel="external">
-                <img src="{{ media_url }}"></a>
-	        </a>
-		{% endfor %}
-	</div>
-	{% endif %}
+	<!-- Media carousel for downloaded items -->
+    {% if media_files and item.id in media_files %}
+        <div class="carousel-wrapper" id="carousel-{{ item.id }}">
+            <div class="media-wrapper">
+                {% if item.id in media_files %}
+                    {% set total_media = media_files[item.id]|length %}
+
+                    {% for media_file in media_files[item.id] %}
+                        {% set filename = media_file[1] %}
+                        {% set file_ext = filename.split(".")[-1].lower() %}
+                        {% set dataset_key = media_file[0] %}
+                        <div class="carousel-slide {% if loop.first %}active{% endif %}">
+                            {% include 'explorer/media.html' %}
+                        </div>
+                    {% endfor %}
+
+                    {% if total_media > 1 %}
+                        <button class="carousel-btn prev" data-item-id="{{ item.id }}" data-step="-1">&#10094;</button>
+                        <button class="carousel-btn next" data-item-id="{{ item.id }}" data-step="1">&#10095;</button>
+
+                        <div class="media-bullets">
+                           {% for i in range(total_media) %}
+                              <span class="dot {% if loop.first %}active{% endif %}"></span>
+                           {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
 
 	<!-- item body -->
 	<div class="item-content">
@@ -100,7 +114,8 @@ set all_known_fields = {
 	<!-- Tags -->
 	{% if fields.get("tags") %}
 		<div class="tags">
-			{{ fields.tags | safe }}
+        Tags:
+			{{ fields.tags.split(",")|join(", ") | safe }}
 		</div>
 	{% endif %}
 
