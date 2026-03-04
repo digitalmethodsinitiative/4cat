@@ -878,6 +878,39 @@ class DataSet(FourcatModule):
 
         return results_path
 
+    def extract_file_from_archive(self, member, staging_area=None):
+        """
+        Extract a single member from this dataset's results archive into a
+        staging area and return the Path to the extracted file. If the member
+        does not exist, return None.
+
+        :param str member: The path of the member inside the archive
+        :param Path staging_area: Optional staging area to extract into
+        :return Path|None: Path to extracted file or None if not found
+        """
+        path = self.get_results_path()
+        if not path.exists():
+            return None
+
+        if not staging_area:
+            staging_area = self.get_staging_area()
+
+        if not staging_area.exists() or not staging_area.is_dir():
+            raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
+
+        with zipfile.ZipFile(path, "r") as archive_file:
+            # Zip member names are stored with forward slashes
+            namelist = archive_file.namelist()
+            if member not in namelist:
+                return None
+
+            # Ensure parent directories exist in staging area
+            extract_path = staging_area.joinpath(member)
+            extract_path.parent.mkdir(parents=True, exist_ok=True)
+            archive_file.extract(member, staging_area)
+
+            return extract_path
+
     def remove_disposable_files(self):
         """
         Remove any disposable files and folders, such as staging areas

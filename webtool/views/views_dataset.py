@@ -7,7 +7,9 @@ import io
 import zipfile
 import json_stream
 import mimetypes
+import uuid
 from pathlib import Path
+from urllib.parse import quote
 from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, flash,
                    get_flashed_messages, url_for, stream_with_context, g)
 from flask_login import login_required, current_user
@@ -156,7 +158,7 @@ Downloading results
 """
 
 
-def _serve_zip_member(archive_path: Path, member: str):
+def _serve_zip_member(archive_path: Path, member: str, dataset: DataSet):
     """Serve a member from a zip archive path and return a Flask Response or error()."""
     if not member:
         return error(400, error="No member specified.")
@@ -168,9 +170,6 @@ def _serve_zip_member(archive_path: Path, member: str):
     if not archive_path.is_file():
         return error(404, error="Archive not found.")
 
-    # Open the archive without a context manager and keep it open until the
-    # streaming generator has finished; close the ZipFile in the generator's
-    # finally block to avoid "archive already closed" errors.
     try:
         zf = zipfile.ZipFile(archive_path, 'r')
     except zipfile.BadZipFile:
@@ -185,44 +184,38 @@ def _serve_zip_member(archive_path: Path, member: str):
             pass
         return error(404, error="File not found in archive.")
 
-    # Try to get uncompressed size from ZipInfo for Content-Length header
-    try:
-        zi = zf.getinfo(member)
-        content_length = zi.file_size
-    except Exception:
-        content_length = None
-
     mime_type, _ = mimetypes.guess_type(member)
     if mime_type is None:
         mime_type = "application/octet-stream"
 
-    def stream_member():
-        f = zf.open(member, 'r')
+    try:
+        extracted = dataset.extract_file_from_archive(member)
+    except Exception as e:
         try:
-            chunk_size = 8192
-            while True:
-                chunk = f.read(chunk_size)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            try:
-                f.close()
-            except Exception:
-                pass
-            try:
-                zf.close()
-            except Exception:
-                pass
+            zf.close()
+        except Exception:
+            pass
+        return error(500, error=f"Error extracting archive member: {str(e)}")
 
-    headers = {
-        "Content-Disposition": f'inline; filename="{Path(member).name}"',
-    }
-    if content_length is not None:
-        headers["Content-Length"] = str(content_length)
+    try:
+        zf.close()
+    except Exception:
+        pass
 
-    return current_app.response_class(stream_with_context(stream_member()), mimetype=mime_type,
-                                      headers=headers)
+    if not extracted or not extracted.exists():
+        return error(404, error="File not found in archive.")
+
+    response = send_from_directory(
+        directory=str(extracted.parent),
+        path=extracted.name,
+        mimetype=mime_type,
+        conditional=True,
+        etag=True
+    )
+    response.headers["Content-Disposition"] = f'inline; filename="{Path(member).name}"'
+    response.headers.setdefault("Accept-Ranges", "bytes")
+    response.call_on_close(lambda: dataset.remove_disposable_files())
+    return response
 
 
 @component.route('/result/<string:dataset_key>/<path:query_file>')
@@ -283,7 +276,7 @@ def get_result(query_file, dataset_key, dataset=None, member=None):
         # resolved_path validated above to be within dataset scope
         if not resolved_path.is_file():
             return error(400, error="Target is not a file.")
-        return _serve_zip_member(resolved_path, member)
+        return _serve_zip_member(resolved_path, member, dataset=dataset)
 
     # Send related file (Flask can handle file not found w/ 404 error)
     return send_from_directory(directory=data_root, path=query_file)
