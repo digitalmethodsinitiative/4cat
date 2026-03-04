@@ -6,6 +6,7 @@ import csv
 import io
 import zipfile
 import json_stream
+import mimetypes
 from pathlib import Path
 from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, Response, flash,
                    get_flashed_messages, url_for, stream_with_context, g)
@@ -402,7 +403,6 @@ def show_archive_file(key: str, filename: str):
         return error(404, error="Archive not found.")
 
     try:
-
         with zipfile.ZipFile(archive_path, "r") as zip_file:
             # Check if file exists in archive
             if filename not in zip_file.namelist():
@@ -410,9 +410,6 @@ def show_archive_file(key: str, filename: str):
 
             # Read file from archive into memory
             file_data = zip_file.read(filename)
-
-            # Determine mime type based on extension
-            import mimetypes
 
             mime_type, _ = mimetypes.guess_type(filename)
             if mime_type is None:

@@ -97,19 +97,92 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     cursor: not-allowed;
 }
 
-.item-media img {
-    width: 100%;
-    max-width: 300px;
-}
-
-.media-item > img, .media-item > audio, .media-item > video {
-    max-width: 100%;
-    max-height: 500px;
-    margin: 0 auto;
-}
 
 span.divider {
     font-size: 16px;
     color: var(--gray-darker);
     cursor: default;
+}
+
+
+/* Media carousel */
+.carousel-wrapper {
+    margin-top: 15px;
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    background-color: var(--gray);
+}
+
+.carousel-slide {
+    display: none;
+    width: 100%;
+}
+
+.carousel-slide.active {
+    display: block;
+}
+
+.carousel-btn {
+    cursor: pointer;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto;
+    padding: 12px;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+    transition: 0.3s ease;
+    user-select: none;
+    background-color: rgba(0, 0, 0, 0.4);
+    border: none;
+    z-index: 10;
+}
+
+.carousel-btn.prev {
+    left: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.carousel-btn.next {
+    right: 0;
+    border-radius: 4px 0 0 4px;
+}
+
+.carousel-btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.items .media-wrapper .media-bullets {
+    position: absolute;
+    width: 100%;
+    bottom: 12px;
+    text-align: center;
+    z-index: 10;
+}
+
+.items .media-wrapper .media-bullets .dot {
+    height: 6px;
+    width: 6px;
+    margin: 0 3px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+}
+
+.items .media-wrapper .media-bullets .dot.active {
+    background-color: rgba(255, 255, 255, 1);
+}
+
+.items .media-wrapper video, .items .media-wrapper img, .items .media-wrapper audio {
+    max-width: 100%;
+    max-height: 500px;
+    display: block;
+    margin: 0 auto;
+}
+
+.items .media-wrapper audio {
+    width: 100%;
 }

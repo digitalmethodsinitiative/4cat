@@ -60,7 +60,9 @@ for (const a in annotation_fields) {
 		<ol class="items" id="explorer-items">
 		{% for item in items %}
 			{% set item_index = loop.index - 1 %}
-			{% include "explorer/item.html" %}
+            {% if not (datasource == "media-import" and item.id == ".metadata.json") %}
+			    {% include "explorer/item.html" %}
+            {% endif %}
 		{% endfor %}
 		</ol>
 	</div>
