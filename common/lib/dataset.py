@@ -10,6 +10,7 @@ import time
 import csv
 import re
 import os
+import errno
 from enum import Enum
 
 from common.lib.annotation import Annotation
@@ -864,14 +865,22 @@ class DataSet(FourcatModule):
 
         results_dir_base = results_file.parent
         results_dir = results_file.name.replace(".", "") + "-staging"
-        results_path = results_dir_base.joinpath(results_dir)
-        index = 1
-        while results_path.exists():
-            results_path = results_dir_base.joinpath(results_dir + "-" + str(index))
-            index += 1
 
-        # create temporary folder
-        results_path.mkdir()
+        index = 1
+        # Try creating the staging directory; if a concurrent process created
+        # it between the exists() check and mkdir(), handle the EEXIST error
+        # by incrementing the index and retrying to avoid race conditions.
+        while True:
+            suffix = "" if index == 1 else f"-{index}"
+            results_path = results_dir_base.joinpath(results_dir + suffix)
+            try:
+                results_path.mkdir()
+                break
+            except OSError as e:
+                if getattr(e, 'errno', None) == errno.EEXIST:
+                    index += 1
+                    continue
+                raise
 
         # Storing the staging area with the dataset so that it can be removed later
         self.disposable_files.append(results_path)
