@@ -154,8 +154,48 @@ def show_results(page):
 """
 Downloading results
 """
+
+
+def _serve_zip_member(archive_path: Path, member: str):
+    """Serve a member from a zip archive path and return a Flask Response or error()."""
+    if not member:
+        return error(400, error="No member specified.")
+
+    # Reject absolute paths and traversal in member
+    if Path(member).is_absolute() or ".." in Path(member).parts:
+        return error(400, error="Invalid member path.")
+
+    if not archive_path.is_file():
+        return error(404, error="Archive not found.")
+
+    try:
+        with zipfile.ZipFile(archive_path, 'r') as zf:
+            if member not in zf.namelist():
+                return error(404, error="File not found in archive.")
+
+            file_data = zf.read(member)
+
+            mime_type, _ = mimetypes.guess_type(member)
+            if mime_type is None:
+                mime_type = "application/octet-stream"
+
+            return Response(
+                file_data,
+                mimetype=mime_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="{Path(member).name}"',
+                    "Content-Length": str(len(file_data)),
+                },
+            )
+
+    except zipfile.BadZipFile:
+        return error(400, error="Invalid zip archive.")
+    except Exception as e:
+        return error(500, error=f"Error reading archive: {str(e)}")
+
+
 @component.route('/result/<string:dataset_key>/<path:query_file>')
-def get_result(query_file, dataset_key, dataset=None):
+def get_result(query_file, dataset_key, dataset=None, member=None):
     """
     Get dataset result file
 
@@ -203,6 +243,16 @@ def get_result(query_file, dataset_key, dataset=None):
 
     except (OSError, ValueError, FileNotFoundError):
         return error(404, error="File not found.")
+
+    # If a zip member is requested, serve it via the zip-member helper
+    if member is None:
+        member = request.args.get("member")
+
+    if member:
+        # resolved_path validated above to be within dataset scope
+        if not resolved_path.is_file():
+            return error(400, error="Target is not a file.")
+        return _serve_zip_member(resolved_path, member)
 
     # Send related file (Flask can handle file not found w/ 404 error)
     return send_from_directory(directory=data_root, path=query_file)
@@ -440,47 +490,13 @@ def show_archive_file(key: str, filename: str):
     except DataSetException:
         return error(404, error="This dataset cannot be found.")
 
-    if not current_user.can_access_dataset(dataset):
-        return error(403, error="This dataset is private.")
-
     if not filename:
         return error(404, error="No filename given.")
 
-    # Locate the archive file
-    archive_path = dataset.get_results_path()
+    # Delegate to merged get_result logic for archive members
+    archive_query_file = dataset.get_results_path().name
+    return get_result(archive_query_file, key, dataset=dataset, member=filename)
 
-    if not archive_path.is_file():
-        return error(404, error="Archive not found.")
-
-    try:
-        with zipfile.ZipFile(archive_path, "r") as zip_file:
-            # Check if file exists in archive
-            if filename not in zip_file.namelist():
-                return error(404, error="File not found in archive.")
-
-            # Read file from archive into memory
-            file_data = zip_file.read(filename)
-
-            mime_type, _ = mimetypes.guess_type(filename)
-            if mime_type is None:
-                mime_type = "application/octet-stream"
-
-            # Return as a response with appropriate headers
-            return Response(
-                file_data,
-                mimetype=mime_type,
-                headers={
-                    "Content-Disposition": f'inline; filename="{Path(filename).name}"',
-                    "Content-Length": str(len(file_data)),
-                },
-            )
-
-    except zipfile.BadZipFile:
-        return error(400, error="Invalid zip archive.")
-    except KeyError:
-        return error(404, error="File not found in archive.")
-    except Exception as e:
-        return error(500, error=f"Error reading archive: {str(e)}")
 
 """
 Individual result pages
