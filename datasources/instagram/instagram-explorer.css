@@ -30,25 +30,6 @@
 	min-width: auto;
 }
 
-.items .media-container {
-    width: 100%;
-    position: relative;
-}
-
-.items .media-container img {
-    width: 100%;
-}
-
-.items .media-container .media-bullets {
-    position: absolute;
-    width: 100%;
-    bottom: 5px;
-    text-align: center;
-    font-size: 22px;
-    color: white;
-    opacity: .6;
-}
-
 .items header, .items .item-content {
 	padding: 20px;
 }
@@ -69,11 +50,90 @@
     padding: 10px;
 }
 
-.items .item-image {
-	max-width: 200px;
-	margin: 0 auto;
-	margin-top: 30px;
-	margin-bottom: 30px;
+.items .item .media-wrapper .no-media {
+	background-color: #e8e8e8;
+	color: grey;
+	padding: 20px;
+}
+
+.items .item .media-wrapper .no-media a, .items .item .media-wrapper .no-media i {
+	color: grey;
+	font-weight: bold;
+}
+
+/* Carousel */
+.carousel-wrapper {
+    position: relative;
+    width: 100%;
+    overflow: hidden; /* Ensures large media doesn't spill out */
+}
+
+.carousel-slide {
+    display: none; /* Hide all slides by default */
+    width: 100%;
+}
+
+.carousel-slide.active {
+    display: block; /* Show the active slide */
+}
+
+/* Carousel Navigation Buttons */
+.carousel-btn {
+    cursor: pointer;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto;
+    padding: 12px;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+    transition: 0.3s ease;
+    user-select: none;
+    background-color: rgba(0, 0, 0, 0.4);
+    border: none;
+    z-index: 10;
+}
+
+.carousel-btn.prev {
+    left: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.carousel-btn.next {
+    right: 0;
+    border-radius: 4px 0 0 4px;
+}
+
+.carousel-btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* Pagination Dots */
+.items .media-wrapper .media-bullets {
+    position: absolute;
+    width: 100%;
+    bottom: 12px;
+    text-align: center;
+    z-index: 10;
+}
+
+.items .media-wrapper .media-bullets .dot {
+    height: 6px;
+    width: 6px;
+    margin: 0 3px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+}
+
+.items .media-wrapper .media-bullets .dot.active {
+    background-color: rgba(255, 255, 255, 1);
+}
+
+.items .media-wrapper video, .items .media-wrapper img {
+    width: 100%;
 }
 
 /** --------------------- *

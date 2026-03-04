@@ -32,7 +32,20 @@
 			
 			<!-- Video thumbnail item -->
 			<div class="item-media">
-				<a href="{{ item.tiktok_url }}" target="_blank"><img src="{{ url_for('static', filename='img/go-to-media.jpg') }}"></a>
+                {% if item.id in media_files %}
+                    {% for media_file in media_files[item.id] %}
+                        {% set filename = media_file[1] %}
+                        {% set file_ext = filename.split(".")[-1].lower() %}
+                        {% set dataset_key = media_file[0] %}
+                        {% if file_ext == "mp4" %}
+                            {% include 'explorer/media.html' %}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div class="no-media">
+                    <i class="fa-solid fa-video-slash"></i> Use the <a href="/results/{{ dataset.key }}/#processor-list-item-video-downloader-tiktok">Download TikTok videos</a> processor to display videos here. If links are expired, run <a href="/results/{{ dataset.key }}/#processor-list-item-tiktok-update-filter">Recollect TikTok data</a> first.
+                    </div>
+                {% endif %}
 			</div>
 			
 		</div>

@@ -22,4 +22,7 @@
     {% elif not dataset.is_finished() %}
         Creating dataset
     {% endif %}
+    {% if dataset.is_finished() and dataset.num_rows > 0 %}
+        {{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %} captured.
+    {% endif %}
 {% endif %}
