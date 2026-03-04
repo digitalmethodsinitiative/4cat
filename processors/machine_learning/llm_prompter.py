@@ -505,7 +505,8 @@ class LLMPrompter(BasicProcessor):
         
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
-        self.dataset.log(f"Using LLM provider '{provider}' with model '{model}' at base URL '{base_url}'")
+        base_url_str = "" if not base_url else f" at base URL '{base_url}'"
+        self.dataset.log(f"Using LLM provider '{provider}' with model '{model}'{base_url_str}")
         try:
             llm = LLMAdapter(
                 provider=provider,
@@ -765,14 +766,23 @@ class LLMPrompter(BasicProcessor):
                             output = [output]
 
                         # More cleaning
-                        # Magistral gives back an annoying nested dict with 'thinking' and 'text', flatten it
-                        if len(output) > 0 and isinstance(output[0], dict) and output[0].get("type") == "thinking":
-                            output_flat = {"thinking": "", "text": []}
+                        # Newer OpenAI models and Magistral return annoying nested dict with 'thinking'/'reasoning and
+                        # 'text', flatten it
+                        if len(output) > 0 and isinstance(output[0], dict) and output[0].get("type") in ["thinking",
+                                                                                                         "reasoning"]:
+                            reasoning_string = output[0].get("type")  # "thinking" or "reasoning"
+                            output_flat = {reasoning_string: "", "text": []}
+
                             for output_part in output:
-                                if output_part.get("type") == "thinking":
-                                    output_flat["thinking"] += "\n".join([think["text"] for think in output_part["thinking"]])
+                                if output_part.get("type") == reasoning_string:
+                                    if reasoning_string in output_part and isinstance(output_part[reasoning_string], list):
+                                        output_flat[reasoning_string] += "\n".join(
+                                            [think.get("text", "") for think in output_part.get(reasoning_string, [])])
+                                    else:
+                                        output_flat[reasoning_string] += output_part.get("text", "")
                                 else:
                                     output_flat["text"].append(output_part.get("text", ""))
+
                             output_flat["text"] = "\n".join(output_flat["text"])
                             output = [output_flat]
 
