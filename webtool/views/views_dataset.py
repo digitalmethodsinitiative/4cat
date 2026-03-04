@@ -8,7 +8,7 @@ import zipfile
 import json_stream
 import mimetypes
 from pathlib import Path
-from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, Response, flash,
+from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, flash,
                    get_flashed_messages, url_for, stream_with_context, g)
 from flask_login import login_required, current_user
 
