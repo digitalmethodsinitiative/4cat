@@ -1304,7 +1304,7 @@ def check_processor():
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
                                     processors=g.modules.processors),
 			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
-			"url": "/result/" + dataset.data["result_file"]
+			"url": url_for("dataset.get_result", dataset_key=dataset.key, query_file=dataset.result_file)
 		})
 
 	return jsonify(children)
