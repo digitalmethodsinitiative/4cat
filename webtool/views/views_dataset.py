@@ -168,30 +168,61 @@ def _serve_zip_member(archive_path: Path, member: str):
     if not archive_path.is_file():
         return error(404, error="Archive not found.")
 
+    # Open the archive without a context manager and keep it open until the
+    # streaming generator has finished; close the ZipFile in the generator's
+    # finally block to avoid "archive already closed" errors.
     try:
-        with zipfile.ZipFile(archive_path, 'r') as zf:
-            if member not in zf.namelist():
-                return error(404, error="File not found in archive.")
-
-            file_data = zf.read(member)
-
-            mime_type, _ = mimetypes.guess_type(member)
-            if mime_type is None:
-                mime_type = "application/octet-stream"
-
-            return Response(
-                file_data,
-                mimetype=mime_type,
-                headers={
-                    "Content-Disposition": f'inline; filename="{Path(member).name}"',
-                    "Content-Length": str(len(file_data)),
-                },
-            )
-
+        zf = zipfile.ZipFile(archive_path, 'r')
     except zipfile.BadZipFile:
         return error(400, error="Invalid zip archive.")
     except Exception as e:
         return error(500, error=f"Error reading archive: {str(e)}")
+
+    if member not in zf.namelist():
+        try:
+            zf.close()
+        except Exception:
+            pass
+        return error(404, error="File not found in archive.")
+
+    # Try to get uncompressed size from ZipInfo for Content-Length header
+    try:
+        zi = zf.getinfo(member)
+        content_length = zi.file_size
+    except Exception:
+        content_length = None
+
+    mime_type, _ = mimetypes.guess_type(member)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+
+    def stream_member():
+        f = zf.open(member, 'r')
+        try:
+            chunk_size = 8192
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            try:
+                f.close()
+            except Exception:
+                pass
+            try:
+                zf.close()
+            except Exception:
+                pass
+
+    headers = {
+        "Content-Disposition": f'inline; filename="{Path(member).name}"',
+    }
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+
+    return current_app.response_class(stream_with_context(stream_member()), mimetype=mime_type,
+                                      headers=headers)
 
 
 @component.route('/result/<string:dataset_key>/<path:query_file>')
