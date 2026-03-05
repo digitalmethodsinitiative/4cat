@@ -42,3 +42,63 @@ https://github.com/docker/buildx/issues/426
 https://stackoverflow.com/questions/64221861/failed-to-resolve-with-frontend-dockerfile-v0
 
 4. More errors coming soon! (No doubt)
+
+---
+
+## Running a local Ollama instance alongside 4CAT
+
+4CAT can use a local [Ollama](https://ollama.com) server for LLM-powered processors.
+A Docker Compose override file (`docker-compose_ollama.yml`) is included to add
+Ollama as a sidecar service so you do not need to run it separately on the host.
+
+### Quick start
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose_ollama.yml up -d
+```
+
+This starts the standard 4CAT stack plus an `ollama` container that is only
+accessible within the Docker network (and optionally on `localhost:11434` on
+the host via the exposed port).
+
+### Configuring 4CAT to use Ollama
+
+1. Log in as admin and open **Control Panel → Settings**.
+2. Set the following LLM fields:
+
+   | Setting | Value |
+   |---|---|
+   | LLM Provider Type | `ollama` |
+   | LLM Server URL | `http://ollama:11434` |
+   | LLM Access | enabled |
+
+3. Save settings.
+4. Open **Control Panel → LLM Server** (visible once *LLM Access* is enabled).
+5. Use the **Refresh** button to load available models, then **Pull** a model
+   (e.g. `llama3.2:3b`) to download it from the Ollama library.
+6. Enable the models you want to make available to users.
+
+### GPU support (NVIDIA)
+
+Uncomment the `deploy.resources` block in `docker-compose_ollama.yml` and
+ensure the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+is installed on your host. Then restart the stack with the override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose_ollama.yml up -d
+```
+
+### Persisting models
+
+Models downloaded by Ollama are stored in the `4cat_ollama_data` Docker volume.
+They survive container restarts and re-creations unless you explicitly remove
+the volume (`docker volume rm 4cat_ollama_data`).
+
+### Using an external Ollama server
+
+If you already run Ollama on the host or elsewhere, skip the override file and
+point 4CAT directly at that server:
+
+- **On the same host**: use `http://host.docker.internal:11434` as the LLM Server URL.
+- **Remote server**: use the server's reachable URL and configure any required
+  API key in the *LLM Server API Key* and *LLM Server Authentication Type* settings.
