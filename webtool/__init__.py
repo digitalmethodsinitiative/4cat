@@ -171,6 +171,7 @@ with app.app_context():
     import webtool.views.views_restart  # noqa: E402
     import webtool.views.views_admin  # noqa: E402
     import webtool.views.views_extensions  # noqa: E402
+    import webtool.views.views_llm  # noqa: E402
     import webtool.views.views_user  # noqa: E402
     import webtool.views.views_dataset  # noqa: E402
     import webtool.views.views_misc  # noqa: E402
@@ -181,6 +182,7 @@ with app.app_context():
     app.register_blueprint(webtool.views.views_restart.component)
     app.register_blueprint(webtool.views.views_admin.component)
     app.register_blueprint(webtool.views.views_extensions.component)
+    app.register_blueprint(webtool.views.views_llm.component)
     app.register_blueprint(webtool.views.views_user.component)
     app.register_blueprint(webtool.views.views_dataset.component)
     app.register_blueprint(webtool.views.views_misc.component)

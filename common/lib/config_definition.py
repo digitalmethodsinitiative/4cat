@@ -621,7 +621,15 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": {},
         "help": "Available LLM models",
-        "tooltip": "A JSON dictionary of available LLM models on the server. 4CAT will query the LLM server for available models periodically.",
+        "tooltip": "A JSON dictionary of available LLM models on the server. Refreshed daily by the OllamaManager worker.",
+        "indirect": True,
+        "global": True
+    },
+    "llm.enabled_models": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": [],
+        "help": "Enabled LLM models",
+        "tooltip": "List of model keys enabled for use. Managed via the LLM Server settings panel.",
         "indirect": True,
         "global": True
     },
