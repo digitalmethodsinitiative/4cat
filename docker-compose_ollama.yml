@@ -1,0 +1,54 @@
+# Use this file as an override to add a local Ollama instance to your 4CAT stack.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose_ollama.yml up -d
+#
+# Once running, configure 4CAT via the Control Panel → Settings → LLM:
+#   LLM Provider Type : ollama
+#   LLM Server URL    : http://ollama:11434
+#
+# GPU support (NVIDIA):
+#   Uncomment the `deploy.resources` block in the ollama service below and
+#   ensure the NVIDIA Container Toolkit is installed on your host.
+#   See: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+#
+# GPU support (Apple Silicon / AMD):
+#   Pass the appropriate device through your host's Docker settings instead.
+#   Ollama will automatically detect the GPU when it is available inside the container.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: 4cat_ollama
+    restart: unless-stopped
+    volumes:
+      - 4cat_ollama:/root/.ollama
+    # Expose the Ollama API on the host for optional external access or
+    # management with the Ollama CLI. Remove this block if you want to keep
+    # Ollama accessible only within the Docker network.
+    ports:
+      - "127.0.0.1:11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "ls"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # --- NVIDIA GPU support (uncomment to enable) ---
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # Make the 4CAT backend wait for Ollama to be healthy before starting.
+  # This prevents initial model-refresh failures on first boot.
+  backend:
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+volumes:
+  4cat_ollama:
+    name: 4cat_ollama_data
