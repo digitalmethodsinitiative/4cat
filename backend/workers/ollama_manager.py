@@ -2,8 +2,6 @@
 Manage Ollama LLM models
 """
 import json
-import time
-
 import requests
 
 from backend.lib.worker import BasicWorker
