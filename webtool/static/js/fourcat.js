@@ -680,16 +680,21 @@ const query = {
         let annotation_list = $('.annotation-fields-list');
 
         if (annotation_list.length === 0) {
-            // Section does not exist yet; create and insert it after the Parameters div
-            let params_div = $('.result-page .card .fullwidth').has('dt:contains("Parameters")');
-            if (params_div.length > 0) {
+            // Section does not exist yet; find the dataset details card and insert after
+            // the last existing fullwidth div before API Credentials or Processors sections
+            let card_dl = $('.result-page .card dl');
+            if (card_dl.length > 0) {
                 let html = '<div class="fullwidth annotation-fields-list"><dt>Annotations</dt><dd><ul>';
                 for (let field_id in annotation_fields) {
                     let label = annotation_fields[field_id].label;
                     html += '<li><span class="property-badge" data-annotation-id="' + field_id + '"><i class="fa-solid fa-tag"></i> ' + label + '</span></li>';
                 }
                 html += '</ul></dd></div>';
-                params_div.after(html);
+                // Insert after the last .fullwidth div that is not the annotation list itself
+                let fullwidth_divs = card_dl.children('.fullwidth').not('.annotation-fields-list');
+                if (fullwidth_divs.length > 0) {
+                    fullwidth_divs.first().after(html);
+                }
             }
         } else {
             // Update existing section: add any new fields

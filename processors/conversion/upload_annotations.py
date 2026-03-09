@@ -26,7 +26,7 @@ class UploadAnnotations(BasicProcessor):
 	title = "Upload annotations"  # title displayed in UI
 	description = ("Upload annotations for this dataset via a CSV file or by pasting text data. "
 				   "The first column should contain item IDs; subsequent columns become annotation fields. "
-				   "Comma separates the data.")
+				   "For CSV file uploads, comma is used as the separator. For text input, a custom separator can be specified.")
 	extension = "csv"
 
 	@classmethod
@@ -44,7 +44,8 @@ class UploadAnnotations(BasicProcessor):
 				"type": UserInput.OPTION_INFO,
 				"help": "Upload annotations for this dataset. The first column should contain item IDs "
 						"matching items in the dataset. Each subsequent column becomes a text annotation. "
-						"Comma separates the data. A maximum of 20 annotation fields per upload is allowed."
+						"For CSV file uploads, comma separates the data. For text input, you can specify a custom "
+						"separator below. A maximum of 20 annotation fields per upload is allowed."
 			},
 			"upload_method": {
 				"type": UserInput.OPTION_CHOICE,
@@ -128,12 +129,12 @@ class UploadAnnotations(BasicProcessor):
 			reader = csv.reader(io.StringIO(content), delimiter=separator)
 			header = next(reader, None)
 		except csv.Error:
-			raise QueryParametersException("Could not parse the data. Make sure comma separates the columns.")
+			raise QueryParametersException("Could not parse the data. Make sure the correct separator is used between columns.")
 
 		if not header or len(header) < 2:
 			raise QueryParametersException(
 				"Data must have at least two columns: the first for item IDs, and at least one for annotations. "
-				"Comma separates the data."
+				"Make sure the correct separator is used between columns."
 			)
 
 		annotation_labels = [h.strip() for h in header[1:]]
@@ -218,7 +219,7 @@ class UploadAnnotations(BasicProcessor):
 			reader = csv.reader(io.StringIO(content), delimiter=separator)
 			header = next(reader, None)
 		except csv.Error:
-			self.dataset.finish_with_error("Could not parse the uploaded data. Make sure comma separates the columns.")
+			self.dataset.finish_with_error("Could not parse the uploaded data. Make sure the correct separator is used between columns.")
 			return
 
 		if not header or len(header) < 2:
