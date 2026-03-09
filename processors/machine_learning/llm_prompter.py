@@ -220,11 +220,10 @@ class LLMPrompter(BasicProcessor):
             # Media-specific options: show info about media files being attached
             options["media_info"] = {
                 "type": UserInput.OPTION_INFO,
-                "help": f"<strong>📎 Media files attached</strong><br>"
-                f"The parent dataset contains <strong>{media_type}</strong> files that will be sent "
+                "help": f"The parent dataset contains <strong>{media_type}</strong> files that will be sent "
                 f"to the LLM with each prompt. Make sure to use a model that supports "
                 f"<strong>{media_type}</strong> input (e.g. vision models for images).<br>"
-                f"Not all models support all media types — if the model cannot process "
+                f"Not all models support all media types. If the model cannot process "
                 f"{media_type} files, an error will be returned during processing.",
             }
             options["system_prompt"] = {
@@ -511,7 +510,7 @@ class LLMPrompter(BasicProcessor):
             if not api_model:
                self.dataset.finish_with_error("Select an API model or insert one manually")
                return
-            # Models can be set manually already
+            # Models can be set manually
             if api_model == "custom":
                 model = self.parameters.get("api_custom_model_id", "")
                 provider = self.parameters.get("api_custom_model_provider", "")
@@ -593,6 +592,7 @@ class LLMPrompter(BasicProcessor):
 
         # Setup annotation saving
         annotations = []
+        media_annotations = {}
         save_annotations = self.parameters.get("save_annotations", False)
 
         i = 0
@@ -647,6 +647,35 @@ class LLMPrompter(BasicProcessor):
                 row = 0
                 max_processed = limit if limit else self.source_dataset.num_rows
 
+                # Load metadata to map filenames back to original post IDs for annotations.
+                filename_to_post_ids = {}
+                if save_annotations:
+                    try:
+                        self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
+                        with open(staging_area.joinpath(".metadata.json")) as meta_file:
+                            archive_metadata = json.load(meta_file)
+                            for url, data in archive_metadata.items():
+                                if data.get("success") and data.get("post_ids"):
+                                    post_ids = [str(pid) for pid in data["post_ids"]]
+                                    # A single URL may map to one filename or multiple files (e.g. video + thumbnail)
+                                    filenames_for_url = []
+                                    if data.get("filename"):
+                                        filenames_for_url.append(data["filename"])
+                                    for file_entry in data.get("files", []):
+                                        if file_entry.get("success") and file_entry.get("filename"):
+                                            filenames_for_url.append(file_entry["filename"])
+                                    # Merge post_ids per filename; extend rather than overwrite so that
+                                    # multiple URLs pointing to the same file don't lose earlier post_ids.
+                                    for filename in filenames_for_url:
+                                        existing = filename_to_post_ids.setdefault(filename, [])
+                                        for post_id in post_ids:
+                                            if post_id not in existing:
+                                                existing.append(post_id)
+
+                    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+                        self.dataset.log(f"Could not load .metadata.json for annotation mapping: {e}. "
+                                         f"Annotations will use filenames as item IDs.")
+
                 for item in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=False):
                     row += 1
 
@@ -669,8 +698,8 @@ class LLMPrompter(BasicProcessor):
                     prompt = base_prompt if base_prompt else f"Analyze this {media_archive_type} file."
                     system_prompt = system_prompt_base
 
-                    self.dataset.update_status(f"Processing {media_archive_type} file {row:,}/{max_processed:,} "
-                                               f"({filename}) with {model}")
+                    self.dataset.update_status(f"Processing {media_archive_type} file {row - 1:,}/{max_processed:,} "
+                                               f"with {model}")
                     try:
                         response = llm.generate_text(
                             prompt,
@@ -766,20 +795,38 @@ class LLMPrompter(BasicProcessor):
                                 annotation_output = {self.parameters.get("annotation_label"): output_item}
                             else:
                                 annotation_output = {model + "_output": output_item}
+
+                            # Resolve filename to original post IDs from .metadata.json
+                            # so annotations are saved against the top-level dataset's item IDs.
+                            annotation_item_ids = filename_to_post_ids.get(item_id, [item_id])
+
+                            # Accumulate each file's output into a merged annotation per post_id.
+                            # Multiple files for the same post are combined into one text annotation,
+                            # with each line prefixed by the filename, separated by newlines.
+                            file_basename = Path(item_id).name
                             for output_key, output_value in annotation_output.items():
-                                annotations.append({
-                                    "label": output_key,
-                                    "item_id": item_id,
-                                    "value": remove_nuls(output_value),
-                                    "type": "text",
-                                })
+                                for annotation_item_id in annotation_item_ids:
+                                    key = (annotation_item_id, output_key)
+                                    media_annotations.setdefault(key, []).append(
+                                        f"{file_basename}: {remove_nuls(output_value)}"
+                                    )
 
                     i += 1
                     if limit and i >= max_processed:
                         limit_reached = True
 
                     # Write annotations in batches
-                    if (i % 1000 == 0 and annotations) or limit_reached:
+                    if (i % 1000 == 0 and media_annotations) or limit_reached:
+                        for (annotation_item_id, label), lines in media_annotations.items():
+                            # If the post only has one media file, don't prepend the filename
+                            value = lines[0].split(": ", 1)[1] if len(lines) == 1 else "\n".join(lines)
+                            annotations.append({
+                                "label": label,
+                                "item_id": annotation_item_id,
+                                "value": value,
+                                "type": "text",
+                            })
+                        media_annotations = {}
                         self.save_annotations(annotations)
                         annotations = []
 
@@ -793,7 +840,7 @@ class LLMPrompter(BasicProcessor):
                         break
 
             else:
-                # Text-based dataset processing: original behavior
+                # Text-based dataset processing (CSV or NDJSON)
                 row = 0
                 max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
                 for item in self.source_dataset.iterate_items():
@@ -1089,6 +1136,16 @@ class LLMPrompter(BasicProcessor):
             return
 
         # Write leftover annotations
+        if media_annotations:
+            for (annotation_item_id, label), lines in media_annotations.items():
+                # If the post only has one media file, don't prepend the filename
+                value = lines[0].split(": ", 1)[1] if len(lines) == 1 else "\n".join(lines)
+                annotations.append({
+                    "label": label,
+                    "item_id": annotation_item_id,
+                    "value": value,
+                    "type": "text",
+                })
         if annotations:
             self.save_annotations(annotations)
 
