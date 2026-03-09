@@ -805,6 +805,11 @@ class LLMPrompter(BasicProcessor):
                             # with each line prefixed by the filename, separated by newlines.
                             file_basename = Path(item_id).name
                             for output_key, output_value in annotation_output.items():
+
+                                # Skip 'signature' and 'type' annotations for Google
+                                if provider == "google" and output_key in (".signature", ".type"):
+                                    continue
+
                                 for annotation_item_id in annotation_item_ids:
                                     key = (annotation_item_id, output_key)
                                     media_annotations.setdefault(key, []).append(
@@ -818,6 +823,7 @@ class LLMPrompter(BasicProcessor):
                     # Write annotations in batches
                     if (i % 1000 == 0 and media_annotations) or limit_reached:
                         for (annotation_item_id, label), lines in media_annotations.items():
+
                             # If the post only has one media file, don't prepend the filename
                             value = lines[0].split(": ", 1)[1] if len(lines) == 1 else "\n".join(lines)
                             annotations.append({
@@ -1102,6 +1108,11 @@ class LLMPrompter(BasicProcessor):
                                     annotation_output = {model + "_output": output_item}
 
                                 for output_key, output_value in annotation_output.items():
+
+                                    # Skip 'signature' and 'type' annotations for Google
+                                    if provider == "google" and output_key in ("extras.signature", ".type"):
+                                        continue
+
                                     annotation = {
                                         "label": output_key,
                                         "item_id": batched_ids[n],
