@@ -42,10 +42,9 @@ class UploadAnnotations(BasicProcessor):
 		return {
 			"intro": {
 				"type": UserInput.OPTION_INFO,
-				"help": "Upload annotations for this dataset. The first column should contain item IDs "
+				"help": "Add annotations to the parent dataset. The first column should contain item IDs "
 						"matching items in the dataset. Each subsequent column becomes a text annotation. "
-						"For CSV file uploads, comma separates the data. For text input, you can specify a custom "
-						"separator below. A maximum of 20 annotation fields per upload is allowed."
+						"A maximum of 20 new annotation fields per uploaded dataset is allowed."
 			},
 			"upload_method": {
 				"type": UserInput.OPTION_CHOICE,
@@ -59,13 +58,18 @@ class UploadAnnotations(BasicProcessor):
 			"data_upload": {
 				"type": UserInput.OPTION_FILE,
 				"help": "CSV file with annotations",
-				"requires": "upload_method=file"
+				"requires": "upload_method=file",
+				"tooltip": "Use UTF-8"
 			},
 			"separator": {
-				"type": UserInput.OPTION_TEXT,
+				"type": UserInput.OPTION_CHOICE,
 				"help": "Separator",
-				"default": ",",
-				"requires": "upload_method=text"
+				"default": "comma",
+				"requires": "upload_method=text",
+				"options": {
+					"comma": "Comma",
+					"tab": "Tab"
+				}
 			},
 			"annotation_text": {
 				"type": UserInput.OPTION_TEXT_LARGE,
@@ -108,7 +112,7 @@ class UploadAnnotations(BasicProcessor):
 			try:
 				content = file.read().decode("utf-8")
 			except UnicodeDecodeError:
-				raise QueryParametersException("The uploaded file must be UTF-8 encoded.")
+				raise QueryParametersException("The uploaded file must be a UTF-8 encoded CSV.")
 			finally:
 				file.seek(0)
 
@@ -117,10 +121,8 @@ class UploadAnnotations(BasicProcessor):
 			content = query.get("annotation_text", "").strip()
 			if not content:
 				raise QueryParametersException("No annotation data was provided.")
-
-			separator = query.get("separator", ",")
-			if not separator:
-				separator = ","
+			separator = query.get("separator", "comma")
+			separator = "," if separator == "comma" else "\t" if separator == "tab" else separator
 		else:
 			raise QueryParametersException("Invalid upload method.")
 
@@ -192,31 +194,29 @@ class UploadAnnotations(BasicProcessor):
 		Process uploaded annotations and save them to the dataset
 		"""
 		upload_method = self.parameters.get("upload_method", "file")
+		import_file = None
+		f_handle = None
 
 		if upload_method == "file":
 			import_file = self.dataset.get_results_path().with_suffix(".importing")
 			if not import_file.exists():
 				self.dataset.finish_with_error("No uploaded file found.")
 				return
-			try:
-				with import_file.open("r", encoding="utf-8") as f:
-					content = f.read()
-			finally:
-				import_file.unlink(missing_ok=True)
 
+			f_handle = import_file.open("r", encoding="utf-8")
 			separator = ","
 		else:
 			content = self.parameters.get("annotation_text", "").strip()
-			separator = self.parameters.get("separator", ",")
-			if not separator:
-				separator = ","
+			separator = self.parameters.get("separator", "comma")
+			separator = "," if separator == "comma" else "\t" if separator == "tab" else separator
 			if not content:
 				self.dataset.finish_with_error("No annotation data was provided.")
 				return
+			f_handle = io.StringIO(content)
 
 		# Parse data
 		try:
-			reader = csv.reader(io.StringIO(content), delimiter=separator)
+			reader = csv.reader(f_handle, delimiter=separator)
 			header = next(reader, None)
 		except csv.Error:
 			self.dataset.finish_with_error("Could not parse the uploaded data. Make sure the correct separator is used between columns.")
@@ -262,6 +262,8 @@ class UploadAnnotations(BasicProcessor):
 		rows = list(reader)
 		total_rows = len(rows)
 
+		results = []
+
 		for row_num, row in enumerate(rows):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while processing annotations")
@@ -277,43 +279,48 @@ class UploadAnnotations(BasicProcessor):
 				skipped += 1
 				continue
 
+			# Save the annotations for this item
+			# We're also going to save the processed annotations as an output to this processor.
+			result = {"id": item_id}
 			for i, label in enumerate(annotation_labels):
 				value = row[i + 1].strip() if i + 1 < len(row) else ""
-				annotations.append({
-					"label": label,
-					"item_id": item_id,
-					"value": value
-				})
+				if value:
+					annotations.append({
+						"label": label,
+						"item_id": item_id,
+						"value": value
+					})
+					saved += 1
 
-			saved += 1
+				result[label] = value
+
+			if len(result) > 1:
+				results.append(result)
 
 			if len(annotations) >= 2500:
 				self.save_annotations(annotations, source_dataset=source_dataset)
 				annotations = []
-				self.dataset.update_status("Processed %i of %i items" % (saved, total_rows))
+				self.dataset.update_status("Added %i annotations, processed rows %i/%i" % (saved, row_num, total_rows))
 				self.dataset.update_progress(row_num / max(1, total_rows))
 
 		# Save remaining annotations
 		if annotations:
 			self.save_annotations(annotations, source_dataset=source_dataset)
 
+		# Delete uploaded file
+		if f_handle:
+			f_handle.close()
+		if import_file and import_file.exists():
+			import_file.unlink(missing_ok=True)
+
 		if saved == 0:
-			self.dataset.finish_with_error(
-				"No valid annotations found. Make sure item IDs in the first column match the dataset."
+			self.dataset.finish_with_error("No valid annotations found. Make sure item IDs in the "
+															"first column match the dataset."
 			)
 			return
 
-		total_annotations = saved * len(annotation_labels)
-
+		# Write uploaded annotations as output file
+		warning = None
 		if skipped:
-			self.dataset.finish_with_warning(
-				saved,
-				"Uploaded %i annotation(s) for %i item(s). Skipped %i row(s) (item ID not found in dataset or empty)."
-				% (total_annotations, saved, skipped)
-			)
-		else:
-			self.dataset.update_status(
-				"Uploaded %i annotation(s) for %i item(s)." % (total_annotations, saved),
-				is_final=True
-			)
-			self.dataset.finish(num_rows=saved)
+			warning = "Uploaded %i annotation(s) for %i item(s). Skipped %i row(s) (item ID not found in dataset or empty)." % (saved, total_rows, skipped)
+		self.write_csv_items_and_finish(results, warning=warning)

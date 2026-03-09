@@ -664,7 +664,6 @@ const query = {
                     update.addClass('updated');
                     target.remove();
 
-                    // Hot-update annotation-fields-list when annotation fields change
                     if (child.finished && child.annotation_fields && Object.keys(child.annotation_fields).length > 0) {
                         query.update_annotation_fields_list(child.annotation_fields);
                     }
@@ -690,11 +689,7 @@ const query = {
                     html += '<li><span class="property-badge" data-annotation-id="' + field_id + '"><i class="fa-solid fa-tag"></i> ' + label + '</span></li>';
                 }
                 html += '</ul></dd></div>';
-                // Insert after the last .fullwidth div that is not the annotation list itself
-                let fullwidth_divs = card_dl.children('.fullwidth').not('.annotation-fields-list');
-                if (fullwidth_divs.length > 0) {
-                    fullwidth_divs.first().after(html);
-                }
+                card_dl.find('#dataset-result').before(html);
             }
         } else {
             // Update existing section: add any new fields
@@ -1710,7 +1705,7 @@ const ui_helpers = {
             let v = $(this).attr('data-value') ? parseInt($(this).attr('data-value')) : 81;
             let target = $(this).attr('data-update-background');
 
-            if($(this).attr('data-update-layout')) {
+            if ($(this).attr('data-update-layout')) {
                 document.querySelector(':root').style.setProperty('--accent', hsv2hsl(h, s, v));
                 document.querySelector(':root').style.setProperty('--highlight', hsv2hsl(h, s, 100));
                 document.querySelector(':root').style.setProperty('--accent-alternate', hsv2hsl((h + 180) % 360, s, 90));
@@ -2207,3 +2202,4 @@ function find_parent(element, selector, start_self=false) {
 
     return null;
 }
+
