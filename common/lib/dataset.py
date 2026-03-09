@@ -1325,7 +1325,7 @@ class DataSet(FourcatModule):
         except json.JSONDecodeError:
             return {}
 
-    def get_columns(self):
+    def get_columns(self, annotation_columns=True):
         """
         Returns the dataset columns.
 
@@ -1350,7 +1350,7 @@ class DataSet(FourcatModule):
             items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
             try:
                 keys = list(next(items).keys())
-                if self.annotation_fields:
+                if self.annotation_fields and annotation_columns:
                     for annotation_field in self.annotation_fields.values():
                         annotation_column = annotation_field["label"]
                         label_count = 1
