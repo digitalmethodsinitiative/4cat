@@ -655,7 +655,7 @@ class LLMPrompter(BasicProcessor):
 
                     # Skip metadata and non-media files
                     filename = item["id"] if "id" in item else str(item.get("filename", ""))
-                    if filename.startswith(".") or filename.split(".")[-1].lower() in ("json", "log", "txt"):
+                    if not filename or filename.startswith(".") or filename.rsplit(".", 1)[-1].lower() in ("json", "log", "txt"):
                         continue
 
                     item_id = filename
@@ -666,19 +666,21 @@ class LLMPrompter(BasicProcessor):
                         skipped += 1
                         continue
 
-                    prompt = base_prompt
+                    prompt = base_prompt if base_prompt else f"Analyze this {media_archive_type} file."
                     system_prompt = system_prompt_base
 
                     self.dataset.update_status(f"Processing {media_archive_type} file {row:,}/{max_processed:,} "
                                                f"({filename}) with {model}")
                     try:
                         response = llm.generate_text(
-                            prompt if prompt else f"Analyze this {media_archive_type} file.",
+                            prompt,
                             system_prompt=system_prompt,
                             temperature=temperature,
                             media_files=[media_file_path],
                         )
                     except Exception as e:
+                        # Best-effort heuristic to detect model incompatibility with media type.
+                        # Error messages vary by provider; this catches common patterns.
                         error_str = str(e).lower()
                         if "vision" in error_str or "image" in error_str or "multimodal" in error_str or "media" in error_str:
                             self.dataset.finish_with_error(

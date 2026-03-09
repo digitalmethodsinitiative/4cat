@@ -196,7 +196,7 @@ class LLMAdapter:
                 if not isinstance(url, str):
                     raise ValueError(f"Media URL must be a string, got {type(url)}")
 
-                mime_type = mimetypes.guess_type(url)[0] or "image/jpeg"
+                mime_type = mimetypes.guess_type(url)[0] or "application/octet-stream"
                 media_category = mime_type.split("/")[0]  # "image", "video", or "audio"
                 content.append(self._format_media_block(url=url, mime_type=mime_type, media_category=media_category))
 
@@ -260,11 +260,7 @@ class LLMAdapter:
                 return {"type": "image_url", "image_url": {"url": url}}
             else:
                 data_uri = f"data:{mime_type};base64,{b64_data}"
-                if media_category == "image":
-                    return {"type": "image_url", "image_url": {"url": data_uri}}
-                else:
-                    # Google Gemini supports inline_data for all media types via data URIs
-                    return {"type": "image_url", "image_url": {"url": data_uri}}
+                return {"type": "image_url", "image_url": {"url": data_uri}}
         else:
             # OpenAI-style format (OpenAI, Mistral, DeepSeek, Ollama, LM Studio, vLLM)
             if url:
