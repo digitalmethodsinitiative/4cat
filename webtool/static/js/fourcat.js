@@ -663,9 +663,44 @@ const query = {
                     ui_helpers.conditional_form.init();
                     update.addClass('updated');
                     target.remove();
+
+                    // Hot-update annotation-fields-list when annotation fields change
+                    if (child.finished && child.annotation_fields && Object.keys(child.annotation_fields).length > 0) {
+                        query.update_annotation_fields_list(child.annotation_fields);
+                    }
                 });
             }
         });
+    },
+
+    update_annotation_fields_list: function (annotation_fields) {
+        /**
+         * Hot-update the annotation-fields-list section when annotation fields change
+         */
+        let annotation_list = $('.annotation-fields-list');
+
+        if (annotation_list.length === 0) {
+            // Section does not exist yet; create and insert it after the Parameters div
+            let params_div = $('.result-page .card .fullwidth').has('dt:contains("Parameters")');
+            if (params_div.length > 0) {
+                let html = '<div class="fullwidth annotation-fields-list"><dt>Annotations</dt><dd><ul>';
+                for (let field_id in annotation_fields) {
+                    let label = annotation_fields[field_id].label;
+                    html += '<li><span class="property-badge" data-annotation-id="' + field_id + '"><i class="fa-solid fa-tag"></i> ' + label + '</span></li>';
+                }
+                html += '</ul></dd></div>';
+                params_div.after(html);
+            }
+        } else {
+            // Update existing section: add any new fields
+            let ul = annotation_list.find('ul');
+            for (let field_id in annotation_fields) {
+                if (ul.find('[data-annotation-id="' + field_id + '"]').length === 0) {
+                    let label = annotation_fields[field_id].label;
+                    ul.append('<li><span class="property-badge" data-annotation-id="' + field_id + '"><i class="fa-solid fa-tag"></i> ' + label + '</span></li>');
+                }
+            }
+        }
     },
 
     check_search_queue: function () {

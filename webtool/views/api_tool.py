@@ -1304,7 +1304,11 @@ def check_processor():
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
                                     processors=g.modules.processors),
 			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
-			"url": "/result/" + dataset.data["result_file"]
+			"url": "/result/" + dataset.data["result_file"],
+			"annotation_fields": {
+				field_id: {"label": field_data.get("label", "")}
+				for field_id, field_data in (top_parent.annotation_fields or {}).items()
+			}
 		})
 
 	return jsonify(children)
