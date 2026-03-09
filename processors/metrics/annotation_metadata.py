@@ -11,7 +11,7 @@ class AnnotationMetadata(BasicProcessor):
 	Download annotation metadata from this dataset
 	"""
 	type = "annotation-metadata"  # job type ID
-	category = "Metrics"  # category
+	category = "Conversion"  # category
 	title = "Export annotations"  # title displayed in UI
 	description = ("Download annotations and their metadata for this dataset. "
 				   "Includes annotation author, timestamp, type, etc.") # description displayed in UI
