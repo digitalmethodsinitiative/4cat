@@ -8,6 +8,7 @@ import json
 import jsonschema
 import requests
 
+from pathlib import Path
 from json import JSONDecodeError
 from jsonschema.exceptions import ValidationError, SchemaError
 from datetime import datetime, timedelta
@@ -73,6 +74,16 @@ class LLMPrompter(BasicProcessor):
             shared_llm_name = False
             shared_llm_default = ""
             shared_llm_models = {}
+
+        # Determine if the parent dataset is a media archive (zip with images/video/audio)
+        is_media_parent = False
+        media_type = "media"
+        if parent_dataset:
+            parent_extension = parent_dataset.get_extension()
+            parent_media_type = parent_dataset.get_media_type()
+            if parent_extension == "zip" and parent_media_type in ("image", "video", "audio"):
+                is_media_parent = True
+                media_type = parent_media_type
 
         options = {
             "ethics_warning1": {
@@ -203,7 +214,37 @@ class LLMPrompter(BasicProcessor):
                 "default": shared_llm_default,
                 "requires": "api_or_local==hosted",
             },
-            "prompt_info": {
+        }
+
+        if is_media_parent:
+            # Media-specific options: show info about media files being attached
+            options["media_info"] = {
+                "type": UserInput.OPTION_INFO,
+                "help": f"<strong>📎 Media files attached</strong><br>"
+                f"The parent dataset contains <strong>{media_type}</strong> files that will be sent "
+                f"to the LLM with each prompt. Make sure to use a model that supports "
+                f"<strong>{media_type}</strong> input (e.g. vision models for images).<br>"
+                f"Not all models support all media types — if the model cannot process "
+                f"{media_type} files, an error will be returned during processing.",
+            }
+            options["system_prompt"] = {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "System prompt",
+                "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
+                "on the tone of the text. This processor may edit the system prompt to "
+                "ensure correct output. System prompts are included in the results file.",
+                "default": "",
+            }
+            options["prompt"] = {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "User prompt",
+                "tooltip": f"Describe what the model should do with each {media_type} file. "
+                f"No column brackets needed — {media_type} files are attached automatically.",
+                "default": "",
+            }
+        else:
+            # Text-based dataset options: column brackets, media URL toggle, batching
+            options["prompt_info"] = {
                 "type": UserInput.OPTION_INFO,
                 "help": "<strong>How to prompt</strong><br>"
                 "Use `[brackets]` with column names to insert dataset items in the prompt. You "
@@ -216,84 +257,91 @@ class LLMPrompter(BasicProcessor):
                 "e.g. [Prompt Compass](https://github.com/ErikBorra/PromptCompass/blob/main/prompts.json#L136) "
                 "or the [Anthropic Prompt Library](https://docs.anthropic.com/en/resources/prompt-library/"
                 "library).",
-            },
-            "system_prompt": {
+            }
+            options["system_prompt"] = {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "System prompt",
                 "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
                 "on the tone of the text. This processor may edit the system prompt to "
                 "ensure correct output. System prompts are included in the results file.",
                 "default": "",
-            },
-            "prompt": {
+            }
+            options["prompt"] = {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "User prompt",
                 "tooltip": "Use [brackets] with columns names.",
                 "default": "",
-            },
-            "use_media": {
+            }
+            options["use_media"] = {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Add images",
                 "tooltip": "Add media URLs for multi-modal processing. Requires a model that supports vision.",
                 "default": False,
-            },
-            "media_columns": {
+            }
+            options["media_columns"] = {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Columns with image URL(s)",
                 "default": "",
                 "inline": True,
                 "tooltip": "Multiple columns can be selected.",
                 "requires": "use_media==true",
-            },
-            "structured_output": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Output structured JSON",
-                "tooltip": "Output in a JSON format instead of text. Note that your chosen model may not support "
-                "structured output.",
-                "default": False,
-            },
-            "json_schema_info": {
-                "type": UserInput.OPTION_INFO,
-                "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
-                "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
-                "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
-                "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
-                "requires": "structured_output==true",
-            },
-            "json_schema": {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "JSON schema",
-                "tooltip": "[required] A JSON schema that the structured output will adhere to",
-                "requires": "structured_output==true",
-                "default": "",
-            },
-            "temperature": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Temperature",
-                "default": 0.1,
-                "coerce_type": float,
-                "max": 2.0,
-                "tooltip": "Temperature indicates how strict the model will gravitate towards the most "
-                "probable next token. A score close to 0 returns more predictable "
-                "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
-            },
-            "truncate_input": {
+            }
+
+        # Common options for both text and media datasets
+        options["structured_output"] = {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Output structured JSON",
+            "tooltip": "Output in a JSON format instead of text. Note that your chosen model may not support "
+            "structured output.",
+            "default": False,
+        }
+        options["json_schema_info"] = {
+            "type": UserInput.OPTION_INFO,
+            "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
+            "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
+            "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
+            "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
+            "requires": "structured_output==true",
+        }
+        options["json_schema"] = {
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "help": "JSON schema",
+            "tooltip": "[required] A JSON schema that the structured output will adhere to",
+            "requires": "structured_output==true",
+            "default": "",
+        }
+        options["temperature"] = {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Temperature",
+            "default": 0.1,
+            "coerce_type": float,
+            "max": 2.0,
+            "tooltip": "Temperature indicates how strict the model will gravitate towards the most "
+            "probable next token. A score close to 0 returns more predictable "
+            "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
+        }
+
+        if not is_media_parent:
+            options["truncate_input"] = {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Max chars in input value",
                 "default": 0,
                 "coerce_type": int,
                 "tooltip": "This value determines how many characters an inserted dataset value may have. 0 = unlimited.",
                 "requires": "use_media==false",
-            },
-            "max_tokens": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Max output tokens",
-                "default": 10000,
-                "coerce_type": int,
-                "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
-                "text for common English text. This includes tokens spent for reasoning.",
-            },
-            "batches": {
+            }
+
+        options["max_tokens"] = {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Max output tokens",
+            "default": 10000,
+            "coerce_type": int,
+            "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
+            "text for common English text. This includes tokens spent for reasoning.",
+        }
+
+        if not is_media_parent:
+            options["batches"] = {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Items per prompt",
                 "coerce_type": int,
@@ -301,8 +349,8 @@ class LLMPrompter(BasicProcessor):
                 "tooltip": "How many dataset items to insert into the prompt. These will be inserted as a list "
                 "wherever the column brackets are used (e.g. '[body]').",
                 "requires": "use_media==false",
-            },
-            "batch_info": {
+            }
+            options["batch_info"] = {
                 "type": UserInput.OPTION_INFO,
                 "help": "<strong>Note on batching:</strong> Batching may increase speed but reduce accuracy. Models "
                 "need to support structured output for batching. This processor uses JSON schemas to ensure "
@@ -310,43 +358,43 @@ class LLMPrompter(BasicProcessor):
                 "values. Describe the dataset values in plurals in your prompt when batching. If you use "
                 "multiple column brackets in your prompt, rows with any empty values are skipped.",
                 "requires": "use_media==false",
-            },
-            "ethics_warning3": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "api_or_local==api",
-                "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
-                "whether local open-source LLMs are also an option.</strong>",
-            },
-            "save_annotations": {
-                "type": UserInput.OPTION_ANNOTATION,
-                "label": "prompt outputs",
-                "default": False,
-            },
-            "hide_think": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Hide reasoning",
-                "default": False,
-                "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
-                "removes this tag and its contents from the output.",
-            },
-            "limit": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Only annotate this many items, then stop",
-                "default": 0,
-                "coerce_type": int,
-                "min": 0,
-                "delegated": True,
-            },
-            "annotation_label": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Label for the annotations to add to the dataset",
-                "default": "",
-                "delegated": True,
-            },
+            }
+
+        options["ethics_warning3"] = {
+            "type": UserInput.OPTION_INFO,
+            "requires": "api_or_local==api",
+            "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
+            "whether local open-source LLMs are also an option.</strong>",
+        }
+        options["save_annotations"] = {
+            "type": UserInput.OPTION_ANNOTATION,
+            "label": "prompt outputs",
+            "default": False,
+        }
+        options["hide_think"] = {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Hide reasoning",
+            "default": False,
+            "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
+            "removes this tag and its contents from the output.",
+        }
+        options["limit"] = {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Only annotate this many items, then stop",
+            "default": 0,
+            "coerce_type": int,
+            "min": 0,
+            "delegated": True,
+        }
+        options["annotation_label"] = {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Label for the annotations to add to the dataset",
+            "default": "",
+            "delegated": True,
         }
 
         # Get the media columns for the select media columns option
-        if parent_dataset and parent_dataset.get_columns():
+        if not is_media_parent and parent_dataset and parent_dataset.get_columns():
             columns = parent_dataset.get_columns()
             options["media_columns"]["type"] = UserInput.OPTION_MULTI
             options["media_columns"]["options"] = {v: v for v in columns}
@@ -360,7 +408,13 @@ class LLMPrompter(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.get_extension() in ["csv", "ndjson"]
+        # Text-based datasets
+        if module.get_extension() in ["csv", "ndjson"]:
+            return True
+        # Media datasets (zip archives with images, video, or audio)
+        if module.get_extension() == "zip" and module.get_media_type() in ("image", "video", "audio"):
+            return True
+        return False
 
     def process(self):
         
@@ -373,10 +427,19 @@ class LLMPrompter(BasicProcessor):
         modal_location = self.parameters.get("api_or_local", "api") 
         hide_think = self.parameters.get("hide_think", False)
 
-        # Optional media columns for files
-        media_columns = self.parameters.get("media_columns", []) if self.parameters.get("use_media") else []
-        if type(media_columns) is str:
-            media_columns = [media_columns]
+        # Check if the source dataset is a media archive (zip with images/video/audio)
+        is_media_archive = (
+            self.source_dataset.get_extension() == "zip"
+            and self.source_dataset.get_media_type() in ("image", "video", "audio")
+        )
+        media_archive_type = self.source_dataset.get_media_type() if is_media_archive else None
+
+        # Optional media columns for files (only for text-based datasets)
+        media_columns = []
+        if not is_media_archive:
+            media_columns = self.parameters.get("media_columns", []) if self.parameters.get("use_media") else []
+            if type(media_columns) is str:
+                media_columns = [media_columns]
 
         temperature = float(self.parameters.get("temperature", 0.1))
         temperature = min(max(temperature, 0), 2)
@@ -389,7 +452,7 @@ class LLMPrompter(BasicProcessor):
         # Set value for batch length in prompts
         batches = max(1, min(self.parameters.get("batches", 1), self.source_dataset.num_rows))
         use_batches = batches > 1
-        if media_columns:  # no batching for media files
+        if media_columns or is_media_archive:  # no batching for media files
             use_batches = False
         if not use_batches:
             self.dataset.delete_parameter("batches")
@@ -470,14 +533,14 @@ class LLMPrompter(BasicProcessor):
 
         # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
-        if not base_prompt and not (system_prompt_base and media_columns):
+        if not base_prompt and not (system_prompt_base and (media_columns or is_media_archive)):
             self.dataset.finish_with_error("You need to insert a valid user prompt")
             return
         self.dataset.update_status("Prompt: %s" % base_prompt)
 
         # Get column values in prompt. These can be one or multiple, and multiple within a bracket as well.
         columns_to_use = re.findall(r"\[.*?]", base_prompt)
-        if not columns_to_use and not media_columns:
+        if not columns_to_use and not media_columns and not is_media_archive:
             self.dataset.finish_with_error(
                 "You need to insert column name(s) in the user prompt within brackets (e.g. '[body]' "
                 "or '[timestamp, author]')"
@@ -577,152 +640,52 @@ class LLMPrompter(BasicProcessor):
         time_start = time.time()
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 
-            row = 0
-            max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
-            for item in self.source_dataset.iterate_items():
-                row += 1
+            if is_media_archive:
+                # Media archive processing: iterate over files in the zip
+                self.dataset.update_status(f"Processing {media_archive_type} files from archive")
+                staging_area = self.dataset.get_staging_area()
+                row = 0
+                max_processed = limit if limit else self.source_dataset.num_rows
 
-                if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while generating text through LLMs")
+                for item in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=False):
+                    row += 1
 
-                # Replace with dataset values
-                prompt = base_prompt
+                    if self.interrupted:
+                        raise ProcessorInterruptedException("Interrupted while generating text through LLMs")
 
-                # Make sure we can match outputs with input IDs
-                if "id" in item:
-                    item_id = item["id"]
-                elif "item_id" in item:
-                    item_id = item["item_id"]
-                else:
-                    item_id = str(i + 1)
-
-                # Store dataset values in batches. Store just one item when we're not batching.
-                item_values = {}
-                for column_to_use in columns_to_use:
-                    if column_to_use not in batched_data:
-                        batched_data[column_to_use] = []
-
-                    try:
-                        # Columns can be comma-separated within the bracket
-                        if "," in column_to_use:
-                            item_value = []
-                            bracket_cols = [c.strip() for c in column_to_use.split(",")]
-                            for bracket_col in bracket_cols:
-                                col_value = str(item[bracket_col]).strip()
-                                if col_value:
-                                    item_value.append(col_value)
-                            item_value = ", ".join(item_value)
-
-                        # Else just get the single item
-                        else:
-                            item_value = str(item[column_to_use]).strip()
-
-                    except KeyError:
-                        self.dataset.finish_with_error(f"Column(s) '{column_to_use}' not in the parent dataset")
-                        return
-
-                    # Skip row if we encounter *any* empty value in *different* brackets in the
-                    # prompt *when batching*. This is because lists with different length in the prompt cause asymmetry
-                    # in the input values, and it's though to then output the correct number of values.
-                    if not item_value and use_batches:
-                        item_values = {}
-                        self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {column_to_use}")
-                        break
-                    else:
-                        item_values[column_to_use] = item_value
-
-                # Get media URL values; split links on comma.
-                media_urls = []
-                for media_column in media_columns:
-                    media_url = item.get(media_column, [])
-                    if media_url:
-                        if isinstance(media_url, list):
-                            media_urls += media_url
-                        else:
-                            media_urls += [url.strip() for url in media_url.split(",")]
-
-                # Skip with empty items
-                empty_items = True if not any(v for v in item_values.values()) and columns_to_use else False
-                if (empty_items and not media_urls) or (media_columns and not media_urls):
-                    if item_values.keys():
-                        missing_columns = andify(columns_to_use) if len(columns_to_use) > 1 else columns_to_use[0]
-                        self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {missing_columns}")
-                    if media_columns and not media_urls:
-                        missing_media_columns = andify(media_columns) if len(media_columns) > 1 else media_columns[0]
-                        self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {missing_media_columns}")
-                    skipped += 1
-                    # (but not if we've reached the end of the dataset; we want to process the last batch)
-                    if row != self.source_dataset.num_rows:
+                    # Skip metadata and non-media files
+                    filename = item["id"] if "id" in item else str(item.get("filename", ""))
+                    if filename.startswith(".") or filename.split(".")[-1].lower() in ("json", "log", "txt"):
                         continue
-                # Else add the values to the batch
-                else:
-                    for item_column, item_value in item_values.items():
-                        if max_input_len > 0:
-                            item_value = item_value[:max_input_len]
-                        batched_data[item_column].append(item_value)
-                    n_batched += 1
-                    batched_ids.append(item_id)  # Also store IDs, so we can match them to the output
 
-                i += 1
-                if limit and i >= max_processed:
-                    limit_reached = True
-                    
-                # Generate text when there's something to process and when we've reached 1) the batch length (which can
-                # be 1) or 2) the end of the dataset or 3) the custom limit.
-                if n_batched and (n_batched % batches == 0 or row == self.source_dataset.num_rows or limit_reached):
+                    item_id = filename
+                    media_file_path = item.file if hasattr(item, "file") else Path(item.get("path", ""))
 
-                    # Insert dataset values into prompt. Insert as list for batched data, else just insert the value.
-                    for column_to_use in columns_to_use:
-                        prompt_values = batched_data[column_to_use]
-                        prompt_values = prompt_values[0] if len(prompt_values) == 1 else f"```{json.dumps(prompt_values)}```"
-                        prompt = prompt.replace(f"[{column_to_use}]", prompt_values)
+                    if not media_file_path or not media_file_path.exists():
+                        self.dataset.log(f"Skipping {filename}: file not found")
+                        skipped += 1
+                        continue
 
-                    # Possibly use a different batch size when we've reached the end of the dataset.
-                    if row == self.source_dataset.num_rows and use_batches:
-                        # Get a new JSON schema for a batch of different length at the end of the iteration
-                        if n_batched != batches and json_schema:
-                            json_schema = self.get_json_schema_for_batch(n_batched, custom_schema=json_schema_original)
-                            # `llm` becomes a RunnableSequence when used, so we'll need to reset it here
-                            llm = LLMAdapter(
-                                provider=provider,
-                                model=model,
-                                api_key=api_key,
-                                base_url=base_url,
-                                temperature=temperature,
-                                max_tokens=max_tokens,
-                                client_kwargs=client_kwargs
-                            )
-                            llm.set_structure(json_schema)
+                    prompt = base_prompt
+                    system_prompt = system_prompt_base
 
-                    # For batched_output, make sure the exact length of outputs is mentioned in the system prompt
-                    if use_batches:
-                        system_prompt = system_prompt_base.replace("{batch_size}", str(n_batched))
-                    else:
-                        system_prompt = system_prompt_base
-
-                    batch_str = f" and {n_batched} items batched into the prompt" if use_batches else ""
-                    self.dataset.update_status(f"Generating text at row {row:,}/"
-                                               f"{max_processed:,} with {model}{batch_str}")
-                    # Now finally generate some text!
+                    self.dataset.update_status(f"Processing {media_archive_type} file {row:,}/{max_processed:,} "
+                                               f"({filename}) with {model}")
                     try:
                         response = llm.generate_text(
-                            prompt,
+                            prompt if prompt else f"Analyze this {media_archive_type} file.",
                             system_prompt=system_prompt,
                             temperature=temperature,
-                            files=media_urls
+                            media_files=[media_file_path],
                         )
-
-                    # Catch 404 errors with media URLs, we simply skip these
-                    except requests.exceptions.HTTPError as e:
-                        if e.response.status_code == 404 and media_urls:
-                            self.dataset.log(f"Skipping row {row} because of media URL is not reachable, ({e})")
-                            skipped += 1
-                            continue
-                        else:
-                            self.dataset.finish_with_warning(outputs, f"{e}")
-                            return
-                    # Broad exception, but necessary with all the different LLM providers and options...
                     except Exception as e:
+                        error_str = str(e).lower()
+                        if "vision" in error_str or "image" in error_str or "multimodal" in error_str or "media" in error_str:
+                            self.dataset.finish_with_error(
+                                f"The model '{model}' does not appear to support {media_archive_type} input. "
+                                f"Please use a model with {media_archive_type} support (e.g. a vision model for images): {e}"
+                            )
+                            return
                         self.dataset.finish_with_warning(outputs, f"Not all items processed: {e}")
                         return
 
@@ -738,48 +701,25 @@ class LLMPrompter(BasicProcessor):
                         self.dataset.finish_with_warning(outputs, warning)
                         return
 
-                    # Always parse JSON outputs in the case of batches.
-                    if use_batches or structured_output:
+                    # Parse structured or plain output
+                    if structured_output:
                         if isinstance(response, str):
                             response = json.loads(response)
-                        
-                        # Check whether input/output value lengths match
-                        if use_batches:
-                            output = self.parse_batched_response(response)
-
-                            if len(output) != n_batched:
-                                self.dataset.update_status(f"Output did not result in {n_batched} item(s).\nInput:\n"
-                                                           f"{prompt}\nOutput:\n{response}")
-                                self.dataset.finish_with_warning(outputs, "Model could not output as many values as the batch. See log "
-                                                               "for incorrect output. Try lowering the batch size, "
-                                                               "editing the prompt, or using a different model.")
-                                return
-                        else:
-                            output = [response]
-
-                        # Also validate whether the JSON schema and the output match
+                        output = [response]
                         try:
                             jsonschema.validate(instance=response, schema=json_schema)
                         except (ValidationError, SchemaError) as e:
                             self.dataset.finish_with_error(f"Invalid JSON schema and/or LLM output: `{e}`")
                             return
-
-                    # Else we'll just store the output in a list
                     else:
-
                         output = response.content
-
                         if not isinstance(output, list):
                             output = [output]
 
-                        # More cleaning
-                        # Newer OpenAI models and Magistral return annoying nested dict with 'thinking'/'reasoning and
-                        # 'text', flatten it
-                        if len(output) > 0 and isinstance(output[0], dict) and output[0].get("type") in ["thinking",
-                                                                                                         "reasoning"]:
-                            reasoning_string = output[0].get("type")  # "thinking" or "reasoning"
+                        # Flatten nested thinking/reasoning dicts
+                        if len(output) > 0 and isinstance(output[0], dict) and output[0].get("type") in ["thinking", "reasoning"]:
+                            reasoning_string = output[0].get("type")
                             output_flat = {reasoning_string: "", "text": []}
-
                             for output_part in output:
                                 if output_part.get("type") == reasoning_string:
                                     if reasoning_string in output_part and isinstance(output_part[reasoning_string], list):
@@ -789,21 +729,10 @@ class LLMPrompter(BasicProcessor):
                                         output_flat[reasoning_string] += output_part.get("text", "")
                                 else:
                                     output_flat["text"].append(output_part.get("text", ""))
-
                             output_flat["text"] = "\n".join(output_flat["text"])
                             output = [output_flat]
 
-                    for n, output_item in enumerate(output):
-
-                        # Retrieve the input values used
-                        if use_batches:
-                            input_value = [v[n] for v in batched_data.values()]
-                        else:
-                            input_value = [v[0] for v in batched_data.values()]
-
-                        time_created = int(time.time())
-
-                        # remove reasoning if so desired
+                    for output_item in output:
                         if hide_think:
                             if isinstance(output_item, str):
                                 output_item = re.sub(r"<think>.*</think>", "", output_item, flags=re.DOTALL).strip()
@@ -811,59 +740,345 @@ class LLMPrompter(BasicProcessor):
                                 if "thinking" in output_item:
                                     del output_item["thinking"]
 
+                        time_created = int(time.time())
                         result = {
-                            "id": batched_ids[n],
+                            "id": item_id,
                             "output": output_item,
-                            "input_value": input_value,
-                            "prompt": prompt if not use_batches else base_prompt,  # Insert dataset values if not batching
+                            "input_value": [filename],
+                            "prompt": prompt,
                             "temperature": temperature,
                             "max_tokens": max_tokens,
                             "model": model,
                             "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                             "time_created_utc": time_created,
-                            "batch_number": n + 1 if use_batches else "",
+                            "batch_number": "",
                             "system_prompt": system_prompt,
                         }
                         outfile.write(json.dumps(result) + "\n")
                         outputs += 1
 
                         if save_annotations:
-                            # Save annotations for every value produced by the LLM, in case of structured output.
-                            # Else this will just save one string.
                             if isinstance(output_item, dict):
                                 annotation_output = flatten_dict({model: output_item})
                             elif self.parameters.get("annotation_label"):
                                 annotation_output = {self.parameters.get("annotation_label"): output_item}
                             else:
                                 annotation_output = {model + "_output": output_item}
-
                             for output_key, output_value in annotation_output.items():
-                                annotation = {
+                                annotations.append({
                                     "label": output_key,
-                                    "item_id": batched_ids[n],
+                                    "item_id": item_id,
                                     "value": remove_nuls(output_value),
                                     "type": "text",
-                                }
+                                })
 
-                                annotations.append(annotation)
+                    i += 1
+                    if limit and i >= max_processed:
+                        limit_reached = True
 
-                    # Remove batched data and store what row we've left off
-                    batched_ids = []
-                    batched_data = {}
-                    n_batched = 0
+                    # Write annotations in batches
+                    if (i % 1000 == 0 and annotations) or limit_reached:
+                        self.save_annotations(annotations)
+                        annotations = []
+
+                    self.dataset.update_progress(row / max_processed)
 
                     # Rate limits for different providers
                     if provider == "mistral":
                         time.sleep(1)
 
-                # Write annotations in batches
-                if (i % 1000 == 0 and annotations) or limit_reached:
-                    self.save_annotations(annotations)
-                    annotations = []
+                    if limit_reached:
+                        break
 
-                self.dataset.update_progress(row / max_processed)
-                if limit_reached:
-                    break
+            else:
+                # Text-based dataset processing: original behavior
+                row = 0
+                max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
+                for item in self.source_dataset.iterate_items():
+                    row += 1
+
+                    if self.interrupted:
+                        raise ProcessorInterruptedException("Interrupted while generating text through LLMs")
+
+                    # Replace with dataset values
+                    prompt = base_prompt
+
+                    # Make sure we can match outputs with input IDs
+                    if "id" in item:
+                        item_id = item["id"]
+                    elif "item_id" in item:
+                        item_id = item["item_id"]
+                    else:
+                        item_id = str(i + 1)
+
+                    # Store dataset values in batches. Store just one item when we're not batching.
+                    item_values = {}
+                    for column_to_use in columns_to_use:
+                        if column_to_use not in batched_data:
+                            batched_data[column_to_use] = []
+
+                        try:
+                            # Columns can be comma-separated within the bracket
+                            if "," in column_to_use:
+                                item_value = []
+                                bracket_cols = [c.strip() for c in column_to_use.split(",")]
+                                for bracket_col in bracket_cols:
+                                    col_value = str(item[bracket_col]).strip()
+                                    if col_value:
+                                        item_value.append(col_value)
+                                item_value = ", ".join(item_value)
+
+                            # Else just get the single item
+                            else:
+                                item_value = str(item[column_to_use]).strip()
+
+                        except KeyError:
+                            self.dataset.finish_with_error(f"Column(s) '{column_to_use}' not in the parent dataset")
+                            return
+
+                        # Skip row if we encounter *any* empty value in *different* brackets in the
+                        # prompt *when batching*. This is because lists with different length in the prompt cause asymmetry
+                        # in the input values, and it's though to then output the correct number of values.
+                        if not item_value and use_batches:
+                            item_values = {}
+                            self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {column_to_use}")
+                            break
+                        else:
+                            item_values[column_to_use] = item_value
+
+                    # Get media URL values; split links on comma.
+                    media_urls = []
+                    for media_column in media_columns:
+                        media_url = item.get(media_column, [])
+                        if media_url:
+                            if isinstance(media_url, list):
+                                media_urls += media_url
+                            else:
+                                media_urls += [url.strip() for url in media_url.split(",")]
+
+                    # Skip with empty items
+                    empty_items = True if not any(v for v in item_values.values()) and columns_to_use else False
+                    if (empty_items and not media_urls) or (media_columns and not media_urls):
+                        if item_values.keys():
+                            missing_columns = andify(columns_to_use) if len(columns_to_use) > 1 else columns_to_use[0]
+                            self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {missing_columns}")
+                        if media_columns and not media_urls:
+                            missing_media_columns = andify(media_columns) if len(media_columns) > 1 else media_columns[0]
+                            self.dataset.update_status(f"Skipping row {row} because of empty value(s) in {missing_media_columns}")
+                        skipped += 1
+                        # (but not if we've reached the end of the dataset; we want to process the last batch)
+                        if row != self.source_dataset.num_rows:
+                            continue
+                    # Else add the values to the batch
+                    else:
+                        for item_column, item_value in item_values.items():
+                            if max_input_len > 0:
+                                item_value = item_value[:max_input_len]
+                            batched_data[item_column].append(item_value)
+                        n_batched += 1
+                        batched_ids.append(item_id)  # Also store IDs, so we can match them to the output
+
+                    i += 1
+                    if limit and i >= max_processed:
+                        limit_reached = True
+                    
+                    # Generate text when there's something to process and when we've reached 1) the batch length (which can
+                    # be 1) or 2) the end of the dataset or 3) the custom limit.
+                    if n_batched and (n_batched % batches == 0 or row == self.source_dataset.num_rows or limit_reached):
+
+                        # Insert dataset values into prompt. Insert as list for batched data, else just insert the value.
+                        for column_to_use in columns_to_use:
+                            prompt_values = batched_data[column_to_use]
+                            prompt_values = prompt_values[0] if len(prompt_values) == 1 else f"```{json.dumps(prompt_values)}```"
+                            prompt = prompt.replace(f"[{column_to_use}]", prompt_values)
+
+                        # Possibly use a different batch size when we've reached the end of the dataset.
+                        if row == self.source_dataset.num_rows and use_batches:
+                            # Get a new JSON schema for a batch of different length at the end of the iteration
+                            if n_batched != batches and json_schema:
+                                json_schema = self.get_json_schema_for_batch(n_batched, custom_schema=json_schema_original)
+                                # `llm` becomes a RunnableSequence when used, so we'll need to reset it here
+                                llm = LLMAdapter(
+                                    provider=provider,
+                                    model=model,
+                                    api_key=api_key,
+                                    base_url=base_url,
+                                    temperature=temperature,
+                                    max_tokens=max_tokens,
+                                    client_kwargs=client_kwargs
+                                )
+                                llm.set_structure(json_schema)
+
+                        # For batched_output, make sure the exact length of outputs is mentioned in the system prompt
+                        if use_batches:
+                            system_prompt = system_prompt_base.replace("{batch_size}", str(n_batched))
+                        else:
+                            system_prompt = system_prompt_base
+
+                        batch_str = f" and {n_batched} items batched into the prompt" if use_batches else ""
+                        self.dataset.update_status(f"Generating text at row {row:,}/"
+                                                   f"{max_processed:,} with {model}{batch_str}")
+                        # Now finally generate some text!
+                        try:
+                            response = llm.generate_text(
+                                prompt,
+                                system_prompt=system_prompt,
+                                temperature=temperature,
+                                files=media_urls
+                            )
+
+                        # Catch 404 errors with media URLs, we simply skip these
+                        except requests.exceptions.HTTPError as e:
+                            if e.response.status_code == 404 and media_urls:
+                                self.dataset.log(f"Skipping row {row} because of media URL is not reachable, ({e})")
+                                skipped += 1
+                                continue
+                            else:
+                                self.dataset.finish_with_warning(outputs, f"{e}")
+                                return
+                        # Broad exception, but necessary with all the different LLM providers and options...
+                        except Exception as e:
+                            self.dataset.finish_with_warning(outputs, f"Not all items processed: {e}")
+                            return
+
+                        # Set model name from the response for more details
+                        if hasattr(response, "response_metadata"):
+                            model = response.response_metadata.get("model_name", model)
+                            if "models/" in model:
+                                model = model.replace("models/", "")
+
+                        if not response:
+                            structured_warning = " with your specified JSON schema" if structured_output else ""
+                            warning = f"{model} could not return text{structured_warning}. Consider editing your prompt or changing settings."
+                            self.dataset.finish_with_warning(outputs, warning)
+                            return
+
+                        # Always parse JSON outputs in the case of batches.
+                        if use_batches or structured_output:
+                            if isinstance(response, str):
+                                response = json.loads(response)
+                        
+                            # Check whether input/output value lengths match
+                            if use_batches:
+                                output = self.parse_batched_response(response)
+
+                                if len(output) != n_batched:
+                                    self.dataset.update_status(f"Output did not result in {n_batched} item(s).\nInput:\n"
+                                                               f"{prompt}\nOutput:\n{response}")
+                                    self.dataset.finish_with_warning(outputs, "Model could not output as many values as the batch. See log "
+                                                                   "for incorrect output. Try lowering the batch size, "
+                                                                   "editing the prompt, or using a different model.")
+                                    return
+                            else:
+                                output = [response]
+
+                            # Also validate whether the JSON schema and the output match
+                            try:
+                                jsonschema.validate(instance=response, schema=json_schema)
+                            except (ValidationError, SchemaError) as e:
+                                self.dataset.finish_with_error(f"Invalid JSON schema and/or LLM output: `{e}`")
+                                return
+
+                        # Else we'll just store the output in a list
+                        else:
+
+                            output = response.content
+
+                            if not isinstance(output, list):
+                                output = [output]
+
+                            # More cleaning
+                            # Newer OpenAI models and Magistral return annoying nested dict with 'thinking'/'reasoning and
+                            # 'text', flatten it
+                            if len(output) > 0 and isinstance(output[0], dict) and output[0].get("type") in ["thinking",
+                                                                                                             "reasoning"]:
+                                reasoning_string = output[0].get("type")  # "thinking" or "reasoning"
+                                output_flat = {reasoning_string: "", "text": []}
+
+                                for output_part in output:
+                                    if output_part.get("type") == reasoning_string:
+                                        if reasoning_string in output_part and isinstance(output_part[reasoning_string], list):
+                                            output_flat[reasoning_string] += "\n".join(
+                                                [think.get("text", "") for think in output_part.get(reasoning_string, [])])
+                                        else:
+                                            output_flat[reasoning_string] += output_part.get("text", "")
+                                    else:
+                                        output_flat["text"].append(output_part.get("text", ""))
+
+                                output_flat["text"] = "\n".join(output_flat["text"])
+                                output = [output_flat]
+
+                        for n, output_item in enumerate(output):
+
+                            # Retrieve the input values used
+                            if use_batches:
+                                input_value = [v[n] for v in batched_data.values()]
+                            else:
+                                input_value = [v[0] for v in batched_data.values()]
+
+                            time_created = int(time.time())
+
+                            # remove reasoning if so desired
+                            if hide_think:
+                                if isinstance(output_item, str):
+                                    output_item = re.sub(r"<think>.*</think>", "", output_item, flags=re.DOTALL).strip()
+                                elif isinstance(output_item, dict):
+                                    if "thinking" in output_item:
+                                        del output_item["thinking"]
+
+                            result = {
+                                "id": batched_ids[n],
+                                "output": output_item,
+                                "input_value": input_value,
+                                "prompt": prompt if not use_batches else base_prompt,  # Insert dataset values if not batching
+                                "temperature": temperature,
+                                "max_tokens": max_tokens,
+                                "model": model,
+                                "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
+                                "time_created_utc": time_created,
+                                "batch_number": n + 1 if use_batches else "",
+                                "system_prompt": system_prompt,
+                            }
+                            outfile.write(json.dumps(result) + "\n")
+                            outputs += 1
+
+                            if save_annotations:
+                                # Save annotations for every value produced by the LLM, in case of structured output.
+                                # Else this will just save one string.
+                                if isinstance(output_item, dict):
+                                    annotation_output = flatten_dict({model: output_item})
+                                elif self.parameters.get("annotation_label"):
+                                    annotation_output = {self.parameters.get("annotation_label"): output_item}
+                                else:
+                                    annotation_output = {model + "_output": output_item}
+
+                                for output_key, output_value in annotation_output.items():
+                                    annotation = {
+                                        "label": output_key,
+                                        "item_id": batched_ids[n],
+                                        "value": remove_nuls(output_value),
+                                        "type": "text",
+                                    }
+
+                                    annotations.append(annotation)
+
+                        # Remove batched data and store what row we've left off
+                        batched_ids = []
+                        batched_data = {}
+                        n_batched = 0
+
+                        # Rate limits for different providers
+                        if provider == "mistral":
+                            time.sleep(1)
+
+                    # Write annotations in batches
+                    if (i % 1000 == 0 and annotations) or limit_reached:
+                        self.save_annotations(annotations)
+                        annotations = []
+
+                    self.dataset.update_progress(row / max_processed)
+                    if limit_reached:
+                        break
 
         outfile.close()
 
@@ -967,12 +1182,16 @@ class LLMPrompter(BasicProcessor):
         if query["api_or_local"] == "api" and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
 
-        if not query["prompt"].strip():
-            raise QueryParametersException("The user prompt cannot be empty.")
+        # For media archive datasets, use_media won't be present in the query
+        is_media_archive = "use_media" not in query
+
+        if not query.get("prompt", "").strip():
+            if not (query.get("system_prompt", "").strip() and is_media_archive):
+                raise QueryParametersException("The user prompt cannot be empty.")
 
         # Get column values in prompt. These can be one or multiple, and multiple within a bracket as well.
-        columns_to_use = re.findall(r"\[.*?]", query["prompt"])
-        if not columns_to_use and not query["use_media"]:
+        columns_to_use = re.findall(r"\[.*?]", query.get("prompt", ""))
+        if not columns_to_use and not query.get("use_media") and not is_media_archive:
             raise QueryParametersException("You need to insert column name(s) in the user prompt within brackets "
                                            "(e.g. '[body]' or '[timestamp, author]')")
 
