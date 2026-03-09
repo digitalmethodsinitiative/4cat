@@ -29,6 +29,7 @@ class AudioExtractor(BasicProcessor):
     title = "Extract audio from videos"  # title displayed in UI
     description = "Create audio files per video"  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "audio"
 
     followups = ["audio-to-text"]
 
