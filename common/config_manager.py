@@ -355,6 +355,13 @@ class ConfigManager(BaseConfigReader):
             tags = tags.copy()
         tags = self.get_active_tags(user, tags, memcache)
 
+        # global settings are only ever stored with the global (empty) tag via
+        # set(), so there can be no valid tag-specific overrides for them.
+        # Always read from the global tag only to avoid returning stale or
+        # incorrect tag-specific data that may exist from older versions.
+        if attribute_name in self.config_definition and self.config_definition.get(attribute_name, {}).get("global"):
+            tags = []
+
         # now we have all tags - get the config values for each (if available)
         # and then return the first matching one. Add the 'empty' tag at the
         # end to fall back to the global value if no specific one exists.

@@ -663,9 +663,44 @@ const query = {
                     ui_helpers.conditional_form.init();
                     update.addClass('updated');
                     target.remove();
+
+                    if (child.finished && child.annotation_fields && Object.keys(child.annotation_fields).length > 0) {
+                        query.update_annotation_fields_list(child.annotation_fields);
+                    }
                 });
             }
         });
+    },
+
+    update_annotation_fields_list: function (annotation_fields) {
+        /**
+         * Hot-update the annotation-fields-list section when annotation fields change
+         */
+        let annotation_list = $('.annotation-fields-list');
+
+        if (annotation_list.length === 0) {
+            // Section does not exist yet; find the dataset details card and insert after
+            // the last existing fullwidth div before API Credentials or Processors sections
+            let card_dl = $('.result-page .card dl');
+            if (card_dl.length > 0) {
+                let html = '<div class="fullwidth annotation-fields-list"><dt>Annotations</dt><dd><ul>';
+                for (let field_id in annotation_fields) {
+                    let label = annotation_fields[field_id].label;
+                    html += '<li><span class="property-badge" data-annotation-id="' + field_id + '"><i class="fa-solid fa-tag"></i> ' + label + '</span></li>';
+                }
+                html += '</ul></dd></div>';
+                card_dl.find('#dataset-result').before(html);
+            }
+        } else {
+            // Update existing section: add any new fields
+            let ul = annotation_list.find('ul');
+            for (let field_id in annotation_fields) {
+                if (ul.find('[data-annotation-id="' + field_id + '"]').length === 0) {
+                    let label = annotation_fields[field_id].label;
+                    ul.append('<li><span class="property-badge" data-annotation-id="' + field_id + '"><i class="fa-solid fa-tag"></i> ' + label + '</span></li>');
+                }
+            }
+        }
     },
 
     check_search_queue: function () {
@@ -1670,7 +1705,7 @@ const ui_helpers = {
             let v = $(this).attr('data-value') ? parseInt($(this).attr('data-value')) : 81;
             let target = $(this).attr('data-update-background');
 
-            if($(this).attr('data-update-layout')) {
+            if ($(this).attr('data-update-layout')) {
                 document.querySelector(':root').style.setProperty('--accent', hsv2hsl(h, s, v));
                 document.querySelector(':root').style.setProperty('--highlight', hsv2hsl(h, s, 100));
                 document.querySelector(':root').style.setProperty('--accent-alternate', hsv2hsl((h + 180) % 360, s, 90));
@@ -2167,3 +2202,4 @@ function find_parent(element, selector, start_self=false) {
 
     return null;
 }
+

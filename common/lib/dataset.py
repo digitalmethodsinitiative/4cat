@@ -1011,7 +1011,7 @@ class DataSet(FourcatModule):
 
         return copy
 
-    def delete(self, commit=True, queue=None):
+    def delete(self, commit=True, delete_log=False):
         """
         Delete the dataset, and all its children
 
@@ -1019,6 +1019,9 @@ class DataSet(FourcatModule):
         a dataset object after it has been deleted is undefined behaviour.
 
         :param bool commit:  Commit SQL DELETE query?
+        :param bool delete_log:  Whether to also delete the log file. Defaults to False, 
+        because logs can be useful for debugging even after a dataset is deleted. Hanging logs
+        are automatically deleted by TempFileCleaner after a certain amount of time.
         """
         # first, recursively delete children
         children = self.db.fetchall(
@@ -1027,7 +1030,7 @@ class DataSet(FourcatModule):
         for child in children:
             try:
                 child = DataSet(key=child["key"], db=self.db, modules=self.modules)
-                child.delete(commit=commit)
+                child.delete(commit=commit, delete_log=delete_log)
             except DataSetException:
                 # dataset already deleted - race condition?
                 pass
@@ -1075,20 +1078,29 @@ class DataSet(FourcatModule):
         self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
         # delete from drive
+        files_to_delete = [self.get_results_path()] + ([self.get_results_path().with_suffix(".log")] if delete_log else [])
+        for path in files_to_delete:
+            try:
+                if path.exists():
+                    path.unlink()
+            except FileNotFoundError:
+                # already deleted, apparently
+                pass
+            except PermissionError as e:
+                self.db.log.error(
+                    f"Could not delete dataset {self.key} file {path}; it may need to be deleted manually: {e}"
+                )
+
+        # delete results folder if it exists
         try:
-            if self.get_results_path().exists():
-                self.get_results_path().unlink()
-            if self.get_results_path().with_suffix(".log").exists():
-                self.get_results_path().with_suffix(".log").unlink()
             if self.get_results_folder_path().exists():
                 shutil.rmtree(self.get_results_folder_path())
-
         except FileNotFoundError:
             # already deleted, apparently
             pass
         except PermissionError as e:
             self.db.log.error(
-                f"Could not delete all dataset {self.key} files; they may need to be deleted manually: {e}"
+                f"Could not delete dataset {self.key} results folder; it may need to be deleted manually: {e}"
             )
 
     def update_children(self, **kwargs):
@@ -1367,7 +1379,7 @@ class DataSet(FourcatModule):
         except json.JSONDecodeError:
             return {}
 
-    def get_columns(self):
+    def get_columns(self, annotation_columns=True):
         """
         Returns the dataset columns.
 
@@ -1392,7 +1404,7 @@ class DataSet(FourcatModule):
             items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
             try:
                 keys = list(next(items).keys())
-                if self.annotation_fields:
+                if self.annotation_fields and annotation_columns:
                     for annotation_field in self.annotation_fields.values():
                         annotation_column = annotation_field["label"]
                         label_count = 1

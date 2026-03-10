@@ -146,6 +146,12 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             except Exception as e:
                 self.log.error("Worker %s clean-up raised exception %s: %s" % (self.type, e.__class__.__name__, str(e)), frame=traceback.extract_tb(e.__traceback__))
 
+            # workers should usually finish their jobs by themselves, but if
+            # the worker finished without errors, the job can be finished in
+            # any case
+            if not self.job.is_finished:
+                self.job.finish()
+
             try:
                 # explicitly close database connection as soon as it's possible
                 self.db.close()
