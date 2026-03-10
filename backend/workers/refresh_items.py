@@ -13,15 +13,14 @@ class ItemUpdater(BasicWorker):
     type = "refresh-items"
     max_workers = 1
 
-    @classmethod
-    def ensure_job(cls, config=None):
-        """
-        Ensure that the refresher is always running
-
-        :return:  Job parameters for the worker
-        """
-        return {"remote_id": "refresh-items", "interval": 60}
+    # ensure_job is intentionally disabled: this worker currently does nothing
+    # and would only create unnecessary job queue churn. Re-enable when work()
+    # has actual tasks to perform.
+    # @classmethod
+    # def ensure_job(cls, config=None):
+    #     return {"remote_id": "refresh-items", "interval": 60}
 
     def work(self):
+        # Placeholder – no tasks implemented yet.
         self.job.finish()
             

@@ -104,6 +104,14 @@ class OllamaManager(BasicWorker):
             self.config.set("llm.available_models", available_models)
             self.log.debug(f"OllamaManager: refreshed model list ({len(available_models)} models)")
 
+            # Reconcile enabled models: remove any that are no longer available
+            enabled_models = self.config.get("llm.enabled_models", [])
+            reconciled = [m for m in enabled_models if m in available_models]
+            if len(reconciled) != len(enabled_models):
+                removed = set(enabled_models) - set(reconciled)
+                self.log.info(f"OllamaManager: removed stale enabled model(s): {', '.join(removed)}")
+                self.config.set("llm.enabled_models", reconciled)
+
         except requests.RequestException as e:
             self.log.warning(f"OllamaManager: could not refresh model list - request error: {e}")
 

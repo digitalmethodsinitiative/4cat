@@ -63,8 +63,17 @@ the host via the exposed port).
 
 ### Configuring 4CAT to use Ollama
 
+#### Automatic configuration (fresh Docker install with sidecar)
+
+When you start 4CAT for the first time using the Ollama override file, the
+`docker_setup.py` initialisation script automatically detects the `ollama`
+sidecar and sets **LLM Provider Type**, **LLM Server URL**, and **LLM Access**
+for you. You can skip to step 2 below.
+
+#### Manual configuration (or to verify/change settings)
+
 1. Log in as admin and open **Control Panel → Settings**.
-2. Set the following LLM fields:
+2. Confirm or set the following LLM fields:
 
    | Setting | Value |
    |---|---|
@@ -102,3 +111,7 @@ point 4CAT directly at that server:
 - **On the same host**: use `http://host.docker.internal:11434` as the LLM Server URL.
 - **Remote server**: use the server's reachable URL and configure any required
   API key in the *LLM Server API Key* and *LLM Server Authentication Type* settings.
+
+In both cases, configure the LLM settings manually via **Control Panel → Settings**
+(see *Manual configuration* above), using the appropriate server URL instead of
+`http://ollama:11434`.
