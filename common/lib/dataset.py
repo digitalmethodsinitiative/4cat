@@ -2033,7 +2033,7 @@ class DataSet(FourcatModule):
             if analysis.type not in processors:
                 continue
 
-            if not processors[analysis.type].get_options(config=config):
+            if not processors[analysis.type].get_options(parent_dataset=self, config=config):
                 # No variable options; this processor has been run so remove
                 del processors[analysis.type]
                 continue
