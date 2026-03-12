@@ -402,8 +402,8 @@ class AudioToText(BasicProcessor):
 
         # Load the video metadata if available
         video_metadata = None
-        if staging_area.joinpath(".video_metadata.json").is_file():
-            with open(staging_area.joinpath(".video_metadata.json")) as file:
+        if staging_area.joinpath(".metadata.json").is_file():
+            with open(staging_area.joinpath(".metadata.json")) as file:
                 video_metadata = json.load(file)
                 self.dataset.log("Found and loaded video metadata")
 
