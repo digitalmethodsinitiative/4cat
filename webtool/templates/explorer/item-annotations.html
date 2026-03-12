@@ -33,6 +33,7 @@
                             {% if from_dataset %}
                                 <div class="item-annotation-input from-dataset">{{ annotation.value }}</div>
                                 {% set from_dataset_item = from_datasets[annotation.from_dataset] %}
+                                {% set processor_options = {} %}
                                 {% if from_dataset_item.type in processors %}
                                     {% set processor_options = processors[from_dataset_item.type].get_options(config=__config) %}
                                 {% endif %}
