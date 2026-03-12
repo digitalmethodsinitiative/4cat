@@ -645,7 +645,7 @@ class LLMPrompter(BasicProcessor):
                 self.dataset.update_status(f"Processing {media_archive_type} files from archive")
                 staging_area = self.dataset.get_staging_area()
                 row = 0
-                max_processed = limit if limit else self.source_dataset.num_rows
+                max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
 
                 # Load metadata to map filenames back to original post IDs for annotations.
                 filename_to_post_ids = {}
@@ -676,8 +676,7 @@ class LLMPrompter(BasicProcessor):
                         self.dataset.log(f"Could not load .metadata.json for annotation mapping: {e}. "
                                          f"Annotations will use filenames as item IDs.")
 
-                for item in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=False):
-                    row += 1
+                for item in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=True, get_annotations=False):
 
                     if self.interrupted:
                         raise ProcessorInterruptedException("Interrupted while generating text through LLMs")
@@ -686,6 +685,7 @@ class LLMPrompter(BasicProcessor):
                     filename = item["id"] if "id" in item else str(item.get("filename", ""))
                     if not filename or filename.startswith(".") or filename.rsplit(".", 1)[-1].lower() in ("json", "log", "txt"):
                         continue
+                    row += 1
 
                     item_id = filename
                     media_file_path = item.file if hasattr(item, "file") else Path(item.get("path", ""))
@@ -698,7 +698,7 @@ class LLMPrompter(BasicProcessor):
                     prompt = base_prompt if base_prompt else f"Analyze this {media_archive_type} file."
                     system_prompt = system_prompt_base
 
-                    self.dataset.update_status(f"Processing {media_archive_type} file {row - 1:,}/{max_processed:,} "
+                    self.dataset.update_status(f"Processing {media_archive_type} file {row:,}/{max_processed:,} "
                                                f"with {model}")
                     try:
                         response = llm.generate_text(
@@ -807,7 +807,10 @@ class LLMPrompter(BasicProcessor):
                             for output_key, output_value in annotation_output.items():
 
                                 # Skip 'signature' and 'type' annotations for Google
-                                if provider == "google" and output_key in (".signature", ".type"):
+                                if provider == "google" and (
+                                    output_key.endswith(".signature")
+                                    or output_key.endswith(".type")
+                                ):
                                     continue
 
                                 for annotation_item_id in annotation_item_ids:

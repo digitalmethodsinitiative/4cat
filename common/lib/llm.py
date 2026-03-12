@@ -129,7 +129,7 @@ class LLMAdapter:
             messages: Union[str, List[BaseMessage]],
             system_prompt: Optional[str] = None,
             temperature: float = 0.1,
-            files: Optional[List[Union[str, Path, dict]]] = None,
+            files: Optional[List[str]] = None,
             media_files: Optional[List[Union[str, Path]]] = None,
     ) -> BaseMessage:
         """
@@ -196,7 +196,7 @@ class LLMAdapter:
                 if not isinstance(url, str):
                     raise ValueError(f"Media URL must be a string, got {type(url)}")
 
-                mime_type = mimetypes.guess_type(url)[0] or "application/octet-stream"
+                mime_type = mimetypes.guess_type(url.split("?")[0])[0] or "application/octet-stream"
                 media_category = mime_type.split("/")[0]  # "image", "video", or "audio"
                 content.append(self._format_media_block(url=url, mime_type=mime_type, media_category=media_category))
 
