@@ -161,6 +161,10 @@ class AttributeRanker(BasicProcessor):
         if type(columns) is not list:
             columns = [columns]
 
+        # set convenience label
+        if len(columns) == 1:
+            self.dataset.update_label(f"Count '{columns[0]}' values")
+
         # convenience variables
         timeframe = self.parameters.get("timeframe")
         split_comma = self.parameters.get("split-comma")
