@@ -207,6 +207,35 @@ if __name__ == "__main__":
                 f"docker exec 4cat_backend python -c \"from common.config_manager import ConfigManager;config=ConfigManager();config.with_db();config.set('flask.server_name', '{formatted_host}:{public_port}');config.db.commit();\""
             )
 
+    # If an Ollama container is available on the Docker network, configure 4CAT to use it.
+    ollama_url = 'http://ollama:11434'
+    try:
+        import requests
+        try:
+            resp = requests.get(f"{ollama_url}/api/tags", timeout=2)
+            if resp.status_code == 200:
+                current_llm_server = config.get("llm.server")
+                if current_llm_server == ollama_url:
+                    print("Ollama server already configured in 4CAT settings.")
+                elif current_llm_server and current_llm_server != ollama_url:
+                    # Previously configured LLM server is different; log a warning but do not overwrite user settings
+                    print(f"Warning: Detected Ollama server at {ollama_url} but llm.server is set to {current_llm_server}. To use the Ollama server, update the llm.server setting to {ollama_url} in the 4CAT Control Panel.")
+                else:
+                    # set basic LLM settings so the initial admin user does not need to
+                    # configure them manually for local development environments that
+                    # include the Ollama sidecar.
+                    config.set('llm.provider_type', 'ollama')
+                    config.set('llm.server', ollama_url)
+                    config.set('llm.access', True)
+                    config.db.commit()
+                    print('Detected Ollama on Docker network; configured LLM settings to use it.')
+        except requests.RequestException:
+            # Ollama not available; do nothing
+            pass
+    except Exception:
+        # requests other error; skip automatic Ollama configuration
+        pass
+
     print(f"\nStarting app\n"
           f"4CAT is accessible at:\n"
           f"{'https' if config.get('flask.https', False) else 'http'}://{config.get('flask.server_name')}\n")
