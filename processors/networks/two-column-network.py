@@ -388,6 +388,9 @@ class ColumnNetworker(BasicProcessor):
                     # needs to be string for Retina to recognise it as qualitative
                     network.nodes[node_id][community_prop] = f"cluster-{community_id}"
 
+        operative = "to" if directed else "↔"
+        self.dataset.update_label(f"{self.title} - '{column_a}' {operative} '{column_b}'")
+
         self.dataset.update_status("Writing network file")
         nx.write_gexf(network, self.dataset.get_results_path())
         self.dataset.finish(len(network.nodes))
