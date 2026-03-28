@@ -69,7 +69,7 @@
                                 {% if dataset.get_own_processor().map_item or dataset.annotation_fields %}
                                 <a class="button-like" href="{{ url_for('dataset.get_mapped_result', key=dataset.key) }}"><i class="fas fa-download" aria-hidden="true"></i> Download csv</a>
                                 {% else %}
-                                <a class="button-like" href="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> Download {{ dataset.result_file.split(".")[-1] }}</a>
+                                <a class="button-like" href="{{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key) }}"><i class="fas fa-download" aria-hidden="true"></i> Download {{ dataset.result_file.split(".")[-1] }}</a>
                                 {% endif %}
                             {% endif %}
                         {% endif %}
