@@ -267,6 +267,13 @@ config_definition = {
         "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
         "global": True
     },
+    "4cat.allow_legacy_result_links": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "global": True,
+        "help": "Allow legacy result links",
+        "tooltip": "Controls whether old links to dataset results without the dataset key are still supported. These links utilized security through obscurity; datasets are available to anyone with link."
+    },
     # proxy stuff
     "proxies.urls": {
         "type": UserInput.OPTION_TEXT_JSON,
