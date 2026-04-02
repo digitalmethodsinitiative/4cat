@@ -685,7 +685,7 @@ def nuke_dataset(key=None, reason=None):
 	for child in children:
 		try:
 			job = Job.get_by_remote_ID(child.key, database=g.db, jobtype=child.type)
-			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": child.type, "level": BasicWorker.INTERRUPT_CANCEL})
 			job.finish()
 			child.delete()
 		except JobNotFoundException:
