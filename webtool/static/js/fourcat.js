@@ -1922,7 +1922,7 @@ const ui_helpers = {
             let targetHeight = $(target).height();
             $(target).css('aria-expanded', false).css('position', '').css('display', '').css('visibility', '').css('height', 0);
             $(target).attr('aria-expanded', true).animate({"height": targetHeight}, 250, function () {
-                $(this).css('height', '')
+                $(this).css('height', '');
             });
 
             if ($(this).find('i.fa.fa-plus')) {
@@ -2018,8 +2018,190 @@ const ui_helpers = {
         },
 
         /**
-         * Manage visibility of form elements when forms are interacted with
+         * Evaluate a single requirement expression against already-resolved field values.
+         * Mirrors UserInput._requirement_met() in Python (common/lib/user_input.py).
+         *
+         * 'other_input' maps field names to their current values:
+         *   - boolean   for checkboxes / toggles
+         *   - string[]  for multi-selects
+         *   - string    for everything else
+         *
+         * Supported operators:
+         *   == / =   exact equality
+         *   !=       negated equality
+         *   ^=       value starts with         !^=  does not start with
+         *   $=       value ends with           !$=  does not end with
+         *   ~=       value contains (or, for arrays, is a member)
+         *            !~=  does not contain / is not a member
+         *
+         * @param {string} req          Requirement expression, e.g. "field==value"
+         * @param {Object} other_input  Map of field names to resolved values
+         * @returns {boolean}           True if the requirement is satisfied
+         */
+        _requirement_met: function(req, other_input) {
+            const match = /([a-zA-Z0-9_-]+)([!=$~^]+)(.*)/.exec(req);
+            let field, operator, value;
+            if(!match) {
+                // no operator found: bare field name, check it is present and non-empty
+                field = req.trim(); operator = '!='; value = '';
+            } else {
+                [, field, operator, value] = match;
+            }
 
+            if(!other_input || !(field in other_input)) {
+                // the referenced field has not been resolved yet (or no input at all)
+                return false;
+            }
+
+            const negated = operator.startsWith('!');
+            if(negated) { operator = operator.substring(1); }
+
+            let other_value = other_input[field];
+
+            if(typeof other_value === 'boolean') {
+                // boolean values come from toggle / checkbox inputs
+                if(operator === '==' || operator === '=') {
+                    // true matches "true"/"checked"; false matches ""/"false"
+                    if(((other_value && ['', 'false'].includes(value)) || (!other_value && ['checked', 'true'].includes(value))) !== negated) {
+                        return false;
+                    }
+                } else {
+                    // non-equality operator on a boolean: check truthy/falsy the same way
+                    if(((other_value && !['true', 'checked'].includes(value)) || (!other_value && !['', 'false'].includes(value))) !== negated) {
+                        return false;
+                    }
+                }
+
+            } else {
+                if(Array.isArray(other_value)) {
+                    // arrays are a bit special
+                    if(other_value.length === 1) {
+                        // single-item array: unwrap and treat as scalar below
+                        other_value = other_value[0];
+                    } else if(operator === '~=') {
+                        // multi-item array + ~=: is value a member of this array?
+                        if((other_value.indexOf(value) < 0) !== negated) {
+                            return false;
+                        }
+                        return true; // handled; skip scalar checks below
+                    } else if(!negated) {
+                        // other operators on multi-item arrays are not meaningful: treat as not satisfied
+                        return false;
+                    }
+                    // negated non-~= on multi-item array: fall through to scalar checks
+                }
+
+                // scalar (or unwrapped single-item array) comparisons
+                const str_other = String(other_value);
+                if(operator === '^=' && str_other.startsWith(value) === negated) { return false; }
+                else if(operator === '$=' && str_other.endsWith(value) === negated) { return false; }
+                else if(operator === '~=' && (str_other.indexOf(value) >= 0) === negated) { return false; }
+                else if((operator === '==' || operator === '=') && (value === other_value) === negated) { return false; }
+            }
+
+            return true;
+        },
+
+        /**
+         * Retrieve the current value of a named form field in a format compatible with _requirement_met.
+         *
+         * @param {string} field             Field name (without 'option-' prefix)
+         * @param {HTMLFormElement} form
+         * @returns {Object|null}            {fieldName: value} or null if the field is not found
+         */
+        _get_field_value: function(field, form) {
+            const element = form.querySelector("*[name='option-" + field + "']");
+            if(!element) { return null; }
+
+            let value;
+            if(element.getAttribute('type') === 'checkbox') {
+                // checkboxes are represented as booleans
+                value = element.checked;
+            } else if(element.multiple) {
+                // multi-select: return array of selected values
+                value = Array.from(element.selectedOptions).map(o => o.value);
+            } else {
+                value = element.value;
+            }
+            return {[field]: value};
+        },
+
+        /**
+         * Evaluate all requirements from a data-requires attribute against the current form state.
+         * Mirrors the requires-normalisation logic in UserInput.parse_value() (common/lib/user_input.py).
+         *
+         * 'reqs' may be:
+         *   - A JSON array string: '["a==1","b!=x"]'  — AND semantics (all must be true)
+         *   - An &&-joined string: "a==1 && b!=x"     — AND semantics
+         *   - A ||-joined string:  "a==1 || a==x"     — OR  semantics (any must be true)
+         *   - A single expression: "a==1"              — backward compatible
+         *
+         * @param {string} reqs             The data-requires attribute value
+         * @param {HTMLFormElement} form
+         * @returns {boolean}
+         */
+        _evaluate_requirements: function(reqs, form) {
+            let req_list, combine_and;
+
+            if(reqs.trim().startsWith('[')) {
+                // JSON array: AND semantics — every requirement must be satisfied
+                try {
+                    // Works if the string is a well-formed JSON array, e.g. from a Python list dumped with json.dumps() or njinja2's tojson filter
+                    req_list = JSON.parse(reqs);
+                } catch(e) {
+                    // malformed JSON: attempt to extract quoted items (e.g. handles Python-style lists with single quotes)
+                    const items = [];
+                    let m;
+                    const re = /'([^']*)'|"([^"]*)"/g;
+                    while ((m = re.exec(reqs)) !== null) {
+                        items.push(m[1] !== undefined ? m[1] : m[2]);
+                    }
+                    if (items.length > 0) {
+                        req_list = items;
+                    } else {
+                        // final fallback: treat the whole string as one requirement
+                        req_list = [reqs];
+                    }
+                }
+                combine_and = true;
+            } else if(reqs.indexOf('||') >= 0) {
+                // pipe-separated alternatives: any one is sufficient (OR)
+                req_list = reqs.split('||').map(r => r.trim());
+                combine_and = false;
+            } else if(reqs.indexOf('&&') >= 0) {
+                // ampersand-separated conditions: all must hold (AND)
+                req_list = reqs.split('&&').map(r => r.trim());
+                combine_and = true;
+            } else {
+                // single requirement string — original behaviour
+                req_list = [reqs];
+                combine_and = true;
+            }
+
+            const results = req_list.map(req => {
+                // extract field name from req to look up the matching form element
+                const m = /([a-zA-Z0-9_-]+)([!=$~^]+)(.*)/.exec(req);
+                const field = m ? m[1] : req.trim();
+
+                const other_input = ui_helpers.conditional_form._get_field_value(field, form);
+                if(other_input === null) {
+                    return false; // field not found in form: requirement not met
+                }
+                return ui_helpers.conditional_form._requirement_met(req, other_input);
+            });
+
+            if(combine_and) {
+                // AND mode: every requirement must be satisfied
+                return results.every(r => r);
+            } else {
+                // OR mode: at least one requirement must be satisfied
+                return results.some(r => r);
+            }
+        },
+
+        /**
+         * Manage visibility of form elements when forms are interacted with
+         *
          * @param e  Event, or a form object
          */
         manage: function (e) {
@@ -2039,55 +2221,10 @@ const ui_helpers = {
             }
 
             conditionals.forEach((element) => {
-                let requirement = RegExp(/([a-zA-Z0-9_-]+)([!=$~^]+)(.*)/g).exec(element.getAttribute('data-requires'));
-                if (!requirement || requirement.length !== 4) { // assume 'field is not empty'
-                    requirement = [null, element.getAttribute('data-requires'), '!=', ''];
-                }
-
-                const negate = requirement[2].startsWith('!');
-                if (negate) {
-                    requirement[2] = requirement[2].substring(1);
-                }
-                const other_field = 'option-' + requirement[1];
-                const other_element = form.querySelector("*[name='" + other_field + "']");
-
-                if (!other_element) { //invalid reference
-                    return;
-                }
-
-                const other_value = other_element.value;
-
-                let requirement_met = false;
-                if (other_element.getAttribute('type') === 'checkbox') {
-                    // checkboxes are a bit different (and simpler)
-                    const other_is_checked = other_element.checked;
-                    if(requirement[2] === '!=') {
-                        if((other_is_checked && ['', 'false'].includes(requirement[3])) || (!other_is_checked && ['checked', 'true'].includes(requirement[3]))) {
-                            requirement_met = true;
-                        }
-                    } else {
-                        if((other_is_checked && ['checked', 'true'].includes(requirement[3])) || (!other_is_checked && ['', 'false'].includes(requirement[3]))) {
-                            requirement_met = true;
-                        }
-                    }
-                } else {
-                    if(requirement[2] === '!=') {
-                        requirement_met = other_value !== requirement[3];
-                    } else if(requirement[2] === '^=') {
-                        requirement_met = other_value.startsWith(requirement[3]);
-                    } else if(requirement[2] === '~=') {
-                        requirement_met = other_value.indexOf(requirement[3]) >= 0;
-                    } else if(requirement[2] === '$=') {
-                        requirement_met = other_value.endsWith(requirement[3]);
-                    } else if(['==', '='].includes(requirement[2])) {
-                        requirement_met = other_value === requirement[3];
-                    }
-                }
-
-                if(negate) {
-                    requirement_met = !requirement_met
-                }
-
+                const requirement_met = ui_helpers.conditional_form._evaluate_requirements(
+                    element.getAttribute('data-requires'),
+                    form
+                );
                 if (requirement_met) {
                     $(element).show();
                 } else {

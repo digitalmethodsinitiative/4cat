@@ -1,5 +1,5 @@
 {% if not option_override %}{% set option_settings = processor.get_options(dataset, __config)[option] %}{% else %}{% set option_settings = option_override[option] %}{% endif %}
-<div class="processor-option-wrap{% if option_override %} delegated-option{% endif %}"{% if option_settings.requires %} data-requires="{{ option_settings.requires }}"{% endif %}>
+<div class="processor-option-wrap{% if option_override %} delegated-option{% endif %}"{% if option_settings.requires %}{% if option_settings.requires is string %} data-requires="{{ option_settings.requires|e }}"{% else %} data-requires='{{ option_settings.requires|tojson }}'{% endif %}{% endif %}>
     <label class="option-type-{{ option_settings.type }}">
         {% if option_settings.type in ("toggle", "annotation") %}
             <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>

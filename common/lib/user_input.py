@@ -195,6 +195,91 @@ class UserInput:
         return parsed_input
 
     @staticmethod
+    def _requirement_met(req, other_input):
+        """
+        Evaluate a single requirement expression against already-parsed input.
+
+        A requirement is a string of the form ``field[operator]value``. Returns
+        True if the requirement is satisfied, False otherwise. The caller is
+        responsible for combining the results of multiple requirements with the
+        appropriate AND/OR logic.
+
+        Supported operators:
+          ==  / =   exact equality
+          !=        negated equality
+          ^=        value starts with
+          !^=       value does not start with
+          $=        value ends with
+          !$=       value does not end with
+          ~=        value contains (or, for lists, is a member of)
+          !~=       value does not contain / is not a member of
+
+        :param str req:          The requirement string to evaluate.
+        :param dict other_input: Already-parsed input to check against.
+        :return bool:            True if the requirement is satisfied.
+        """
+        try:
+            field, operator, value = re.findall(r"([a-zA-Z0-9_-]+)([!=$~^]+)(.*)", req)[0]
+        except IndexError:
+            # no operator found: treat the whole string as a bare field name
+            # and check that a field with that name is present and non-empty
+            field, operator, value = (req, "!=", "")
+
+        if not other_input or field not in other_input:
+            # the referenced field has not been parsed yet (or no input at all)
+            return False
+
+        negated = operator.startswith("!")
+        if negated:
+            operator = operator[1:]
+
+        other_value = other_input.get(field)
+        if type(other_value) is bool:
+            # boolean values come from toggle/checkbox options
+            if operator in ("==", "="):
+                # True matches "true"/"checked"; False matches ""/"false"
+                if ((other_value and value in ("", "false")) or (not other_value and value in ("true", "checked"))) != negated:
+                    return False
+            else:
+                # any non-equality operator: check truthy/falsy in the same way
+                if ((other_value and value not in ("true", "checked")) or (not other_value and value not in ("", "false"))) != negated:
+                    return False
+
+        else:
+            if type(other_value) in (tuple, list):
+                # iterables are a bit special
+                if len(other_value) == 1:
+                    # single-item list: unwrap and treat as a scalar below
+                    other_value = other_value[0]
+                elif operator == "~=":
+                    # multi-item list + ~= means 'is value a member of this list?'
+                    if (value not in other_value) != negated:
+                        return False
+                    return True  # handled; skip scalar checks below
+                elif not negated:
+                    # other operators don't have a meaningful multi-item list
+                    # interpretation; treat as not satisfied
+                    return False
+                # a negated non-~= operator on a multi-item list falls through
+                # to the scalar checks below (with other_value still a list)
+
+            # scalar (or unwrapped single-item list) comparisons
+            if operator == "^=" and str(other_value).startswith(value) == negated:
+                # starts-with check
+                return False
+            elif operator == "$=" and str(other_value).endswith(value) == negated:
+                # ends-with check
+                return False
+            elif operator == "~=" and (value in str(other_value)) == negated:
+                # substring / contains check
+                return False
+            elif operator in ("==", "=") and (value == other_value) == negated:
+                # exact-equality check
+                return False
+
+        return True
+
+    @staticmethod
     def parse_value(settings, choice, other_input=None, silently_correct=True):
         """
         Filter user input
@@ -212,52 +297,42 @@ class UserInput:
         :return:  Validated and parsed input
         """
         # short-circuit if there is a requirement for the field to be parsed
-        # and the requirement isn't met
+        # and the requirement isn't met.
+        # 'requires' may be:
+        #   - a single string:          "field==value"
+        #   - an &&-joined string:      "field1==v1 && field2==v2"  (all must be true)
+        #   - a ||-joined string:       "field1==v1 || field2==v2"  (any must be true)
+        #   - a list/tuple of strings:  AND semantics (all must be true)
         if settings.get("requires"):
-            try:
-                field, operator, value = re.findall(r"([a-zA-Z0-9_-]+)([!=$~^]+)(.*)", settings.get("requires"))[0]
-            except IndexError:
-                # invalid condition, interpret as 'does the field with this name have a value'
-                field, operator, value = (choice, "!=", "")
+            reqs = settings["requires"]
 
-            if field not in other_input:
-                raise RequirementsNotMetException()
-
-            negated = operator.startswith("!")
-            if negated:
-                operator = operator[1:]
-
-            other_value = other_input.get(field)
-            if type(other_value) is bool:
-                # evalues to a boolean, i.e. checkboxes etc
-                if operator in ("==", "="):
-                    if ((other_value and value in ("", "false")) or (not other_value and value in ("true", "checked"))) != negated:
-                        raise RequirementsNotMetException()
-                else:
-                    if ((other_value and value not in ("true", "checked")) or (not other_value and value not in ("", "false"))) != negated:
-                        raise RequirementsNotMetException()
-
+            # normalise to a list of individual requirement strings plus a flag
+            # indicating whether they combine with AND (True) or OR (False)
+            if isinstance(reqs, (list, tuple)):
+                # a list always uses AND semantics: every requirement must be satisfied
+                req_list = list(reqs)
+                combine_and = True
+            elif "||" in reqs:
+                # pipe-separated alternatives: any one is sufficient (OR)
+                req_list = [r.strip() for r in reqs.split("||")]
+                combine_and = False
+            elif "&&" in reqs:
+                # ampersand-separated conditions: all must hold (AND)
+                req_list = [r.strip() for r in reqs.split("&&")]
+                combine_and = True
             else:
-                if type(other_value) in (tuple, list):
-                    # iterables are a bit special
-                    if len(other_value) == 1:
-                        # treat one-item lists as "normal" values
-                        other_value = other_value[0]
-                    elif operator == "~=":  # interpret as 'is in list?'
-                        if (value not in other_value) != negated:
-                            raise RequirementsNotMetException()
-                    elif not negated:
-                        # condition doesn't make sense for a list, so assume it's not True
-                        raise RequirementsNotMetException()
+                # single requirement string — original behaviour
+                req_list = [reqs]
+                combine_and = True
 
-                if operator == "^=" and str(other_value).startswith(value) == negated:
-                    raise RequirementsNotMetException()
-                elif operator == "$=" and str(other_value).endswith(value) == negated:
-                    raise RequirementsNotMetException()
-                elif operator == "~=" and (value in str(other_value)) == negated:
-                    raise RequirementsNotMetException()
-                elif operator in ("==", "=") and (value == other_value) == negated:
-                    raise RequirementsNotMetException()
+            results = [UserInput._requirement_met(r, other_input) for r in req_list]
+
+            if combine_and and not all(results):
+                # AND mode: every requirement must be satisfied
+                raise RequirementsNotMetException()
+            elif not combine_and and not any(results):
+                # OR mode: at least one requirement must be satisfied
+                raise RequirementsNotMetException()
 
         input_type = settings.get("type", "")
         if input_type in UserInput.OPTIONS_COSMETIC:
