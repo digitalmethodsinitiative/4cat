@@ -2583,12 +2583,12 @@ class DataSet(FourcatModule):
                 )
             if "label" not in annotation_field:
                 raise AnnotationException(
-                    "Can't save annotation fields: all fields must have a label"
+                    "Can't save annotation fields: field %s must have a label"
                     % field_id
                 )
             if "type" not in annotation_field:
                 raise AnnotationException(
-                    "Can't save annotation fields: all fields must have a type"
+                    "Can't save annotation fields: field %s must have a type"
                     % field_id
                 )
 
