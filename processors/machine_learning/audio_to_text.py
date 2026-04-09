@@ -79,7 +79,16 @@ class AudioToText(BasicProcessor):
         :return:
         """
         # Unique queue for locally hosted models; used by other local model processors as well
-        return "local_models" 
+        local_queue = "local_models" 
+        if not dataset:
+            return local_queue
+        else:
+            if dataset.parameters.get('model_host', 'local') in ["local"]:
+                # Hosted models also go in the local queue since they use the same shared LLM server
+                return local_queue
+        
+        # Queue per model/API type
+        return f"{cls.type}-{dataset.parameters.get('model_host', 'local')}"
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
