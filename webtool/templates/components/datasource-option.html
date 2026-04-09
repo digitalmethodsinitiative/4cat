@@ -5,7 +5,7 @@
         <div class="form-intro"{% if settings.requires %}{% if settings.requires is string %} data-requires="{{ settings.requires|e }}"{% else %} data-requires='{{ settings.requires|tojson }}'{% endif %}{% endif %}>{{ settings.help|markdown|safe }}</div>
     {% else %}
         <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}{% if settings.requires %}{% if settings.requires is string %} data-requires="{{ settings.requires|e }}"{% else %} data-requires='{{ settings.requires|tojson }}'{% endif %}{% endif %}>
-            <label for="forminput-{{ option }}">{{ settings.help }}</label>
+            <label for="forminput-{{ option }}">{{ settings.help|markdown(True)|safe }}</label>
             <div{% if settings.type == "toggle" %} class="with-tail"{% endif %}>
         {% if settings.type == "toggle" %}
             <input name="option-{{ option }}" id="forminput-{{ option }}" type="checkbox" {% if settings.default %} checked{% endif %}>
