@@ -1,4 +1,6 @@
 import json
+import base64
+import mimetypes
 import requests
 from pathlib import Path
 from typing import List, Optional, Union
@@ -127,7 +129,8 @@ class LLMAdapter:
             messages: Union[str, List[BaseMessage]],
             system_prompt: Optional[str] = None,
             temperature: float = 0.1,
-            files: Optional[List[Union[str, Path, dict]]] = None,
+            files: Optional[List[str]] = None,
+            media_files: Optional[List[Union[str, Path]]] = None,
     ) -> BaseMessage:
         """
         Supports string input or LangChain message list, with optional multimodal files.
@@ -135,7 +138,8 @@ class LLMAdapter:
         :param messages: Text prompt or list of LangChain messages
         :param system_prompt: Optional system prompt
         :param temperature: Temperature for generation
-        :param files: Optional list of file paths or content dicts for multimodal input
+        :param files: Optional list of media URLs for multimodal input
+        :param media_files: Optional list of local file paths for multimodal input (base64-encoded)
         :returns: Generated response message
         """
         if isinstance(messages, str):
@@ -144,8 +148,12 @@ class LLMAdapter:
                 lc_messages.append(SystemMessage(content=system_prompt))
 
             # Create multimodal content if files are provided
-            if files:
-                multimodal_content = self.create_multimodal_content(messages, files)
+            if files or media_files:
+                multimodal_content = self.create_multimodal_content(
+                    messages,
+                    media_urls=files,
+                    media_files=media_files,
+                )
                 lc_messages.append(HumanMessage(content=multimodal_content))
             else:
                 lc_messages.append(HumanMessage(content=messages))
@@ -166,38 +174,104 @@ class LLMAdapter:
     def create_multimodal_content(
         self,
         text: str,
-        image_urls: Optional[List[str]] = None,
+        media_urls: Optional[List[str]] = None,
+        media_files: Optional[List[Union[str, Path]]] = None,
     ) -> List[dict]:
         """
-        Create multimodal content structure for LangChain messages with media URLs.
-        Only supports image URLs for now.
+        Create multimodal content structure for LangChain messages with media URLs
+        and/or local media files (base64-encoded).
+
+        Supports images, video, and audio depending on the provider and model.
 
         :param text: Text content
-        :param image_urls: List of media URLs (http/https)
+        :param media_urls: List of media URLs (http/https)
+        :param media_files: List of local file paths to encode as base64
         :returns: List of content blocks
         """
         content = []
 
-        # Add image URLs first
-        if image_urls:
-            for url in image_urls:
+        # Add media URLs
+        if media_urls:
+            for url in media_urls:
                 if not isinstance(url, str):
-                    raise ValueError(f"Image URL must be a string, got {type(url)}")
+                    raise ValueError(f"Media URL must be a string, got {type(url)}")
 
-                # Format based on provider
-                if self.provider == "anthropic":
-                    content.append(
-                        {"type": "image", "source": {"type": "url", "url": url}}
-                    )
-                else:
-                    # OpenAI-style format
-                    content.append({"type": "image_url", "image_url": {"url": url}})
+                mime_type = mimetypes.guess_type(url.split("?")[0])[0] or "application/octet-stream"
+                media_category = mime_type.split("/")[0]  # "image", "video", or "audio"
+                content.append(self._format_media_block(url=url, mime_type=mime_type, media_category=media_category))
+
+        # Add base64-encoded local files
+        if media_files:
+            for file_path in media_files:
+                file_path = Path(file_path)
+                if not file_path.exists():
+                    raise ValueError(f"Media file not found: {file_path}")
+
+                mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+                media_category = mime_type.split("/")[0]
+
+                with file_path.open("rb") as f:
+                    b64_data = base64.b64encode(f.read()).decode("utf-8")
+
+                content.append(self._format_media_block(
+                    b64_data=b64_data, mime_type=mime_type, media_category=media_category
+                ))
 
         # Add text content
         if text:
             content.append({"type": "text", "text": text})
 
         return content
+
+    def _format_media_block(
+        self,
+        url: Optional[str] = None,
+        b64_data: Optional[str] = None,
+        mime_type: str = "image/jpeg",
+        media_category: str = "image",
+    ) -> dict:
+        """
+        Format a single media block for the appropriate provider.
+
+        :param url: Media URL (if URL-based)
+        :param b64_data: Base64-encoded data (if file-based)
+        :param mime_type: MIME type of the media
+        :param media_category: "image", "video", or "audio"
+        :returns: Provider-formatted content block
+        """
+        if self.provider == "anthropic":
+            if media_category == "image":
+                if url:
+                    return {"type": "image", "source": {"type": "url", "url": url}}
+                else:
+                    return {"type": "image", "source": {
+                        "type": "base64", "media_type": mime_type, "data": b64_data
+                    }}
+            else:
+                # Anthropic uses document blocks for video/audio
+                if url:
+                    return {"type": "document", "source": {"type": "url", "url": url}}
+                else:
+                    return {"type": "document", "source": {
+                        "type": "base64", "media_type": mime_type, "data": b64_data
+                    }}
+        elif self.provider == "google":
+            if url:
+                return {"type": "image_url", "image_url": {"url": url}}
+            else:
+                data_uri = f"data:{mime_type};base64,{b64_data}"
+                return {"type": "image_url", "image_url": {"url": data_uri}}
+        else:
+            # OpenAI-style format (OpenAI, Mistral, DeepSeek, Ollama, LM Studio, vLLM)
+            if url:
+                return {"type": "image_url", "image_url": {"url": url}}
+            else:
+                data_uri = f"data:{mime_type};base64,{b64_data}"
+                if media_category == "audio" and self.provider == "openai":
+                    return {"type": "input_audio", "input_audio": {
+                        "data": b64_data, "format": mime_type.split("/")[-1]
+                    }}
+                return {"type": "image_url", "image_url": {"url": data_uri}}
 
     def set_structure(self, json_schema):
         if not json_schema:

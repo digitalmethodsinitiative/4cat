@@ -1,5 +1,6 @@
 import packaging.version
 import requests
+import time
 import json
 
 from common.lib.helpers import add_notification, get_github_version, get_software_version
@@ -98,10 +99,24 @@ class UpdateChecker(BasicWorker):
         phonehome_url += f"/get-notifications/?version={current_version}&docker={docker}"
 
         try:
-            notifications = requests.get(phonehome_url, headers={
-				"User-Agent": f"4cat/{current_version}{docker_bit}"
-			}).json()
-        except (requests.RequestException, json.JSONDecodeError) as e:
+            retries = 0
+            response = None
+
+            while retries < 3:
+                response = requests.get(phonehome_url, headers={
+                    "User-Agent": f"4cat/{current_version}{docker_bit}"
+                })
+
+                if response.status_code != 200:
+                    retries += 1
+                    time.sleep(5 * retries)
+                    continue
+
+                break
+
+            notifications = response.json()
+
+        except (requests.RequestException, json.JSONDecodeError, AttributeError) as e:
             self.log.warning(f"Cannot retrieve notifications from notifications server ({e})")
             return
 

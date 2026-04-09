@@ -57,7 +57,7 @@ processor_packages = {
 	"jieba",  # word-trees, tokenise
 	"jsonschema",  # llm_prompter
 	"lxml",  # download_images_4chan, wikipedia_network, url_titles
-	"nltk~=3.9.1",  # similar-words, word-trees, collocations, split_sentences, tokenise
+	"nltk~=3.9.3",  # similar-words, word-trees, collocations, split_sentences, tokenise
 	"networkx>=3.0",  # networks/*
 	"numpy",  # image_wall, histwords, video_hasher, hash_similarity_network, aggregate_stats, tf_idf
 	"pandas",  # youtube_imagewall, tf_idf

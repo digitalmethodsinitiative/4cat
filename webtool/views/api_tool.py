@@ -685,7 +685,7 @@ def nuke_dataset(key=None, reason=None):
 	for child in children:
 		try:
 			job = Job.get_by_remote_ID(child.key, database=g.db, jobtype=child.type)
-			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": child.type, "level": BasicWorker.INTERRUPT_CANCEL})
 			job.finish()
 			child.delete()
 		except JobNotFoundException:
@@ -1304,7 +1304,11 @@ def check_processor():
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
                                     processors=g.modules.processors),
 			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
-			"url": "/result/" + dataset.data["result_file"]
+			"url": "/result/" + dataset.data["result_file"],
+			"annotation_fields": {
+				field_id: {"label": field_data.get("label", "")}
+				for field_id, field_data in (top_parent.annotation_fields or {}).items()
+			}
 		})
 
 	return jsonify(children)

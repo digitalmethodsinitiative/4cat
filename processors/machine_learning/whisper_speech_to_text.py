@@ -103,60 +103,128 @@ class AudioToText(BasicProcessor):
             else False
         )
 
+        # Host options
         options = {
-            "host_model_info": {
-                "type": UserInput.OPTION_INFO,
-                "help": "Local Whisper models can be enabled through the DMI Service Manager (Settings -> DMI Service "
-                        "Manager)"
-            },
             "model_host": {
                 "type": UserInput.OPTION_CHOICE,
-                "default": "local",
-                "options": {"local": "Local", "external": "External (OpenAI API)"},
+                "default": "local" if local_whisper else "openai",
+                "options": {"openai": "OpenAI API"}  | ({"local": "Local (DMI Service Manager)"} if local_whisper else {}),
                 "help": "Model type",
-                "tooltip": "Local Whisper models need to be configured in settings."
+                "tooltip": "Local Whisper models require DMI Service Manager to be running and configured in settings."
             },
-            "amount": {
-                "type": UserInput.OPTION_TEXT,
-                "requires": "model_host==local"
-            },
-            "local_model": {
-                # Whisper model options
-                # TODO: Could limit model availability in conjunction with "amount"
-                "type": UserInput.OPTION_CHOICE,
-                "help": "Whisper model",
-                "default": "base",
-                "tooltip": "Larger sizes increase quality at expense of greatly increasing the amount of time to process. Try the Base model and increase as needed.",
-                "options": {
-                    "tiny.en": "Tiny English",
-                    "tiny": "Tiny Detect Language",
-                    "base.en": "Base English",
-                    "base": "Base Detect Language",
-                    "small.en": "Small English",
-                    "small": "Small Detect Language",
-                    "medium.en": "Medium English",
-                    "medium": "Medium Detect Language",
-                    "large": "Large Detect Language"
+        }
+            
+        if local_whisper:
+            options.update({
+                "amount_local": {
+                    "type": UserInput.OPTION_TEXT,
+                    "requires": "model_host==local"
                 },
-                "requires": "model_host==local"
+                "local_model": {
+                    # Whisper model options
+                    "type": UserInput.OPTION_CHOICE,
+                    "help": "Whisper model",
+                    "default": "small",
+                    "tooltip": "Larger sizes increase quality at expense of greatly increasing the amount of time to process. Try the Small model and increase as needed.",
+                    "options": {
+                        "small.en": "Small English",
+                        "small": "Small Detect Language",
+                        "medium.en": "Medium English",
+                        "medium": "Medium Detect Language",
+                        "large": "Large Detect Language"
+                    },
+                    "requires": "model_host==local"
+                },
+                "translate": {
+                    "type": UserInput.OPTION_TOGGLE,
+                    "help": "Translate transcriptions to English",
+                    "default": False,
+                    "requires": "model_host==local"
+                },
+                "advanced": {
+                    "type": UserInput.OPTION_TEXT_JSON,
+                    "help": "[Advanced settings](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e"
+                            "067f8/whisper/transcribe.py#LL374C3-L374C3)",
+                    "default": {},
+                    "tooltip": "Additional settings can be provided as a JSON e.g., {\"--no_speech_threshold\": 0.2, "
+                            "\"--logprob_threshold\": -0.5}.",
+                    "requires": "model_host==local"
+                },
+            })
+            # Update the Local audio amount max and help from config
+            max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100))
+            if max_number_audio_files == 0:  # Unlimited allowed
+                options["amount_local"]["help"] = "Number of audio files"
+                options["amount_local"]["default"] = 100
+                options["amount_local"]["min"] = 0
+                options["amount_local"]["tooltip"] = "Use '0' to convert all audio (this can take a very long time)"
+            else:
+                options["amount_local"]["help"] = f"Number of audio files (max {max_number_audio_files})"
+                options["amount_local"]["default"] = min(max_number_audio_files, 100)
+                options["amount_local"]["max"] = max_number_audio_files
+                options["amount_local"]["min"] = 1
+
+        # Universal and OpenAI API options
+        options.update({
+            # No max for external since we won't be processing the files in 4CAT and can rely on OpenAI's limits
+            # User may want to limit (e.g. for cost reasons)
+            "amount_external": {
+                "type": UserInput.OPTION_TEXT,
+                "default": 0,
+                "min": 0,
+                "help": "Number of audio files to convert (0 will convert all)",
+                "tooltip": "Use '0' to convert all audio (this can take a very long time)",
+                "requires": "model_host==openai"
             },
-            "external_model": {
+            "openai_action": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Action to perform with OpenAI API",
+                "default": "transcribe",
+                "options": {
+                    "transcribe": "Transcribe",
+                    "translate": "Translate",
+                    "diarize": "Diarize (Speaker identification)"
+                },
+                "requires": "model_host==openai",
+                "tooltip": "Transcription converts speech to text in the original language. Translation converts speech to English text (only available with Whisper V2). Diarization separates speakers and attempts to group them by speaker (only available with GPT-4o Diarization)."
+            },
+            "openai_transcribe_model": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Model",
-                "default": "gpt-4o-mini-transcribe",
+                "default": "gpt-4o-transcribe",
                 "tooltip": "GPT-4o generally outperforms Whisper",
                 "options": {
                     "gpt-4o-transcribe": "GPT-4o",
                     "gpt-4o-mini-transcribe": "GPT-4o mini",
                     "whisper-1": "Whisper V2"
                 },
-                "requires": "model_host==external"
+                "requires": "model_host==openai&&openai_action==transcribe"
+            },
+            "openai_translate_model": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Model",
+                "default": "whisper-1",
+                "tooltip": "Whisper V2 is currently the only model that supports translation",
+                "options": {
+                    "whisper-1": "Whisper V2"
+                },
+                "requires": ["model_host==openai", "openai_action==translate"]
+            },
+            "openai_diarize_model": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Model",
+                "default": "gpt-4o-transcribe-diarize",
+                "tooltip": "GPT-4o Diarization is currently the only model that supports diarization",
+                "options": {
+                    "gpt-4o-transcribe-diarize": "GPT-4o Diarization",
+                },
+                "requires": ["model_host==openai", "openai_action==diarize"]
             },
             "prompt": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Prompt",
+                "help": "Prompt (optional)",
                 "default": "",
-                "tooltip": "Optional; prompts can aid the model in specific vocabulary detection or to add punctuation "
+                "tooltip": "Prompts can aid the model in specific vocabulary detection or to add punctuation"
                            "and filler words."
             },
             "language": {
@@ -164,22 +232,7 @@ class AudioToText(BasicProcessor):
                 "help": "Language of audio",
                 "default": "",
                 "tooltip": "Optional; can help performance and latency. Use ISO-693-1 format (e.g. 'en').",
-                "requires": "model_host==external"
-            },
-            "translate": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Translate transcriptions to English",
-                "default": False,
-                "tooltip": "Not supported by GPT models"
-            },
-            "advanced": {
-                "type": UserInput.OPTION_TEXT_JSON,
-                "help": "[Advanced settings](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e"
-                        "067f8/whisper/transcribe.py#LL374C3-L374C3)",
-                "default": {},
-                "tooltip": "Additional settings can be provided as a JSON e.g., {\"--no_speech_threshold\": 0.2, "
-                           "\"--logprob_threshold\": -0.5}.",
-                "requires": "model_host==local"
+                "requires": "model_host==openai"
             },
             "save_annotations": {
                 "type": UserInput.OPTION_ANNOTATION,
@@ -187,25 +240,9 @@ class AudioToText(BasicProcessor):
                 "tooltip": "Add transcriptions to top dataset",
                 "default": False
             }
-        }
+        })
 
-        if local_whisper:
-            # Update the amount max and help from config
-            max_number_audio_files = int(config.get("dmi-service-manager.bd_whisper_num_files", 100))
-            if max_number_audio_files == 0:  # Unlimited allowed
-                options["amount"]["help"] = "Number of audio files"
-                options["amount"]["default"] = 100
-                options["amount"]["min"] = 0
-                options["amount"]["tooltip"] = "Use '0' to convert all audio (this can take a very long time)"
-            else:
-                options["amount"]["help"] = f"Number of audio files (max {max_number_audio_files})"
-                options["amount"]["default"] = min(max_number_audio_files, 100)
-                options["amount"]["max"] = max_number_audio_files
-                options["amount"]["min"] = 1
-        else:
-            options["model_host"]["options"] = {"external": "External (OpenAI API)"}
-            options["model_host"]["default"] = "external"
-
+        # Check for 4CAT wide API key if using OpenAI models
         api_key = config.get("api.openai.api_key")
         if not api_key:
             options["api_key"] = {
@@ -213,7 +250,7 @@ class AudioToText(BasicProcessor):
                 "default": "",
                 "help": "OpenAI API key",
                 "tooltip": "Can be created on platform.openapi.com",
-                "requires": "model_host==external",
+                "requires": "model_host==openai",
                 "sensitive": True
             }
 
@@ -224,8 +261,8 @@ class AudioToText(BasicProcessor):
         This takes a zipped set of audio files and uses a Whisper docker image to identify speech and convert to text,
         or calls the OpenAI API.
         """
-
-        model_host = self.parameters.get("model_host", "external")
+        skipped_items = 0
+        model_host = self.parameters.get("model_host", "openai")
 
         local_whisper = (
             True
@@ -236,52 +273,19 @@ class AudioToText(BasicProcessor):
             else False
         )
 
-        if model_host == "local" and not local_whisper:
-            self.dataset.finish_with_error("Can't run a self-hosted Whisper model. Admins can configure this in the "
-                                           "4CAT settings (settings -> DMI Service Manager).")
-            return
-
-        api_key = self.parameters.get("api_key")
-        if not api_key:
-            api_key = self.config.get("api.openai.api_key")
-        if not api_key and model_host == "external":
-            self.dataset.finish_with_error("You need to provide a valid API key when using an external model")
-            return
-
-        # Check advanced_settings
-        advanced_settings = self.parameters.get("advanced", False)
-        if advanced_settings:
-            try:
-                advanced_settings = json.loads(advanced_settings)
-            except ValueError:
-                self.dataset.finish_with_error("Unable to parse Advanced settings. Please format as JSON.")
+        # Check settings and configuration based on host type
+        if model_host == "local":
+            if not local_whisper:
+                self.dataset.finish_with_error("Can't run a self-hosted Whisper model. Admins can configure this in the "
+                                               "4CAT settings (settings -> DMI Service Manager).")
                 return
-
-        # Unpack the audio files into a staging_area
-        self.dataset.update_status("Unzipping audio files")
-        staging_area = self.unpack_archive_contents(self.source_file)
-        # Prepare output dir
-        output_dir = self.dataset.get_staging_area()
-
-        # Collect filenames (skip .json metadata files)
-        audio_filenames = [filename for filename in os.listdir(staging_area)
-                           if filename.split('.')[-1] not in ["json", "log"]]
-        if self.parameters.get("amount", 100) != 0:
-            max_files = min(self.parameters.get("amount", 100), len(audio_filenames))
-            audio_filenames = audio_filenames[:max_files]
-        total_audio_files = len(audio_filenames)
-
-        prompt = self.parameters.get("prompt", "")
-        translate = self.parameters.get("translate", False)
-        save_annotations = self.parameters.get("save_annotations", False)
-
-        # Initialize DMI Service Manager when using local model
-        if model_host != "external":
+            
+            # Check DMI Service Manager configuration if using local model
             dmi_service_manager = DmiServiceManager(processor=self)
 
             # Check connection and GPU memory available
             try:
-                gpu_response = dmi_service_manager.check_gpu_memory_available("blip2")
+                gpu_response = dmi_service_manager.check_gpu_memory_available("whisper")
             except DmiServiceManagerException as e:
                 if "GPU not enabled on this instance of DMI Service Manager" in str(e):
                     self.dataset.update_status(
@@ -293,10 +297,53 @@ class AudioToText(BasicProcessor):
                 self.dataset.finish_with_error("Can't reach DMI Service Manager.")
                 return
 
-            if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 1000000:
-                self.dataset.finish_with_error(
-                    "DMI Service Manager currently busy; no GPU memory available. Please try again later.")
+            if gpu_response and int(gpu_response.get("memory", {}).get("gpu_free_mem", 0)) < 10000000:
+                # is_final to avoid status overwritten (flag should be resent when job is claimed again)
+                self.dataset.update_status("DMI Service Manager currently busy; no GPU memory available. Trying again later.", is_final=True)
+                # Release job here (do not set self.interrupted or self.abort will release 10 seconds or finish the job)
+                self.job.release(delay=60)  # Try again in a minute
+                raise ProcessorInterruptedException("DMI Service Manager GPU busy")
+        
+            # Check advanced_settings
+            advanced_settings = self.parameters.get("advanced", False)
+            if advanced_settings:
+                try:
+                    advanced_settings = json.loads(advanced_settings)
+                except ValueError:
+                    self.dataset.finish_with_error("Unable to parse Advanced settings. Please format as JSON.")
+                    return
+
+        else:
+            # Check for API key if using OpenAI models
+            api_key = self.parameters.get("api_key")
+            if not api_key:
+                api_key = self.config.get("api.openai.api_key")
+            if not api_key and model_host == "openai":
+                self.dataset.finish_with_error("You need to provide a valid API key when using an OpenAI model")
                 return
+
+        # Unpack the audio files into a staging_area
+        self.dataset.update_status("Unzipping audio files")
+        staging_area = self.unpack_archive_contents(self.source_file)
+        # Prepare output dir
+        output_dir = self.dataset.get_staging_area()
+
+        # Collect filenames (skip .json metadata files)
+        audio_filenames = [filename for filename in os.listdir(staging_area)
+                           if filename.split('.')[-1] not in ["json", "log"]]
+        total_audio_files = len(audio_filenames)
+
+        prompt = self.parameters.get("prompt", "")
+        save_annotations = self.parameters.get("save_annotations", False)
+        # Initialize DMI Service Manager when using local model
+        if model_host == "local":
+            translate = self.parameters.get("translate", False)
+
+            # Update amount based on config max if needed
+            if self.parameters.get("amount_local", 100) != 0:
+                max_files = min(self.parameters.get("amount_local", 100), len(audio_filenames))
+                audio_filenames = audio_filenames[:max_files]
+                total_audio_files = len(audio_filenames)
 
             # Provide audio files to DMI Service Manager
             # Results should be unique to this dataset
@@ -316,7 +363,7 @@ class AudioToText(BasicProcessor):
                              "--model", self.parameters.get("local_model")],
                     }
             if not self.config.get("dmi-service-manager.be_whisper_gpu", True):
-                data["args"].append(["--device", "cpu"])
+                data["args"].extend(["--device", "cpu"])
             if prompt:
                 data["args"].extend(["--initial_prompt", prompt])
             if translate:
@@ -345,65 +392,120 @@ class AudioToText(BasicProcessor):
             # Download the result files
             dmi_service_manager.process_results(output_dir)
 
-        # Use API
+        # Use OpenAI API
         else:
-
             self.dataset.update_status("Getting transcriptions from OpenAI")
+            max_files = self.parameters.get("amount_external", 0)
+            max_files = max_files if max_files != 0 else total_audio_files
 
-            external_model = self.parameters.get("external_model", "gpt-4o-mini-transcribe")
+            openai_action = self.parameters.get("openai_action", "transcribe")
+            translate = openai_action == "translate"
+
+            # Resolve the actual model to use based on action-specific parameters.
+            # Resolution order: action-specific param -> legacy `openai_model` -> code default.
+            if openai_action == "transcribe":
+                selected_model = self.parameters.get(
+                    "openai_transcribe_model",
+                    self.parameters.get("openai_model", "gpt-4o-mini-transcribe")
+                )
+            elif openai_action == "translate":
+                selected_model = self.parameters.get(
+                    "openai_translate_model",
+                    self.parameters.get("openai_model", "whisper-1")
+                )
+            elif openai_action == "diarize":
+                selected_model = self.parameters.get(
+                    "openai_diarize_model",
+                    self.parameters.get("openai_model", "gpt-4o-transcribe-diarize")
+                )
+            else:
+                # Default fallback (shouldn't really be needed)
+                selected_model = self.parameters.get("openai_model", "gpt-4o-mini-transcribe")
             language = self.parameters.get("language", "")
 
             client = openai.OpenAI(api_key=api_key)
 
-            # Get response
-            audio_filenames = [filename for filename in os.listdir(staging_area) if
-                               filename.split('.')[-1] not in ["json", "log"]]
-
-            # Translation if only available for Whisper
-            if translate and external_model != "whisper-1":
+            # Fallback checks for action-model compatibility (in case of misconfiguration or legacy `openai_model` usage)
+            if translate and selected_model != "whisper-1":
                 self.dataset.finish_with_error("Translation is only supported by Whisper for now")
+                return
+            elif openai_action == "diarize" and selected_model != "gpt-4o-transcribe-diarize":
+                self.dataset.finish_with_error("Diarization is only supported by GPT-4o Diarization for now")
                 return
 
             for i, audio_filename in enumerate(audio_filenames):
+                if self.interrupted:
+                    # Stop process, but processes results
+                    skipped_items += len(audio_filenames) - i
+                    self.dataset.update_status("Analysis interrupted while processing audio files.")
+                    break
+                
+                if max_files != 0 and (i - skipped_items >= max_files):
+                    self.dataset.update_status(f"Reached the maximum number of audio files to process ({max_files}).")
+                    break
+                
                 with open(os.path.join(staging_area, audio_filename), "rb") as f:
                     try:
-                        if not translate:
-                            response = self.get_openai_api_transcription(
+                        if openai_action == "transcribe":
+                            # Returns Transcription (json) or TranscriptionVerbose (verbose_json).
+                            # verbose_json adds language, duration, segments, and words but is whisper-1 only.
+                            result = self.get_openai_api_transcription(
                                 f,
-                                model=external_model,
+                                client=client,
+                                model=selected_model,
                                 prompt=prompt,
                                 language=language,
-                                client=client
+                            )
+                        elif openai_action == "diarize":
+                            # Returns TranscriptionDiarized (diarized_json).
+                            result = self.get_openai_api_diarization(
+                                f,
+                                client=client,
+                                model=selected_model,
+                                prompt=prompt,
+                                language=language,
+                            )
+                        elif openai_action == "translate":
+                            # Returns Translation (json) — only field is text.
+                            result = self.get_openai_api_translation(
+                                f,
+                                client=client,
+                                model=selected_model,
+                                prompt=prompt,
+                                language=language,
                             )
                         else:
-                            response = self.get_openai_api_translation(
-                                f,
-                                prompt=prompt,
-                                client=client
-                            )
+                            self.dataset.finish_with_error("Invalid OpenAI action specified.")
+                            return
+
+                        # All SDK response types are Pydantic BaseModel instances.
+                        # model_dump() serializes every field the API returned.
+                        transcription = result.model_dump()
+
                     except (openai.NotFoundError, openai.BadRequestError, openai.AuthenticationError,
                             openai.RateLimitError, openai.APIConnectionError) as e:
-                        self.dataset.finish_with_error(e.message)
-                        return
+                        skipped_items += 1
+                        error_msg = f"OpenAI API error for file {audio_filename}: {e.message}"
+                        self.dataset.log(error_msg)
+                        transcription = {"text": "", "errors": [error_msg]}
+                    except Exception as e:
+                        skipped_items += 1
+                        error_msg = f"Unexpected error for file {audio_filename}: {str(e)}"
+                        self.dataset.log(error_msg)
+                        transcription = {"text": "", "errors": [error_msg]}
 
-                    transcription = {
-                        "text": response.text,
-                        "language": language
-                    }
-                    f.close()
-
-                    out_file = audio_filename.split(".")[0] + ".json"
-                    with open(output_dir.joinpath(out_file), "w") as transcription_json:
-                        json.dump(transcription, transcription_json)
-                        transcription_json.close()
+                out_file = audio_filename.split(".")[0] + ".json"
+                with open(output_dir.joinpath(out_file), "w") as transcription_json:
+                    json.dump(transcription, transcription_json)
 
                 s = "" if i == 0 else "s"
                 self.dataset.update_status(f"Got {i + 1} transcription{s} from OpenAI")
+                self.dataset.update_progress((i + 1) / max_files)
 
         # Load the video metadata if available
         video_metadata = None
-        if staging_area.joinpath(".video_metadata.json").is_file():
-            with open(staging_area.joinpath(".video_metadata.json")) as file:
+        if staging_area.joinpath(".metadata.json").is_file():
+            with open(staging_area.joinpath(".metadata.json")) as file:
                 video_metadata = json.load(file)
                 self.dataset.log("Found and loaded video metadata")
 
@@ -412,19 +514,20 @@ class AudioToText(BasicProcessor):
         # Save files as NDJSON, then use map_item for 4CAT to interact
         processed = 0
         annotations = []
+        self.dataset.update_status("Saving results to dataset...")
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
             for result_filename in os.listdir(output_dir):
-                if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while writing results to file")
-
-                self.dataset.log(f"Writing {result_filename}...")
+                # Do not check interrupt; save completed results
                 with open(output_dir.joinpath(result_filename), "r") as result_file:
                     result_data = json.loads("".join(result_file))
                     audio_name = ".".join(result_filename.split(".")[:-1])
                     audio_metadata = video_metadata.get(audio_name, {}) if video_metadata else {}
                     fourcat_metadata = {
                         "audio_id": audio_name,
-                        # TODO: need to pass along filename/videoname/postid/SOMETHING consistent
+                        "model_host": model_host,
+                        "model": (selected_model if model_host == "openai" else self.parameters.get("local_model")),
+                        "auto_translate": translate if model_host == "local" else (openai_action == "translate" if model_host == "openai" else False),
+                        "openai_action": openai_action if model_host == "openai" else None,
                         "audio_metadata": audio_metadata,
                     }
                     result_data.update({"4CAT_metadata": fourcat_metadata})
@@ -441,74 +544,159 @@ class AudioToText(BasicProcessor):
                 processed += 1
 
         if save_annotations:
+            self.dataset.update_status(f"Saving transcriptions as annotations on {len(annotations)} posts...")
             self.save_annotations(annotations)
 
-        self.dataset.update_status(f"Detected speech in {processed} of {total_audio_files} audio files")
-        self.dataset.finish(processed)
+        if skipped_items > 0:
+            self.dataset.finish_with_warning(processed, f"Completed {processed} file{'s' if processed != 1 else ''}. Skipped {skipped_items} file{'s' if skipped_items != 1 else ''}.")
+        else:
+            self.dataset.update_status(f"Detected speech in {processed} of {total_audio_files} audio files", is_final=True)
+            self.dataset.finish(processed)
 
     def get_openai_api_transcription(self, input_file, client, model="gpt-4o-mini-transcribe", language="", prompt=""):
         """
-        Gets a transcription from the OpenAI API.
-        :param input_file:      Location of input audio file.
-        :param client:          OpenAI API client.
-        :param model:           OpenAI model. Can be gpt-4o-mini-transcribe, gpt-4o-transcribe, or whisper-1.
-        :param language:        Indicated language. Can help with performance.
-        :param prompt:          Prompt text. Can help with performance.
+        Request a transcription from the OpenAI audio API.
 
-        see https://platform.openai.com/docs/api-reference/audio/createTranscription
+        Returns a Transcription or TranscriptionVerbose SDK object (Pydantic BaseModel).
 
-        returns: response
+        whisper-1 supports response_format="verbose_json", which returns a TranscriptionVerbose
+        with: text, language, duration, segments (TranscriptionSegment list), words, usage.
+
+        gpt-4o-transcribe and gpt-4o-mini-transcribe only support response_format="json", which
+        returns a Transcription with: text, logprobs (optional), usage (optional).
+
+        See https://platform.openai.com/docs/api-reference/audio/createTranscription
         """
-        # Get response
-        response = client.audio.transcriptions.create(
+        # whisper-1 supports verbose_json, which returns the richer TranscriptionVerbose object
+        # (language, duration, segments, words). GPT-4o models only support json.
+        response_format = "verbose_json" if model == "whisper-1" else "json"
+        return client.audio.transcriptions.create(
             file=input_file,
             model=model,
             temperature=0,
             language=language,
-            response_format="json",
+            response_format=response_format,
             prompt=prompt
         )
-        return response
+
+    def get_openai_api_diarization(self, input_file, client, model="gpt-4o-transcribe-diarize", prompt="", language=""):
+        """
+        Request a diarized transcription from the OpenAI audio API.
+
+        Returns a TranscriptionDiarized SDK object (Pydantic BaseModel) with:
+        text, duration, task, segments (TranscriptionDiarizedSegment list), usage (optional).
+
+        Each TranscriptionDiarizedSegment has: id, start, end, text, speaker, type.
+        response_format="diarized_json" is required to receive speaker annotations.
+
+        See https://platform.openai.com/docs/api-reference/audio/createTranscription
+        """
+        return client.audio.transcriptions.create(
+            file=input_file,
+            model=model,
+            temperature=0,
+            language=language,
+            response_format="diarized_json",
+            prompt=prompt,
+            chunking_strategy="auto",
+            # To send known speaker references for cross-file consistency, pass extra_body:
+            # extra_body={
+            #     "known_speaker_names": ["Alice", "Bob"],
+            #     "known_speaker_references": [to_data_url("alice.wav"), to_data_url("bob.wav")],
+            # },
+        )
 
     def get_openai_api_translation(self, input_file, client, language="",
-                                   prompt=""):
+                                   prompt="", model="whisper-1"):
         """
-        Gets a transcription from the OpenAI API.
-        :param input_file:      Location of input audio file.
-        :param client:          OpenAI API client.
-        :param model:           OpenAI model. Can be gpt-4o-mini-transcribe, gpt-4o-transcribe, or whisper-1.
-        :param language:        Indicated language. Can help with performance.
-        :param prompt:          Prompt text. Can help with performance.
+        Request a translation to English from the OpenAI audio API.
 
-        see https://platform.openai.com/docs/api-reference/audio/createTranscription
+        Returns a Translation SDK object (Pydantic BaseModel) with a single field: text.
+        Only whisper-1 supports translation.
 
-        returns: response
+        See https://platform.openai.com/docs/api-reference/audio/createTranslation
         """
-        # Get response
-        response = client.audio.translations.create(
+        return client.audio.translations.create(
             file=input_file,
-            model="whisper-1",
+            model=model,
             temperature=0,
             response_format="json",
             prompt=prompt
         )
-        return response
 
     @staticmethod
     def map_item(item):
         """
-        :param item:
-        :return:
+        Maps an NDJSON result item to a standardized MappedItem.
+
+        The NDJSON is the result.model_dump() of the SDK response object merged with 4CAT_metadata.
+        Supported SDK response schemas:
+          - Transcription (json format):        text, logprobs?, usage?
+          - TranscriptionVerbose (verbose_json): text, language, duration, segments?, words?, usage?
+          - TranscriptionDiarized (diarized_json): text, duration, task, segments, usage?
+          - Translation (json format):           text
+          - Local whisper binary output:         text, language, segments?
+
+        Segments are formatted differently depending on action:
+          - Diarized: [Speaker] text (start; end)
+          - All others: text (start; end)
         """
-        fourcat_metadata = item.get("4CAT_metadata")
-        audio_metadata = fourcat_metadata.get("audio_metadata")
+        fourcat_metadata = item.get("4CAT_metadata", {})
+        audio_metadata = fourcat_metadata.get("audio_metadata", {})
+        openai_action = fourcat_metadata.get("openai_action")
+
+        # Format segments based on response type.
+        # TranscriptionDiarizedSegment: {id, start, end, text, speaker, type}
+        # TranscriptionSegment (verbose_json) and local whisper: {id, seek, start, end, text, tokens, ...}
+        segments = item.get("segments") or []
+        if openai_action == "diarize":
+            segments_str = "\n".join(
+                f"[{s.get('speaker', '?')}] {s.get('text', '')} "
+                f"(start: {s.get('start')}; end: {s.get('end')})"
+                for s in segments
+            )
+        else:
+            segments_str = "\n".join(
+                f"{s.get('text', '')} (start: {s.get('start')}; end: {s.get('end')})"
+                for s in segments
+            )
+
+        # TranscriptionVerbose only: word-level timestamps {word, start, end}
+        words = item.get("words") or []
+        words_str = " ".join(w.get("word", "") for w in words)
+
+        # Usage is optional and its shape depends on the billing type:
+        # UsageTokens: {type, input_tokens, output_tokens, total_tokens, input_token_details?}
+        # UsageDuration: {type, seconds}
+        usage = item.get("usage")
+        if usage:
+            if usage.get("type") == "tokens":
+                usage_str = (
+                    f"tokens — input: {usage.get('input_tokens')}, "
+                    f"output: {usage.get('output_tokens')}, "
+                    f"total: {usage.get('total_tokens')}"
+                )
+            else:
+                usage_str = f"duration: {usage.get('seconds')}s"
+        else:
+            usage_str = ""
+
         return MappedItem({
             "id": fourcat_metadata.get("audio_id"),
+            "model_host": fourcat_metadata.get("model_host"),
+            "model": fourcat_metadata.get("model"),
+            "openai_action": openai_action,
+            "auto_translate": fourcat_metadata.get("auto_translate"),
             "body": item.get("text", ""),
+            # language is present in TranscriptionVerbose, TranscriptionDiarized, and local whisper output
             "language": item.get("language", ""),
-            "segments": ",\n".join(
-                [f"text: {segment['text']} (start: {segment['start']}; end: {segment['end']}; )" for segment in
-                 item.get("segments", [])]),
+            # duration is present in TranscriptionVerbose and TranscriptionDiarized
+            "duration": item.get("duration", ""),
+            "segments": segments_str,
+            # words is only present in TranscriptionVerbose (whisper-1, verbose_json)
+            "words": words_str,
+            "usage": usage_str,
+            "errors": ", ".join(item.get("errors") or []),
             "original_video_url": audio_metadata.get("url", ""),
             "post_ids": ", ".join(audio_metadata.get("post_ids", [])),
             "from_dataset": audio_metadata.get("from_dataset", "")

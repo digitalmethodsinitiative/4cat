@@ -94,7 +94,7 @@ class ThreadMetadata(BasicProcessor):
                 )
                 threads[post["thread_id"]]["count"] += 1
 
-            except ValueError:
+            except (ValueError, TypeError):
                 no_timestamp += 1
 
             progress += 1

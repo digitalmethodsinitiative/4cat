@@ -969,7 +969,7 @@ class DataSet(FourcatModule):
 
         return copy
 
-    def delete(self, commit=True, queue=None):
+    def delete(self, commit=True, delete_log=False):
         """
         Delete the dataset, and all its children
 
@@ -977,6 +977,9 @@ class DataSet(FourcatModule):
         a dataset object after it has been deleted is undefined behaviour.
 
         :param bool commit:  Commit SQL DELETE query?
+        :param bool delete_log:  Whether to also delete the log file. Defaults to False, 
+        because logs can be useful for debugging even after a dataset is deleted. Hanging logs
+        are automatically deleted by TempFileCleaner after a certain amount of time.
         """
         # first, recursively delete children
         children = self.db.fetchall(
@@ -985,7 +988,7 @@ class DataSet(FourcatModule):
         for child in children:
             try:
                 child = DataSet(key=child["key"], db=self.db, modules=self.modules)
-                child.delete(commit=commit)
+                child.delete(commit=commit, delete_log=delete_log)
             except DataSetException:
                 # dataset already deleted - race condition?
                 pass
@@ -996,13 +999,13 @@ class DataSet(FourcatModule):
             if job.is_claimed:
                 # tell API to stop any jobs running for this dataset
                 # level 2 = cancel job
-                # we're not interested in the result - if the API is available,
-                # it will do its thing, if it's not the backend is probably not
-                # running so the job also doesn't need to be interrupted
+                # we must wait for the API to process the request before deleting
+                # the job record from the database; if we fire-and-forget the job
+                # row is gone by the time the API looks it up, causing
+                # JobNotFoundException and leaving the worker running uninterrupted
                 call_api(
                     "cancel-job",
                     {"remote_id": self.key, "jobtype": self.type, "level": 2},
-                    False,
                 )
 
             # this deletes the job from the database
@@ -1033,20 +1036,29 @@ class DataSet(FourcatModule):
         self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
         # delete from drive
+        files_to_delete = [self.get_results_path()] + ([self.get_results_path().with_suffix(".log")] if delete_log else [])
+        for path in files_to_delete:
+            try:
+                if path.exists():
+                    path.unlink()
+            except FileNotFoundError:
+                # already deleted, apparently
+                pass
+            except PermissionError as e:
+                self.db.log.error(
+                    f"Could not delete dataset {self.key} file {path}; it may need to be deleted manually: {e}"
+                )
+
+        # delete results folder if it exists
         try:
-            if self.get_results_path().exists():
-                self.get_results_path().unlink()
-            if self.get_results_path().with_suffix(".log").exists():
-                self.get_results_path().with_suffix(".log").unlink()
             if self.get_results_folder_path().exists():
                 shutil.rmtree(self.get_results_folder_path())
-
         except FileNotFoundError:
             # already deleted, apparently
             pass
         except PermissionError as e:
             self.db.log.error(
-                f"Could not delete all dataset {self.key} files; they may need to be deleted manually: {e}"
+                f"Could not delete dataset {self.key} results folder; it may need to be deleted manually: {e}"
             )
 
     def update_children(self, **kwargs):
@@ -1325,7 +1337,7 @@ class DataSet(FourcatModule):
         except json.JSONDecodeError:
             return {}
 
-    def get_columns(self):
+    def get_columns(self, annotation_columns=True):
         """
         Returns the dataset columns.
 
@@ -1350,7 +1362,7 @@ class DataSet(FourcatModule):
             items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
             try:
                 keys = list(next(items).keys())
-                if self.annotation_fields:
+                if self.annotation_fields and annotation_columns:
                     for annotation_field in self.annotation_fields.values():
                         annotation_column = annotation_field["label"]
                         label_count = 1
@@ -2021,7 +2033,7 @@ class DataSet(FourcatModule):
             if analysis.type not in processors:
                 continue
 
-            if not processors[analysis.type].get_options(config=config):
+            if not processors[analysis.type].get_options(parent_dataset=self, config=config):
                 # No variable options; this processor has been run so remove
                 del processors[analysis.type]
                 continue
@@ -2571,12 +2583,12 @@ class DataSet(FourcatModule):
                 )
             if "label" not in annotation_field:
                 raise AnnotationException(
-                    "Can't save annotation fields: all fields must have a label"
+                    "Can't save annotation fields: field %s must have a label"
                     % field_id
                 )
             if "type" not in annotation_field:
                 raise AnnotationException(
-                    "Can't save annotation fields: all fields must have a type"
+                    "Can't save annotation fields: field %s must have a type"
                     % field_id
                 )
 

@@ -5,6 +5,7 @@ import traceback
 import zipfile
 import typing
 import shutil
+import copy
 import abc
 import csv
 import os
@@ -182,7 +183,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         # get parameters
         # if possible, fill defaults where parameters are not provided
         given_parameters = self.dataset.parameters.copy()
-        all_parameters = self.get_options(self.dataset, config=self.config)
+        all_parameters = self.get_options(self.source_dataset, config=self.config)
         self.parameters = {
             param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
             for param in [*all_parameters.keys(), *given_parameters.keys()]
@@ -912,10 +913,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
         Get processor options
 
-        This method by default returns the class's "options" attribute, or an
-        empty dictionary. It can be redefined by processors that need more
-        fine-grained options, e.g. in cases where the availability of options
-        is partially determined by the parent dataset's parameters.
+        This method by default returns an empty dictionary. Processors should
+        override this method to return their options. The deprecated `options`
+        class attribute is still supported for backwards compatibility (returned
+        as a deep copy to prevent mutation), but `get_options()` should always
+        be used instead.
 
         :param parent_dataset DataSet:  An object representing the dataset that
             the processor would be or was run on. Can be used, in conjunction with
@@ -924,7 +926,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :return dict:   Options for this processor
         """
 
-        return cls.options if hasattr(cls, "options") else {}
+        return copy.deepcopy(cls.options) if hasattr(cls, "options") else {}
 
     @classmethod
     def get_status(cls):

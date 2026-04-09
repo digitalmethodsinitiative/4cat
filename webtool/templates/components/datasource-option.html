@@ -2,9 +2,9 @@
         </fieldset>
         {% set fieldset.open = False %}
     {% elif settings.type == "info" %}
-        <div class="form-intro"{% if settings.requires %} data-requires="{{ settings.requires }}"{% endif %}>{{ settings.help|markdown|safe }}</div>
+        <div class="form-intro"{% if settings.requires %}{% if settings.requires is string %} data-requires="{{ settings.requires|e }}"{% else %} data-requires='{{ settings.requires|tojson }}'{% endif %}{% endif %}>{{ settings.help|markdown|safe }}</div>
     {% else %}
-        <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}{% if settings.requires %} data-requires="{{ settings.requires }}"{% endif %}>
+        <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}{% if settings.requires %}{% if settings.requires is string %} data-requires="{{ settings.requires|e }}"{% else %} data-requires='{{ settings.requires|tojson }}'{% endif %}{% endif %}>
             <label for="forminput-{{ option }}">{{ settings.help }}</label>
             <div{% if settings.type == "toggle" %} class="with-tail"{% endif %}>
         {% if settings.type == "toggle" %}
@@ -19,7 +19,7 @@
                 </p>
             {% endif %}
         {% elif settings.type == "string" %}
-            <input name="option-{{ option }}" id="forminput-{{ option }}"{% if settings.min %} min="{{ settings.min }}"{% endif %}{% if settings.max %} max="{{ settings.max }}"{% endif %} type="{% if settings.min or settings.max %}number{% elif settings.password %}password{% else %}text{% endif %}" value="{{ settings.default }}">
+            <input name="option-{{ option }}" id="forminput-{{ option }}"{% if settings.min is defined and settings.min is not none %} min="{{ settings.min }}"{% endif %}{% if settings.max is defined and settings.max is not none %} max="{{ settings.max }}"{% endif %}{% if settings.min is defined and settings.min is not none and settings.min|float > 0 %} step="{{ settings.min }}"{% elif settings.min is defined and settings.min is not none and settings.min|float == 0 %} step="any"{% endif %} type="{% if (settings.min is defined and settings.min is not none) or (settings.max is defined and settings.max is not none) %}number{% elif settings.password %}password{% else %}text{% endif %}" value="{{ settings.default }}">
             {% if "tooltip" in settings %}
                 <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
     	        <p role="tooltip" id="tooltip-option-{{ option }}">
