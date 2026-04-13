@@ -261,8 +261,22 @@ class LLMAdapter:
             else:
                 data_uri = f"data:{mime_type};base64,{b64_data}"
                 return {"type": "image_url", "image_url": {"url": data_uri}}
+        elif self.provider == "ollama":
+            if media_category != "image":
+                raise ValueError(f"Ollama provider only supports image media, got category '{media_category}'")
+            if url:
+                return {
+                    "type": "image_url",
+                    "image_url": url,
+                }
+            else:
+                data_uri = f"data:{mime_type};base64,{b64_data}"
+                return {
+                    "type": "image_url",
+                    "image_url": data_uri
+                }
         else:
-            # OpenAI-style format (OpenAI, Mistral, DeepSeek, Ollama, LM Studio, vLLM)
+            # OpenAI-style format (OpenAI, Mistral, DeepSeek, LM Studio, vLLM)
             if url:
                 return {"type": "image_url", "image_url": {"url": url}}
             else:
