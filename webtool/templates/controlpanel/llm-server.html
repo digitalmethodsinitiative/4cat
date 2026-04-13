@@ -62,6 +62,7 @@
                 <tr>
                     <th>Model</th>
                     <th>Display name</th>
+                    <th>Capabilities</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -77,6 +78,9 @@
                             {% else %}
                                 {{ model.name }}
                             {% endif %}
+                        </td>
+                        <td>
+                            <span class="property-badge">{{ model.capabilities | join(", ") }}</span>
                         </td>
                         <td>
                             {% if model_id in enabled_models %}
