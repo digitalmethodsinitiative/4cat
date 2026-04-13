@@ -3,6 +3,7 @@ Manage Ollama LLM models
 """
 import json
 import requests
+import re
 
 from backend.lib.worker import BasicWorker
 
@@ -61,6 +62,122 @@ class OllamaManager(BasicWorker):
             headers[llm_auth_type] = llm_api_key
         return headers
 
+    @staticmethod
+    def _format_model_display_name(model_id, meta):
+        """
+        Build a friendly display name for a model using metadata where possible.
+        Falls back to a sensible string derived from `model_id`.
+
+        Dear Ollama: if you add a "display_name" field to your /api/show response, I will use it and not complain about missing metadata fields.  Pretty please? :)
+        Because this is ridiculous.
+        """
+        model_info = meta.get("model_info", {}) if meta else {}
+        details = meta.get("details", {}) if meta else {}
+
+        # Basename preference: explicit metadata, else model id prefix
+        basename = None
+        for key in ("general.basename", "general.base_model.0.name"):
+            val = model_info.get(key)
+            if val:
+                basename = str(val).strip()
+                break
+        if not basename:
+            basename = model_id.split(":", 1)[0].replace("-", " ").replace("_", " ").strip() or model_id
+
+        # Helpers for parsing and formatting parameter counts
+        def _parse_param_count(val):
+            if val is None:
+                return None
+            if isinstance(val, int):
+                return val
+            if isinstance(val, float):
+                return int(val)
+            s = str(val).strip()
+            if not s:
+                return None
+            s = s.replace(",", "")
+            m = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*([BbMm])$", s)
+            if m:
+                num = float(m.group(1))
+                suf = m.group(2).upper()
+                return int(num * (1_000_000_000 if suf == "B" else 1_000_000))
+            # try float / scientific
+            try:
+                return int(float(s))
+            except Exception:
+                return None
+
+        def _humanize(n):
+            if n is None:
+                return None
+            n = int(n)
+            if n >= 1_000_000_000:
+                x = n / 1_000_000_000
+                s = f"{x:.1f}" if x < 10 else f"{int(round(x))}"
+                if s.endswith('.0'):
+                    s = s[:-2]
+                return f"{s}B"
+            if n >= 1_000_000:
+                x = n / 1_000_000
+                s = f"{x:.1f}" if x < 10 else f"{int(round(x))}"
+                if s.endswith('.0'):
+                    s = s[:-2]
+                return f"{s}M"
+            return f"{n:,}"
+
+        # Determine param count from prioritized fields
+        param_candidate = None
+        for key in ("parameter_size", "parameter_count"):
+            if key in details:
+                param_candidate = details.get(key)
+                break
+        if param_candidate is None:
+            param_candidate = model_info.get("general.parameter_count")
+        param_int = _parse_param_count(param_candidate)
+        human = _humanize(param_int)
+
+        # Normalize size label if present
+        size_label = model_info.get("general.size_label")
+        size_label_norm = str(size_label).strip() if size_label else None
+
+        # Extract tag (suffix after ':') if present
+        tag = model_id.split(":", 1)[1].strip() if ":" in model_id else None
+
+        # Decide suffix using tag-aware rules
+        suffix = None
+        if tag:
+            t = tag
+            tl = t.lower()
+            # Special handling for common tags that often indicate size or version
+            if tl in ("latest", "stable", "current"):
+                suffix = f"{t} · {human}" if human else t
+            # If tag looks like a size (e.g. "1b", "1.7B"), can use as suffix
+            else:
+                m = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*([bBmM])$", t)
+                if m:
+                    # tag is a size like '1b' or '1.7B'
+                    num = m.group(1)
+                    suf = m.group(2).upper()
+                    tag_size = f"{num}{suf}"
+                    # prefer explicit size_label if it matches
+                    if size_label_norm and size_label_norm.upper() == tag_size.upper():
+                        suffix = size_label_norm
+                    else:
+                        suffix = tag_size
+                else:
+                    suffix = f"{t} · {human}" if human else t
+        else:
+            # No tag, so just use size if available
+            if size_label_norm:
+                suffix = size_label_norm
+            elif human:
+                suffix = human
+            else:
+                # Nothing useful to show; fallback to model id
+                return model_id
+
+        return f"{basename} ({suffix})"
+
     def refresh_models(self):
         """
         Query the Ollama server for available models and update llm.available_models.
@@ -90,10 +207,11 @@ class OllamaManager(BasicWorker):
                 self.log.debug(f"OllamaManager: could not get metadata for {model_id} (error: {e}), using name only")
                 meta = None
             if meta:
-                display_name = (
-                    f"{meta['model_info']['general.basename']}"
-                    f" ({meta['details']['parameter_size']} parameters)"
-                )
+                try:
+                    display_name = self._format_model_display_name(model_id, meta)
+                except Exception as e:
+                    self.log.debug(f"OllamaManager: error formatting display name for {model_id}: {e}")
+                    display_name = model_id
                 success = True
             else:
                 display_name = model_id
@@ -105,6 +223,7 @@ class OllamaManager(BasicWorker):
                 "model_card": f"https://ollama.com/library/{model_id.split(':')[0]}",
                 "provider": "local",
                 "metadata_success": success,
+                "model_info": meta.get("model_info", {}),
                 "capabilities": meta.get("capabilities", []),
                 "details": meta.get("details", {}),
                 "modified_at": meta.get("modified_at", None),
