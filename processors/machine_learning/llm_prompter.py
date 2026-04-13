@@ -78,12 +78,23 @@ class LLMPrompter(BasicProcessor):
         # Determine if the parent dataset is a media archive (zip with images/video/audio)
         is_media_parent = False
         media_type = "media"
+        hosted_and_local_available = True
         if parent_dataset:
             parent_extension = parent_dataset.get_extension()
             parent_media_type = parent_dataset.get_media_type()
             if parent_extension == "zip" and parent_media_type in ("image", "video", "audio"):
                 is_media_parent = True
                 media_type = parent_media_type
+            if parent_media_type in ("video", "audio"):
+                # Ollama and LM Studio currently only support text and image
+                hosted_and_local_available = False
+        
+        # Add additional sources for LLM Models
+        api_or_local_options = {"api": "API"}
+        if hosted_and_local_available:
+            api_or_local_options["local"] = "Local"
+            if shared_llm_name:
+                api_or_local_options["hosted"] = shared_llm_name
 
         options = {
             "ethics_warning1": {
@@ -94,9 +105,7 @@ class LLMPrompter(BasicProcessor):
             "api_or_local": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Local or API",
-                "options": {"api": "API", "local": "Local"}
-                if not shared_llm_name
-                else {"hosted": shared_llm_name, "api": "API", "local": "Local"},
+                "options": api_or_local_options,
                 "default": "api" if not shared_llm_name else "hosted",
                 "tooltip": "You can use 'local' models through Ollama and LM Studio as long as you have a valid "
                 "and accessible URL through which the model can be reached.",
