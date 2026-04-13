@@ -3,126 +3,151 @@
         "name": "",
         "model_card": "",
         "provider": "",
-        "default": true
+        "default": true,
+        "capabilities": []
     },
     "custom": {
         "name": "[custom]",
         "model_card": "",
-        "provider": ""
+        "provider": "",
+        "capabilities": []
     },
     "gpt-5.4": {
         "name": "[OpenAI] GPT-5.4",
         "model_card": "https://platform.openai.com/docs/models/gpt-5.4",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "audio", "structured_output"]
     },
     "gpt-5-mini": {
         "name": "[OpenAI] GPT-5 mini",
         "model_card": "https://platform.openai.com/docs/models/gpt-5-mini",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "gpt-5-nano": {
         "name": "[OpenAI] GPT-5 nano",
         "model_card": "https://platform.openai.com/docs/models/gpt-5-nano",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "gpt-5.4-pro": {
         "name": "[OpenAI] GPT-5.4 Pro",
         "model_card": "https://platform.openai.com/docs/models/gpt-5.4-pro",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "audio", "video", "structured_output"]
     },
     "gpt-4.1-mini": {
         "name": "[OpenAI] GPT-4.1 mini",
         "model_card": "https://platform.openai.com/docs/models/gpt-4.1-mini",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "gpt-4.1-nano": {
         "name": "[OpenAI] GPT-4.1 nano",
         "model_card": "https://platform.openai.com/docs/models/gpt-4.1-nano",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "gpt-4.1": {
         "name": "[OpenAI] GPT-4.1",
         "model_card": "https://platform.openai.com/docs/models/gpt-4.1",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "gpt-4o-mini": {
         "name": "[OpenAI] GPT-4o mini",
         "model_card": "https://platform.openai.com/docs/models/gpt-4o-mini",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "gpt-4o": {
         "name": "[OpenAI] GPT-4o",
         "model_card": "https://platform.openai.com/docs/models/gpt-4o",
-        "provider": "openai"
+        "provider": "openai",
+        "capabilities": ["text", "image", "audio", "structured_output"]
     },
     "gemini-3.1-pro-preview": {
         "name": "[Google] Gemini 3.1 Pro",
         "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-pro",
-        "provider": "google"
+        "provider": "google",
+        "capabilities": ["text", "image", "video", "audio", "structured_output"]
     },
     "gemini-3-flash-preview": {
         "name": "[Google] Gemini 3 Flash",
         "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-flash",
-        "provider": "google"
+        "provider": "google",
+        "capabilities": ["text", "image", "video", "audio", "structured_output"]
     },
     "gemini-3.1-flash-lite-preview": {
         "name": "[Google] Gemini 3.1 Flash Lite",
         "provider": "google",
-        "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-flash-lite"
+        "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-flash-lite",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "claude-opus-4-6": {
         "name": "[Anthropic] Claude Opus 4.6 (latest)",
         "model_card": "https://www.anthropic.com/claude/opus",
-        "provider": "anthropic"
+        "provider": "anthropic",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "claude-sonnet-4-6": {
         "name": "[Anthropic] Claude Sonnet 4.6 (latest)",
         "model_card": "https://www.anthropic.com/claude/sonnet",
-        "provider": "anthropic"
+        "provider": "anthropic",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "claude-4-5-haiku": {
         "name": "[Anthropic] Claude 4.5 Haiku (latest)",
-         "model_card": "https://www.anthropic.com/claude/haiku",
-        "provider": "anthropic"
+        "model_card": "https://www.anthropic.com/claude/haiku",
+        "provider": "anthropic",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "magistral-small-2509": {
         "name": "[Mistral] Magistral Small 1.2 (25.09)",
         "model_card": "https://docs.mistral.ai/models/magistral-small-1-2-25-09",
-        "provider": "mistral"
+        "provider": "mistral",
+        "capabilities": ["text", "reasoning", "structured_output"]
     },
     "magistral-medium-2509": {
         "name": "[Mistral] Magistral Medium 1.2 (25.09)",
         "model_card": "https://docs.mistral.ai/models/magistral-medium-1-2-25-09",
-        "provider": "mistral"
+        "provider": "mistral",
+        "capabilities": ["text", "reasoning", "structured_output"]
     },
     "mistral-small-2506": {
         "name": "[Mistral] Mistral Small 3.2 (25.06)",
         "model_card": "https://docs.mistral.ai/models/mistral-small-3-2-25-06",
-        "provider": "mistral"
+        "provider": "mistral",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "mistral-medium-2508": {
         "name": "[Mistral] Mistral Medium 3.1 (25.08)",
         "model_card": "mistral-medium-2508",
-        "provider": "mistral"
+        "provider": "mistral",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "mistral-large-2512": {
         "name": "[Mistral] Mistral Large 3 (25.12)",
         "model_card": "https://docs.mistral.ai/models/mistral-large-3-25-12",
-        "provider": "mistral"
+        "provider": "mistral",
+        "capabilities": ["text", "image", "structured_output"]
     },
     "open-mistral-nemo-2407": {
         "name": "[Mistral] Mistral Nemo 12B",
         "model_card": "https://docs.mistral.ai/models/mistral-nemo-12b-24-07",
-        "provider": "mistral"
+        "provider": "mistral",
+        "capabilities": ["text", "structured_output"]
     },
     "deepseek-chat": {
         "name": "[DeepSeek] DeepSeek latest (non-reasoning)",
         "model_card": "https://api-docs.deepseek.com/quick_start/pricing",
-        "provider": "deepseek"
+        "provider": "deepseek",
+        "capabilities": ["text", "structured_output"]
     },
     "deepseek-reasoner": {
         "name": "[DeepSeek] DeepSeek latest (reasoning)",
         "model_card": "https://api-docs.deepseek.com/quick_start/pricing",
-        "provider": "deepseek"
+        "provider": "deepseek",
+        "capabilities": ["text", "reasoning"]
     }
 }
