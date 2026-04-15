@@ -23,12 +23,13 @@ class OllamaClient:
     """
 
     def __init__(self, base_url: str, api_key: Optional[str] = None,
-                 auth_type: Optional[str] = None, timeout: int = 10) -> None:
+                 auth_type: Optional[str] = None, timeout: int = 10, log=None) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.auth_type = auth_type
         self.timeout = timeout
         self._session = requests.Session()
+        self.log = log
 
     def _headers(self) -> dict:
         """Build request headers, including auth if configured."""
@@ -36,6 +37,22 @@ class OllamaClient:
         if self.api_key and self.auth_type:
             headers[self.auth_type] = self.api_key
         return headers
+    
+    def is_available(self) -> bool:
+        """Check if the Ollama server is reachable and responding to /api/tags."""
+        try:
+            r = self._session.get(
+                f"{self.base_url}/api/tags",
+                headers=self._headers(),
+                timeout=self.timeout,
+            )
+            if self.log and r.status_code != 200:
+                self.log.warning(f"OllamaClient: server responded with status code {r.status_code} during availability check: {r.text}")
+            return r.status_code == 200
+        except requests.RequestException as e:
+            if self.log:
+                self.log.warning(f"OllamaClient: server is not available at {self.base_url}: {e}")
+            return False
 
     def list_models(self) -> list[dict]:
         """List available models from the Ollama server.
@@ -50,8 +67,11 @@ class OllamaClient:
             )
             if r.status_code == 200:
                 return r.json().get("models", [])
-        except requests.RequestException:
-            pass
+            if self.log:
+                self.log.warning(f"OllamaClient: failed to list models from {self.base_url}, status code {r.status_code}: {r.text}")
+        except requests.RequestException as e:
+            if self.log:
+                self.log.warning(f"OllamaClient: failed to list models from {self.base_url}: {e}")
         return []
 
     def show_model(self, model_id: str) -> dict | None:
@@ -69,8 +89,11 @@ class OllamaClient:
             )
             if r.status_code == 200:
                 return r.json()
-        except requests.RequestException:
-            pass
+            if self.log:
+                self.log.warning(f"OllamaClient: failed to show model {model_id} from {self.base_url}, status code {r.status_code}: {r.text}")
+        except requests.RequestException as e:
+            if self.log:
+                self.log.warning(f"OllamaClient: failed to show model {model_id} from {self.base_url}: {e}")
         return None
 
     def pull_model(self, model_id: str, stream: bool = False) -> bool:
@@ -87,8 +110,12 @@ class OllamaClient:
                 json={"model": model_id, "stream": stream},
                 timeout=600,
             )
+            if r.status_code != 200 and self.log:
+                self.log.warning(f"OllamaClient: failed to pull model {model_id} from {self.base_url}, status code {r.status_code}: {r.text}")
             return r.status_code == 200
-        except requests.RequestException:
+        except requests.RequestException as e:
+            if self.log:
+                self.log.warning(f"OllamaClient: failed to pull model {model_id} from {self.base_url}: {e}")
             return False
 
     def delete_model(self, model_id: str) -> bool:
@@ -104,8 +131,12 @@ class OllamaClient:
                 json={"model": model_id},
                 timeout=30,
             )
+            if r.status_code != 200 and self.log:
+                self.log.warning(f"OllamaClient: failed to delete model {model_id} from {self.base_url}, status code {r.status_code}: {r.text}")
             return r.status_code == 200
-        except requests.RequestException:
+        except requests.RequestException as e:
+            if self.log:
+                self.log.warning(f"OllamaClient: failed to delete model {model_id} from {self.base_url}: {e}")  
             return False
 
     @staticmethod
@@ -281,16 +312,18 @@ class OllamaClient:
         }
 
     @classmethod
-    def from_config(cls, config) -> "OllamaClient":
+    def from_config(cls, config, log=None) -> "OllamaClient":
         """Instantiate an OllamaClient from 4CAT config.
 
         Reads ``llm.server``, ``llm.api_key``, and ``llm.auth_type``.
 
         :param config:  A 4CAT ``ConfigWrapper`` or ``ConfigManager`` instance.
+        :param log:     A logging instance for reporting issues.
         :returns:       Configured ``OllamaClient``.
         """
         return cls(
             base_url=config.get("llm.server", ""),
             api_key=config.get("llm.api_key", "") or None,
             auth_type=config.get("llm.auth_type", "") or None,
+            log=log,
         )

@@ -36,6 +36,11 @@ class OllamaManager(BasicWorker):
 		task = self.job.details.get("task", "refresh") if self.job.details else "refresh"
 		model_name = self.job.data["remote_id"]
 
+		self.client = self._get_client()  # Initialize client once per job run
+		if not self.client.is_available():
+			self.job.finish()
+			return
+
 		if task == "refresh":
 			self.refresh_models()
 		elif task == "pull":
@@ -54,7 +59,7 @@ class OllamaManager(BasicWorker):
 	def _get_client(self) -> OllamaClient:
 		"""Return a fresh OllamaClient configured from 4CAT settings."""
 		if not self.client:
-			self.client = OllamaClient.from_config(self.config)
+			self.client = OllamaClient.from_config(self.config, log=self.log)
 		return self.client
 
 	def refresh_models(self):
@@ -64,7 +69,7 @@ class OllamaManager(BasicWorker):
 		if not self.config.get("llm.server", ""):
 			return
 
-		client = self._get_client()
+		client = self._get_client()		
 		models = client.list_models()
 
 		if not models and not self.config.get("llm.server", ""):
