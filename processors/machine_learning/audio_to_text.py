@@ -314,8 +314,8 @@ class AudioToText(BasicProcessor):
                 raise ProcessorInterruptedException("DMI Service Manager GPU busy")
         
             # Check advanced_settings
-            advanced_settings = self.parameters.get("advanced", False)
-            if advanced_settings:
+            advanced_settings = self.parameters.get("advanced", {})
+            if type(advanced_settings) is str:
                 try:
                     advanced_settings = json.loads(advanced_settings)
                 except ValueError:
