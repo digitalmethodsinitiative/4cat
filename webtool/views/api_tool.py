@@ -429,7 +429,20 @@ def queue_dataset():
 	# are sent for validation. This makes the front-end re-submit the full
 	# query
 	if not has_confirm:
-		return jsonify({"status": "validated", "keep": sanitised_query})
+		# Re-serialize only OPTION_TEXT_JSON values back to JSON strings before
+		# returning keep. parse_all parses these into Python lists/dicts, but
+		# jsonify turns them into JS arrays/objects. FormData.set() then coerces
+		# those to "[object Object],..." on the for-real re-submission.
+		# (Other list/dict fields, e.g. parsed URL lists are not touched.)
+		json_option_keys = {
+			option for option, settings in search_worker.get_options(None, g.config).items()
+			if settings.get("type") == UserInput.OPTION_TEXT_JSON
+		}
+		keep = {
+			k: json.dumps(v) if k in json_option_keys and isinstance(v, (list, dict)) else v
+			for k, v in sanitised_query.items()
+		}
+		return jsonify({"status": "validated", "keep": keep})
 
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
