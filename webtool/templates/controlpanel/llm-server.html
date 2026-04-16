@@ -1,0 +1,151 @@
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}LLM Server{% endblock %}
+{% block body_class %}plain-page admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "llm" %}{% endblock %}
+
+{% block body %}
+<article class="small">
+    <section class="result-list">
+        <h2><span>LLM Server</span></h2>
+
+        {% if flashes %}
+        <div class="form-notices-wrapper">
+            {% for notice in flashes %}
+            <p class="form-notice">{{ notice|safe }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Server status #}
+        <div class="user-panel">
+            <table class="fullwidth cp-table">
+                <tr>
+                    <th>Setting</th>
+                    <th>Value</th>
+                </tr>
+                <tr>
+                    <td>Server URL</td>
+                    <td>{% if llm_server %}<code>{{ llm_server }}</code>{% else %}<em>Not configured</em>{% endif %}</td>
+                </tr>
+                <tr>
+                    <td>Status</td>
+                    <td>
+                        {% if server_status == "online" %}
+                            <span style="color: green;"><i class="fa fa-check-circle" aria-hidden="true"></i> Online</span>
+                        {% elif server_status == "not configured" %}
+                            <span style="color: grey;"><i class="fa fa-minus-circle" aria-hidden="true"></i> Not configured</span>
+                        {% else %}
+                            <span style="color: red;"><i class="fa fa-times-circle" aria-hidden="true"></i> {{ server_status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        {# Available models #}
+        <h2><span>Available Models</span>
+            <form action="{{ url_for("llm.llm_panel") }}" method="POST" style="display:inline; float:right;">
+                <input type="hidden" name="action" value="refresh">
+                <button type="submit" class="small"><i class="fa fa-sync-alt" aria-hidden="true"></i> Refresh</button>
+            </form>
+        </h2>
+
+        <div class="user-panel">
+            <table class="fullwidth notification-table cp-table">
+                <colgroup>
+                    <col>
+                    <col>
+                    <col>
+                    <col class="actions">
+                </colgroup>
+                <tr>
+                    <th>Model</th>
+                    <th>Display name</th>
+                    <th>Capabilities</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+                {% if available_models %}
+                    {% for model_id, model in available_models.items() %}
+                    <tr>
+                        <td>
+                            <span class="property-badge">{{ model_id }}</span>
+                        </td>
+                        <td>
+                            {% if model.model_card %}
+                                <a href="{{ model.model_card }}" target="_blank" rel="noopener">{{ model.name }}</a>
+                            {% else %}
+                                {{ model.name }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="property-badge">{{ model.capabilities | join(", ") }}</span>
+                        </td>
+                        <td>
+                            {% if model_id in enabled_models %}
+                                <span style="color: green;"><i class="fa fa-check" aria-hidden="true"></i> Enabled</span>
+                            {% else %}
+                                <span style="color: grey;"><i class="fa fa-minus" aria-hidden="true"></i> Disabled</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if model_id in enabled_models %}
+                            <form action="{{ url_for("llm.llm_panel") }}" method="POST" style="display:inline;">
+                                <input type="hidden" name="action" value="disable">
+                                <input type="hidden" name="model_name" value="{{ model_id }}">
+                                <button type="submit" class="small"><i class="fa fa-toggle-off" aria-hidden="true"></i> Disable</button>
+                            </form>
+                            {% else %}
+                            <form action="{{ url_for("llm.llm_panel") }}" method="POST" style="display:inline;">
+                                <input type="hidden" name="action" value="enable">
+                                <input type="hidden" name="model_name" value="{{ model_id }}">
+                                <button type="submit" class="small"><i class="fa fa-toggle-on" aria-hidden="true"></i> Enable</button>
+                            </form>
+                            {% endif %}
+                            <form action="{{ url_for("llm.llm_panel") }}" method="POST" style="display:inline;">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="model_name" value="{{ model_id }}">
+                                <button type="submit" class="small confirm-first" data-confirm-action="delete this model from the Ollama server">
+                                    <i class="fa fa-trash" aria-hidden="true"></i> Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4">
+                            {% if llm_server %}
+                                No models found. Use the <strong>Refresh</strong> button to fetch available models, or pull a new model below.
+                            {% else %}
+                                Configure the LLM server URL in <a href="{{ url_for("admin.manipulate_settings") }}">Settings</a> first.
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endif %}
+            </table>
+        </div>
+    </section>
+
+    {# Pull a new model #}
+    {% if llm_server %}
+    <section>
+        <h2><span>Pull Model</span></h2>
+        <p>Enter an Ollama model name (e.g. <code>llama3:8b</code>) to pull it from the
+            <a href="https://ollama.com/library" target="_blank" rel="noopener">Ollama library</a>.
+            Pulling large models may take several minutes; the job runs in the background.</p>
+        <form action="{{ url_for("llm.llm_panel") }}" method="POST" class="wide">
+            <input type="hidden" name="action" value="pull">
+            <div class="form-element">
+                <label for="model-name">Model name</label>
+                <input type="text" id="model-name" name="model_name" placeholder="e.g. llama3:8b">
+            </div>
+            <div class="submit-container">
+                <button type="submit"><i class="fa fa-download" aria-hidden="true"></i> Pull model</button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+</article>
+{% endblock %}

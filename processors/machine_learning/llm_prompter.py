@@ -67,9 +67,15 @@ class LLMPrompter(BasicProcessor):
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         # Check if 4CAT wide LLM server is available
         if config.get("llm.access", False) and config.get("llm.server", ""):
-            shared_llm_name = config.get("llm.host_name", "4CAT LLM Server")
-            shared_llm_models = {model: model_metadata.get("name") for model, model_metadata in config.get("llm.available_models", {}).items()}
-            shared_llm_default = list(shared_llm_models.keys())[0] if shared_llm_models else ""
+            # Check some models enabled
+            shared_llm_enabled_models = config.get("llm.enabled_models", [])
+            shared_llm_models = {model: model_metadata.get("name") for model, model_metadata in config.get("llm.available_models", {}).items() if model in shared_llm_enabled_models}
+            if not shared_llm_models:
+                shared_llm_name = False
+                shared_llm_default = ""
+            else:
+                shared_llm_name = config.get("llm.host_name", "4CAT LLM Server")
+                shared_llm_default = list(shared_llm_models.keys())[0] if shared_llm_models else ""
         else:
             shared_llm_name = False
             shared_llm_default = ""
