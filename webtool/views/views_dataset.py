@@ -4,7 +4,6 @@
 import json
 import csv
 import io
-import zipfile
 import json_stream
 import mimetypes
 from pathlib import Path
