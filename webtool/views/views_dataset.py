@@ -168,37 +168,14 @@ def _serve_zip_member(archive_path: Path, member: str, dataset: DataSet):
     if not archive_path.is_file():
         return error(404, error="Archive not found.")
 
-    try:
-        zf = zipfile.ZipFile(archive_path, 'r')
-    except zipfile.BadZipFile:
-        return error(400, error="Invalid zip archive.")
-    except Exception as e:
-        return error(500, error=f"Error reading archive: {str(e)}")
-
-    if member not in zf.namelist():
-        try:
-            zf.close()
-        except Exception:
-            pass
-        return error(404, error="File not found in archive.")
-
     mime_type, _ = mimetypes.guess_type(member)
     if mime_type is None:
         mime_type = "application/octet-stream"
 
     try:
-        extracted = dataset.extract_file_from_archive(member)
+        extracted = dataset.extract_file_from_archive(member, archive_path=archive_path)
     except Exception as e:
-        try:
-            zf.close()
-        except Exception:
-            pass
         return error(500, error=f"Error extracting archive member: {str(e)}")
-
-    try:
-        zf.close()
-    except Exception:
-        pass
 
     if not extracted or not extracted.exists():
         return error(404, error="File not found in archive.")
@@ -230,7 +207,7 @@ def get_result(query_file, dataset_key, dataset=None, member=None):
     if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
         return redirect(url_for('static', filename='img/favicon/favicon.ico'))
     
-    if dataset and type(dataset) is DataSet:
+    if dataset and isinstance(dataset, DataSet):
         # dataset is already a DataSet object
         if dataset.key != dataset_key:
             return error(400, error="Dataset key does not match dataset provided.")

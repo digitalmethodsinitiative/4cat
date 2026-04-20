@@ -12,6 +12,7 @@ import re
 import os
 import errno
 from enum import Enum
+from pathlib import Path
 
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
@@ -887,17 +888,27 @@ class DataSet(FourcatModule):
 
         return results_path
 
-    def extract_file_from_archive(self, member, staging_area=None):
+    def extract_file_from_archive(self, member, staging_area=None, archive_path=None):
         """
-        Extract a single member from this dataset's results archive into a
-        staging area and return the Path to the extracted file. If the member
-        does not exist, return None.
+        Extract a single member from this dataset's results archive (or an
+        explicitly provided archive path) into a staging area and return the
+        Path to the extracted file. If the member does not exist, return
+        ``None``.
 
         :param str member: The path of the member inside the archive
         :param Path staging_area: Optional staging area to extract into
+        :param archive_path: Optional path to the archive file to extract from
         :return Path|None: Path to extracted file or None if not found
         """
-        path = self.get_results_path()
+        if not member:
+            return None
+
+        # Reject absolute paths and traversal in the member path
+        if Path(member).is_absolute() or ".." in Path(member).parts:
+            raise ValueError("Invalid member path.")
+
+        # Determine archive path (use provided archive_path if given)
+        path = Path(archive_path) if archive_path is not None else self.get_results_path()
         if not path.exists():
             return None
 
@@ -907,7 +918,7 @@ class DataSet(FourcatModule):
         if not staging_area.exists() or not staging_area.is_dir():
             raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
 
-        with zipfile.ZipFile(path, "r") as archive_file:
+        with zipfile.ZipFile(str(path), "r") as archive_file:
             # Zip member names are stored with forward slashes
             namelist = archive_file.namelist()
             if member not in namelist:
