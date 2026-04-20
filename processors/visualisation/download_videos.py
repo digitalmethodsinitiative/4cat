@@ -1026,7 +1026,8 @@ class VideoDownloaderPlus(BasicProcessor):
             elif not self.config.get("video-downloader.allow-unknown-size", False):
                 raise FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
 
-        self.dataset.update_status(f"Downloading {self.downloaded_videos + 1}/{self.total_possible_videos} via requests: {original_url}")
+        original_url_str = original_url if len(original_url) < 100 else original_url[:97] + "..."
+        self.dataset.update_status(f"Downloading {self.downloaded_videos + 1}/{self.total_possible_videos} via requests: {original_url_str}")
         
         bytes_written = 0
         max_bytes = max_video_size * 1000000 if max_video_size else 0

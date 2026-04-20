@@ -1052,13 +1052,13 @@ class DataSet(FourcatModule):
             if job.is_claimed:
                 # tell API to stop any jobs running for this dataset
                 # level 2 = cancel job
-                # we're not interested in the result - if the API is available,
-                # it will do its thing, if it's not the backend is probably not
-                # running so the job also doesn't need to be interrupted
+                # we must wait for the API to process the request before deleting
+                # the job record from the database; if we fire-and-forget the job
+                # row is gone by the time the API looks it up, causing
+                # JobNotFoundException and leaving the worker running uninterrupted
                 call_api(
                     "cancel-job",
                     {"remote_id": self.key, "jobtype": self.type, "level": 2},
-                    False,
                 )
 
             # this deletes the job from the database
@@ -2086,7 +2086,7 @@ class DataSet(FourcatModule):
             if analysis.type not in processors:
                 continue
 
-            if not processors[analysis.type].get_options(config=config):
+            if not processors[analysis.type].get_options(parent_dataset=self, config=config):
                 # No variable options; this processor has been run so remove
                 del processors[analysis.type]
                 continue
@@ -2646,12 +2646,12 @@ class DataSet(FourcatModule):
                 )
             if "label" not in annotation_field:
                 raise AnnotationException(
-                    "Can't save annotation fields: all fields must have a label"
+                    "Can't save annotation fields: field %s must have a label"
                     % field_id
                 )
             if "type" not in annotation_field:
                 raise AnnotationException(
-                    "Can't save annotation fields: all fields must have a type"
+                    "Can't save annotation fields: field %s must have a type"
                     % field_id
                 )
 

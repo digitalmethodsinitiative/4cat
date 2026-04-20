@@ -203,6 +203,48 @@ class ExtensionManipulator(BasicWorker):
         extension_folder.rename(canonical_folder)
         self.extension_log.info(f"Finished installing extension {canonical_name} (version {manifest_data.get('version', 'unknown')}) with ID "
                                 f"{canonical_id}.")
+        
+        # Enable the extension immediately so it will be picked up on restart.
+        # Use the central discovery routine to verify the actual folder/key
+        try:
+            from common.lib.helpers import find_extensions
+
+            extensions, errors = find_extensions()
+        except Exception as e:
+            extensions = {}
+            errors = [str(e)]
+
+        # Prefer authoritative canonical_id if present in discovered extensions,
+        # otherwise fall back to the actual folder name. Finally default to
+        # canonical_id if not found. Mimics find_extensions logic.
+        enable_key = None
+        if canonical_id in extensions:
+            enable_key = canonical_id
+        else:
+            folder_name = canonical_folder.name
+            if folder_name in extensions:
+                enable_key = folder_name
+            else:
+                enable_key = canonical_id
+
+        entry = {"enabled": True, "name": canonical_name}
+        if manifest_data.get("version"):
+            entry["version"] = manifest_data.get("version")
+
+        try:
+            current = self.config.get("extensions.enabled") or {}
+            if not isinstance(current, dict):
+                current = {}
+            current[enable_key] = entry
+            # write back to config (global setting)
+            self.config.set("extensions.enabled", current)
+            self.extension_log.info(f"Enabled extension {enable_key} in configuration.")
+            if errors:
+                for err in errors:
+                    self.extension_log.warning(f"find_extensions reported: {err}")
+        except Exception as e:
+            # Log but do not fail installation if config cannot be written
+            self.extension_log.error(f"Could not auto enable extension {enable_key}: {e}")
         return True
 
 
