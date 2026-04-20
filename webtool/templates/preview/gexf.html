@@ -170,7 +170,7 @@
     <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i> Open in Gephi Lite
 </a>
 
-<a class="retina-link" target="_blank" href="https://ouestware.gitlab.io/retina/#/graph/?url={{ url_for('dataset.get_result', query_file=dataset.result_file, _external=True) }}">
+<a class="retina-link" target="_blank" href="https://ouestware.gitlab.io/retina/#/graph/?url={{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key, _external=True) }}">
     <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i> Open in Retina
 </a>
 {% endif %}
