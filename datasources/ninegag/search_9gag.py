@@ -8,6 +8,7 @@ from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
+from common.lib.helpers import normalize_url_encoding
 
 
 class SearchNineGag(Search):
@@ -67,6 +68,7 @@ class SearchNineGag(Search):
             }
 
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": post["id"],
             "url": post["url"],
             "subject": post["title"],

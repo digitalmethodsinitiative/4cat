@@ -8,7 +8,7 @@
 </head>
 <body class="json-preview">
 {% if truncated %}
-<p class="warning">Note: only the first {{ "{:,}".format(truncated) }} of {{ "{:,}".format(dataset.num_rows) }} total items of this dataset are shown in this preview (~{{ ((truncated / dataset.num_rows) * 100)|round(0)|int }}%)</p>
+<p class="warning-text">Note: only the first {{ "{:,}".format(truncated) }} of {{ "{:,}".format(dataset.num_rows) }} total items of this dataset are shown in this preview (~{{ ((truncated / dataset.num_rows) * 100)|round(0)|int }}%)</p>
 {% endif %}
 <pre>
     {{ json|safe }}

@@ -86,7 +86,7 @@ class UniqueFilter(BaseFilter):
 
             if unique_item:
                 unique += 1
-                yield mapped_item.original
+                yield mapped_item
 
             if processed % 500 == 0:
                 self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))
@@ -115,7 +115,7 @@ class UniqueFilter(BaseFilter):
         options = {
             "columns": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Item attributes to consider for uniqueness",
+                "help": "Columns to consider for uniqueness",
                 "inline": True,
                 "default": "body"
             },

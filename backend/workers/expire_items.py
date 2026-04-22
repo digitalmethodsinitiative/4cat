@@ -12,6 +12,9 @@ from common.lib.exceptions import DataSetNotFoundException, WorkerInterruptedExc
 
 from common.lib.user import User
 from common.config_manager import ConfigWrapper
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from common.lib.helpers import send_email
 
 
 class ThingExpirer(BasicWorker):
@@ -31,6 +34,8 @@ class ThingExpirer(BasicWorker):
 
     type = "expire-datasets"
     max_workers = 1
+
+    expiry_notification_after_days = 7    
 
     @classmethod
     def ensure_job(cls, config=None):
@@ -138,6 +143,43 @@ class ThingExpirer(BasicWorker):
             else:
                 warning_notification = f'WARNING: This account will be deleted at <time datetime="{expires_at.strftime("%C")}">{expires_at.strftime("%-d %B %Y %H:%M")}</time>. Make sure to back up your data before then.'
                 user.add_notification(warning_notification)
+
+                # If the account will be deleted within 7 days, try sending an email
+                try:
+                    delta = expires_at - now
+                    if datetime.timedelta(0) <= delta <= datetime.timedelta(days=self.expiry_notification_after_days):
+                        if user.get_value("expiry-email-sent", default=False):
+                            # already sent
+                            continue
+
+                        # Ensure mail is configured on this server and username looks like an email
+                        if self.config.get('mail.server') and re.match(r"[^@]+@[^@]+\.[^@]+", username):
+                            msg = MIMEMultipart("alternative")
+                            msg["From"] = self.config.get('mail.noreply')
+                            msg["To"] = username
+                            msg["Subject"] = "4CAT account expiration warning"
+
+                            plain = (
+                                f"Your 4CAT account '{username}' is scheduled for deletion on {expires_at.strftime('%C')}.\n"
+                                "Please back up your data before then."
+                            )
+
+                            html = (
+                                f"<p>Your 4CAT account <strong>{username}</strong> is scheduled for deletion at "
+                                f"<time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%-d %B %Y %H:%M')}</time>.</p>"
+                                "<p>Please back up your data before then.</p>"
+                            )
+
+                            msg.attach(MIMEText(plain, "plain"))
+                            msg.attach(MIMEText(html, "html"))
+
+                            # send_email expects (recipient, message, mail_config)
+                            send_email([username], msg, self.config)
+                            # mark as sent
+                            user.set_value("expiry-email-sent", int(time.time()))
+                except Exception:
+                    # Don't let email failures interrupt the worker; just log
+                    self.log.warning(f"Failed to send expiration email to {username}")
 
     def expire_notifications(self):
         """

@@ -25,7 +25,7 @@ class SVGHistogramRenderer(BasicProcessor):
 	type = "histogram"  # job type ID
 	category = "Visual"  # category
 	title = "Histogram"  # title displayed in UI
-	description = "Generates a histogram (bar graph) from time frequencies."  # description displayed in UI
+	description = "Generates a histogram from time frequencies."  # description displayed in UI
 	extension = "svg"
 
 	@classmethod
@@ -87,16 +87,14 @@ class SVGHistogramRenderer(BasicProcessor):
 				self.dataset.log("Removed non-date interval: %s" % non_date)
 
 		if len(intervals) <= 1:
-			self.dataset.update_status("Not enough data available for a histogram; need more than one time series.")
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Not enough data available for a histogram; need more than one time series.")
 			return
 
 		self.dataset.update_status("Cleaning up data")
 		try:
 			(missing, intervals) = pad_interval(intervals)
 		except ValueError:
-			self.dataset.update_status("Some of the items in the dataset contain invalid dates; cannot count frequencies per interval.", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Some of the items in the dataset contain invalid dates; cannot count frequencies per interval.")
 			return
 
 		# create histogram

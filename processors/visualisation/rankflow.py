@@ -559,13 +559,11 @@ class RankFlowRenderer(BasicProcessor):
             self.dataset.log("Pretty-printing failed, retrying...")
             canvas.saveas(filename=str(self.dataset.get_results_path()))
 
+        n_items = len(items) * len(list(items.items()).pop())
         if unknown_dates > 0:
-            self.dataset.update_status(
-                f"Dataset completed. Skipped {unknown_dates} items with unknown dates.",
-                is_final=True,
-            )
-
-        self.dataset.finish(len(items) * len(list(items.items()).pop()))
+            self.dataset.finish_with_warning(n_items, f"Skipped {unknown_dates} items with unknown dates.")
+        else:
+            self.dataset.finish(n_items)
 
     def black_or_white(self, hsv):
         """

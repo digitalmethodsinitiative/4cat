@@ -30,7 +30,7 @@ class TelegramImageDownloader(BasicProcessor):
     type = "image-downloader-telegram"  # job type ID
     category = "Visual"  # category
     title = "Download Telegram images"  # title displayed in UI
-    description = "Download images and store in a zip file. Downloads through the Telegram API might take a while. " \
+    description = "Download images and store in a ZIP file. Downloads through the Telegram API might take a while. " \
                   "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
@@ -99,6 +99,7 @@ class TelegramImageDownloader(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
+
         if type(module) is DataSet:
             # we need these to actually instantiate a telegram client and
             # download the images
@@ -124,7 +125,10 @@ class TelegramImageDownloader(BasicProcessor):
             json.dump(self.metadata, outfile)
 
         self.dataset.update_status("Compressing images")
-        self.write_archive_and_finish(self.staging_area)
+        warning = None
+        if not self.flawless:
+            warning = "Not all images could be downloaded. The the dataset logs for details."
+        self.write_archive_and_finish(self.staging_area, warning=warning)
 
     async def get_images(self):
         """
@@ -220,12 +224,13 @@ class TelegramImageDownloader(BasicProcessor):
                         else:
                             # video thumbnail
                             await client.download_media(message, str(path), thumb=-1)
-                        msg_id = message.id
+                        msg_id = f"{entity}-{message.id}"
                         success = True
                     except (AttributeError, RuntimeError, ValueError, TypeError, TimedOutError) as e:
                         filename = f"{entity}-index-{media_done}"
-                        msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
-                        self.dataset.log(f"Could not download image for message {msg_id} ({e})")
+                        msg_id = f"{entity}-{message.id}" if hasattr(message, "id") else None
+                        msg_id_log = msg_id if msg_id else f"with index {media_done:,}"
+                        self.dataset.log(f"Could not download image for message {msg_id_log} ({e})")
                         self.flawless = False
 
                     finally:
@@ -234,7 +239,7 @@ class TelegramImageDownloader(BasicProcessor):
                             "filename": filename,
                             "success": success,
                             "from_dataset": self.source_dataset.key,
-                            "post_ids": [msg_id]
+                            "post_ids": [msg_id] if msg_id else []
                         }
 
             except BadRequestError as e:

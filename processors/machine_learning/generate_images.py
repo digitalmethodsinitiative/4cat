@@ -25,7 +25,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
     type = "image-downloader-stable-diffusion"  # job type ID
     category = "Visual"  # category
     title = "Generate images from text prompts"  # title displayed in UI
-    description = "Given a list of prompts, generates images for those prompts using the Stable Diffusion XL image model."  # description displayed in UI
+    description = "Given a list of prompts, generates images using the Stable Diffusion XL image model."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
     followups = ImageDownloader.followups
@@ -54,6 +54,19 @@ class StableDiffusionImageGenerator(BasicProcessor):
             "tooltip": "Use '0' to allow unlimited number"
         },
     }
+
+    @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Shared queue for locally hosted models
+
+        :param str remote_id:  Job item ID
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset to run job for
+        :return:
+        """
+        # Unique queue for locally hosted models; used by other local model processors as well
+        return "local_models" 
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

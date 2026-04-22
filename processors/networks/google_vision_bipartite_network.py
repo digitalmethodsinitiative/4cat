@@ -19,7 +19,7 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
     """
     type = "vision-bipartite-network"  # job type ID
     category = "Networks"  # category
-    title = "Google Vision Bipartite Annotation Network"  # title displayed in UI
+    title = "Google Vision bipartite annotation network"  # title displayed in UI
     description = "Create a GEXF network file comprised of all annotations returned by the Google Vision API. Labels " \
                   "returned by the API, and image file names, are nodes. Edges are created between file names and " \
                   "labels if the label occurs for the image with that file name."

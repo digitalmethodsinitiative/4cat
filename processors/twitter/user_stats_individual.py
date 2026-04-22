@@ -16,8 +16,8 @@ class TwitterStats(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-user-stats-individual"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Individual User Statistics"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "Individual user statistics"  # title displayed in UI
     description = "Lists users and their number of tweets, number of followers, number of friends, how many times they are listed, their UTC time offset, whether the user has a verified account and how many times they appear in the data set."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 

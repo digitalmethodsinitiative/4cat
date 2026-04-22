@@ -180,7 +180,7 @@ def data_overview(datasource=None):
             labels.append("zeeschuimer")
 
         # Get example keys for the datasource
-        if datasource_id not in ["upload"]: # ignore upload as keys are variable
+        if datasource_id not in ["upload"]:  # ignore upload as keys are variable
             example_keys = get_datasource_example_keys(db=g.db, modules=g.modules, dataset_type=datasource_id + "-search")
 
         # Get daily post counts for local datasource to display in a graph

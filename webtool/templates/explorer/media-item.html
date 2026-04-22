@@ -1,0 +1,36 @@
+<!-- Media template for displaying images, videos, and audio files -->
+<!-- Extract file extension for media type detection -->
+{% set filename = item.get("filename", "") %}
+{% set file_ext = filename.split(".")[-1].lower() if "." in filename else "" %}
+
+<!-- Media header -->
+<header>
+	<!-- Filename -->
+	{% if item.get("filename") %}
+		<span title="Filename" class="filename">
+			<i class="fa fa-file"></i> {{ item["filename"] }}
+		</span>
+	{% endif %}
+
+</header>
+
+<!-- Media content -->
+<article>
+    <div class="carousel-wrapper">
+        <div class="media-wrapper">
+            {% set dataset_key = dataset.key %}
+            {% set filename = item.filename %}
+            {% include 'explorer/media.html' %}
+        </div>
+    </div>
+
+	<!-- File metadata -->
+	<div class="file-metadata">
+		{% if item.get("file_type") %}
+			<span class="file-type">
+				<strong>Type:</strong> {{ item["file_type"] }}
+			</span>
+		{% endif %}
+	</div>
+
+</article>

@@ -1,5 +1,7 @@
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
+import threading
+from functools import wraps
 
 import time
 import urllib3
@@ -10,18 +12,40 @@ from collections import namedtuple
 from asyncio import CancelledError as asyncioCancelledError
 from concurrent.futures import CancelledError as futureCancelledError
 
+
+def synchronized_method(func):
+    """
+    A decorator to synchronize access to a method using a lock.
+    """
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        with self.lock:
+            return func(self, *args, **kwargs)
+
+    return wrapper
+
 class FailedProxiedRequest:
     """
     A delegated request that has failed for whatever reason
 
     The failure context (usually the exception) is stored in the `context`
-    property.
+    property. We also keep track of the proxy URL that serviced the request so
+    downstream consumers can make informed retry decisions.
     """
 
     context = None
+    proxy_url = None
 
-    def __init__(self, context=None):
+    def __init__(self, context=None, proxy_url=None):
         self.context = context
+        self.proxy_url = proxy_url
+
+
+class NoProxiesAvailableError(Exception):
+    """
+    Raised when all proxies are unhealthy and localhost fallback is disabled
+    """
+    pass
 
 
 class ProxyStatus:
@@ -56,15 +80,49 @@ class SophisticatedFuturesProxy:
     MAX_CONCURRENT_PER_HOST = 0
 
     def __init__(
-        self, url, log=None, cooloff=3, concurrent_overall=5, concurrent_host=2
+        self,
+        url,
+        log=None,
+        cooloff=3,
+        concurrent_overall=5,
+        concurrent_host=2,
+        healthcheck_url=None,
+        healthcheck_timeout=5,
     ):
         self.proxy_url = url
         self.hostnames = {}
         self.log = log
+        self.healthcheck_url = healthcheck_url
+        self.healthcheck_timeout = healthcheck_timeout
 
         self.COOLOFF = cooloff
         self.MAX_CONCURRENT_OVERALL = concurrent_overall
         self.MAX_CONCURRENT_PER_HOST = concurrent_host
+
+    def probe(self):
+        """
+        Probe proxy health via a known-good endpoint.
+
+        :return bool: True if probe succeeds, False otherwise.
+        """
+        if not self.healthcheck_url:
+            return False
+
+        proxy_definition = (
+            {"http": self.proxy_url, "https": self.proxy_url}
+            if self.proxy_url != DelegatedRequestHandler.PROXY_LOCALHOST
+            else None
+        )
+
+        try:
+            response = requests.get(
+                self.healthcheck_url,
+                timeout=self.healthcheck_timeout,
+                proxies=proxy_definition,
+            )
+            return response.ok
+        except requests.exceptions.RequestException:
+            return False
 
     def know_hostname(self, url):
         """
@@ -86,6 +144,22 @@ class SophisticatedFuturesProxy:
 
         return hostname
 
+    def has_active_requests(self):
+        """
+        Check if this proxy has any truly active requests.
+        
+        Active means CLAIMED or RUNNING status - not COOLING_OFF.
+        COOLING_OFF requests are essentially finished and waiting to be released,
+        so they shouldn't prevent proxy removal.
+        
+        :return bool: True if proxy has requests that are claimed or running
+        """
+        for metadata in self.hostnames.values():
+            for request in metadata.running:
+                if request.status in (ProxyStatus.CLAIMED, ProxyStatus.RUNNING):
+                    return True
+        return False
+    
     def release_cooled_off(self):
         """
         Release proxies that have finished cooling off.
@@ -207,9 +281,19 @@ class DelegatedRequestHandler:
         pool = ThreadPoolExecutor()
         self.session = FuturesSession(executor=pool)
         self.log = log
+        self.lock = threading.RLock()
+        
+        # Proxy health tracking
+        self.proxy_health = {}
+        self.proxy_warnings_logged = set()
+        self.all_proxies_failed_logged = False
+        
+        # Track proxies that should be removed but have active requests
+        self.proxies_pending_removal = set()
 
         self.refresh_settings(config)
 
+    @synchronized_method
     def refresh_settings(self, config):
         """
         Load proxy settings
@@ -218,13 +302,59 @@ class DelegatedRequestHandler:
         configuration reader, which could make things complicated in
         thread-based contexts.
 
+        Initializes proxy pool or updates if URLs have changed, preserving proxies with active requests.
+
         :param config:  Configuration reader
         """
-
-        self.proxy_settings = {
+        # Load new settings
+        new_proxy_settings = {
             k: config.get(k) for k in ("proxies.urls", "proxies.cooloff", "proxies.concurrent-overall",
-                                            "proxies.concurrent-host", "proxies.concurrent-host")
+                                            "proxies.concurrent-host", "proxies.allow-localhost-fallback")
         }
+
+        # Probe target for proxy health checks; defaults to local frontend robots endpoint
+        healthcheck_url = config.get("proxies.healthcheck-url")
+        if not healthcheck_url:
+            server_name = config.get("flask.server_name")
+            if server_name:
+                scheme = "https" if config.get("flask.https") else "http"
+                healthcheck_url = f"{scheme}://{server_name}/robots.txt"
+        new_proxy_settings["proxies.healthcheck-url"] = healthcheck_url
+        new_proxy_settings["proxies.healthcheck-timeout"] = config.get("proxies.healthcheck-timeout") or 5
+        
+        # Normalize empty config to localhost
+        if not new_proxy_settings["proxies.urls"]:
+            self.log.warning(
+                "No proxies configured (proxies.urls is empty or None). "
+                "Using localhost (direct connection) for all requests. "
+                "Set Proxy URLs in setting to [\"__localhost__\"] to disable this warning."
+            )
+            new_proxy_settings["proxies.urls"] = [self.PROXY_LOCALHOST]
+        
+        # Check if proxy URLs have changed
+        proxy_urls_changed = (not hasattr(self, 'proxy_settings') or 
+                             self.proxy_settings.get("proxies.urls") != new_proxy_settings["proxies.urls"])
+        
+        # Update settings
+        self.proxy_settings = new_proxy_settings
+        
+        # Reset proxy health tracking when settings are refreshed
+        num_proxies_restored = len([p for p in self.proxy_health if not self.proxy_health[p]])
+        self.proxy_health = {}
+        self.proxy_warnings_logged = set()
+        self.all_proxies_failed_logged = False
+        
+        if num_proxies_restored > 0:
+            self.log.debug(f"Proxy health reset: {num_proxies_restored} proxies restored")
+        
+        # Initialize or update proxy pool
+        if not self.proxy_pool:
+            # First initialization
+            self._initialize_proxy_pool()
+        elif proxy_urls_changed:
+            # Settings changed - update pool
+            self._update_proxy_pool()
+
 
     def add_urls(self, urls, queue_name="_", position=-1, **kwargs):
         """
@@ -236,31 +366,64 @@ class DelegatedRequestHandler:
         :param kwargs: Other keyword arguments will be passed on to
         `requests.get()`
         """
-        if queue_name in self.halted or "_" in self.halted:
-            # do not add URLs while delegator is shutting down
-            return
+        with self.lock:
+            if queue_name in self.halted or "_" in self.halted:
+                # do not add URLs while delegator is shutting down
+                return
 
-        if queue_name not in self.queue:
-            self.queue[queue_name] = []
+            if queue_name not in self.queue:
+                self.queue[queue_name] = []
 
-        for i, url in enumerate(urls):
-            url_metadata = namedtuple(
-                "UrlForDelegatedRequest", ("url", "args", "status", "proxied")
-            )
-            url_metadata.url = url
-            url_metadata.kwargs = kwargs
-            url_metadata.index = self.index
-            url_metadata.proxied = None
-            url_metadata.status = self.REQUEST_STATUS_QUEUED
-            self.index += 1
+            for i, url in enumerate(urls):
+                url_metadata = namedtuple(
+                    "UrlForDelegatedRequest", ("url", "args", "status", "proxied")
+                )
+                url_metadata.url = url
+                # Make a per-URL copy of kwargs to avoid shared mutation across entries
+                per_kwargs = {**kwargs} if kwargs else {}
+                url_metadata.index = self.index
+                url_metadata.proxied = None
+                url_metadata.status = self.REQUEST_STATUS_QUEUED
+                self.index += 1
 
-            if position == -1:
-                self.queue[queue_name].append(url_metadata)
-            else:
-                self.queue[queue_name].insert(position + i, url_metadata)
+                # If a response hook is provided, wrap it to inject the original URL
+                try:
+                    hooks = per_kwargs.get("hooks")
+                    if hooks and "response" in hooks:
+                        # Copy hooks dict to avoid shared mutation
+                        hooks = {**hooks}
+                        original_hook = hooks["response"]
+                        # Support a single callable or a list of callables
+                        def wrap(h, original_url):
+                            def _wrapped(resp, *a, **k):
+                                # Inject FourCAT-specific original URL in kwargs once
+                                if "fourcat_original_url" not in k:
+                                    k["fourcat_original_url"] = original_url
+                                return h(resp, *a, **k)
+                            return _wrapped
+
+                        if isinstance(original_hook, list):
+                            hooks["response"] = [wrap(h, url) for h in original_hook]
+                        else:
+                            hooks["response"] = wrap(original_hook, url)
+
+                        # Persist modified hooks back into per-URL kwargs
+                        per_kwargs["hooks"] = hooks
+                except Exception:
+                    # If wrapping fails for any reason, proceed without modification
+                    pass
+
+                # Assign the isolated kwargs to this metadata entry
+                url_metadata.kwargs = per_kwargs
+
+                if position == -1:
+                    self.queue[queue_name].append(url_metadata)
+                else:
+                    self.queue[queue_name].insert(position + i, url_metadata)
 
         self.manage_requests()
 
+    @synchronized_method
     def get_queue_length(self, queue_name="_"):
         """
         Get the length, of the queue
@@ -269,12 +432,87 @@ class DelegatedRequestHandler:
         :return int: Amount of URLs in the queue (regardless of status)
         """
         queue_length = 0
-        for queue in self.queue:
+        for queue in list(self.queue.keys()):
             if queue == queue_name or queue_name == "_":
-                queue_length += len(self.queue[queue_name])
+                queue_length += len(self.queue.get(queue, []))
 
         return queue_length
 
+    @synchronized_method
+    def _update_proxy_pool(self):
+        """
+        Update proxy pool when settings change
+        
+        Adds new proxies, removes old ones, and preserves proxies with active requests.
+        Updates settings for existing proxies that remain in the configuration.
+        """
+        new_proxy_urls = set(self.proxy_settings["proxies.urls"])
+        current_proxy_urls = set(self.proxy_pool.keys())
+        
+        # Find proxies to add and remove
+        proxies_to_add = new_proxy_urls - current_proxy_urls
+        proxies_to_remove = current_proxy_urls - new_proxy_urls
+        proxies_to_keep = current_proxy_urls & new_proxy_urls
+        
+        # Remove proxies that are no longer in config
+        for proxy_url in proxies_to_remove:
+            if proxy_url in self.proxy_pool:
+                proxy_obj = self.proxy_pool[proxy_url].proxy
+                # Check if proxy has truly active requests (CLAIMED or RUNNING, not COOLING_OFF)
+                if not proxy_obj.has_active_requests():
+                    # No active requests - remove immediately
+                    del self.proxy_pool[proxy_url]
+                    if proxy_url in self.proxy_health:
+                        del self.proxy_health[proxy_url]
+                    self.proxies_pending_removal.discard(proxy_url)
+                    self.log.info(f"Removed proxy {proxy_url} (no longer in config)")
+                else:
+                    # Has active requests - mark for removal but don't delete yet
+                    self.proxies_pending_removal.add(proxy_url)
+                    self.log.warning(f"Proxy {proxy_url} marked for removal (has active requests, will not accept new requests)")
+        
+        # Update settings for existing proxies
+        for proxy_url in proxies_to_keep:
+            if proxy_url in self.proxy_pool:
+                proxy_obj = self.proxy_pool[proxy_url].proxy
+                proxy_obj.COOLOFF = self.proxy_settings["proxies.cooloff"]
+                proxy_obj.MAX_CONCURRENT_OVERALL = self.proxy_settings["proxies.concurrent-overall"]
+                proxy_obj.MAX_CONCURRENT_PER_HOST = self.proxy_settings["proxies.concurrent-host"]
+                proxy_obj.healthcheck_url = self.proxy_settings.get("proxies.healthcheck-url")
+                proxy_obj.healthcheck_timeout = self.proxy_settings.get("proxies.healthcheck-timeout", 5)
+        
+        # Add new proxies
+        for proxy_url in proxies_to_add:
+            self._add_proxy_to_pool(proxy_url)
+            self.log.info(f"Added new proxy {proxy_url}")
+        
+        if proxies_to_add or proxies_to_remove:
+            self.log.info(f"Proxy pool updated: {len(self.proxy_pool)} total proxies "
+                         f"({len(proxies_to_add)} added, {len([p for p in proxies_to_remove if p not in self.proxy_pool])} removed)")
+    
+    @synchronized_method
+    def _add_proxy_to_pool(self, proxy_url):
+        """
+        Add a proxy to the pool
+        
+        Helper method to avoid duplicating proxy creation logic.
+        
+        :param str proxy_url: The proxy URL to add (or PROXY_LOCALHOST for direct connection)
+        """
+        self.proxy_pool[proxy_url] = namedtuple("ProxyEntry", ("proxy", "last_used"))
+        self.proxy_pool[proxy_url].proxy = SophisticatedFuturesProxy(
+            proxy_url,
+            self.log,
+            self.proxy_settings.get("proxies.cooloff", 0.1),
+            self.proxy_settings.get("proxies.concurrent-overall", 5),
+            self.proxy_settings.get("proxies.concurrent-host", 2),
+            self.proxy_settings.get("proxies.healthcheck-url"),
+            self.proxy_settings.get("proxies.healthcheck-timeout", 5),
+        )
+        self.proxy_pool[proxy_url].last_used = 0
+        self.proxy_health[proxy_url] = True
+    
+    @synchronized_method
     def claim_proxy(self, url):
         """
         Find a proxy to do the request with
@@ -282,39 +520,78 @@ class DelegatedRequestHandler:
         Finds a `SophisticatedFuturesProxy` that has an open slot for this URL.
 
         :param str url:  URL to proxy a request for
-        :return SophisticatedFuturesProxy or False:
+        :return SophisticatedFuturesProxy or None:
+            - SophisticatedFuturesProxy if a proxy is available
+            - None if all proxies are busy (retry later)
+        :raises NoProxiesAvailableError: If all proxies unhealthy and fallback disabled
         """
-        if not self.proxy_pool:
-            # this will trigger the first time this method is called
-            # build a proxy pool with some information per available proxy
-            proxies = self.proxy_settings["proxies.urls"]
-            for proxy_url in proxies:
-                self.proxy_pool[proxy_url] = namedtuple(
-                    "ProxyEntry", ("proxy", "last_used")
-                )
-                self.proxy_pool[proxy_url].proxy = SophisticatedFuturesProxy(
-                    proxy_url,
-                    self.log,
-                    self.proxy_settings["proxies.cooloff"],
-                    self.proxy_settings["proxies.concurrent-overall"],
-                    self.proxy_settings["proxies.concurrent-host"],
-                )
-                self.proxy_pool[proxy_url].last_used = 0
-
-            self.log.debug(f"Proxy pool has {len(self.proxy_pool)} available proxies.")
-
-        # within the pool, find the least recently used proxy that is available
+        # Get healthy proxies (excluding those pending removal)
+        healthy_proxies = [p for p in self.proxy_pool 
+                          if self.proxy_health.get(p, True)
+                          and p not in self.proxies_pending_removal]
+        
+        # If no healthy proxies, check if we should create localhost
+        if not healthy_proxies:
+            allow_localhost = self.proxy_settings.get("proxies.allow-localhost-fallback", True)
+            
+            if allow_localhost and self.PROXY_LOCALHOST not in self.proxy_pool:
+                # Create localhost as fallback
+                if not self.all_proxies_failed_logged:
+                    self.all_proxies_failed_logged = True
+                    self.log.error("All configured proxies are unhealthy. Falling back to localhost (direct connection).")
+                self._add_proxy_to_pool(self.PROXY_LOCALHOST)
+                self.log.info("Created localhost proxy for direct connections")
+                healthy_proxies = [self.PROXY_LOCALHOST]
+            elif not allow_localhost:
+                # Fallback disabled - fail
+                if not self.all_proxies_failed_logged:
+                    self.all_proxies_failed_logged = True
+                    self.log.error("All proxies are unhealthy and localhost fallback is disabled.")
+                raise NoProxiesAvailableError("All proxies unhealthy and localhost fallback disabled")
+            else:
+                # Localhost exists but unhealthy
+                raise NoProxiesAvailableError("All proxies including localhost are unhealthy")
+        
+        # within the pool, find the least recently used healthy proxy that is available
         sorted_by_cooloff = sorted(
-            self.proxy_pool, key=lambda p: self.proxy_pool[p].last_used
+            healthy_proxies, key=lambda p: self.proxy_pool[p].last_used
         )
         for proxy_id in sorted_by_cooloff:
             claimed_proxy = self.proxy_pool[proxy_id].proxy.claim_for(url)
             if claimed_proxy:
                 self.proxy_pool[proxy_id].last_used = time.time()
                 return claimed_proxy
+        
+        # All proxies busy
+        return None
+    
+    @synchronized_method
+    def _initialize_proxy_pool(self):
+        """
+        Initialize the proxy pool with configured proxies
+        
+        Called once during refresh_settings(). If no proxies configured,
+        adds localhost. Otherwise adds configured proxies.
+        """
+        proxies = self.proxy_settings.get("proxies.urls", [])
+        
+        # Handle empty/None proxy configuration - add localhost
+        if not proxies:
+            self.log.warning(
+                "No proxies configured (proxies.urls is empty or None). "
+                "Using localhost (direct connection) for all requests. "
+                "Set Proxy URLs in setting to [\"__localhost__\"] to disable this warning."
+            )
+            self._add_proxy_to_pool(self.PROXY_LOCALHOST)
+            return
+        
+        # Initialize configured proxies
+        for proxy_url in proxies:
+            self._add_proxy_to_pool(proxy_url)
 
-        return False
+        self.log.debug(f"Proxy pool initialized with {len(self.proxy_pool)} proxies.")
 
+    @synchronized_method
     def manage_requests(self):
         """
         Manage requests asynchronously
@@ -329,7 +606,10 @@ class DelegatedRequestHandler:
         finished requests in the original queue order (`get_results()`).
         """
         # go through queue and look at the status of each URL
-        for queue_name in self.queue:
+        for queue_name in list(self.queue.keys()):
+            if queue_name not in self.queue:
+                continue
+
             for i, url_metadata in enumerate(self.queue[queue_name]):
                 url = url_metadata.url
 
@@ -344,10 +624,57 @@ class DelegatedRequestHandler:
                     # request will also be done()!
                     self.log.debug(f"Request for {url} finished, collecting result")
                     url_metadata.proxied.proxy.mark_request_finished(url)
+                    
+                    # Clean up proxies pending removal if they have no more active requests
+                    proxy_url = url_metadata.proxied.proxy.proxy_url
+                    if proxy_url in self.proxies_pending_removal and proxy_url in self.proxy_pool:
+                        proxy_obj = self.proxy_pool[proxy_url].proxy
+                        # Check if proxy has truly active requests (not just cooling off)
+                        if not proxy_obj.has_active_requests():
+                            del self.proxy_pool[proxy_url]
+                            if proxy_url in self.proxy_health:
+                                del self.proxy_health[proxy_url]
+                            self.proxies_pending_removal.discard(proxy_url)
+                            self.log.info(f"Removed proxy {proxy_url} (completed all active requests)")
                     try:
                         response = url_metadata.proxied.request.result()
+                        # annotate the response so processors can see which
+                        # proxy (if any) handled the request
+                        setattr(
+                            response,
+                            "_4cat_proxy",
+                            url_metadata.proxied.proxy.proxy_url,
+                        )
                         url_metadata.proxied.result = response
 
+                    except requests.exceptions.ProxyError as e:
+                        # Proxy connection issue - validate proxy with health probe first
+                        proxy_url = url_metadata.proxied.proxy.proxy_url
+
+                        probe_succeeded = url_metadata.proxied.proxy.probe()
+                        if probe_succeeded:
+                            self.log.debug(
+                                f"Proxy {proxy_url} returned a proxy error for {url}, "
+                                f"but health probe to {url_metadata.proxied.proxy.healthcheck_url} succeeded; "
+                                f"passing original error back to requester"
+                            )
+                            url_metadata.proxied.result = FailedProxiedRequest(
+                                e, proxy_url
+                            )
+                        else:
+                            self.proxy_health[proxy_url] = False
+
+                            if proxy_url not in self.proxy_warnings_logged:
+                                self.proxy_warnings_logged.add(proxy_url)
+                                self.log.warning(
+                                    f"Proxy {proxy_url} marked as unhealthy due to connection failure and failed health probe "
+                                    f"({url_metadata.proxied.proxy.healthcheck_url}): {str(e)}"
+                                )
+
+                            # Retry with a different proxy
+                            url_metadata.status = self.REQUEST_STATUS_QUEUED
+                            url_metadata.proxied = None
+                    
                     except (
                         ConnectionError,
                         asyncioCancelledError,
@@ -356,11 +683,15 @@ class DelegatedRequestHandler:
                         urllib3.exceptions.HTTPError,
                     ) as e:
                         # this is where timeouts, etc, go
-                        url_metadata.proxied.result = FailedProxiedRequest(e)
+                        url_metadata.proxied.result = FailedProxiedRequest(
+                            e, url_metadata.proxied.proxy.proxy_url
+                        )
 
                     finally:
                         # success or fail, we can pass it on
-                        url_metadata.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
+                        # Only set to waiting if not requeued by ProxyError handler
+                        if url_metadata.status != self.REQUEST_STATUS_QUEUED:
+                            url_metadata.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
 
                 else:
                     # running - ignore for now
@@ -372,9 +703,27 @@ class DelegatedRequestHandler:
                     queue_name in self.halted or "_" in self.halted
                 ):
                     # no request running for this URL yet, try to start one
-                    proxy = self.claim_proxy(url)
-                    if not proxy:
-                        # no available proxies, try again next loop
+                    try:
+                        proxy = self.claim_proxy(url)
+                    except NoProxiesAvailableError as e:
+                        # All proxies failed and fallback disabled - fail this request
+                        url_metadata.proxied = namedtuple(
+                            "DelegatedRequest",
+                            ("request", "created", "result", "proxy", "url", "index"),
+                        )
+                        url_metadata.proxied.request = None
+                        url_metadata.proxied.created = time.time()
+                        url_metadata.proxied.result = FailedProxiedRequest(e, None)
+                        url_metadata.proxied.proxy = None
+                        url_metadata.proxied.url = url
+                        url_metadata.proxied.index = url_metadata.index
+                        url_metadata.status = self.REQUEST_STATUS_WAITING_FOR_YIELD
+                        self.queue[queue_name][i] = url_metadata
+                        continue
+                    
+                    if proxy is None:
+                        # No proxy available (all busy)
+                        # Try again next loop iteration
                         continue
 
                     proxy_url = proxy.proxy_url
@@ -443,25 +792,27 @@ class DelegatedRequestHandler:
         """
         self.manage_requests()
 
-        # no results, no return
-        if queue_name not in self.queue:
-            return
-
-        # use list comprehensions here to avoid having to modify the
-        # lists while iterating through them
-        for url_metadata in [u for u in self.queue[queue_name]]:
-            # for each URL in the queue...
-            if url_metadata.status == self.REQUEST_STATUS_WAITING_FOR_YIELD:
-                # see if a finished request is available...
-                self.queue[queue_name].remove(url_metadata)
-                yield url_metadata.url, url_metadata.proxied.result
-
-            elif preserve_order:
-                # ...but as soon as a URL has no finished result, return
-                # unless we don't care about the order, then continue and yield
-                # as much as possible
+        with self.lock:
+            # no results, no return
+            if queue_name not in self.queue:
                 return
 
+            # use list comprehensions here to avoid having to modify the
+            # lists while iterating through them
+            for url_metadata in [u for u in self.queue[queue_name]]:
+                # for each URL in the queue...
+                if url_metadata.status == self.REQUEST_STATUS_WAITING_FOR_YIELD:
+                    # see if a finished request is available...
+                    self.queue[queue_name].remove(url_metadata)
+                    yield url_metadata.url, url_metadata.proxied.result
+
+                elif preserve_order:
+                    # ...but as soon as a URL has no finished result, return
+                    # unless we don't care about the order, then continue and yield
+                    # as much as possible
+                    return
+
+    @synchronized_method
     def _halt(self, queue_name="_"):
         """
         Interrupt fetching of results
@@ -479,11 +830,11 @@ class DelegatedRequestHandler:
         """
         self.halted.add(queue_name)
 
-        for queue in self.queue:
+        for queue in list(self.queue.keys()):
             if queue_name == "_" or queue_name == queue:
                 # use a list comprehension here to avoid having to modify the
                 # list while iterating through it
-                for url_metadata in [u for u in self.queue[queue]]:
+                for url_metadata in [u for u in self.queue.get(queue, [])]:
                     if url_metadata.status != self.REQUEST_STATUS_STARTED:
                         self.queue[queue].remove(url_metadata)
                     else:
@@ -505,5 +856,6 @@ class DelegatedRequestHandler:
             # exhaust generator without doing something w/ results
             all(self.get_results(queue_name, preserve_order=False))
 
-        if queue_name in self.queue:
-            del self.queue[queue_name]
+        with self.lock:
+            if queue_name in self.queue:
+                del self.queue[queue_name]

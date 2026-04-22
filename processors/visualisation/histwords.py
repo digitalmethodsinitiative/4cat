@@ -118,8 +118,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # parse parameters
         input_words = self.parameters.get("words", "")
         if not input_words or not input_words.split(","):
-            self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No input words provided, cannot look for similar words.")
             return
 
         input_words = input_words.split(",")
@@ -192,8 +191,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
             for query in input_words:
                 if query not in model.key_to_index:
-                    self.dataset.update_status("Query '%s' was not found in model %s; cannot find nearest neighbours." % (query, model_name), is_final=True)
-                    self.dataset.finish(0)
+                    self.dataset.finish_as_empty(f"Query '{query}' was not found in model {model_name}; cannot find nearest neighbours.")
                     return
 
                 if self.interrupted:
@@ -260,8 +258,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             vectors = svd.fit_transform(vectors)
         else:
             shutil.rmtree(staging_area)
-            self.dataset.update_status("Invalid dimensionality reduction technique selected", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("Invalid dimensionality reduction technique selected")
             return
 
         # also keep track of the boundaries of our 2D space, so we can plot

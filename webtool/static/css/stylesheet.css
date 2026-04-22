@@ -1147,7 +1147,7 @@ a.property-badge {
     color: var(--gray-dark);
 }
 
-.warning {
+.warning-text {
     color: var(--warning);
 }
 

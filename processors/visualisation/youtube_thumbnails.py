@@ -120,8 +120,7 @@ class YouTubeThumbnails(BasicProcessor):
 					retries += 1
 					time.sleep(self.sleep_time)  # Wait a bit before trying again
 
-			# Do nothing with the results if the requests failed -
-			# be in the final results file
+			# Do nothing with the results if the requests failed
 			if retries >= self.max_retries:
 				self.dataset.update_status("Error during YouTube API request")
 			else:

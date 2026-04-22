@@ -23,8 +23,9 @@ class CategorizeImagesCLIP(BasicProcessor):
     """
     type = "image-to-categories"  # job type ID
     category = "Visual"  # category
-    title = "Categorize Images using OpenAI's CLIP models"  # title displayed in UI
-    description = "Given a list of categories, the CLIP model will estimate likelihood an image is to belong to each (total of all categories per image will be 100%)."  # description displayed in UI
+    title = "Categorize images with CLIP"  # title displayed in UI
+    description = ("Provide a list of categories and classify images with OpenAI's CLIP models. This will estimate "
+                   "the likelihood an image belongs to a category (total of all category values will be 100%).")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     followups = ["image-category-wall"]
@@ -54,6 +55,19 @@ class CategorizeImagesCLIP(BasicProcessor):
             "tooltip": "Use '0' to allow unlimited number"
         },
     }
+
+    @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Shared queue for locally hosted models
+
+        :param str remote_id:  Job item ID
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset to run job for
+        :return:
+        """
+        # Unique queue for locally hosted models; used by other local model processors as well
+        return "local_models" 
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

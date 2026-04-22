@@ -21,7 +21,7 @@ class ConvertText(BasicProcessor):
     type = "convert-text"  # job type ID
     category = "Conversion"  # category
     title = "Replace text"  # title displayed in UI
-    description = ("Find and replace text in selected fields and and output these in a new dataset. Changed text can "
+    description = ("Find text in selected fields, replace parts of it, and write to a new dataset. Converted texts can "
                    "also be added to the original dataset as annotations.")  # description displayed in UI
     extension = "csv"
 
@@ -38,7 +38,7 @@ class ConvertText(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "Text to replace",
-                "tooltip": "Multiple values can be replaced, separate with comma.",
+                "tooltip": "Multiple values can be replaced; separate with comma.",
             },
             "as_regex": {
                 "type": UserInput.OPTION_TOGGLE,

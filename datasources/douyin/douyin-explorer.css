@@ -1,0 +1,44 @@
+body {
+	background-color: #161823;
+	color: #b8b9bc;
+}
+
+.items header span.item_id {
+	display: none;
+}
+
+.items li.item {
+	border-radius: 10px;
+	padding: 20px;
+	max-width: 200px;
+	color: #b8b9bc;
+	background-color: #292b35;
+	border-bottom: 1px grey;
+}
+
+
+.items li.item .preview {
+	display: block;
+	margin: 0 auto;
+	max-width: 300px;
+}
+
+
+.items .item header .author_picture {
+	float: left;
+	margin-right: 15px;
+}
+
+.items .item header .author_picture img {
+	border-radius: 100px;
+	width: 50px;
+}
+
+.items .item header .author_picture:after {
+	display: none;
+}
+
+.items .item .item-annotations {
+	background-color: black;
+	color: white;
+}

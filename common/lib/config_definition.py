@@ -301,6 +301,27 @@ config_definition = {
         "tooltip": "Per proxy, this many requests can run concurrently per host. Should be lower than or equal to the "
                    "overall limit."
     },
+    "proxies.allow-localhost-fallback": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Fall back to localhost",
+        "tooltip": "If all proxies are down, allow falling back to direct requests (i.e., no proxy)."
+    },
+    "proxies.healthcheck-url": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Proxy health check URL",
+        "tooltip": "Known-good URL used to validate whether a proxy is actually down when a proxied request fails. "
+                   "Leave empty to auto-use this 4CAT frontend's /robots.txt URL based on Flask host and scheme."
+    },
+    "proxies.healthcheck-timeout": {
+        "type": UserInput.OPTION_TEXT,
+        "coerce_type": float,
+        "default": 5,
+        "min": 0.1,
+        "help": "Proxy health check timeout",
+        "tooltip": "Timeout in seconds for the proxy health check request."
+    },
     # logging
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
@@ -377,17 +398,17 @@ config_definition = {
     "explorer.max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": 100000,
-        "help": "Amount of posts",
+        "help": "Amount of items",
         "coerce_type": int,
-        "tooltip": "Maximum number of posts to be considered by the Explorer (prevents timeouts and "
+        "tooltip": "Maximum number of items to be considered by the Explorer (prevents timeouts and "
                    "memory errors)"
     },
     "explorer.posts_per_page": {
         "type": UserInput.OPTION_TEXT,
         "default": 50,
-        "help": "Posts per page",
+        "help": "Items per page",
         "coerce_type": int,
-        "tooltip": "Number of posts to display per page"
+        "tooltip": "Number of items to display per page"
     },
     "explorer.config_explanation": {
         "type": UserInput.OPTION_INFO,
@@ -414,12 +435,11 @@ config_definition = {
     },
     "flask.server_name": {
         "type": UserInput.OPTION_TEXT,
-        "default": "4cat.local:5000",
+        "default": "localhost:5000",
         "help": "Host name",
-        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost; when running 4CAT in Docker this "
-                   "setting is ignored as any domain/port binding should be handled outside of the Docker container"
-                   "; the Docker container itself will serve on any domain name on the port configured in the .env "
-                   "file.",
+        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Include a port when not using 80 (HTTP) or 443 (HTTPS), or "
+                   "when your reverse proxy forwards on a non-standard port. This value is passed to Flask’s SERVER_NAME. "
+                   "Restart the front-end for changes to apply.",
         "global": True
     },
     "flask.autologin.hostnames": {
@@ -599,9 +619,9 @@ config_definition = {
     },
     "llm.available_models": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": [],
+        "default": {},
         "help": "Available LLM models",
-        "tooltip": "A JSON array of available LLM models on the server. 4CAT will query the LLM server for available models periodically.",
+        "tooltip": "A JSON dictionary of available LLM models on the server. 4CAT will query the LLM server for available models periodically.",
         "indirect": True,
         "global": True
     },

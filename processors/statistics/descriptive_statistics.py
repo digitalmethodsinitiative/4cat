@@ -160,7 +160,7 @@ class DescriptiveStatistics(BasicProcessor):
             results.append(stats)
 
         if not results:
-            self.dataset.finish_with_error("No valid numerical data found in the selected columns")
+            self.dataset.finish_as_empty("No valid numerical data found in the selected columns")
             return
 
         # Finish up

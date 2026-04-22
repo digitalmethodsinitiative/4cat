@@ -11,6 +11,7 @@ import re
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
+from common.lib.helpers import normalize_url_encoding
 
 class SearchLinkedIn(Search):
     """
@@ -162,6 +163,7 @@ class SearchLinkedIn(Search):
             link_url = item["content"]["articleComponent"]["navigationContext"].get("actionTarget", "")
 
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item_id,
             "thread_id": item_id,
             "body": item["commentary"]["text"]["text"] if item["commentary"] else "",

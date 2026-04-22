@@ -31,9 +31,9 @@ class Tokenise(BasicProcessor):
     type = "tokenise-posts"  # job type ID
     category = "Text analysis"  # category
     title = "Tokenise"  # title displayed in UI
-    description = "Splits the post body texts in separate words (tokens). This data can then be used for text analysis. " \
-                  "The output is a list of lists (each list representing all post tokens or " \
-                  "tokens per sentence)."  # description displayed in UI
+    description = "Splits item texts into separate tokens. This data can then be used for text analysis. " \
+                  "The output is a list of lists, each list representing all item tokens or " \
+                  "tokens per sentence."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
     followups = ["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller", ]
@@ -207,7 +207,7 @@ class Tokenise(BasicProcessor):
     def process(self):
         """
         This takes a 4CAT results file as input, and outputs a number of files
-        containing tokenised posts, grouped per time unit as specified in the
+        containing tokenised items, grouped per time unit as specified in the
         parameters.
 
         Tokens are stored as a JSON dump per 'output unit'; each output unit
@@ -216,7 +216,7 @@ class Tokenise(BasicProcessor):
         want to keep all tokens for a given output unit in memory until it's
         done, as for large datasets that may exceed memory capacity. Instead,
         we keep a file handle open while tokenising and write the tokens to
-        that file per tokenised post. Since we simply need to store a list of
+        that file per tokenised item. Since we simply need to store a list of
         strings, we can concatenate these lists manually, only using the json
         export options for the token lists. In other words, files are written
         as such:
@@ -227,7 +227,7 @@ class Tokenise(BasicProcessor):
         then, if not the first token in the list, a comma:
             ,
 
-        then for each post, a list of tokens, with json.dumps:
+        then for each item, a list of tokens, with json.dumps:
             ["token1","token2"]
 
         then after all tokens are done for an output unit, a closing bracket:
@@ -348,7 +348,7 @@ class Tokenise(BasicProcessor):
         # prepare staging area
         staging_area = self.dataset.get_staging_area()
 
-        # process posts
+        # process items
         self.dataset.update_status("Processing items")
         docs_per = self.parameters.get("docs_per")
         grouping = "item" if self.parameters.get("grouping-per", "") == "item" else "sentence"
@@ -379,31 +379,31 @@ class Tokenise(BasicProcessor):
                     get_annotations = True
                     break
 
-        for post in self.source_dataset.iterate_items(self, get_annotations=get_annotations):
-            # determine what output unit this post belongs to
+        for item in self.source_dataset.iterate_items(self, get_annotations=get_annotations):
+            # determine what output unit this item belongs to
             if docs_per != "thread":
                 try:
-                    document_descriptor = get_interval_descriptor(post, docs_per)
+                    document_descriptor = get_interval_descriptor(item, docs_per)
                 except ValueError as e:
                     self.dataset.update_status("%s, cannot count items per %s" % (str(e), docs_per), is_final=True)
                     self.dataset.update_status(0)
                     return
             else:
                 # Ensure descriptor is a safe filename (strip disallowed characters)
-                document_descriptor = re.sub(r"[^a-zA-Z0-9._+-]", "", str(post.get("thread_id", "") if post.get("thread_id") else "undefined")) or "undefined"
+                document_descriptor = re.sub(r"[^a-zA-Z0-9._+-]", "", str(item.get("thread_id", "") if item.get("thread_id") else "undefined")) or "undefined"
 
             # Prep metadata
             # document_numbers lists the indexes for documents found in filename relating to this post/item
             # It should only have one index if grouped_by is "item", but may have more if grouped_by is "sentence" or multiple columns are provided
             metadata['parameters']['intervals'].add(document_descriptor)
-            post_id = post.get('id')
-            if post_id in metadata:
-                # Posts may be processed multiple times over time, so we need to keep track of all documents
-                self.dataset.log(f"Note: duplicate post ID {post_id} found in dataset; posts will be processed multiple times")
+            item_id = item.get('id')
+            if item_id in metadata:
+                # Items may be processed multiple times over time, so we need to keep track of all documents
+                self.dataset.log(f"Note: duplicate item ID {item_id} found in dataset; items will be processed multiple times")
             else:
-                metadata[post_id] = {}
-            if document_descriptor not in metadata[post_id]:
-                metadata[post_id][document_descriptor] = {
+                metadata[item_id] = {}
+            if document_descriptor not in metadata[item_id]:
+                metadata[item_id][document_descriptor] = {
                     'filename': document_descriptor + ".json",
                     'document_numbers': [],
                     'interval': document_descriptor,
@@ -412,15 +412,13 @@ class Tokenise(BasicProcessor):
 
             groupings = []
             for column in columns:
-                column_value = post.get(column)
+                column_value = item.get(column)
                 # Possible to only check ones? Not if column is blank/None for some rows, but not all.
                 if column_value is not None and type(column_value) is not str:
-                    self.dataset.update_status("Column %s contains non text values and cannot be tokenized" % column,
-                                               is_final=True)
-                    self.dataset.update_status(0)
+                    self.dataset.finish_with_error("Column %s contains non text values and cannot be tokenized")
                     return
 
-                value = [Tokenise.normalise_segment(v) for v in sentence_method(post[column], language) if
+                value = [Tokenise.normalise_segment(v) for v in sentence_method(item[column], language) if
                          v is not None]
                 if value:
                     groupings.extend(value)
@@ -431,7 +429,7 @@ class Tokenise(BasicProcessor):
 
             # tokenise...
             for i, document in enumerate(groupings):
-                post_tokens = []
+                item_tokens = []
 
                 # clean up text and get tokens from it
                 body = link_regex.sub("", document)
@@ -456,17 +454,17 @@ class Tokenise(BasicProcessor):
                     if self.parameters["lemmatise"] and lemmatizer:
                         token = lemmatizer.lemmatize(token)
 
-                    # append tokens to the post's token list
-                    post_tokens.append(token)
+                    # append tokens to the item's token list
+                    item_tokens.append(token)
 
                 # write tokens to file
                 # this writes lists of json lists, with the outer list serialised
                 # 'manually' and the token lists serialised by the json library
-                if post_tokens:
+                if item_tokens:
 
                     # Only keep unique words, if desired
                     if only_unique:
-                        post_tokens = list(set(post_tokens))
+                        item_tokens = list(set(item_tokens))
 
                     output_file = staging_area.joinpath(document_descriptor + ".json")
                     output_path = str(output_file)
@@ -486,19 +484,19 @@ class Tokenise(BasicProcessor):
                     if output_files[current_output_path] > 0:
                         output_file_handle.write(",\n")
 
-                    output_file_handle.write(json.dumps(post_tokens))
-                    metadata[post_id][document_descriptor]['document_numbers'].append(output_files[output_path])
+                    output_file_handle.write(json.dumps(item_tokens))
+                    metadata[item_id][document_descriptor]['document_numbers'].append(output_files[output_path])
                     if i > 0:
-                        # TODO: potentially store the different docs and map them to the post; the post_topic_matrix processor could make use of this
-                        # However, why someone would want to predict topics for different parts of a post seems unclear
-                        metadata[post_id][document_descriptor]['multiple_docs'] = True
+                        # TODO: potentially store the different docs and map them to the item; the item_topic_matrix processor could make use of this
+                        # However, why someone would want to predict topics for different parts of a item seems unclear
+                        metadata[item_id][document_descriptor]['multiple_docs'] = True
 
                     # Possibly save tokens as annotations, in batches of 1000 to prevent memory hog
                     if save_annotations:
                         annotations.append({
                             "label": "tokens",
-                            "item_id": post_id,
-                            "value": ",".join(post_tokens)
+                            "item_id": item_id,
+                            "value": ",".join(item_tokens)
                         })
                         if processed % 1000 == 0:
                             self.save_annotations(annotations, hide_in_explorer=True)
@@ -515,7 +513,7 @@ class Tokenise(BasicProcessor):
 
         # close all json lists
         # we do this now because only here do we know all files have been
-        # fully written - if posts are out of order, the tokeniser may
+        # fully written - if items are out of order, the tokeniser may
         # need to repeatedly switch between various token files
         for output_path in output_files:
             with open(output_path, "a") as file_handle:
@@ -526,11 +524,12 @@ class Tokenise(BasicProcessor):
         with staging_area.joinpath(".token_metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
+        warning = None
         if sentence_error:
-            self.dataset.update_status(f"Finished tokenizing; Unable to group by sentence ({language} not supported), instead grouped by item.", is_final=True)
+            warning = f"Finished tokenizing; Unable to group by sentence ({language} not supported), instead grouped by item."
 
         # create zip of archive and delete temporary files and folder
-        self.write_archive_and_finish(staging_area)
+        self.write_archive_and_finish(staging_area, warning=warning)
 
     @staticmethod
     def get_sentence_method(language, grouping, dataset=None):
@@ -546,7 +545,7 @@ class Tokenise(BasicProcessor):
         def dummy_function(x, *args, **kwargs):
             return [x]
 
-        # if told so, first split the post into separate sentences
+        # if told so, first split the item into separate sentences
         if grouping == "sentence":
             if language == "Russian":
                 # for russian we use a special purpose splitter with better
@@ -554,7 +553,7 @@ class Tokenise(BasicProcessor):
                 return razdel.sentenize, False
             elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab'))]:
                 if dataset:
-                    dataset.update_status(f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")
+                    dataset.update_status(f"Language {language} not available for sentence tokenizer; grouping by items instead.")
                 return dummy_function, True
             else:
                 return sent_tokenize, False

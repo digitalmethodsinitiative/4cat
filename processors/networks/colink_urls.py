@@ -3,6 +3,7 @@ Generate co-link network of URLs in posts
 """
 import re
 import time
+import multiprocessing
 
 import psutil
 
@@ -16,6 +17,10 @@ __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
+
+def _write_gexf(graph, path):
+	nx.write_gexf(graph, path)
 
 class URLCoLinker(BasicProcessor):
 	"""
@@ -172,11 +177,25 @@ class URLCoLinker(BasicProcessor):
 		self.dataset.update_status(f"Network has {len(network.nodes)} and {len(network.edges)} edges")
 		self.dataset.log(f"time elapsed: {time.time() - start_time:.2f} seconds")
 		self.dataset.update_status("Writing network file")
-		if psutil.virtual_memory().percent > 95:
-			self.dataset.update_status("WARNING: memory usage about 95%; network may fail...")
-			self.log.warning(f"Memory usage above 95%: network dataset {self.dataset.key}")
-			#TODO: add perhaps kill the processor? It's frustrating that we can collect the data but not write it!
-		nx.write_gexf(network, self.dataset.get_results_path())
+		
+		writer = multiprocessing.Process(target=_write_gexf, args=(network, self.dataset.get_results_path()))
+		writer.start()
+		while writer.is_alive():
+			if psutil.virtual_memory().percent >= 90:
+				self.log.warning(f"Memory usage above 90% during write; terminating writer for dataset {self.dataset.key}")
+				self.dataset.update_status("WARNING: memory usage above 90%; terminating write to prevent crash")
+				writer.terminate()
+				writer.join(timeout=5)
+				self.dataset.finish_with_error("Network write terminated because memory usage exceeded 90%")
+				return
+			time.sleep(0.5)
+
+		writer.join()
+		if writer.exitcode != 0:
+			self.dataset.finish_with_error("Network write failed")
+			self.log.warning(f"Network writer exited with code {writer.exitcode} for dataset {self.dataset.key}")
+			return
+			
 		self.dataset.log(f"time to complete: {time.time() - start_time:.2f} seconds")
 		self.dataset.finish(len(network.nodes))
 

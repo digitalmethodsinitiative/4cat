@@ -12,7 +12,7 @@ class AnnotateImages(ProcessorPreset):
     """
     type = "preset-annotate-images"  # job type ID
     category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Annotate images with Google Vision API"  # title displayed in UI
+    title = "Annotate images with Google Vision"  # title displayed in UI
     description = "Use the Google Vision API to extract labels detected in the most-linked images from the dataset. Note that " \
                   "this is a paid service and will count towards your API credit."
     extension = "csv"

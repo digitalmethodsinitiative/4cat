@@ -1,6 +1,7 @@
 import collections
 import itertools
 import datetime
+import zipfile
 import fnmatch
 import random
 import shutil
@@ -8,6 +9,8 @@ import json
 import time
 import csv
 import re
+import os
+from enum import Enum
 
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
@@ -18,6 +21,14 @@ from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
                                    MapItemException, MappedItemIncompleteException, AnnotationException)
 
+
+class StatusType(Enum):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    SUCCESS = "finished"
+    EMPTY = "empty"
+    WARNING = "warning"
+    ERROR = "error"
 
 class DataSet(FourcatModule):
     """
@@ -54,7 +65,7 @@ class DataSet(FourcatModule):
     is_new = True
 
     no_status_updates = False
-    staging_areas = None
+    disposable_files = None
     _queue_position = None
 
     def __init__(
@@ -105,7 +116,7 @@ class DataSet(FourcatModule):
         self.parameters = {}
         self.available_processors = {}
         self._genealogy = None
-        self.staging_areas = []
+        self.disposable_files = []
         self.modules = modules
 
         if key is not None:
@@ -170,6 +181,7 @@ class DataSet(FourcatModule):
                 "parameters": json.dumps(parameters),
                 "result_file": "",
                 "creator": owner,
+                "status_type": StatusType.QUEUED.value,
                 "status": "",
                 "type": type,
                 "timestamp": int(time.time()),
@@ -289,7 +301,7 @@ class DataSet(FourcatModule):
         with log_path.open("a", encoding="utf-8") as outfile:
             outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
 
-    def _iterate_items(self, processor=None, offset=0):
+    def _iterate_items(self, processor=None, offset=0, *args, **kwargs):
         """
         A generator that iterates through a CSV or NDJSON file
 
@@ -356,11 +368,96 @@ class DataSet(FourcatModule):
                     yield json.loads(line)
 
         else:
-            raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+            raise NotImplementedError(f"Cannot iterate through {path.suffix} file")
+
+    def _iterate_archive_contents(
+            self,
+            staging_area=None,
+            immediately_delete=True,
+            filename_filter=None,
+            processor=None,
+            offset=0,
+            *args, **kwargs
+        ):
+        """
+        A generator that iterates through files in an archive
+
+        With every iteration, the processor's 'interrupted' flag is checked,
+        and if set a ProcessorInterruptedException is raised, which by default
+        is caught and subsequently stops execution gracefully.
+
+        Files are temporarily unzipped and deleted after use.
+
+        :param Path staging_area:  Where to store the files while they're
+          being worked with. If omitted, a temporary folder is created and
+          marked for deletion after all files have been yielded
+        :param bool immediately_delete:  Temporary files are removed after
+          yielding; False keeps files until the staging_area is removed
+        :param list filename_filter:  Whitelist of filenames to iterate. If
+          empty, do not filter
+        :param BasicProcessor processor:  A reference to the processor
+          iterating the dataset.
+        :param int offset:  Skip this many files before yielding (warning: may
+          skip a metadata file too!)
+        :return:  An iterator with a dictionary for each file, containing an
+          `id`, a `path`, and all attributes of the `ZipInfo` object as keys
+        """
+        path = self.get_results_path()
+        if not path.exists():
+            return
+
+        if not staging_area:
+            staging_area = self.get_staging_area()
+
+        if not staging_area.exists() or not staging_area.is_dir():
+            raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
+
+        iterations = 0
+        with zipfile.ZipFile(path, "r") as archive_file:
+            # sorting is important because it ensures .metadata.json is read
+            # first
+            archive_contents = sorted(archive_file.infolist(), key=lambda x: x.filename)
+            for archived_file in archive_contents:
+
+                if filename_filter and archived_file.filename not in filename_filter:
+                    continue
+
+                if archived_file.is_dir():
+                    # do not yield folders - we'll get to the files in them
+                    continue
+
+                if iterations < offset:
+                    iterations += 1
+                    continue
+
+                if hasattr(processor, "interrupted") and processor.interrupted:
+                    raise ProcessorInterruptedException(
+                        "Processor interrupted while iterating through Zip archive"
+                    )
+
+                iterations += 1
+                temp_file = staging_area.joinpath(archived_file.filename)
+                archive_file.extract(archived_file.filename, staging_area)
+
+                # iterated items are expected as a dictionary
+                # we thus make a dictionary from the ZipInfo object
+                # and use the path (inside the archive) as a unique ID
+                yield {
+                    "id": archived_file.filename,
+                    "path": temp_file,
+                    **{
+                        attribute: getattr(archived_file, attribute) for attribute in dir(archived_file) if not attribute.startswith("_")
+                    }
+                }
+
+                if immediately_delete:
+                    # this, effectively, triggers when the *next* item is
+                    # asked for, or if it is the last file
+                    temp_file.unlink()
 
     def iterate_items(
             self, processor=None, warn_unmappable=True, map_missing="default", get_annotations=True, max_unmappable=None,
-            offset=0
+            offset=0, *args, **kwargs
     ):
         """
         Generate mapped dataset items
@@ -407,6 +504,16 @@ class DataSet(FourcatModule):
         :param get_annotations: Whether to also fetch annotations from the database.
           This can be disabled to help speed up iteration.
         :param offset: After how many rows we should yield items.
+        :param bool immediately_delete:  Only used when iterating a file
+          archive. Defaults to `True`, if set to `False`, files are not deleted
+          from the staging area after the iteration, so they can be re-used.
+        :param staging_area:  Only used when iterating a file archive. Where to
+          store the files while they're being worked with. If omitted, a
+          temporary folder is created and marked for deletion after all files
+          have been yielded.
+        :param list filename_filter:  Only used when iterating a file archive.
+          Whitelist of filenames to iterate, others are skipped. If empty, do
+          not filter.
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = 0
@@ -421,7 +528,7 @@ class DataSet(FourcatModule):
         # If we're getting annotations, we're caching items so we don't need to retrieve annotations one-by-one.
         get_annotations = True if self.annotation_fields and get_annotations else False
         if get_annotations:
-            annotation_fields = self.annotation_fields
+            annotation_fields = self.annotation_fields.copy()
             item_batch_size = 500
             dataset_item_cache = []
             annotations_before = int(time.time())
@@ -444,9 +551,10 @@ class DataSet(FourcatModule):
             default_strategy = map_missing
             map_missing = {}
 
-        # Loop through items
-        for i, item in enumerate(self._iterate_items(processor, offset=offset)):
+        iterator = self._iterate_items if self.get_extension() != "zip" else self._iterate_archive_contents
 
+        # Loop through items
+        for i, item in enumerate(iterator(processor=processor, offset=offset, *args, **kwargs)):
             # Save original to yield
             original_item = item.copy()
 
@@ -499,6 +607,7 @@ class DataSet(FourcatModule):
                 mapper=item_mapper,
                 original=original_item,
                 mapped_object=mapped_item,
+                data_file=original_item["path"] if "path" in original_item and issubclass(type(original_item["path"]), os.PathLike) else None,
                 **(
                     mapped_item.get_item_data()
                     if type(mapped_item) is MappedItem
@@ -765,26 +874,37 @@ class DataSet(FourcatModule):
         results_path.mkdir()
 
         # Storing the staging area with the dataset so that it can be removed later
-        self.staging_areas.append(results_path)
+        self.disposable_files.append(results_path)
 
         return results_path
 
-    def remove_staging_areas(self):
+    def remove_disposable_files(self):
         """
-        Remove any staging areas that were created and all files contained in them.
+        Remove any disposable files and folders, such as staging areas
+
+        Called from BasicProcessor after processing a dataset finishes.
         """
         # Remove DataSet staging areas
-        if self.staging_areas:
-            for staging_area in self.staging_areas:
-                if staging_area.is_dir():
-                    shutil.rmtree(staging_area)
+        if self.disposable_files:
+            for disposable_file in self.disposable_files:
+                if disposable_file.exists():
+                    shutil.rmtree(disposable_file)
 
-    def finish(self, num_rows=0):
+    def finish(self, num_rows=0, status_type=None):
         """
         Declare the dataset finished
+
+        :param int num_rows:  Number of rows in the dataset
+        :param StatusType status_type:  Status type to set the dataset to.
+          If omitted, set to SUCCESS if num_rows > 0, else EMPTY
         """
         if self.data["is_finished"]:
             raise RuntimeError("Cannot finish a finished dataset again")
+        
+        if status_type is None:
+            status_type = StatusType.SUCCESS if num_rows > 0 else StatusType.EMPTY
+        elif not isinstance(status_type, StatusType):
+            raise ValueError("status_type must be a StatusType enum value")
 
         self.db.update(
             "datasets",
@@ -793,11 +913,13 @@ class DataSet(FourcatModule):
                 "is_finished": True,
                 "num_rows": num_rows,
                 "progress": 1.0,
+                "status_type": status_type.value,
                 "timestamp_finished": int(time.time()),
             },
         )
         self.data["is_finished"] = True
         self.data["num_rows"] = num_rows
+        self.data["status_type"] = status_type.value
 
     def copy(self, shallow=True):
         """
@@ -847,7 +969,7 @@ class DataSet(FourcatModule):
 
         return copy
 
-    def delete(self, commit=True, queue=None):
+    def delete(self, commit=True, delete_log=False):
         """
         Delete the dataset, and all its children
 
@@ -855,6 +977,9 @@ class DataSet(FourcatModule):
         a dataset object after it has been deleted is undefined behaviour.
 
         :param bool commit:  Commit SQL DELETE query?
+        :param bool delete_log:  Whether to also delete the log file. Defaults to False, 
+        because logs can be useful for debugging even after a dataset is deleted. Hanging logs
+        are automatically deleted by TempFileCleaner after a certain amount of time.
         """
         # first, recursively delete children
         children = self.db.fetchall(
@@ -863,7 +988,7 @@ class DataSet(FourcatModule):
         for child in children:
             try:
                 child = DataSet(key=child["key"], db=self.db, modules=self.modules)
-                child.delete(commit=commit)
+                child.delete(commit=commit, delete_log=delete_log)
             except DataSetException:
                 # dataset already deleted - race condition?
                 pass
@@ -874,13 +999,13 @@ class DataSet(FourcatModule):
             if job.is_claimed:
                 # tell API to stop any jobs running for this dataset
                 # level 2 = cancel job
-                # we're not interested in the result - if the API is available,
-                # it will do its thing, if it's not the backend is probably not
-                # running so the job also doesn't need to be interrupted
+                # we must wait for the API to process the request before deleting
+                # the job record from the database; if we fire-and-forget the job
+                # row is gone by the time the API looks it up, causing
+                # JobNotFoundException and leaving the worker running uninterrupted
                 call_api(
                     "cancel-job",
                     {"remote_id": self.key, "jobtype": self.type, "level": 2},
-                    False,
                 )
 
             # this deletes the job from the database
@@ -911,20 +1036,29 @@ class DataSet(FourcatModule):
         self.db.delete("users_favourites", where={"key": self.key}, commit=commit)
 
         # delete from drive
+        files_to_delete = [self.get_results_path()] + ([self.get_results_path().with_suffix(".log")] if delete_log else [])
+        for path in files_to_delete:
+            try:
+                if path.exists():
+                    path.unlink()
+            except FileNotFoundError:
+                # already deleted, apparently
+                pass
+            except PermissionError as e:
+                self.db.log.error(
+                    f"Could not delete dataset {self.key} file {path}; it may need to be deleted manually: {e}"
+                )
+
+        # delete results folder if it exists
         try:
-            if self.get_results_path().exists():
-                self.get_results_path().unlink()
-            if self.get_results_path().with_suffix(".log").exists():
-                self.get_results_path().with_suffix(".log").unlink()
             if self.get_results_folder_path().exists():
                 shutil.rmtree(self.get_results_folder_path())
-
         except FileNotFoundError:
             # already deleted, apparently
             pass
         except PermissionError as e:
             self.db.log.error(
-                f"Could not delete all dataset {self.key} files; they may need to be deleted manually: {e}"
+                f"Could not delete dataset {self.key} results folder; it may need to be deleted manually: {e}"
             )
 
     def update_children(self, **kwargs):
@@ -1203,7 +1337,7 @@ class DataSet(FourcatModule):
         except json.JSONDecodeError:
             return {}
 
-    def get_columns(self):
+    def get_columns(self, annotation_columns=True):
         """
         Returns the dataset columns.
 
@@ -1228,7 +1362,7 @@ class DataSet(FourcatModule):
             items = self.iterate_items(warn_unmappable=False, get_annotations=False, max_unmappable=100)
             try:
                 keys = list(next(items).keys())
-                if self.annotation_fields:
+                if self.annotation_fields and annotation_columns:
                     for annotation_field in self.annotation_fields.values():
                         annotation_column = annotation_field["label"]
                         label_count = 1
@@ -1364,6 +1498,7 @@ class DataSet(FourcatModule):
             query_bit = self.data["query"].replace(" ", "-").lower()
             query_bit = re.sub(r"[^a-z0-9\-]", "", query_bit)
             query_bit = query_bit[:100]  # Crop to avoid OSError
+            query_bit = query_bit.strip("-")  # Remove leading/trailing dashes that might have been introduced by the previous steps
             file = query_bit + "-" + self.data["key"]
             file = re.sub(r"[-]+", "-", file)
 
@@ -1462,7 +1597,7 @@ class DataSet(FourcatModule):
         """
         return self.data["status"]
 
-    def update_status(self, status, is_final=False):
+    def update_status(self, status, is_final=False, status_type=None):
         """
         Update dataset status
 
@@ -1477,10 +1612,15 @@ class DataSet(FourcatModule):
         :param bool is_final:  If this is `True`, subsequent calls to this
         method while the object is instantiated will not update the dataset
         status.
+        :param StatusType|None status_type:  Type of status. If provided, this updates
+        the `status_type` field of the dataset as well.
         :return bool:  Status update successful?
         """
         if self.no_status_updates:
             return
+        
+        if status_type is not None and not isinstance(status_type, StatusType):
+            raise ValueError("status_type must be a StatusType enum value")
 
         # for presets, copy the updated status to the preset(s) this is part of
         if self.preset_parent is None:
@@ -1493,11 +1633,16 @@ class DataSet(FourcatModule):
         if self.preset_parent:
             for preset_parent in self.preset_parent:
                 if not preset_parent.is_finished():
-                    preset_parent.update_status(status)
+                    preset_parent.update_status(status, status_type=status_type)
 
+        # Update own status
+        status_data = {"status": status}
+        if status_type is not None:
+            self.data["status_type"] = status_type.value
+            status_data["status_type"] = status_type.value
         self.data["status"] = status
         updated = self.db.update(
-            "datasets", where={"key": self.data["key"]}, data={"status": status}
+            "datasets", where={"key": self.data["key"]}, data=status_data
         )
 
         if is_final:
@@ -1535,7 +1680,7 @@ class DataSet(FourcatModule):
         """
         return self.data["progress"]
 
-    def finish_with_error(self, error):
+    def finish_with_error(self, error: str) -> None:
         """
         Set error as final status, and finish with 0 results
 
@@ -1546,7 +1691,42 @@ class DataSet(FourcatModule):
         :return:
         """
         self.update_status(error, is_final=True)
-        self.finish(0)
+        self.finish(0, status_type=StatusType.ERROR)
+
+        return None
+
+    def finish_with_warning(self, num_rows: int, warning: str) -> None:
+        """
+        Indicate this dataset has finished with a warning. This needs
+        the number of completed rows. If `num_rows` is zero, status_type
+        will be set to "error" as the dataset did not write anything and
+        is considered failed.
+
+        :param str num_rows:  How many rows succeeded.
+        :param str warning:  Warning message for final dataset status.
+        :return:
+        """
+
+        if not isinstance(num_rows, int):
+            raise ValueError("num_rows must be a positive integer")
+        if num_rows <= 0:
+            self.finish_with_error(warning)
+            return
+
+        self.update_status(warning, is_final=True)
+        self.finish(num_rows, status_type=StatusType.WARNING)
+
+        return None
+
+    def finish_as_empty(self, status_message):
+        """
+        Indicate this dataset has finished with no results and a message
+
+        :param str status_message: The message to show.
+        :return:
+        """
+        self.update_status(status_message, is_final=True)
+        self.finish(0, status_type=StatusType.EMPTY)
 
         return None
 
@@ -1853,7 +2033,7 @@ class DataSet(FourcatModule):
             if analysis.type not in processors:
                 continue
 
-            if not processors[analysis.type].get_options(config=config):
+            if not processors[analysis.type].get_options(parent_dataset=self, config=config):
                 # No variable options; this processor has been run so remove
                 del processors[analysis.type]
                 continue
@@ -2022,7 +2202,7 @@ class DataSet(FourcatModule):
 
     def get_extension(self):
         """
-        Gets the file extention this dataset produces.
+        Gets the file extension this dataset produces.
         Also checks whether the results file exists.
         Used for checking processor and dataset compatibility.
 
@@ -2032,6 +2212,18 @@ class DataSet(FourcatModule):
             return self.get_results_path().suffix[1:]
 
         return False
+    
+    def is_filter(self):
+        """
+        Check whether a dataset is a filter dataset.
+
+        :return bool:  True if the dataset is a filter dataset, False otherwise. None if deprecated (i.e., filter status unknown).
+        """
+        own_processor = self.get_own_processor()
+        if own_processor is None:
+            # Deprecated datasets do not have a processor
+            return None
+        return own_processor.is_filter()
 
     def get_media_type(self):
         """
@@ -2051,6 +2243,87 @@ class DataSet(FourcatModule):
 
         # Default to text
         return self.parameters.get("media_type", "text")
+
+    def get_media_from_children(self, item_ids=[]) -> dict:
+        """ Returns a list of media filenames that have been downloaded
+            via video or image download child processors
+
+        :param list item_ids:   A list of item IDs to limit the filename retrieval to.
+        returns dict: item_id as key and a list of tuples (child dataset key -> filename) as items
+        """
+        children = self.get_children()
+
+        if not children:
+            return {}
+
+        media_map = {}
+
+        # Get children that are image/video downloaders
+        media_datasets = [
+            p for p in children
+            if ("video-downloader" in p.type or "image-downloader" in p.type) and p.data.get("num_rows", 0) > 0 and p.is_finished()
+        ]
+
+        # Loop through media datasets and create a map of dataset key -> filenames
+        # Skip files that were downloaded multiple times
+        seen_files = set()
+
+        for media_dataset in media_datasets:
+            for item in media_dataset.iterate_items():
+
+                if item.file.name == ".metadata.json":
+                    with item.file.open() as infile:
+                        metadata = json.load(infile)
+
+                        for url_key, item_metadata in metadata.items():
+                            media_items = set()
+                            post_ids = item_metadata.get("post_ids", [])  # Required
+
+                            if not post_ids:
+                                continue
+
+                            # Make sure we're matching and passing strings
+                            post_ids = [str(p_id) for p_id in post_ids]
+                            item_ids = [str(i_id) for i_id in item_ids]
+
+                            # Skip items that are not in the requested item_ids
+                            if item_ids and not any(p_id in item_ids for p_id in post_ids):
+                                continue
+
+                            # Single file (images usually format like this)
+                            is_success = item_metadata.get("success", True)
+
+                            if is_success and "filename" in item_metadata:
+                                media_info = (media_dataset.key, item_metadata["filename"])
+                                media_items.add(media_info)
+
+                            # Multiple files (videos with the 'files' array)
+                            if item_metadata.get("files"):
+                                for file in item_metadata["files"]:
+                                    if file.get("success") and "filename" in file:
+                                        media_info = (media_dataset.key, file["filename"])
+                                        media_items.add(media_info)
+
+                            if not media_items:
+                                continue
+
+                            # Append to post_id list
+                            for post_id in post_ids:
+                                if post_id not in media_map:
+                                    media_map[post_id] = []
+
+                                for media_item in media_items:
+                                    if media_item not in media_map[post_id]:
+                                        # Don't add post_id -> filename couplings that we've already seen
+                                        media_ref = (post_id, media_item[1])
+                                        if media_ref not in seen_files:
+                                            media_map[post_id].append(media_item)
+                                        seen_files.add(media_ref)
+
+                    # break after .metadata.json
+                    break
+
+        return media_map
 
     def get_metadata(self):
         """
@@ -2228,17 +2501,17 @@ class DataSet(FourcatModule):
         # Add some dataset data to annotations, if not present
         for annotation_data in annotations:
             # Check if the required fields are present
-            if "item_id" not in annotation_data:
+            if not annotation_data.get("item_id"):
                 raise AnnotationException(
                     "Can't save annotations; annotation must have an `item_id` referencing "
                     "the item it annotated, got %s" % annotation_data
                 )
-            if "field_id" not in annotation_data:
+            if not annotation_data.get("field_id"):
                 raise AnnotationException(
                     "Can't save annotations; annotation must have a `field_id` field, "
                     "got %s" % annotation_data
                 )
-            if "label" not in annotation_data or not isinstance(
+            if not annotation_data.get("label") or not isinstance(
                     annotation_data["label"], str
             ):
                 raise AnnotationException(
@@ -2310,12 +2583,12 @@ class DataSet(FourcatModule):
                 )
             if "label" not in annotation_field:
                 raise AnnotationException(
-                    "Can't save annotation fields: all fields must have a label"
+                    "Can't save annotation fields: field %s must have a label"
                     % field_id
                 )
             if "type" not in annotation_field:
                 raise AnnotationException(
-                    "Can't save annotation fields: all fields must have a type"
+                    "Can't save annotation fields: field %s must have a type"
                     % field_id
                 )
 
@@ -2373,7 +2646,6 @@ class DataSet(FourcatModule):
         :param attr:  Data key to get
         :return:  Value
         """
-
         if attr in dir(self):
             # an explicitly defined attribute should always be called in favour
             # of this passthrough
@@ -2382,7 +2654,7 @@ class DataSet(FourcatModule):
         elif attr in self.data:
             return self.data[attr]
         else:
-            raise AttributeError("DataSet instance has no attribute %s" % attr)
+           raise AttributeError("DataSet instance has no attribute %s" % attr)
 
     def __setattr__(self, attr, value):
         """

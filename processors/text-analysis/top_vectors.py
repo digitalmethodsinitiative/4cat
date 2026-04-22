@@ -20,7 +20,7 @@ class VectorRanker(BasicProcessor):
 	type = "vector-ranker"  # job type ID
 	category = "Metrics" # category
 	title = "Extract top words"  # title displayed in UI
-	description = "Ranks most used tokens per tokenset (overall or per timeframe). " \
+	description = "Ranks most used tokens per token set (overall or per timeframe). " \
 				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
@@ -94,16 +94,16 @@ class VectorRanker(BasicProcessor):
 		# now rank the vectors by most prevalent per "file" (i.e. interval)
 		overall_top = {}
 		index = 0
-		for vector_file in self.iterate_archive_contents(self.source_file):
+		for packed_vectors in self.source_dataset.iterate_items():
 			# we support both pickle and json dumps of vectors
-			vector_unpacker = pickle if vector_file.suffix == "pb" else json
+			vector_unpacker = pickle if packed_vectors.file.suffix == "pb" else json
 
 			index += 1
-			vector_set_name = vector_file.stem  # we don't need the full path
+			vector_set_name = packed_vectors.file.stem  # we don't need the full path
 			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
 			self.dataset.update_progress(index / self.source_dataset.num_rows)
 
-			with vector_file.open("rb") as binary_tokens:
+			with packed_vectors.file.open("rb") as binary_tokens:
 				# these were saved as pickle dumps so we need the binary mode
 				vectors = vector_unpacker.load(binary_tokens)
 

@@ -55,6 +55,19 @@ class CategorizeImagesCLIP(BasicProcessor):
     }
 
     @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Shared queue for locally hosted models
+
+        :param str remote_id:  Job item ID
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset to run job for
+        :return:
+        """
+        # Unique queue for locally hosted models; used by other local model processors as well
+        return "local_models" 
+
+    @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
         Allow on image archives if enabled in Control Panel
@@ -116,15 +129,15 @@ class CategorizeImagesCLIP(BasicProcessor):
 
         # Unpack the image files into a staging_area
         self.dataset.update_status("Unzipping image files")
-        staging_area = self.dataset.get_staging_area()
         total_image_files = 0
         image_filenames = []
-        for file in self.iterate_archive_contents(self.source_file, staging_area=staging_area, immediately_delete=False):
+        staging_area = self.dataset.get_staging_area()
+        for item in self.source_dataset.iterate_items(immediately_delete=False, staging_area=staging_area):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unpacking archive")
 
-            if file.name.split('.')[-1] not in ["json", "log"]:
-                image_filenames.append(file.name)
+            if item.file.suffix not in (".json", ".log"):
+                image_filenames.append(item.file.name)
                 total_image_files += 1
 
             if self.parameters.get("amount", 100) != 0 and total_image_files >= self.parameters.get("amount", 100):

@@ -17,8 +17,8 @@ class TwitterMentionsExport(BasicProcessor):
     Collect User stats as both author and mention.
     """
     type = "twitter-mentions-export"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Mentions Export"  # title displayed in UI
+    category = "Twitter analysis"  # category
+    title = "Mentions export"  # title displayed in UI
     description = "Identifies mentions types and creates mentions table (tweet id, from author id, from username, to user id, to username, mention type)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 

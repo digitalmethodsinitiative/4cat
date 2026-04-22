@@ -47,7 +47,7 @@ which you can collect data to import into 4CAT for analysis:
 * LinkedIn
 * Pinterest
 * Threads
-* Thruth.social
+* Truth.social
 * TikTok (posts and comments)
 * X/Twitter
 * Xiaohangshu

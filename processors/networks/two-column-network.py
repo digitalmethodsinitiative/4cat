@@ -129,6 +129,14 @@ class ColumnNetworker(BasicProcessor):
                 "tooltip": "Name of the column of values at which edges terminate"
             }
 
+        options["detect-communities"] = {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Detect communities",
+			"tooltip": "Assign nodes to communities using two separate community detection algorithms (see processor "
+					   "references). Will never be done for networks with more than 50.000 edges."
+		}
+
         return options
 
     @classmethod
@@ -156,6 +164,7 @@ class ColumnNetworker(BasicProcessor):
         interval_type = self.parameters.get("interval")
         to_lower = self.parameters.get("to-lowercase", False)
         ignoreable = [n.strip() for n in self.parameters.get("ignore-nodes", "").split(",") if n.strip()]
+        detect_communities = self.parameters.get("detect-communities", False)
 
         processed = 0
 
@@ -165,8 +174,7 @@ class ColumnNetworker(BasicProcessor):
         for item in self.source_dataset.iterate_items(self):
             if column_a not in item or column_b not in item:
                 missing = "'" + "' and '".join([c for c in (column_a, column_b) if c not in item]) + "'"
-                self.dataset.update_status(f"Column(s) {missing} not found in dataset", is_final=True)
-                self.dataset.finish(0)
+                self.dataset.finish_with_error(f"Column(s) {missing} not found in dataset")
                 return
 
             processed += 1
@@ -283,8 +291,7 @@ class ColumnNetworker(BasicProcessor):
                         processed_edges.add(edge)
 
         if not network.edges():
-            self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_as_empty("No edges could be created for the given parameters")
             return
 
         # If the network is dynamic, now we calculate spells from the intervals
@@ -364,6 +371,14 @@ class ColumnNetworker(BasicProcessor):
             "louvain_community": partial(nx.community.louvain_communities, seed=0),
             "greedy_modularity_class": partial(nx.community.greedy_modularity_communities, weight="weight"),
         }
+
+        if network.number_of_edges() > 50_000:
+            self.dataset.log("Network has more than 50.000 edges; skipping community detection.")
+            detect_communities = False
+
+        if not detect_communities:
+            community_types = {}
+
         for community_prop, community_function in community_types.items():
             self.dataset.update_status(f"Calculating node communities ({community_prop})")
             community_id = 0
@@ -372,6 +387,9 @@ class ColumnNetworker(BasicProcessor):
                 for node_id in community:
                     # needs to be string for Retina to recognise it as qualitative
                     network.nodes[node_id][community_prop] = f"cluster-{community_id}"
+
+        operative = "to" if directed else "↔"
+        self.dataset.update_label(f"{self.title} - '{column_a}' {operative} '{column_b}'")
 
         self.dataset.update_status("Writing network file")
         nx.write_gexf(network, self.dataset.get_results_path())

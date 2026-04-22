@@ -11,7 +11,7 @@ class AnnotationMetadata(BasicProcessor):
 	Download annotation metadata from this dataset
 	"""
 	type = "annotation-metadata"  # job type ID
-	category = "Metrics"  # category
+	category = "Conversion"  # category
 	title = "Export annotations"  # title displayed in UI
 	description = ("Download annotations and their metadata for this dataset. "
 				   "Includes annotation author, timestamp, type, etc.") # description displayed in UI
@@ -33,7 +33,8 @@ class AnnotationMetadata(BasicProcessor):
 		annotation_metadata = self.source_dataset.get_annotation_metadata()
 
 		if not annotation_metadata:
-			self.dataset.finish_with_error("No annotations made for this dataset")
+			self.dataset.finish_as_empty("No annotations made for this dataset")
+			return
 
 		for row in annotation_metadata:
 			timestamp = row["timestamp"]

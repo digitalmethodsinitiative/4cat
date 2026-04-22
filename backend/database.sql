@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   id                     BIGSERIAL PRIMARY KEY,
   jobtype                text    DEFAULT 'misc',
   remote_id              text,
+  queue_id               text DEFAULT '',
   details                text,
   timestamp              integer,
   timestamp_after        integer DEFAULT 0,
@@ -36,6 +37,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
     remote_id
   );
 
+CREATE INDEX IF NOT EXISTS job_queue ON jobs (queue_id);
 
 -- queries
 CREATE TABLE IF NOT EXISTS datasets (
@@ -50,6 +52,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   result_file         text DEFAULT '',
   timestamp           integer,
   status              text,
+  status_type         text DEFAULT '',
   num_rows            integer DEFAULT 0,
   progress            float DEFAULT 0.0,
   is_finished         boolean DEFAULT FALSE,

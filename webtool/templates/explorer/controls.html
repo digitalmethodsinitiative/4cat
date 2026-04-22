@@ -12,9 +12,9 @@
             {% if warning %}
             <div class="fullwidth notice">{{ warning }}</div>
             {% endif %}
-            {% if key and post_count > max_posts %}
-            <div class="fullwidth notice">Large dataset - only showing the first {{ max_posts }} posts. Use filter processors to limit the dataset.</div>
-            {% set post_count = max_posts %}
+            {% if key and item_count > max_items %}
+            <div class="fullwidth notice">Large dataset - only showing the first {{ max_items }} items. Use filter processors to limit the dataset.</div>
+            {% set item_count = max_items %}
             {% endif %}
             <nav class="dataset-toolbox" aria-label="Annotation controls">
                 <ul>
@@ -37,10 +37,10 @@
 					{% include "explorer/annotations-editor.html" %}
 				</div>
 				<div class="fullwidth" id="sort-options">
-					<dt>Sort posts by</dt>
+					<dt>Sort items by</dt>
 					<dd>
                         <div class="padding">
-                            {% set sorting_disabled = True if dataset.num_rows > max_posts else False %}
+                            {% set sorting_disabled = True if dataset.num_rows > max_items else False %}
                             <select class="sort-select" id="column-sort-select" name="sort-select" {% if sorting_disabled %}disabled{% endif %}>
                                 <option class="sort-option" value="dataset-order">Dataset order</option>
                                 <option disabled value>dataset columns:</option>
@@ -53,7 +53,7 @@
                                 <option class="sort-option" value="reverse" {% if reverse == true %}selected{% endif %}>High to low</option>
                             </select>
                             {% if sorting_disabled %}
-                            <span class="notice">Disabled for datasets exceeding {{ max_posts }} items.</span>
+                            <span class="notice">Disabled for datasets exceeding {{ max_items }} items.</span>
                             {% endif %}
                         </div>
 					</dd>
@@ -63,7 +63,7 @@
                     <dd>
                         <div class="info-row">
                             <div class="padding">
-                                Posts {{ offset + 1 }}—{{ post_count if (offset + posts_per_page) > post_count else (offset + posts_per_page) }} ({{ post_count }} total).
+                                Item {{ offset + 1 }}—{{ item_count if (offset + items_per_page) > item_count else (offset + items_per_page) }} ({{ item_count }} total).
                             </div>
                             <div id="tutorial-cell" class="padding">
                                 <a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets#annotations" target="_blank"><span><i class="fa-solid fa-graduation-cap"></i> How to annotate datasets</span></a>

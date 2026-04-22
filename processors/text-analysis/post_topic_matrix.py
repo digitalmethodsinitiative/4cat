@@ -22,9 +22,9 @@ class TopicModelWordExtractor(BasicProcessor):
     """
     type = "document_topic_matrix"  # job type ID
     category = "Text analysis"  # category
-    title = "Post/Topic matrix (predict which posts belong to which topics)"  # title displayed in UI
-    description = ("Uses the LDA model to predict which topic each item or sentence belongs to. Creates a CSV file where "
-                   "each line represents one 'document'; if tokens are grouped per 'item' and only one column is used "
+    title = "Post/topic matrix"  # title displayed in UI
+    description = ("Predict which item or sentence belong to which topics using LDA. Creates a CSV file where "
+                   "each line represents one 'document'. If tokens are grouped per 'item' and only one column is used "
                    "(e.g. only the 'body' column), there is one row per post/item, otherwise a post may be represented "
                    "by multiple rows (for each sentence and/or column used).")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
@@ -100,11 +100,9 @@ class TopicModelWordExtractor(BasicProcessor):
         with zipfile.ZipFile(self.source_file, "r") as archive_file:
             zip_filenames = archive_file.namelist()
             if any([filename not in zip_filenames for filename in ['.token_metadata.json', '.model_metadata.json']]):
-                self.dataset.update_status(
+                self.dataset.finish_with_error(
                     "Metadata files not found; cannot perform analysis (if Tolenise is from previous 4CAT version; try "
-                    "running previous analysis again)",
-                    is_final=True)
-                self.dataset.update_status(0)
+                    "running previous analysis again)")
                 return
 
             # Extract our metadata files

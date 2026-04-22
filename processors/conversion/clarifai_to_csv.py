@@ -45,8 +45,7 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
         done = 0
 
         if not self.source_file.exists():
-            self.dataset.update_status("No data was returned by the Clarifai API, so none can be converted.", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("No data was returned by the Clarifai API, so none can be converted.")
             return
 
         # recreate CSV file with the new dialect

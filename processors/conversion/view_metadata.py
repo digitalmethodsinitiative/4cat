@@ -65,8 +65,7 @@ class ViewMetadata(BasicProcessor):
 		with zipfile.ZipFile(self.source_file, "r") as archive_file:
 			archive_contents = sorted(archive_file.namelist())
 			if '.metadata.json' not in archive_contents:
-				self.dataset.update_status("Unable to identify metadata file", is_final=True)
-				self.dataset.finish(0)
+				self.dataset.finish_with_error("Unable to identify metadata file")
 				return
 
 			staging_area = self.dataset.get_staging_area()
@@ -79,8 +78,7 @@ class ViewMetadata(BasicProcessor):
 		if parent_processor is None or not hasattr(parent_processor, "map_metadata"):
 			if parent_processor is not None:
 				self.log.warning(f"Metadata formatter processor cannot run on {parent_processor.type}; map_metadata method not implemented")
-			self.dataset.update_status("Cannot reformat metadata for this dataset", is_final=True)
-			self.dataset.finish(0)
+			self.dataset.finish_with_error("Cannot reformat metadata for this dataset")
 			return
 		self.dataset.log(f"Collecting metadata created by {parent_processor.type}")
 

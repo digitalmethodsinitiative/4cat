@@ -8,6 +8,7 @@ from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.helpers import normalize_url_encoding
 
 
 class SearchRedNoteComments(Search):
@@ -52,6 +53,7 @@ class SearchRedNoteComments(Search):
         timestamp = datetime.fromtimestamp(int(item["create_time"]) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 
         return MappedItem({
+            "collected_from_url": normalize_url_encoding(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item["id"],
             "thread_id": item["note_id"],
             "url": f"https://www.xiaohongshu.com/explore/{item['note_id']}",

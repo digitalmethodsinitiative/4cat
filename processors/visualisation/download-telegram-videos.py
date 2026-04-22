@@ -29,7 +29,7 @@ class TelegramVideoDownloader(BasicProcessor):
     type = "video-downloader-telegram"  # job type ID
     category = "Visual"  # category
     title = "Download Telegram videos"  # title displayed in UI
-    description = "Download videos and store in a zip file. Downloads through the Telegram API might take a while. " \
+    description = "Download videos and store in a ZIP file. Downloads through the Telegram API might take a while. " \
                   "Note that not always all videos can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
@@ -115,7 +115,10 @@ class TelegramVideoDownloader(BasicProcessor):
             json.dump(self.metadata, outfile)
 
         self.dataset.update_status("Compressing videos")
-        self.write_archive_and_finish(self.staging_area)
+        warning = None
+        if not self.flawless:
+            warning = "Not all videos could be downloaded. The the dataset logs for details."
+        self.write_archive_and_finish(self.staging_area, warning=warning)
 
     async def get_videos(self):
         """
@@ -194,12 +197,13 @@ class TelegramVideoDownloader(BasicProcessor):
                         if hasattr(message.media, "document"):
                             await message.download_media(str(path))
 
-                        msg_id = message.id
+                        msg_id = f"{entity}-{message.id}"
                         success = True
                     except (AttributeError, RuntimeError, ValueError, TypeError, BadRequestError) as e:
                         filename = f"{entity}-index-{media_done}"
-                        msg_id = str(message.id) if hasattr(message, "id") else f"with index {media_done:,}"
-                        self.dataset.log(f"Could not download video for message {msg_id} ({e})")
+                        msg_id = f"{entity}-{message.id}" if hasattr(message, "id") else None
+                        msg_id_log = msg_id if msg_id else f"with index {media_done:,}"
+                        self.dataset.log(f"Could not download video for message {msg_id_log} ({e})")
                         self.flawless = False
 
                     media_done += 1
@@ -207,7 +211,7 @@ class TelegramVideoDownloader(BasicProcessor):
                         "filename": filename,
                         "success": success,
                         "from_dataset": self.source_dataset.key,
-                        "post_ids": [msg_id]
+                        "post_ids": [msg_id] if msg_id else []
                     }
 
             except FloodError as e:

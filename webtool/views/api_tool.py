@@ -348,7 +348,7 @@ def import_dataset():
 
 			outfile.write(chunk)
 
-	job = g.queue.add_job(worker_type, {"file": str(temporary_path)}, dataset.key)
+	job = g.queue.add_job(worker_or_type=worker, details={"file": str(temporary_path)}, dataset=dataset)
 	dataset.link_job(job)
 
 	return jsonify({
@@ -429,7 +429,20 @@ def queue_dataset():
 	# are sent for validation. This makes the front-end re-submit the full
 	# query
 	if not has_confirm:
-		return jsonify({"status": "validated", "keep": sanitised_query})
+		# Re-serialize only OPTION_TEXT_JSON values back to JSON strings before
+		# returning keep. parse_all parses these into Python lists/dicts, but
+		# jsonify turns them into JS arrays/objects. FormData.set() then coerces
+		# those to "[object Object],..." on the for-real re-submission.
+		# (Other list/dict fields, e.g. parsed URL lists are not touched.)
+		json_option_keys = {
+			option for option, settings in search_worker.get_options(None, g.config).items()
+			if settings.get("type") == UserInput.OPTION_TEXT_JSON
+		}
+		keep = {
+			k: json.dumps(v) if k in json_option_keys and isinstance(v, (list, dict)) else v
+			for k, v in sanitised_query.items()
+		}
+		return jsonify({"status": "validated", "keep": keep})
 
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
@@ -467,7 +480,7 @@ def queue_dataset():
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 
-	g.queue.add_job(jobtype=search_worker_id, remote_id=dataset.key, interval=0)
+	g.queue.add_job(worker_or_type=search_worker, dataset=dataset, interval=0)
 	new_job = Job.get_by_remote_ID(dataset.key, g.db)
 	dataset.link_job(new_job)
 
@@ -685,7 +698,7 @@ def nuke_dataset(key=None, reason=None):
 	for child in children:
 		try:
 			job = Job.get_by_remote_ID(child.key, database=g.db, jobtype=child.type)
-			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": child.type, "level": BasicWorker.INTERRUPT_CANCEL})
 			job.finish()
 			child.delete()
 		except JobNotFoundException:
@@ -1204,7 +1217,7 @@ def queue_processor(key=None, processor=None):
 
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
-		g.queue.add_job(jobtype=processor, remote_id=analysis.key)
+		g.queue.add_job(worker_or_type=g.modules.processors[processor], dataset=analysis)
 		job = Job.get_by_remote_ID(analysis.key, database=g.db)
 		analysis.link_job(job)
 		analysis.update_status("Queued")
@@ -1275,7 +1288,24 @@ def check_processor():
 		if not current_user.can_access_dataset(dataset):
 			continue
 
-		genealogy = dataset.get_genealogy()
+		if dataset.is_top_dataset():
+			if dataset.parameters.get("copied_from", None):
+				# Filter dataset - get original dataset for display
+				original_key = dataset.parameters.get("copied_from", None)
+				try:
+					original_dataset = DataSet(key=original_key, db=g.db, modules=g.modules)
+				except DataSetException:
+					# Cannot find original dataset; no longer has parent and cannot render child view
+					g.log.warning(f"Dataset {dataset.key} is a filter but original dataset {original_key} not found. Skipping...")
+					continue
+				genealogy = original_dataset.get_genealogy()
+			else:
+				# Top-level dataset; not a child, cannot render child view
+				g.log.warning(f"Dataset {dataset.key} is top-level; cannot render child view. Skipping...")
+				continue
+		else:
+			genealogy = dataset.get_genealogy()
+
 		parent = genealogy[-2]
 		top_parent = genealogy[0]
 
@@ -1287,7 +1317,11 @@ def check_processor():
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
                                     processors=g.modules.processors),
 			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
-			"url": "/result/" + dataset.data["result_file"]
+			"url": "/result/" + dataset.data["result_file"],
+			"annotation_fields": {
+				field_id: {"label": field_data.get("label", "")}
+				for field_id, field_data in (top_parent.annotation_fields or {}).items()
+			}
 		})
 
 	return jsonify(children)
