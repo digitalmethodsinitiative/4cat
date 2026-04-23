@@ -383,6 +383,40 @@ def _jinja2_filter_media_url_from_filepath(filepath):
     # Convert to forward slashes for URL (works on both Windows and Linux)
     return relative_path.as_posix()
 
+@current_app.template_filter("visible_parameters")
+def _jinja2_filter_visible_parameters(parameters):
+    """
+    Filter parameters dictionary to only retain those that should be visbile to a user
+
+    :param dict parameters:
+    :return dict:
+    """
+    result = {}
+    for key, value in parameters.items():
+        if key in ("copied_from", "copied_at", "next", "attach_to", "frontend-confirm"):
+            # for internal 4CAT preset/dataset linking/parsing
+            continue
+
+        elif key in ("pseudonymise", "user", "board", "datasource", "type", "label", "header", "expires-after", "email-complete", "original_timestamp", "session_id"):
+            # these are used, but not directly in the dataset parameter list
+            continue
+
+        elif key in ("search-scope", "search_scope", "random_amount", "scope_length", "scope_density", "country_name"):
+            # ancient 4chan-related things
+            continue
+
+        elif key in ("jst", "mst"):
+            # deprecated data sources used these, they contained cookie values (i.e. senstive data)
+            continue
+
+        elif key.startswith("api_"):
+            # api keys etc, handled separately
+            continue
+
+        result[key] = value
+
+    return result
+
 
 @current_app.template_filter('parameter_str')
 def _jinja2_filter_parameter_str(url):

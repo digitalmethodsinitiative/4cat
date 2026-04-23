@@ -52,7 +52,7 @@
                     </div>
                 {% endif %}
                 </dl>
-            {% if dataset.parameters %}
+            {% if dataset.parameters|visible_parameters %}
                 <dl class="badge-list parameters with-overflow">
                 {% include "dataset-page/dataset-parameters.html" %}
                 </dl>

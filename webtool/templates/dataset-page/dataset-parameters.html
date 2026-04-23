@@ -25,7 +25,7 @@
     {% endcall %}
 {% endif %}
 
-{% for parameter in dataset.parameters if parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "next", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label", "expires-after", "email-complete", "original_timestamp", "session_id") and parameter[0:4] != "api_" %}
+{% for parameter in dataset.parameters|visible_parameters if parameter not in ("min_date", "max_date") %}
     {% if parameter.startswith("mapping-") %}
         {# Special case: CSV column mapping #}
         {% set label %}{{ parameter|replace("mapping-", "column: ") }}{% endset %}
