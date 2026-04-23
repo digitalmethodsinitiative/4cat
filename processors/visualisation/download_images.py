@@ -303,7 +303,7 @@ class ImageDownloader(BasicProcessor):
             if self.interrupted:
                 self.complete = True
                 self.flush_proxied_requests()
-                if downloaded_files > 0:
+                if len(downloaded_files) > 0:
                     # Some files downloaded, wrap up
                     self.warning_message = "Processor was interrupted; partial results have been saved."
                     break

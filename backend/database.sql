@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   result_file         text DEFAULT '',
   timestamp           integer,
   status              text,
+  status_type         text DEFAULT '',
   num_rows            integer DEFAULT 0,
   progress            float DEFAULT 0.0,
   is_finished         boolean DEFAULT FALSE,

@@ -131,7 +131,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 # their data from. However, this should only be done as long as the
                 # preset is not finished yet, because after that there may be processors
                 # that run on the final preset result
-                while self.source_dataset.type.startswith("preset-") and not self.source_dataset.is_finished():
+                while self.source_dataset.is_preset() and not self.source_dataset.is_finished():
                     self.is_running_in_preset = True
                     self.source_dataset = self.source_dataset.get_parent()
                     if self.source_dataset is None:
@@ -1032,3 +1032,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :return:  True
         """
         return True
+    
+    @staticmethod
+    def is_preset():
+        """
+        Is this processor a preset?
+
+        :return:  False
+        """
+        return False

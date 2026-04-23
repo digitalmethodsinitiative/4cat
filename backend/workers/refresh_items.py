@@ -60,7 +60,7 @@ class ItemUpdater(BasicWorker):
                         try:
                             model_metadata = requests.post(f"{llm_server}/api/show", headers=headers, json={"model": model}, timeout=10).json()
                             available_models[model] = {
-                                "name": f"{model_metadata['model_info']['general.basename']} ({model_metadata['details']['parameter_size']} parameters)",
+                                "name": f"{model_metadata['model_info'].get('general.basename', model)} ({model_metadata['details']['parameter_size']} parameters)",
                                 "model_card": f"https://ollama.com/library/{model}",
                                 "provider": "local"
                             }
