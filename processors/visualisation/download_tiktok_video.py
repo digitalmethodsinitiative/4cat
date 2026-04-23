@@ -19,7 +19,7 @@ class TikTokVideoDownloader(ProcessorPreset):
 
     This is a Preset that runs the VideoDownloaderPlus with set parameters
     """
-    type = "preset-video-downloader-tiktok"  # job type ID
+    type = "video-downloader-tiktok"  # job type ID
     category = "Visual"  # category
     title = "Download TikTok videos"  # title displayed in UI
     description = "Downloads full videos for TikTok"
@@ -130,7 +130,7 @@ class TikTokVideoMetadata(BasicProcessor):
         """
         Do not show anywhere
         """
-        return module.type == "preset-video-downloader-tiktok-v2"
+        return False
     
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

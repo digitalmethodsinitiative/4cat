@@ -315,7 +315,9 @@ class VideoDownloaderPlus(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
-        return ((module.type.endswith("-search") or module.is_from_collector() or module.type == "tiktok-video-downloader-metadata")
+        return ((module.type.endswith("-search") or 
+                 module.is_from_collector() or 
+                 module.type == "tiktok-video-downloader-metadata")
                 # These have their own video downloaders
                 and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]) \
                 and module.get_extension() in ("csv", "ndjson")
