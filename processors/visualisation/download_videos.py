@@ -459,6 +459,9 @@ class VideoDownloaderPlus(BasicProcessor):
             self.warning_message = str(e)
         except Exception as e:
             # This ensures dataset is finished_with_warning below in finally block
+            # Note: this means that a real error in the code will lead to a finished dataset with a warning, which is not ideal, but ensures that we capture the error message 
+            # and any videos downloaded up to that point rather than losing everything. Future improvement could be to distinguish between types of exceptions and only 
+            # finish_with_warning for expected exceptions (e.g. max videos downloaded) and finish_with_error for unexpected exceptions (e.g. coding errors).
             self.warning_message = str(e)
             # Re-raise for logging and notification
             raise e
@@ -1174,56 +1177,48 @@ class VideoDownloaderPlus(BasicProcessor):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while collecting video URLs.")
             item_urls = set()
-            _fallback_item_urls = set()
             if index + 1 % 250 == 0:
                 self.dataset.update_status(f"Extracting video links from item {index + 1}/{self.source_dataset.num_rows}")
 
-            # Fallback URLs should be *known* single (post) URL columns, but may be blank
-            _fallback_url = post.get(_fallback_column, None)
-            if not _fallback_url:
-                _fallback_url = None
-            elif _fallback_url is not str:
-                _fallback_url = str(_fallback_url).strip()
-
-            for column in columns:
-                _fallback_only = False
-                value = post.get(column)
+            def _parse_and_collect_video_urls(value):
                 if not value:
-                    if _fallback_url:
-                        value = _fallback_url
-                        _fallback_only = True
-                    else:
-                        continue
-
+                    return set(), False
                 if value is not str:
                     value = str(value)
-
                 video_links = self.identify_video_urls_in_string(value)
-                if video_links:
-                    if _fallback_only:
-                        _fallback_item_urls |= set(video_links)
-                    else:
-                        item_urls |= set(video_links)
-            
-            # Main queue
-            for item_url in item_urls:
-                if item_url not in urls:
-                    urls[item_url] = {
-                        'post_ids': {post.get('id')},
-                        "_ytdlp_fallback_url": _fallback_url
-                        }
-                else:
-                    urls[item_url]['post_ids'].add(post.get('id'))
+                return set(video_links), bool(video_links)
 
-            # Fallback queue
-            for item_url in _fallback_item_urls:
-                if item_url not in urls:
-                    _fallback_urls[item_url] = {
+            # Fallback URLs should be *known* single (post) URL columns, but may be blank
+            _fallback_value = post.get(_fallback_column, None)
+            _fallback_url_links, has_fallback_links = _parse_and_collect_video_urls(_fallback_value)
+            fallback_url = _fallback_url_links.pop() if _fallback_url_links else None
+
+            for column in columns:
+                value = post.get(column)
+                video_links, has_links = _parse_and_collect_video_urls(value)
+                
+                if has_links:
+                    item_urls |= set(video_links)
+            
+            if item_urls:
+                # Main queue (with possible fallback URL attached)
+                for item_url in item_urls:
+                    if item_url not in urls:
+                        urls[item_url] = {
+                            'post_ids': {post.get('id')},
+                            "_ytdlp_fallback_url": fallback_url
+                            }
+                    else:
+                        urls[item_url]['post_ids'].add(post.get('id'))
+            elif has_fallback_links:
+                # Fallback queue only; no video URLs found in main columns, but fallback column has a URL that can be used
+                if fallback_url not in urls:
+                    _fallback_urls[fallback_url] = {
                         'post_ids': {post.get('id')},
-                        "_ytdlp_fallback_url": _fallback_url
+                        "_ytdlp_fallback_url": fallback_url # Not currently used as _fallback_urls are currently only added to YT-DLP queue
                         }
                 else:
-                    _fallback_urls[item_url]['post_ids'].add(post.get('id'))
+                    _fallback_urls[fallback_url]['post_ids'].add(post.get('id'))
 
         if not urls and not _fallback_urls:
             raise ProcessorException("No video urls identified in provided data.")
