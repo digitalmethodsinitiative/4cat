@@ -12,8 +12,7 @@ import requests
 
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper, RepeatedFailure
-from processors.visualisation.download_videos import VideoDownloaderPlus
+from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
 from processors.visualisation.download_images import ImageDownloader
 from backend.lib.processor import BasicProcessor
