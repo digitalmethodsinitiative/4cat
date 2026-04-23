@@ -7,11 +7,18 @@
             </p>
         </aside>
         <div class="processor-card">
+            <aside class="run-child-processor">
+                <button class="no-style">
+                    <i class="fa-regular fa-square-plus" aria-hidden="true"></i> <span class="sr-only">Run processor on this dataset</span>
+                </button>
+            </aside>
             <button class="journey-marker{% if not dataset.get_children() %} end{% endif %}">
             {% if not dataset.is_finished %}
                 &#62193; {# spinner #}
             {% elif not dataset.num_rows %}
                 &#62796; {# skull #}
+            {% else %}
+                <span class="status-indicator status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}"></span>
             {% endif %}
             </button>
             <header>

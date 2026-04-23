@@ -17,6 +17,27 @@
                 <li class="button-like"><a href="{{ url_for('dataset.show_result', key=dataset.key) }}">Permalink</a></li>
             </ul>
         </nav>
+
+        <header>
+            <h1><i class="fa fa-{% if dataset.get_own_processor().icon %}{{ dataset.get_own_processor().icon }}{% else %}database{% endif %}" aria-hidden="true"></i> {{ dataset.get_label() }}</h1>
+            <nav>
+                <ul class="dataset-actions">
+                    <li>
+                        <a href="#"><i class="fa fa-fw fa-edit" aria-hidden="true"></i><span class="sr-only">Edit dataset label</span></a>
+                    </li>
+                    <li>
+                        <a href="#"><i class="fa fa-fw fa-clipboard-list" aria-hidden="true"></i><span class="sr-only">Log file</span></a>
+                    </li>
+                    {% if dataset.type in processors %}
+                    <li>
+                        <a href="{{ dataset.get_version_url("backend/processors/" + processors[dataset.type].filepath) }}"><i class="fab fa-fw fa-github" aria-hidden="true"></i><span class="sr-only">GitHub</span></a>
+                    </li>
+                    {% endif %}
+                </ul>
+                {% include "dataset-page/dropdown-button.html" %}
+            </nav>
+        </header>
+
         <dl class="badge-list">
             <div class="status-badge status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows == 0 %}bad{% else %}good{% endif %}">
                 <dt class="sr-only">Status</dt>
@@ -56,29 +77,11 @@
         {% endif %}
         </dl>
 
-        <header>
-            <h1>{{ dataset.get_label() }}</h1>
-            <nav>
-                <ul class="dataset-actions">
-                    <li>
-                        <a href="#"><i class="fa fa-fw fa-edit" aria-hidden="true"></i><span class="sr-only">Edit dataset label</span></a>
-                    </li>
-                    <li>
-                        <a href="#"><i class="fa fa-fw fa-clipboard-list" aria-hidden="true"></i><span class="sr-only">Log file</span></a>
-                    </li>
-                    {% if dataset.type in processors %}
-                    <li>
-                        <a href="{{ dataset.get_version_url("backend/processors/" + processors[dataset.type].filepath) }}"><i class="fab fa-fw fa-github" aria-hidden="true"></i><span class="sr-only">GitHub</span></a>
-                    </li>
-                    {% endif %}
-                </ul>
-                {% include "dataset-page/dropdown-button.html" %}
-            </nav>
-        </header>
-
+        {% if dataset.parameters|visible_parameters %}
         <dl class="badge-list">
             {% include "dataset-page/dataset-parameters.html" %}
         </dl>
+        {% endif %}
     </section>
 
     <section class="analysis-results center-stage">
@@ -89,7 +92,7 @@
         </ul>
 
         <div class="big-button-wrap">
-            <button class="big-processor-button">Run processor</button>
+            <button class="big-processor-button"><i class="fa-regular fa-square-plus run-processor-button" aria-hidden="true"></i> Run processor</button>
         </div>
     </section>
 {% endblock %}

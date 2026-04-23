@@ -53,7 +53,7 @@
     color: var(--yellow-light);
 }
 
-.badge-list .status-badge-annotated.status-good dt {
+.badge-list .status-badge-annotated.status-good dt, .status-indicator.status-good {
     border: var(--stroke) solid var(--green-light);
     background: var(--green-light);
     color: var(--green);
@@ -64,7 +64,7 @@
     color: var(--green);
 }
 
-.badge-list .status-badge-annotated.status-bad dt {
+.badge-list .status-badge-annotated.status-bad dt, .status-indicator.status-bad {
     border: var(--stroke) solid var(--red-light);
     background: var(--red-light);
     color: var(--red);
@@ -75,7 +75,7 @@
     color: var(--red);
 }
 
-.badge-list .status-badge-annotated.status-neutral dt {
+.badge-list .status-badge-annotated.status-neutral dt, .status-indicator.status-neutral {
     border: var(--stroke) solid var(--blue-light);
     background: var(--blue-light);
     color: var(--blue);
@@ -86,7 +86,7 @@
     color: var(--blue);
 }
 
-.badge-list .status-badge-annotated.status-warning dt {
+.badge-list .status-badge-annotated.status-warning dt, .status-indicator.status-warning {
     border: var(--stroke) solid var(--yellow-light);
     background: var(--yellow-light);
     color: var(--yellow);

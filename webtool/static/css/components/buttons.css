@@ -1,3 +1,12 @@
+button.no-style {
+  padding: 0;
+  border: none;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  background: none
+}
+
 .button-like {
     font-variant: small-caps;
     text-transform: lowercase;
