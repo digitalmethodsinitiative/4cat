@@ -269,10 +269,17 @@ def get_result_legacy(query_file):
     if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
         return redirect(url_for('static', filename='img/favicon/favicon.ico'))
 
-    if g.config.get("4cat.allow_legacy_result_links", False):
-        return send_from_directory(directory=g.config.get('PATH_DATA'), path=query_file)
-    else:
+    import re
+    # Parse dataset key from query_file if possible
+    possible_keys = re.findall(r"[abcdef0-9]{32}", query_file)
+    if not possible_keys:
+        g.log.warning(f"Query file {query_file} does not seem to contain a dataset key - cannot serve file.")
         return error(404, error="This link format is no longer supported. Please use the updated link from the dataset page.")
+    
+    # if for whatever reason there are multiple hashes in the filename,
+    # the key should be the first one (e.g. folder_dataset_key or dataset_type_dataset_key.csv)
+    key = possible_keys.pop(0)
+    return get_result(dataset_key=key, query_file=query_file)
 
 @component.route('/mapped-result/<string:key>/')
 def get_mapped_result(key):
