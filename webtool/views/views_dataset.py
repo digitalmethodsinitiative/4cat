@@ -483,27 +483,6 @@ def preview_items(key):
             message="No preview is available for this file.",
         )
 
-@component.route(
-    "/result/<string:key>/archive/<path:filename>"
-)
-def show_archive_file(key: str, filename: str):
-    """
-    Return a file from within a zip archive.
-    :param str, key:                The dataset key
-    :param str, filename:           The path to the file within the archive
-    """
-    try:
-        dataset = DataSet(key=key, db=g.db, modules=g.modules)
-    except DataSetException:
-        return error(404, error="This dataset cannot be found.")
-
-    if not filename:
-        return error(404, error="No filename given.")
-
-    # Delegate to merged get_result logic for archive members
-    archive_query_file = dataset.get_results_path().name
-    return get_result(archive_query_file, key, dataset=dataset, member=filename)
-
 
 """
 Individual result pages
