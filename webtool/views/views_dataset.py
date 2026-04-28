@@ -153,8 +153,6 @@ def show_results(page):
 """
 Downloading results
 """
-
-
 def _serve_zip_member(archive_path: Path, member: str, dataset: DataSet):
     """Serve a member from a zip archive path and return a Flask Response or error()."""
     if not member:
@@ -191,9 +189,8 @@ def _serve_zip_member(archive_path: Path, member: str, dataset: DataSet):
     response.call_on_close(lambda: dataset.remove_disposable_files())
     return response
 
-
-@component.route('/result/<string:dataset_key>/<path:query_file>')
-def get_result(query_file, dataset_key, dataset=None, member=None):
+@component.route('/download/<string:dataset_key>/')
+def get_result(dataset_key=None, dataset=None, query_file=None, zip_member=None):
     """
     Get dataset result file
 
@@ -202,25 +199,36 @@ def get_result(query_file, dataset_key, dataset=None, member=None):
     :param dataset:  Optional DataSet object, if already available
     :return:  Result file
     """
-    # Handle favicon relative requests that get caught by this broad route
-    if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
-        return redirect(url_for('static', filename='img/favicon/favicon.ico'))
-    
+    # Allows use to use get_result without reinstantiating the DataSet if we already have it
     if dataset and isinstance(dataset, DataSet):
-        # dataset is already a DataSet object
-        if dataset.key != dataset_key:
+        # check DataSet object and dataset_key match if both provided to avoid confusion
+        if dataset_key and dataset.key != dataset_key:
             return error(400, error="Dataset key does not match dataset provided.")
-    else:
-        # Check if dataset is valid key
+    elif dataset_key:
+        # Check if dataset_key is valid key
         try:
             dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
         except DataSetException:
             return error(404, error="Dataset not found.")
+    else:
+        return error(400, error="No valid dataset or dataset_key provided.")
     
     # Ensure dataset available to user
     if dataset.is_private and not (
-            g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
+            g.config.get("privileges.can_view_private_datasets") or 
+            dataset.is_accessible_by(current_user)
+            ):
         return error(403, error="This dataset is private.")
+    
+    # Read query_file and zip_member from request args if not supplied by a direct call
+    if query_file is None:
+        query_file = request.args.get("query_file")
+    if zip_member is None:
+        zip_member = request.args.get("zip_member")
+
+    # If no specific file is requested, serve the main results file
+    if not query_file:
+        query_file = dataset.get_results_path().name
     
     # Security: Build and validate the full path
     data_root = g.config.get('PATH_DATA')
@@ -242,15 +250,9 @@ def get_result(query_file, dataset_key, dataset=None, member=None):
     except (OSError, ValueError, FileNotFoundError):
         return error(404, error="File not found.")
 
-    # If a zip member is requested, serve it via the zip-member helper
-    if member is None:
-        member = request.args.get("member")
-
-    if member:
-        # resolved_path validated above to be within dataset scope
-        if not resolved_path.is_file():
-            return error(400, error="Target is not a file.")
-        return _serve_zip_member(resolved_path, member, dataset=dataset)
+    if zip_member:
+        # resolved_path already validated above to be within dataset scope
+        return _serve_zip_member(archive_path=resolved_path, member=zip_member, dataset=dataset)
 
     # Send related file (Flask can handle file not found w/ 404 error)
     return send_from_directory(directory=data_root, path=query_file)
