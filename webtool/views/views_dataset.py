@@ -254,8 +254,21 @@ def get_result(dataset_key=None, dataset=None, query_file=None, zip_member=None)
         # resolved_path already validated above to be within dataset scope
         return _serve_zip_member(archive_path=resolved_path, member=zip_member, dataset=dataset)
 
+    # Guess MIME type, default to binary if unknown
+    mime_type, _ = mimetypes.guess_type(query_file)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+
     # Send related file (Flask can handle file not found w/ 404 error)
-    return send_from_directory(directory=data_root, path=query_file)
+    response = send_from_directory(
+        directory=data_root, 
+        path=query_file,
+        mimetype=mime_type,
+        conditional=True,
+        etag=True
+        )
+    response.headers.setdefault("Accept-Ranges", "bytes")
+    return response
 
 @component.route('/result/<path:query_file>')
 def get_result_legacy(query_file):
