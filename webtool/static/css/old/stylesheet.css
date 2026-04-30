@@ -1,10 +1,10 @@
-@import url('reset.css');
-@import url('colours.css');
+@import url('old/reset.css');
+@import url('old/colours.css');
 
-@import url('dataset-page.css');
-@import url('control-panel.css');
+@import url('old/dataset-page.css');
+@import url('old/control-panel.css');
 
-@import url('progress.css');
+@import url('old/progress.css');
 
 
 /** --------------------- *
@@ -12,36 +12,36 @@
   * --------------------- */
 @font-face {
     font-family: 'Open Sans';
-    src: url("../fonts/OpenSans-Regular.ttf")
+    src: url("../../fonts/OpenSans-Regular.ttf")
 }
 
 @font-face {
     font-family: 'Open Sans';
     font-weight: bold;
-    src: url("../fonts/OpenSans-Bold.ttf")
+    src: url("../../fonts/OpenSans-Bold.ttf")
 }
 
 @font-face {
     font-family: 'Open Sans';
     font-style: italic;
-    src: url("../fonts/OpenSans-Italic.ttf")
+    src: url("../../fonts/OpenSans-Italic.ttf")
 }
 
 @font-face {
     font-family: 'Open Sans';
     font-weight: bold;
     font-style: italic;
-    src: url("../fonts/OpenSans-BoldItalic.ttf")
+    src: url("../../fonts/OpenSans-BoldItalic.ttf")
 }
 
 @font-face {
     font-family: 'Fixedsys';
-    src: url("../fonts/fsex300-webfont.woff")
+    src: url("../../fonts/fsex300-webfont.woff")
 }
 
 @font-face {
     font-family: 'Inter';
-    src: url("../fonts/Inter-VariableFont_opsz,wght.ttf");
+    src: url("../../fonts/Inter-VariableFont_opsz,wght.ttf");
 }
 
 /** --------------------- *

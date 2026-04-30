@@ -29,9 +29,9 @@
     --panel-bg-2: hsl(0, 0%, 76%);
     --panel-bg-3: hsl(0, 0%, 50%);
 
-    --max-width: 1100px; /** viewport width **/
+    --max-width: 68rem; /** viewport width **/
 
-    --font-base: 10px; /** the alpha and the omega **/
+    --font-base: 0.625rem; /** the alpha and the omega **/
 
     --font-normal: calc(var(--font-base) / 3 * 4);
     --font-body: calc(var(--font-base) / 6 * 7);
@@ -49,7 +49,7 @@
     --spacing-large: calc(var(--spacing-tiny) * 8);
     --spacing-xlarge: calc(var(--spacing-tiny) * 12);
 
-    --stroke-light: 1px;
+    --stroke-light: calc(var(--font-base) * 0.1);
     --stroke: calc(var(--stroke-light) * 2);
     --stroke-journey: calc(var(--stroke-light) * 3);
     --radius: calc(var(--font-base) / 6 * 5);

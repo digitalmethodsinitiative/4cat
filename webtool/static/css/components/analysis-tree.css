@@ -16,10 +16,10 @@
     content: '';
     position: absolute;
     top: 0;
-    left: calc((var(--journey-width) * 0.5) + (var(--stroke-journey) * 0.5));
+    left: calc((var(--journey-width) * 0.5) + (var(--stroke-journey) * 2.5));
     border-bottom: calc(var(--stroke-journey) * 2) solid var(--dark);
     background: var(--bright);
-    width: var(--journey-width);
+    width: calc(var(--journey-width) - (var(--stroke-journey) * 2));
     height: 0;
 }
 
@@ -72,6 +72,7 @@
 }
 
 .journey-marker {
+    /** big circle before each dataset **/
     font-family: 'Font Awesome 6 Free', monospace;
     font-weight: 900;
     background: var(--dark);
@@ -104,26 +105,49 @@
 }
 
 .journey-marker .status-indicator {
+    /** coloured dot in middle of journey indicator **/
     position: absolute;
-    top: calc(50% + 0.5px);
+    top: 50%;
     left: 50%;
-    margin-top: -0.3em;
-    margin-left: -0.3em;
     overflow: hidden;
-    height: 0.6em;
-    width: 0.6em;
+    height: calc(var(--font-body) * 0.75);
+    width: calc(var(--font-body) * 0.75);
+    border-radius: calc(var(--font-body) * 0.375);
+    margin-top: calc(var(--font-body) * -0.375);
+    margin-left: calc(var(--font-body) * -0.375);
     border: 0;
-    border-radius: 0.3em;
     text-indent: -10em;
-}
-
-@keyframes spin {
-    from {transform:rotate(0deg);}
-    to {transform:rotate(360deg);}
+    animation-timing-function: linear;
 }
 
 .in-progress > article > div > .journey-marker {
-    animation: spin 2s infinite linear;
+    animation: status-pulse 1.25s infinite alternate;
+}
+
+@keyframes status-pulse {
+    from {
+        height: calc(var(--font-body) * 0.75);
+        width: calc(var(--font-body) * 0.75);
+        border-radius: calc(var(--font-body) * 0.375);
+        margin-top: calc(var(--font-body) * -0.375);
+        margin-left: calc(var(--font-body) * -0.375);
+    }
+    to {
+        width: calc((var(--font-body) * 2) - var(--stroke-journey) * 2);
+        height: calc((var(--font-body) * 2) - var(--stroke-journey) * 2);
+        border-radius: var(--font-body);
+        margin-top: calc(((var(--font-body) * 2) - var(--stroke-journey) * 2) * -0.5);
+        margin-left: calc(((var(--font-body) * 2) - var(--stroke-journey) * 2) * -0.5);
+    }
+}
+
+@keyframes status-spin {
+    from {
+        transform:rotate(0deg);
+    }
+    to {
+        transform:rotate(360deg);
+    }
 }
 
 /** journey marker of first item in tree, and any item with children **/
@@ -142,10 +166,10 @@
 /** any processor card **/
 .processor-card {
     position: relative;
-    padding-bottom: var(--spacing-large);
+    padding: var(--spacing-regular) 0;
 }
 
-.processor-card > header::before {
+.processor-card > .dataset-header::before {
     /** curve towards journey marker **/
     border: var(--stroke-journey) solid var(--dark);
     border-bottom-left-radius: var(--double-radius);
@@ -162,10 +186,8 @@
     left: calc((-1 * var(--spacing-xlarge)) - (2 * var(--stroke-journey)));
 }
 
-.processor-card header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+.processor-card .dataset-header {
+    color: inherit;
     border: var(--stroke-light) solid var(--dark);
     border-radius: var(--radius);
     border-bottom-left-radius: 0;
@@ -205,15 +227,6 @@
     border-bottom-right-radius: var(--radius);
 }
 
-.processor-card h3 {
-    font-family: Chivo;
-    font-weight: normal;
-    font-size: var(--font-h1);
-    flex-grow: 0;
-    padding: 0 var(--spacing-regular);
-    margin: 0;
-}
-
 .processor-card .quick-links {
     flex-grow: 1;
 }
@@ -223,10 +236,6 @@
     color: var(--panel-bg-0);
 }
 
-.processor-card header > i {
-    font-size: calc(var(--font-h1) * 1.5);
-}
-
 .analysis-results .dataset-actions li {
     background: var(--panel-bg-1);
     color: var(--semidark);
@@ -234,7 +243,7 @@
 }
 
 /** colours for dropdown button in processor cards **/
-.processor-card .with-dropdown .button-like {
+.processor-card .button-like {
     color: var(--button-bg-regular);
     background-color: transparent;
     outline-color: var(--button-bg-regular);
@@ -299,7 +308,7 @@ aside.run-child-processor i:hover::before {
     box-sizing: border-box;
 }
 
-.big-processor-button {
+.big-processor-button, .run-hint p {
     border-radius: var(--radius);
     border: var(--stroke-light) solid var(--dark);
     border-bottom-width: var(--stroke-journey);
@@ -329,4 +338,40 @@ aside.run-child-processor i:hover::before {
     border-right-width: 0;
     width: calc(var(--spacing-xlarge) - var(--stroke-journey));
     height: calc(var(--spacing-xlarge) + var(--spacing-small));
+}
+
+.run-hint {
+    border-left: var(--stroke-journey) solid var(--dark);
+    position: relative;
+    overflow: hidden;
+}
+
+.sub.tree > li:not(.with-children) > .run-hint {
+    border-left-color: transparent;
+}
+
+.run-hint::before {
+    content: '';
+    display: block;
+    position: absolute;
+    left: calc(var(--stroke-journey) * -1);
+    top: calc(-100%);
+    border: 0 dotted var(--dark);
+    border-bottom-left-radius: var(--double-radius);
+    border-left-width: var(--stroke-journey);
+    border-bottom-width: var(--stroke-journey);
+    width: var(--spacing-xlarge);
+    height: calc(var(--spacing-xlarge) + var(--spacing-small));
+}
+
+.sub.tree > li:not(.with-children) > .run-hint::before {
+    border-left-color: transparent;
+}
+
+.run-hint p {
+    width: max-content;
+    font-size: var(--font-body);
+    margin: 0;
+    margin-left: var(--spacing-xlarge);
+    padding: var(--spacing-small) var(--spacing-large);
 }

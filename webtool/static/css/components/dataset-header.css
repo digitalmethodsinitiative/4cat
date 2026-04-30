@@ -1,0 +1,41 @@
+.dataset-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--brighten-12);
+    color: var(--bright);
+    align-content: center;
+    padding: var(--spacing-regular);
+    box-sizing: border-box;
+}
+
+.dataset-header h3, .dataset-header h1 {
+    font-family: Chivo, sans-serif;
+    font-weight: normal;
+    font-size: var(--font-h1);
+    flex-grow: 0;
+    padding: 0 var(--spacing-regular);
+    margin: 0;
+}
+
+.dataset-header nav {
+    position: relative;
+    align-items: center;
+    display: flex;
+    flex-grow: 1;
+    justify-content: space-between;
+}
+
+.dataset-header nav ul.dataset-fetch {
+    text-align: right;
+    column-gap: 0;
+    position: relative;
+}
+
+.dataset-header nav.actions {
+    justify-content: end;
+}
+
+.dataset-header > i {
+    font-size: calc(var(--font-h1) * 1.5);
+}

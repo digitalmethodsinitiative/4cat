@@ -24,6 +24,11 @@ button.no-style {
     padding: 8px 18px;
 }
 
+.action-button-wrap {
+    display: flex;
+    column-gap: 1em;
+}
+
 .with-dropdown .button-like a {
     height: 1.25em;
 }

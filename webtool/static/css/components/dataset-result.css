@@ -1,12 +1,15 @@
 .dataset-metadata {
     background: var(--semidark);
-    padding-top: var(--spacing-large);
-    padding-bottom: var(--spacing-small);
+    padding: var(--spacing-large) 0;
 }
 
 .dataset-metadata > * {
     max-width: var(--max-width);
-    margin: 0 auto var(--spacing-regular) auto;
+    margin: 0 auto 0 auto;
+}
+
+.dataset-metadata > .dataset-header {
+    margin-top: var(--spacing-regular);
 }
 
 .dataset-metadata nav > ul, .dataset-actions {
@@ -19,40 +22,29 @@
     background: transparent;
 }
 
+.dataset-metadata .badge-list, .dataset-metadata p.notice {
+    background: var(--brighten-12);
+    padding: var(--spacing-small) var(--spacing-regular);
+    box-sizing: border-box;
+    border-top: var(--stroke-light) dashed var(--dark);
+    color: var(--bright);
+}
+
 .dataset-metadata .badge-list dt {
     color: var(--button-grey);
 }
 
-.dataset-metadata .badge-list dd {
-    color: var(--bright);
-}
-
-.dataset-metadata header {
-    background: var(--brighten-12);
-    color: var(--bright);
-    display: flex;
-    align-content: center;
-    padding: 0 var(--spacing-regular);
-    box-sizing: border-box;
-}
-
-.dataset-metadata h1 {
-    font-family: Chivo;
-    font-weight: normal;
+.dataset-metadata h1, .dataset-metadata i. {
     font-size: var(--font-h1);
-    border-bottom: var(--stroke) solid var(--button-grey);
     margin-right: var(--spacing-regular);
     height: var(--font-normal);
     padding: var(--spacing-small) var(--spacing-tiny);
     line-height: var(--font-normal);
 }
 
-.dataset-metadata header nav {
-    position: relative;
-    align-items: center;
-    display: flex;
-    flex-grow: 1;
-    justify-content: space-between;
+.dataset-metadata h1 {
+    font-family: Chivo, sans-serif;
+    font-weight: normal;
 }
 
 .dataset-actions li {
@@ -73,12 +65,15 @@
     background: var(--button-grey);
 }
 
-.dataset-metadata header nav ul.dataset-fetch {
-    text-align: right;
-    column-gap: 0;
-    position: relative;
-}
-
 .dataset-fetch .button-like {
     outline-color: var(--button-grey);
+}
+
+.dataset-metadata p.notice {
+    font-variant: small-caps;
+    text-transform: lowercase;
+}
+
+.dataset-metadata p.notice a {
+    text-decoration: underline;
 }

@@ -1,19 +1,24 @@
-{% if dataset.get_results_path().exists() %}
-<ul class="dataset-fetch with-dropdown">
-    <li class="button-like">
-        {% if (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
+<div class="action-button-wrap">
+    {% if dataset.get_results_path().exists() %}
+    {% if (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item) and not
+    __user_config("ui.inline_preview") %}
+    <ul class="dataset-fetch">
+        <li class="button-like">
             <a href="{{ url_for('dataset.preview_items', key=dataset.key) }}">View</a>
-        {% else %}
-            <a href="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}">Download
-                ({{ dataset.get_extension() }}, {{ dataset.get_results_path()|filesize }})</a>
-        {% endif %}
-        <ul class="dropdown-action-button">
-            <li><a href="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}">Download
-                ({{ dataset.get_extension() }}, {{ dataset.get_results_path()|filesize }})</a></li>
-            {% if dataset.get_own_processor().map_item or dataset.annotation_fields %}
+        </li>
+    </ul>
+    {% endif %}
+    {% set have_dropdown = (dataset.get_own_processor().map_item or dataset.annotation_fields) %}
+    <ul class="dataset-fetch{% if have_dropdown %} with-dropdown{% endif %}">
+        <li class="button-like">
+            <a href="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}">Download ({{
+                dataset.get_extension() }}, {{ dataset.get_results_path()|filesize }})</a>
+            {% if have_dropdown %}
+            <ul class="dropdown-action-button">
                 <li><a href="{{ url_for('dataset.get_mapped_result', key=dataset.key) }}">Download (csv)</a></li>
+            </ul>
             {% endif %}
-        </ul>
-    </li>
-</ul>
-{% endif %}
+        </li>
+    </ul>
+    {% endif %}
+</div>
