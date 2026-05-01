@@ -7,30 +7,34 @@
     position: relative;
     padding-left: var(--journey-width);
     box-sizing: border-box;
-    margin-top: var(--spacing-large)
 }
 
-/** very first item of analysis tree root level **/
+/** very first item connects to the header box **/
+.analysis-results > ul > li:first-child {
+    padding-top: var(--spacing-xlarge);
+}
+
 .analysis-results > ul > li:first-child::before {
-    /** block top of border that extends above journey marker **/
+    /** funnel **/
     content: '';
     position: absolute;
     top: 0;
-    left: calc((var(--journey-width) * 0.5) + (var(--stroke-journey) * 2.5));
-    border-bottom: calc(var(--stroke-journey) * 2) solid var(--dark);
-    background: var(--bright);
+    left: calc((var(--journey-width) * 0.5) + (var(--stroke-journey) * 1.25));
     width: calc(var(--journey-width) - (var(--stroke-journey) * 2));
-    height: 0;
+    height: calc(var(--journey-width) / 2);
+    background: var(--semidark);
+    mask: radial-gradient(#0000 71%, #F09 1%) 10000% 10000%/99.5% 200%;
 }
+
 
 /** very last item of analysis tree root level **/
 .analysis-results > ul > li:last-child {
-    border-left-style: dashed;
+    border-color: transparent;
 }
 
 /** any item **/
 .analysis-results .tree > li {
-    border-left: var(--stroke-journey) solid var(--dark);
+    border-left: var(--stroke-journey) solid var(--semidark);
     padding-left: calc(var(--spacing-xlarge) / 2);
 }
 
@@ -47,7 +51,7 @@
 
 /** processor card wrappers of processors with children **/
 .analysis-results li.with-children > article {
-    border-left-color: var(--dark);
+    border-left-color: var(--semidark);
 }
 
 /** processor datetime **/
@@ -96,12 +100,12 @@
 
 .journey-marker.end::after {
     content: '';
-    width: var(--stroke-journey);
+    height: var(--stroke-journey);
     background: var(--dark);
-    height: 100%;
+    width: 100%;
     position: absolute;
-    right: calc(-1 * var(--stroke-journey));
-    top: 0;
+    left: 0;
+    bottom: 0;
 }
 
 .journey-marker .status-indicator {
@@ -164,14 +168,30 @@
 }
 
 /** any processor card **/
+/** standard processor card height **/
+:root {
+    --card-height: calc(var(--font-h1) * 10);
+}
 .processor-card {
     position: relative;
     padding: var(--spacing-regular) 0;
 }
 
+.processor-card::before {
+    /** dotted line connecting card to journey marker **/
+    content: '';
+    display: block;
+    position: absolute;
+    top: calc(var(--spacing-regular) + var(--font-body) + (var(--stroke) / 2));
+    left: calc(-1 * var(--spacing-regular));
+    width: var(--spacing-regular);
+    border: var(--stroke) solid var(--semidark);
+    border-width: calc(var(--stroke-journey) / 2) 0;
+}
+
 .processor-card > .dataset-header::before {
     /** curve towards journey marker **/
-    border: var(--stroke-journey) solid var(--dark);
+    border: var(--stroke-journey) solid var(--semidark);
     border-bottom-left-radius: var(--double-radius);
     border-top-width: 0;
     border-right-width: 0;
@@ -192,6 +212,7 @@
     border-radius: var(--radius);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
+    border-bottom-color: var(--panel-bg-2);
     background: var(--panel-bg-0);
     padding: var(--spacing-regular);
 }
@@ -212,7 +233,7 @@
 
 /** any badge list in a processor card that is not the last one **/
 .processor-card .badge-list.dataset-status:not(:last-child) {
-    border-bottom: var(--stroke-light) dashed var(--dark);
+    border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
 }
 
 .processor-card .badge-list dd {
@@ -303,9 +324,15 @@ aside.run-child-processor i:hover::before {
 /** 'run new processor' button at bottom **/
 .big-button-wrap {
     position: relative;
-    width: 100%;
-    padding-left: var(--spacing-xlarge);
+    padding-left: calc(var(--spacing-xlarge) + (2 * var(--stroke-journey)));
     box-sizing: border-box;
+    margin-left: calc((var(--spacing-xlarge) / 2 * -1) - var(--stroke-journey));
+}
+
+.big-button-wrap em {
+    color: var(--fourcat-accent);
+    display: block;
+    font-style: normal;
 }
 
 .big-processor-button, .run-hint p {
@@ -322,7 +349,15 @@ aside.run-child-processor i:hover::before {
 .big-processor-button:hover {
     cursor: pointer;
     background: var(--button-bg-regular);
+}
+
+.big-processor-button:hover, .big-processor-button:hover em {
     color: var(--bright);
+}
+
+.big-processor-button .byline {
+    margin: var(--spacing-tiny) 0 0 0;
+    font-size: var(--font-normal)
 }
 
 .big-processor-button::before {
@@ -331,23 +366,26 @@ aside.run-child-processor i:hover::before {
     display: block;
     position: absolute;
     left: 0;
-    top: calc(-1 * var(--spacing-large));
-    border: var(--stroke-journey) dashed var(--dark);
+    top: 0;
+    border: var(--stroke-journey) dotted var(--semidark);
     border-bottom-left-radius: var(--double-radius);
     border-top-width: 0;
     border-right-width: 0;
-    width: calc(var(--spacing-xlarge) - var(--stroke-journey));
-    height: calc(var(--spacing-xlarge) + var(--spacing-small));
+    width: calc(var(--spacing-xlarge) + var(--stroke-journey));
+    height: calc((100% - var(--stroke-journey)) / 2);
 }
 
 .run-hint {
-    border-left: var(--stroke-journey) solid var(--dark);
+    border-left: var(--stroke-journey) solid var(--semidark);
     position: relative;
-    overflow: hidden;
+    display: none;
 }
 
-.sub.tree > li:not(.with-children) > .run-hint {
+.tree > li:not(.with-children) > .run-hint {
     border-left-color: transparent;
+    height: 2rem;
+    padding-top: calc(2.5rem + var(--spacing-regular));
+    margin-top: calc(-1 * (6rem - var(--spacing-xlarge) - var(--stroke-journey)));
 }
 
 .run-hint::before {
@@ -356,7 +394,7 @@ aside.run-child-processor i:hover::before {
     position: absolute;
     left: calc(var(--stroke-journey) * -1);
     top: calc(-100%);
-    border: 0 dotted var(--dark);
+    border: 0 dotted var(--semidark);
     border-bottom-left-radius: var(--double-radius);
     border-left-width: var(--stroke-journey);
     border-bottom-width: var(--stroke-journey);
@@ -364,8 +402,11 @@ aside.run-child-processor i:hover::before {
     height: calc(var(--spacing-xlarge) + var(--spacing-small));
 }
 
-.sub.tree > li:not(.with-children) > .run-hint::before {
-    border-left-color: transparent;
+.tree > li:not(.with-children) > .run-hint::before {
+    top: 0;
+    height: 5.8em;
+    z-index: var(--z-run-hint);
+    border-left: var(--stroke-journey) dotted var(--semidark);
 }
 
 .run-hint p {

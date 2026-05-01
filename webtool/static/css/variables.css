@@ -56,6 +56,7 @@
     --double-radius: calc(2 * var(--radius));
 
     --z-journey-marker: 1;
+    --z-run-hint: 2;
     --z-button: 10;
     --z-button-dropdown: 15;
     --z-footer-header: 1000;
