@@ -10,7 +10,9 @@ import time
 import csv
 import re
 import os
+import errno
 from enum import Enum
+from pathlib import Path
 
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
@@ -864,19 +866,70 @@ class DataSet(FourcatModule):
 
         results_dir_base = results_file.parent
         results_dir = results_file.name.replace(".", "") + "-staging"
-        results_path = results_dir_base.joinpath(results_dir)
-        index = 1
-        while results_path.exists():
-            results_path = results_dir_base.joinpath(results_dir + "-" + str(index))
-            index += 1
 
-        # create temporary folder
-        results_path.mkdir()
+        index = 1
+        # Try creating the staging directory; if a concurrent process created
+        # it between the exists() check and mkdir(), handle the EEXIST error
+        # by incrementing the index and retrying to avoid race conditions.
+        while True:
+            suffix = "" if index == 1 else f"-{index}"
+            results_path = results_dir_base.joinpath(results_dir + suffix)
+            try:
+                results_path.mkdir()
+                break
+            except OSError as e:
+                if getattr(e, 'errno', None) == errno.EEXIST:
+                    index += 1
+                    continue
+                raise
 
         # Storing the staging area with the dataset so that it can be removed later
         self.disposable_files.append(results_path)
 
         return results_path
+
+    def extract_file_from_archive(self, member, staging_area=None, archive_path=None):
+        """
+        Extract a single member from this dataset's results archive (or an
+        explicitly provided archive path) into a staging area and return the
+        Path to the extracted file. If the member does not exist, return
+        ``None``.
+
+        :param str member: The path of the member inside the archive
+        :param Path staging_area: Optional staging area to extract into
+        :param archive_path: Optional path to the archive file to extract from
+        :return Path|None: Path to extracted file or None if not found
+        """
+        if not member:
+            return None
+
+        # Reject absolute paths and traversal in the member path
+        if Path(member).is_absolute() or ".." in Path(member).parts:
+            raise ValueError("Invalid member path.")
+
+        # Determine archive path (use provided archive_path if given)
+        path = Path(archive_path) if archive_path is not None else self.get_results_path()
+        if not path.exists():
+            return None
+
+        if not staging_area:
+            staging_area = self.get_staging_area()
+
+        if not staging_area.exists() or not staging_area.is_dir():
+            raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
+
+        with zipfile.ZipFile(str(path), "r") as archive_file:
+            # Zip member names are stored with forward slashes
+            namelist = archive_file.namelist()
+            if member not in namelist:
+                return None
+
+            # Ensure parent directories exist in staging area
+            extract_path = staging_area.joinpath(member)
+            extract_path.parent.mkdir(parents=True, exist_ok=True)
+            archive_file.extract(member, staging_area)
+
+            return extract_path
 
     def remove_disposable_files(self):
         """
@@ -1627,7 +1680,7 @@ class DataSet(FourcatModule):
             self.preset_parent = [
                                      parent
                                      for parent in self.get_genealogy()
-                                     if parent.type.find("preset-") == 0 and parent.key != self.key
+                                     if parent.is_preset() and parent.key != self.key
                                  ][:1]
 
         if self.preset_parent:
@@ -2349,13 +2402,23 @@ class DataSet(FourcatModule):
         SERVER_HTTPS) plus hardcoded '/result/'.
         TODO: create more dynamic method of obtaining url.
         """
-        filename = self.get_results_path().name
+        from flask import has_app_context, url_for
 
-        # we cheat a little here by using the modules' config reader, but these
-        # will never be context-dependent values anyway
-        url_to_file = ('https://' if self.modules.config.get("flask.https") else 'http://') + \
-                      self.modules.config.get("flask.server_name") + '/result/' + filename
-        return url_to_file
+        query_file = self.get_results_path().name
+        
+        # Use Flask's url_for if possible, to ensure we get the correct server name and protocol (e.g., if behind a reverse proxy)
+        if has_app_context():
+            return url_for(
+                "dataset.get_result",
+                dataset_key=self.key,
+                query_file=query_file,
+                _external=True
+            )
+
+        # Fallback for non-Flask contexts (e.g., backend and workers)
+        scheme = "https" if self.modules.config.get("flask.https") else "http"
+        server = self.modules.config.get("flask.server_name")
+        return f"{scheme}://{server}/download/{self.key}/"
 
     def warn_unmappable_item(
             self, item_count, processor=None, error_message=None, warn_admins=True
@@ -2638,6 +2701,16 @@ class DataSet(FourcatModule):
             "SELECT * FROM annotations WHERE dataset = '%s';" % self.key
         )
         return annotation_data
+
+    def is_preset(self):
+        """
+        Is this dataset a preset dataset?
+
+         Preset datasets are datasets that are generated by presets.
+
+         :return:  False
+        """
+        return self.get_own_processor() is not None and self.get_own_processor().is_preset()
 
     def __getattr__(self, attr):
         """

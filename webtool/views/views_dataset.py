@@ -4,11 +4,10 @@
 import json
 import csv
 import io
-import zipfile
 import json_stream
 import mimetypes
 from pathlib import Path
-from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, Response, flash,
+from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, flash,
                    get_flashed_messages, url_for, stream_with_context, g)
 from flask_login import login_required, current_user
 
@@ -154,23 +153,153 @@ def show_results(page):
 """
 Downloading results
 """
+def _serve_zip_member(archive_path: Path, member: str, dataset: DataSet):
+    """Serve a member from a zip archive path and return a Flask Response or error()."""
+    if not member:
+        return error(400, error="No member specified.")
 
+    # Reject absolute paths and traversal in member
+    if Path(member).is_absolute() or ".." in Path(member).parts:
+        return error(400, error="Invalid member path.")
 
-@component.route('/result/<path:query_file>')
-def get_result(query_file):
+    if not archive_path.is_file():
+        return error(404, error="Archive not found.")
+
+    mime_type, _ = mimetypes.guess_type(member)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+
+    try:
+        extracted = dataset.extract_file_from_archive(member, archive_path=archive_path)
+    except Exception as e:
+        return error(500, error=f"Error extracting archive member: {str(e)}")
+
+    if not extracted or not extracted.exists():
+        return error(404, error="File not found in archive.")
+
+    response = send_from_directory(
+        directory=str(extracted.parent),
+        path=extracted.name,
+        mimetype=mime_type,
+        conditional=True,
+        etag=True
+    )
+    response.headers["Content-Disposition"] = f'inline; filename="{Path(member).name}"'
+    response.headers.setdefault("Accept-Ranges", "bytes")
+    response.call_on_close(lambda: dataset.remove_disposable_files())
+    return response
+
+@component.route('/download/<string:dataset_key>/<path:query_file>')
+@component.route('/download/<string:dataset_key>/')
+def get_result(dataset_key=None, dataset=None, query_file=None, zip_member=None):
     """
     Get dataset result file
 
     :param str query_file:  name of the result file
+    :param str dataset_key:  dataset key
+    :param dataset:  Optional DataSet object, if already available
     :return:  Result file
-    :rmime: text/csv
+    """
+    # Allows use to use get_result without reinstantiating the DataSet if we already have it
+    if dataset and isinstance(dataset, DataSet):
+        # check DataSet object and dataset_key match if both provided to avoid confusion
+        if dataset_key and dataset.key != dataset_key:
+            return error(400, error="Dataset key does not match dataset provided.")
+    elif dataset_key:
+        # Check if dataset_key is valid key
+        try:
+            dataset = DataSet(key=dataset_key, db=g.db, modules=g.modules)
+        except DataSetException:
+            return error(404, error="Dataset not found.")
+    else:
+        return error(400, error="No valid dataset or dataset_key provided.")
+    
+    # Ensure dataset available to user
+    if dataset.is_private and not (
+            g.config.get("privileges.can_view_private_datasets") or 
+            dataset.is_accessible_by(current_user)
+            ):
+        return error(403, error="This dataset is private.")
+    
+    # Read query_file and zip_member from request args if not supplied by a direct call
+    if query_file is None:
+        query_file = request.args.get("query_file")
+    if zip_member is None:
+        zip_member = request.args.get("zip_member")
+
+    # If no specific file is requested, serve the main results file
+    if not query_file:
+        query_file = dataset.get_results_path().name
+    
+    # Security: Build and validate the full path
+    data_root = g.config.get('PATH_DATA')
+    results_folder = dataset.get_results_folder_path()
+    requested_file = data_root.joinpath(query_file)
+
+    # If the file doesn't exist relative to data_root, try the dataset's results folder.
+    # Static HTML pages reference assets via relative URL paths rather than query params.
+    if not requested_file.exists():
+        fallback = results_folder / query_file
+        if fallback.exists():
+            query_file = str(fallback.relative_to(data_root))
+            requested_file = data_root / query_file
+
+    try:
+        resolved_path = requested_file.resolve(strict=True)
+    except (OSError, FileNotFoundError):
+        return error(404, error="File not found.")
+
+    try:
+        # Must be within data_root and within the dataset's results folder (or the main results file)
+        resolved_path.relative_to(data_root.resolve())
+        if resolved_path != dataset.get_results_path().resolve():
+            resolved_path.relative_to(results_folder.resolve())
+    except ValueError:
+        return error(403, error="Access denied.")
+
+    if zip_member:
+        # resolved_path already validated above to be within dataset scope
+        return _serve_zip_member(archive_path=resolved_path, member=zip_member, dataset=dataset)
+
+    # Guess MIME type, default to binary if unknown
+    mime_type, _ = mimetypes.guess_type(query_file)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+
+    # Send related file (Flask can handle file not found w/ 404 error)
+    response = send_from_directory(
+        directory=data_root, 
+        path=query_file,
+        mimetype=mime_type,
+        conditional=True,
+        etag=True
+        )
+    response.headers.setdefault("Accept-Ranges", "bytes")
+    return response
+
+@component.route('/result/<path:query_file>')
+def get_result_legacy(query_file):
+    """
+    Legacy route for backward compatibility to maintain compatibility with old links that don't include the dataset key.
+    
+    :param str query_file:  name of the result file
+    :return:  Result file or error
     """
     # Handle favicon relative requests that get caught by this broad route
     if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
         return redirect(url_for('static', filename='img/favicon/favicon.ico'))
-    
-    return send_from_directory(directory=g.config.get('PATH_DATA'), path=query_file)
 
+    import re
+    # Parse dataset key from query_file if possible
+    possible_keys = re.findall(r"[abcdef0-9]{32}", query_file)
+    if not possible_keys:
+        g.log.warning(f"Query file {query_file} does not seem to contain a dataset key - cannot serve file.")
+        return error(404, error="This link format is no longer supported. Please use the updated link from the dataset page.")
+    
+    # if for whatever reason there are multiple hashes in the filename,
+    # the key should be the first one (e.g. folder_dataset_key or dataset_type_dataset_key.csv)
+    key = possible_keys.pop(0)
+    return get_result(dataset_key=key, query_file=query_file)
 
 @component.route('/mapped-result/<string:key>/')
 def get_mapped_result(key):
@@ -374,63 +503,6 @@ def preview_items(key):
             message="No preview is available for this file.",
         )
 
-@component.route(
-    "/result/<string:key>/archive/<string:filename>"
-)
-def show_archive_file(key: str, filename: str):
-    """
-    Return a file from within a zip archive.
-    :param str, key:                The dataset key
-    :param str, filename:           The path to the file within the archive
-    """
-    try:
-        dataset = DataSet(key=key, db=g.db, modules=g.modules)
-    except DataSetException:
-        return error(404, error="This dataset cannot be found.")
-
-    if not current_user.can_access_dataset(dataset):
-        return error(403, error="This dataset is private.")
-
-    if not filename:
-        return error(404, error="No filename given.")
-
-    # Locate the archive file
-    archive_path = (
-        Path(g.config.get("PATH_DATA")) / dataset.get_results_path()
-    )
-
-    if not archive_path.is_file():
-        return error(404, error="Archive not found.")
-
-    try:
-        with zipfile.ZipFile(archive_path, "r") as zip_file:
-            # Check if file exists in archive
-            if filename not in zip_file.namelist():
-                return error(404, error="File not found in archive.")
-
-            # Read file from archive into memory
-            file_data = zip_file.read(filename)
-
-            mime_type, _ = mimetypes.guess_type(filename)
-            if mime_type is None:
-                mime_type = "application/octet-stream"
-
-            # Return as a response with appropriate headers
-            return Response(
-                file_data,
-                mimetype=mime_type,
-                headers={
-                    "Content-Disposition": f'inline; filename="{Path(filename).name}"',
-                    "Content-Length": str(len(file_data)),
-                },
-            )
-
-    except zipfile.BadZipFile:
-        return error(400, error="Invalid zip archive.")
-    except KeyError:
-        return error(404, error="File not found in archive.")
-    except Exception as e:
-        return error(500, error=f"Error reading archive: {str(e)}")
 
 """
 Individual result pages

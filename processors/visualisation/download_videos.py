@@ -3,6 +3,7 @@ Download videos from URLs
 
 First attempt to download via request, but if that fails use yt-dlp.
 """
+import copy
 import json
 import re
 import shutil
@@ -314,7 +315,9 @@ class VideoDownloaderPlus(BasicProcessor):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
-        return ((module.type.endswith("-search") or module.is_from_collector())
+        return ((module.type.endswith("-search") or 
+                 module.is_from_collector() or 
+                 module.type == "tiktok-video-downloader-metadata")
                 # These have their own video downloaders
                 and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]) \
                 and module.get_extension() in ("csv", "ndjson")
@@ -331,7 +334,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # Collect URLs
         try:
-            urls = self.collect_video_urls()
+            urls, _preexisting_fallback_queue = self.collect_video_urls()
         except ProcessorException as e:
             self.dataset.finish_with_error(str(e))
             return
@@ -365,13 +368,13 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # Initialize counters
         self.downloaded_videos = 0
-        failed_downloads = 0
-        copied_videos = 0
+        self.failed_downloads = 0
+        self.copied_videos = 0
         consecutive_errors = 0
         # not_a_video tracked within direct_results
-        total_not_a_video = 0
-        skipped_urls = 0
-        processed_urls = 0
+        self.total_not_a_video = 0
+        self.skipped_urls = 0
+        self.processed_urls = 0
         last_domains = []
         total_urls = len(urls)
         self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
@@ -382,41 +385,35 @@ class VideoDownloaderPlus(BasicProcessor):
         # Tier 2: Queue direct downloads
         # Tier 3: Fallback to yt-dlp if needed
         
-        direct_download_queue = []
-        ytdlp_fallback_queue = []
-
         # Tier 1: Library check and queue preparation
+        direct_download_queue = []
         self.dataset.update_status("Copying existing videos")
-        for url in list(urls.keys()):
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while collecting videos.")
+        self.add_to_queue(
+            url_list=list(urls.keys()), 
+            queue=direct_download_queue, 
+            url_dict=urls,
+            skip_channels=not download_channels,
+            copy_if_existing=True,
+            existing_video_library=vid_lib, 
+            copy_output_path=results_path
+            )
 
-            # Try to copy from library
-            copy_result = self._try_copy_from_library(url, urls, vid_lib, results_path)
-            if copy_result["copied"]:
-                copied_videos += copy_result["count"]
-                processed_urls += 1
-                continue
-            elif copy_result["skip"]:
-                skipped_urls += 1
-                total_not_a_video += 1
-                continue
-
-            # Initialize URL metadata
-            urls[url]["success"] = False
-            urls[url]["retry"] = True
-
-            # Skip known channels if not downloading channels
-            if not download_channels and any([sub_url in url for sub_url in self.known_channels]):
-                message = 'Skipping known channel: %s' % url
-                urls[url]['error'] = message
-                failed_downloads += 1
-                skipped_urls += 1
-                self.dataset.log(message)
-                continue
-
-            # Queue for direct download attempt
-            direct_download_queue.append(url)
+        # Seed ytdlp_fallback_queue and update urls dict
+        ytdlp_fallback_queue = []
+        # Add _preexisting_fallback_queue to main urls dict for tracking (after direct_download_queue created)
+        if _preexisting_fallback_queue:
+            # Here fallback URLs only exist if provided columns contained no URLs (and a fallback column was provided)
+            # Fallback URLs were designed for specific datasources to take advantage of YT-DLPs platform specific extractors (e.g. TikTok)
+            urls.update(_preexisting_fallback_queue)
+            self.add_to_queue(
+                url_list=list(_preexisting_fallback_queue.keys()),
+                queue=ytdlp_fallback_queue,
+                url_dict=urls,
+                skip_channels=not download_channels,
+                copy_if_existing=True,
+                existing_video_library=vid_lib, 
+                copy_output_path=results_path
+                )
 
         # Tier 2: Process direct downloads with proxies
         stop_processing = False
@@ -430,13 +427,13 @@ class VideoDownloaderPlus(BasicProcessor):
                     also_indirect, amount, last_domains, ignore_not_video
                 )
                 
-                processed_urls += direct_results["processed"]
-                failed_downloads += direct_results["failed"]
+                self.processed_urls += direct_results["processed"]
+                self.failed_downloads += direct_results["failed"]
                 # Track not_a_video for logging purposes
                 _ = direct_results["not_a_video_consecutive"]  # noqa: F841
-                total_not_a_video += direct_results["not_a_video_total"]
+                self.total_not_a_video += direct_results["not_a_video_total"]
                 consecutive_errors = direct_results["consecutive_errors"]
-                ytdlp_fallback_queue = direct_results["ytdlp_queue"]
+                ytdlp_fallback_queue.extend(direct_results["ytdlp_queue"])
                 stop_processing = direct_results["stop_processing"]
                 stop_reason = direct_results["stop_reason"]
                 # Note: self.downloaded_videos already updated in real-time during processing
@@ -457,21 +454,24 @@ class VideoDownloaderPlus(BasicProcessor):
                     amount, also_indirect, yt_dlp_archive_map, consecutive_errors
                 )
                 
-                failed_downloads += ytdlp_results["failed"]
-                processed_urls += ytdlp_results["processed"]
+                self.failed_downloads += ytdlp_results["failed"]
+                self.processed_urls += ytdlp_results["processed"]
         except ProcessorInterruptedException as e:
             # Interrupted; ensure we save metadata and finish with warning
             self.warning_message = str(e)
         except Exception as e:
             # This ensures dataset is finished_with_warning below in finally block
+            # Note: this means that a real error in the code will lead to a finished dataset with a warning, which is not ideal, but ensures that we capture the error message 
+            # and any videos downloaded up to that point rather than losing everything. Future improvement could be to distinguish between types of exceptions and only 
+            # finish_with_warning for expected exceptions (e.g. max videos downloaded) and finish_with_error for unexpected exceptions (e.g. coding errors).
             self.warning_message = str(e)
             # Re-raise for logging and notification
             raise e
         finally:
             # Save metadata and finish
             self._save_metadata(urls, results_path)
-            self._log_statistics(total_urls, processed_urls, skipped_urls, copied_videos, failed_downloads, total_not_a_video)
-            self._finish_processing(results_path, copied_videos, failed_downloads, total_not_a_video, processed_urls, total_urls)
+            self._log_statistics(total_urls)
+            self._finish_processing(results_path, total_urls)
 
     def _setup_ytdlp_options(self, results_path, max_video_size, max_video_res, allow_unknown_sizes):
         """
@@ -521,6 +521,54 @@ class VideoDownloaderPlus(BasicProcessor):
             self.dataset.log(f"YT-DLP format filter: {ydl_opts['format']}")
 
         return ydl_opts
+
+    def add_to_queue(self, url_list, queue, url_dict, skip_channels=False, copy_if_existing=False, existing_video_library=None, copy_output_path=None):
+        """
+        Add a list of URLs to a provided queue and initizliaze the result in provided URL dictionary.
+
+        If `skip_channels` is `True`, channels in `self.known_channels` will not be added (useful to avoid YT-DLP downloading many/all videos from a channel).
+        If `copy_if_existing` is `True`, URL is checked in the `existing_video_library` and, if present/previously downloaded, it is copied instead.
+
+        :param list url_list: List of URLs to add to the queue
+        :param list queue: Queue to add URLs to
+        :param dict url_dict: Dictionary to update with URL metadata
+        :param bool skip_channels: Whether to skip known channels
+        :param bool copy_if_existing: Whether to attempt to copy video from previous dataset if URL exists in library
+        :param DatasetVideoLibrary existing_video_library: Video library to check for existing videos if `copy_if_existing` is `True`
+        :param Path copy_output_path: Path to copy videos to if copied from library
+        :return: None
+        """
+        for url in list(url_list):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while collecting videos.")
+
+            # Try to copy from library
+            if copy_if_existing and existing_video_library and copy_output_path:
+                copy_result = self._try_copy_from_library(url, url_dict, existing_video_library, copy_output_path)
+                if copy_result["copied"]:
+                    self.copied_videos += copy_result["count"]
+                    self.processed_urls += 1
+                    continue
+                elif copy_result["skip"]:
+                    self.skipped_urls += 1
+                    self.total_not_a_video += 1
+                    continue
+
+            # Initialize URL metadata
+            url_dict[url]["success"] = False
+            url_dict[url]["retry"] = True
+
+            # Skip known channels if not downloading channels
+            if skip_channels and any([sub_url in url for sub_url in self.known_channels]):
+                message = 'Skipping known channel: %s' % url
+                url_dict[url]['error'] = message
+                self.failed_downloads += 1
+                self.skipped_urls += 1
+                self.dataset.log(message)
+                continue
+
+            # Add to provided queue
+            queue.append(url)
 
     def _try_copy_from_library(self, url, urls_dict, vid_lib, results_path):
         """
@@ -623,7 +671,14 @@ class VideoDownloaderPlus(BasicProcessor):
                     self.downloaded_videos += num_files
                     self._update_download_status()
                 elif download_result["fallback_to_ytdlp"]:
-                    results["ytdlp_queue"].append(url)
+                    # Check for fallback, used when normal URL fails
+                    _ytdlp_fallback_url = urls_dict[url].get("_ytdlp_fallback_url")
+                    if _ytdlp_fallback_url:
+                        # Add fallout URL to urls_dict and append to queue
+                        urls_dict[_ytdlp_fallback_url] = copy.deepcopy(urls_dict[url])
+                        results["ytdlp_queue"].append(_ytdlp_fallback_url)
+                    else:
+                        results["ytdlp_queue"].append(url)
                 elif download_result["not_a_video"]:
                     results["processed"] += 1
                     results["not_a_video_consecutive"] += 1
@@ -914,37 +969,37 @@ class VideoDownloaderPlus(BasicProcessor):
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
-    def _log_statistics(self, total_urls, processed_urls, skipped_urls, copied_videos, failed_downloads, total_not_a_video):
+    def _log_statistics(self, total_urls):
         """Log comprehensive download statistics"""
         self.dataset.log("=" * 60)
         self.dataset.log("VIDEO DOWNLOAD SUMMARY")
         self.dataset.log(f"Total URLs collected: {total_urls}")
-        self.dataset.log(f"URLs processed (download attempted or copied): {processed_urls}")
-        self.dataset.log(f"URLs skipped (previously failed, max limit, known channels): {skipped_urls}")
-        self.dataset.log(f"URLs not reviewed: {total_urls - processed_urls - skipped_urls}")
+        self.dataset.log(f"URLs processed (download attempted or copied): {self.processed_urls}")
+        self.dataset.log(f"URLs skipped (previously failed, max limit, known channels): {self.skipped_urls}")
+        self.dataset.log(f"URLs not reviewed: {total_urls - self.processed_urls - self.skipped_urls}")
         self.dataset.log(f"Videos successfully downloaded (new): {self.downloaded_videos}")
-        self.dataset.log(f"Videos copied from previous downloads: {copied_videos}")
-        self.dataset.log(f"Total videos in dataset: {self.downloaded_videos + copied_videos}")
-        self.dataset.log(f"Download failures: {failed_downloads}")
-        self.dataset.log(f"Not a video (URLs that don't lead to videos): {total_not_a_video}")
-        self.dataset.log(f"URL review rate: {processed_urls}/{total_urls} ({100*processed_urls/total_urls if total_urls > 0 else 0:.1f}%)")
-        self.dataset.log(f"Success rate (of processed URLs): {(self.downloaded_videos + copied_videos)}/{processed_urls} ({100*(self.downloaded_videos + copied_videos)/processed_urls if processed_urls > 0 else 0:.1f}%)")
+        self.dataset.log(f"Videos copied from previous downloads: {self.copied_videos}")
+        self.dataset.log(f"Total videos in dataset: {self.downloaded_videos + self.copied_videos}")
+        self.dataset.log(f"Download failures: {self.failed_downloads}")
+        self.dataset.log(f"Not a video (URLs that don't lead to videos): {self.total_not_a_video}")
+        self.dataset.log(f"URL review rate: {self.processed_urls}/{total_urls} ({100*self.processed_urls/total_urls if total_urls > 0 else 0:.1f}%)")
+        self.dataset.log(f"Success rate (of processed URLs): {(self.downloaded_videos + self.copied_videos)}/{self.processed_urls} ({100*(self.downloaded_videos + self.copied_videos)/self.processed_urls if self.processed_urls > 0 else 0:.1f}%)")
         self.dataset.log("=" * 60)
 
-    def _finish_processing(self, results_path, copied_videos, failed_downloads, total_not_a_video, processed_urls, total_urls):
+    def _finish_processing(self, results_path, total_urls):
         """Finish processing and create result archive"""
         self.dataset.update_status("Writing downloaded videos to zip archive")
-        self.write_archive_and_finish(results_path, self.downloaded_videos + copied_videos, finish=False)
+        self.write_archive_and_finish(results_path, self.downloaded_videos + self.copied_videos, finish=False)
         
         status_msg = f"Downloaded {self.downloaded_videos} videos"
-        if copied_videos > 0:
-            status_msg += f"; {copied_videos} videos copied from previous downloads"
-        if failed_downloads > 0:
-            status_msg += f"; {failed_downloads} downloads failed"
-        if total_not_a_video > 0:
-            status_msg += f"; {total_not_a_video} URLs were not videos"
-        if processed_urls > 0:
-            status_msg += f"; Processed {processed_urls} URLs of {total_urls}"
+        if self.copied_videos > 0:
+            status_msg += f"; {self.copied_videos} videos copied from previous downloads"
+        if self.failed_downloads > 0:
+            status_msg += f"; {self.failed_downloads} downloads failed"
+        if self.total_not_a_video > 0:
+            status_msg += f"; {self.total_not_a_video} URLs were not videos"
+        if self.processed_urls > 0:
+            status_msg += f"; Processed {self.processed_urls} URLs of {total_urls}"
         
         if self.warning_message:
             self.dataset.update_status(status_msg)
@@ -1107,6 +1162,11 @@ class VideoDownloaderPlus(BasicProcessor):
     def collect_video_urls(self, *args, **kwargs):
         """Collect video URLs from the source dataset"""
         urls = {}
+        
+        # Fallback URLs; if a URL failed, this URL can be used as a backup
+        _fallback_urls = {}
+        _fallback_column = self.parameters.get("_ytdlp_fallback_column", None)
+
         columns = self.parameters.get("columns")
         if type(columns) is str:
             columns = [columns]
@@ -1122,27 +1182,49 @@ class VideoDownloaderPlus(BasicProcessor):
             if index + 1 % 250 == 0:
                 self.dataset.update_status(f"Extracting video links from item {index + 1}/{self.source_dataset.num_rows}")
 
-            for column in columns:
-                value = post.get(column)
+            def _parse_and_collect_video_urls(value):
                 if not value:
-                    continue
-
+                    return set(), False
                 if value is not str:
                     value = str(value)
-
                 video_links = self.identify_video_urls_in_string(value)
-                if video_links:
+                return set(video_links), bool(video_links)
+
+            # Fallback URLs should be *known* single (post) URL columns, but may be blank
+            _fallback_value = post.get(_fallback_column, None)
+            _fallback_url_links, has_fallback_links = _parse_and_collect_video_urls(_fallback_value)
+            fallback_url = _fallback_url_links.pop() if _fallback_url_links else None
+
+            for column in columns:
+                value = post.get(column)
+                video_links, has_links = _parse_and_collect_video_urls(value)
+                
+                if has_links:
                     item_urls |= set(video_links)
-
-            for item_url in item_urls:
-                if item_url not in urls:
-                    urls[item_url] = {'post_ids': {post.get('id')}}
+            
+            if item_urls:
+                # Main queue (with possible fallback URL attached)
+                for item_url in item_urls:
+                    if item_url not in urls:
+                        urls[item_url] = {
+                            'post_ids': {post.get('id')},
+                            "_ytdlp_fallback_url": fallback_url
+                            }
+                    else:
+                        urls[item_url]['post_ids'].add(post.get('id'))
+            elif has_fallback_links:
+                # Fallback queue only; no video URLs found in main columns, but fallback column has a URL that can be used
+                if fallback_url not in urls:
+                    _fallback_urls[fallback_url] = {
+                        'post_ids': {post.get('id')},
+                        "_ytdlp_fallback_url": fallback_url # Not currently used as _fallback_urls are currently only added to YT-DLP queue
+                        }
                 else:
-                    urls[item_url]['post_ids'].add(post.get('id'))
+                    _fallback_urls[fallback_url]['post_ids'].add(post.get('id'))
 
-        if not urls:
+        if not urls and not _fallback_urls:
             raise ProcessorException("No video urls identified in provided data.")
-        return urls
+        return urls, _fallback_urls
 
     def identify_video_urls_in_string(self, text):
         """Search string of text for URLs that may contain video links"""
