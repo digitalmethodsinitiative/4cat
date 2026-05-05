@@ -24,6 +24,7 @@ import json
 import os
 import re
 import sys
+import time
 import traceback
 from pathlib import Path
 from typing import Optional
@@ -296,12 +297,91 @@ def splice_into_module(existing: str, translation: dict, python_rel: str) -> str
     return updated
 
 
+REASONING_KEYS = ("reasoning_content", "reasoning", "thinking", "thought")
+
+
+def _extract_reasoning(chunk) -> str:
+    """
+    Pull reasoning/thinking tokens off a LangChain chunk. Different model
+    families surface them under different keys, so try several.
+    """
+    kwargs = getattr(chunk, "additional_kwargs", None) or {}
+    for key in REASONING_KEYS:
+        val = kwargs.get(key)
+        if isinstance(val, str) and val:
+            return val
+    return ""
+
+
+def call_llm_streaming(llm: LLMAdapter, user_prompt: str, system_prompt: str) -> str:
+    """
+    Stream the LLM response to stderr chunk-by-chunk and return the accumulated
+    *visible content* (reasoning tokens are surfaced live but NOT included in
+    the returned string — they aren't part of the parseable answer).
+
+    For reasoning models like gpt-oss / deepseek-r1, the model spends a long
+    time emitting reasoning tokens before producing the visible answer; without
+    surfacing them the stream looks frozen. We mark the reasoning vs content
+    transitions so the user can tell what phase the model is in.
+    """
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    messages = []
+    if system_prompt:
+        messages.append(SystemMessage(content=system_prompt))
+    messages.append(HumanMessage(content=user_prompt))
+
+    sys.stderr.write("\n--- LLM stream begin ---\n")
+    sys.stderr.flush()
+
+    content_chunks: list[str] = []
+    state: Optional[str] = None  # "reasoning" | "content"
+
+    for chunk in llm.llm.stream(messages):
+        reasoning = _extract_reasoning(chunk)
+        content = getattr(chunk, "content", "") or ""
+
+        if reasoning:
+            if state != "reasoning":
+                sys.stderr.write("\n--- reasoning ---\n")
+                state = "reasoning"
+            sys.stderr.write(reasoning)
+            sys.stderr.flush()
+
+        if content:
+            if state != "content":
+                # transitioning from reasoning (or nothing) to visible output
+                sys.stderr.write("\n--- output ---\n")
+                state = "content"
+            sys.stderr.write(content)
+            sys.stderr.flush()
+            content_chunks.append(content)
+
+    sys.stderr.write("\n--- LLM stream end ---\n")
+    sys.stderr.flush()
+    return "".join(content_chunks)
+
+
+def extract_raw_from_exception(exc: BaseException) -> Optional[str]:
+    """
+    Pull whatever raw LLM output we can find off a LangChain exception. Tries
+    several attribute names since they vary by LangChain version. Returns None
+    if nothing recoverable.
+    """
+    for attr in ("llm_output", "observation", "output"):
+        val = getattr(exc, attr, None)
+        if isinstance(val, str):
+            return val
+    return None
+
+
 def translate_one(
     llm: LLMAdapter,
     python_path: Path,
     repo_root: Path,
     zeeschuimer_root: Path,
     use_structured_output: bool,
+    stream: bool,
 ) -> dict:
     """
     Translate one Python file. Returns a manifest entry dict.
@@ -312,6 +392,8 @@ def translate_one(
         "js_file": None,
         "status": "failed",
         "commentary": "",
+        "duration_seconds": None,
+        "raw_response": None,
         "error": None,
     }
 
@@ -337,24 +419,48 @@ def translate_one(
     existing_module = js_path.read_text(encoding="utf-8")
     user_prompt = build_user_prompt(python_source, existing_module, rel)
 
-    try:
-        response = llm.generate_text(user_prompt, system_prompt=SYSTEM_PROMPT)
-    except Exception as e:
-        entry["error"] = f"LLM call failed: {e}"
-        return entry
+    started = time.monotonic()
+    raw_response: Optional[str] = None
+    translation: Optional[dict] = None
+    llm_error: Optional[str] = None
 
-    if use_structured_output:
-        # with_structured_output returns the parsed dict directly.
-        if isinstance(response, dict):
-            translation = response
+    try:
+        if stream:
+            raw_response = call_llm_streaming(llm, user_prompt, SYSTEM_PROMPT)
+            translation = parse_freetext_response(raw_response)
+        elif use_structured_output:
+            try:
+                response = llm.generate_text(user_prompt, system_prompt=SYSTEM_PROMPT)
+            except Exception as e:
+                raw_response = extract_raw_from_exception(e)
+                llm_error = f"LLM call failed: {e}"
+                response = None
+            if response is not None:
+                if isinstance(response, dict):
+                    translation = response
+                    # Structured-output success doesn't expose the raw text.
+                else:
+                    llm_error = (
+                        f"Expected dict from structured output, got "
+                        f"{type(response).__name__}"
+                    )
         else:
-            entry["error"] = (
-                f"Expected dict from structured output, got {type(response).__name__}"
-            )
-            return entry
-    else:
-        text = getattr(response, "content", str(response))
-        translation = parse_freetext_response(text)
+            response = llm.generate_text(user_prompt, system_prompt=SYSTEM_PROMPT)
+            raw_response = getattr(response, "content", str(response))
+            translation = parse_freetext_response(raw_response)
+    except Exception as e:
+        raw_response = raw_response or extract_raw_from_exception(e)
+        llm_error = f"LLM call failed: {e}"
+
+    entry["duration_seconds"] = round(time.monotonic() - started, 2)
+    entry["raw_response"] = raw_response
+
+    if llm_error:
+        entry["error"] = llm_error
+        return entry
+    if translation is None:
+        entry["error"] = "no translation produced (no error raised, no dict returned)"
+        return entry
 
     bad = validate_translation(translation)
     if bad:
@@ -404,6 +510,25 @@ def main():
         action="store_true",
         help="Disable JSON-schema structured output; parse the response as free text.",
     )
+    cli.add_argument(
+        "--stream",
+        action="store_true",
+        help=(
+            "Stream LLM output to stderr as it is generated, so you can watch a "
+            "slow model work. Implies --no-structured-output (streaming and "
+            "structured output don't mix cleanly)."
+        ),
+    )
+    cli.add_argument(
+        "--no-fail-fast",
+        action="store_true",
+        help=(
+            "Continue translating remaining files even after one fails. By "
+            "default the script aborts on the first failure, since failures here "
+            "are typically configuration- or model-correlated and continuing "
+            "wastes LLM time."
+        ),
+    )
     args = cli.parse_args()
 
     dmi_ollama_key = os.environ.get("DMI_OLLAMA_KEY")
@@ -428,7 +553,7 @@ def main():
         client_kwargs={"headers": {"X-API-KEY": dmi_ollama_key}},
     )
 
-    use_structured_output = not args.no_structured_output
+    use_structured_output = not args.no_structured_output and not args.stream
     if use_structured_output:
         try:
             llm.set_structure(LLM_SCHEMA)
@@ -440,11 +565,19 @@ def main():
             )
             use_structured_output = False
 
-    print(f"Using model: {args.model} (provider: ollama, structured_output: {use_structured_output})")
+    fail_fast = not args.no_fail_fast
+    print(
+        f"Using model: {args.model} "
+        f"(provider: ollama, structured_output: {use_structured_output}, "
+        f"stream: {args.stream}, fail_fast: {fail_fast})"
+    )
 
     entries = []
+    overall_started = time.monotonic()
     for python_path in files:
-        print(f"Translating {python_path.relative_to(repo_root).as_posix()}...")
+        rel_for_log = python_path.relative_to(repo_root).as_posix()
+        print(f"Translating {rel_for_log}...", flush=True)
+        per_file_started = time.monotonic()
         try:
             entry = translate_one(
                 llm,
@@ -452,6 +585,7 @@ def main():
                 repo_root,
                 args.zeeschuimer_checkout.resolve(),
                 use_structured_output,
+                args.stream,
             )
         except Exception as e:
             entry = {
@@ -459,16 +593,34 @@ def main():
                 "js_file": None,
                 "status": "failed",
                 "commentary": "",
+                "duration_seconds": round(time.monotonic() - per_file_started, 2),
                 "error": f"unexpected exception: {e}\n{traceback.format_exc()}",
             }
         entry["model"] = args.model
         entries.append(entry)
-        print(f"  -> {entry['status']}" + (f" ({entry['error']})" if entry.get("error") else ""))
+        dur = entry.get("duration_seconds")
+        dur_str = f" in {dur}s" if dur is not None else ""
+        err_str = f" ({entry['error']})" if entry.get("error") else ""
+        print(f"  -> {entry['status']}{dur_str}{err_str}", flush=True)
 
+        if entry["status"] == "failed" and not args.no_fail_fast:
+            remaining = len(files) - len(entries)
+            if remaining > 0:
+                print(
+                    f"\nFail-fast: aborting after first failure; skipping "
+                    f"{remaining} remaining file(s). Pass --no-fail-fast to continue past failures.",
+                    flush=True,
+                )
+            break
+
+    overall_duration = round(time.monotonic() - overall_started, 2)
     manifest = {
         "model": args.model,
         "provider": "ollama",
         "structured_output": use_structured_output,
+        "stream": args.stream,
+        "fail_fast": fail_fast,
+        "total_duration_seconds": overall_duration,
         "entries": entries,
     }
     args.output_manifest.parent.mkdir(parents=True, exist_ok=True)
@@ -477,7 +629,10 @@ def main():
     n_ok = sum(1 for e in entries if e["status"] == "ok")
     n_failed = sum(1 for e in entries if e["status"] == "failed")
     n_skipped = sum(1 for e in entries if e["status"] == "skipped")
-    print(f"\nDone with model `{args.model}`: {n_ok} ok, {n_failed} failed, {n_skipped} skipped.")
+    print(
+        f"\nDone with model `{args.model}` in {overall_duration}s: "
+        f"{n_ok} ok, {n_failed} failed, {n_skipped} skipped."
+    )
     print(f"Manifest written to {args.output_manifest}")
 
     if n_ok == 0 and n_failed > 0:
