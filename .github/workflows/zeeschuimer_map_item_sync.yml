@@ -1,0 +1,259 @@
+# Auto-translate Zeeschuimer datasource `map_item` functions from Python to JS
+# and open a draft PR against digitalmethodsinitiative/zeeschuimer.
+#
+# Triggers on pushes to master that touch any Zeeschuimer datasource (or the
+# helper script itself). Also exposes a `workflow_dispatch` trigger with a
+# `bootstrap` input for the initial run that translates all 15 datasources at
+# once.
+#
+# Required secrets (configured in repo Settings -> Secrets and variables -> Actions):
+#   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net (already used by helper script)
+#   ZEESCHUIMER_APP_ID           - numeric App ID of the GitHub App installed on
+#                                  digitalmethodsinitiative/zeeschuimer with permissions
+#                                  contents:write + pull-requests:write (and nothing else)
+#   ZEESCHUIMER_APP_PRIVATE_KEY  - full PEM private key for that App (including BEGIN/END lines)
+
+name: Sync Zeeschuimer map_item from 4CAT
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'datasources/**/search_*.py'
+      - 'helper-scripts/map_item_converter.py'
+      - '.github/workflows/zeeschuimer_map_item_sync.yml'
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: 'Translate every Zeeschuimer datasource (initial sync). Ignored if "files" is set.'
+        type: boolean
+        default: false
+      files:
+        description: 'Space-separated list of datasource files to translate (e.g. "datasources/tiktok/search_tiktok.py"). Overrides bootstrap.'
+        type: string
+        default: ''
+      model:
+        description: 'Override LLM model on DMI Ollama (default: gemma3:4b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
+        type: string
+        default: ''
+
+jobs:
+  sync:
+    name: Translate map_item and open Zeeschuimer PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 4CAT
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Determine changed datasource files
+        id: changed
+        run: |
+          # Manual run with explicit files takes precedence
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.files }}" ]; then
+            echo "mode=files" >> "$GITHUB_OUTPUT"
+            echo "files=${{ inputs.files }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.bootstrap }}" = "true" ]; then
+            echo "mode=bootstrap" >> "$GITHUB_OUTPUT"
+            echo "files=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'datasources/*/search_*.py' || true)
+          if [ -z "$changed" ]; then
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "files=" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=files" >> "$GITHUB_OUTPUT"
+            files=$(echo "$changed" | tr '\n' ' ')
+            echo "files=$files" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Exit early if nothing to do
+        if: steps.changed.outputs.mode == 'none'
+        run: |
+          echo "No Zeeschuimer datasource files changed; nothing to translate."
+          exit 0
+
+      - name: Set up Python
+        if: steps.changed.outputs.mode != 'none'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install LLM dependencies
+        if: steps.changed.outputs.mode != 'none'
+        run: |
+          # LLMAdapter (common/lib/llm.py) imports every provider's langchain
+          # package at module load, so all of these are required even though
+          # we only use the Ollama provider at runtime.
+          pip install \
+            langchain-core \
+            langchain-ollama \
+            langchain-openai \
+            langchain-anthropic \
+            langchain-google-genai \
+            langchain-mistralai \
+            langchain-deepseek \
+            pydantic \
+            requests
+
+      - name: Mint Zeeschuimer App token
+        if: steps.changed.outputs.mode != 'none'
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ZEESCHUIMER_APP_ID }}
+          private-key: ${{ secrets.ZEESCHUIMER_APP_PRIVATE_KEY }}
+          owner: digitalmethodsinitiative
+          repositories: zeeschuimer
+
+      - name: Checkout Zeeschuimer
+        if: steps.changed.outputs.mode != 'none'
+        uses: actions/checkout@v4
+        with:
+          repository: digitalmethodsinitiative/zeeschuimer
+          path: zeeschuimer-checkout
+          token: ${{ steps.app_token.outputs.token }}
+
+      - name: Run translation
+        if: steps.changed.outputs.mode != 'none'
+        env:
+          DMI_OLLAMA_KEY: ${{ secrets.DMI_OLLAMA_KEY }}
+          LLM_MODEL: ${{ inputs.model || 'gemma3:4b' }}
+        run: |
+          if [ "${{ steps.changed.outputs.mode }}" = "bootstrap" ]; then
+            python helper-scripts/map_item_converter.py \
+              --bootstrap \
+              --zeeschuimer-checkout ./zeeschuimer-checkout \
+              --output-manifest ./manifest.json
+          else
+            python helper-scripts/map_item_converter.py \
+              --files ${{ steps.changed.outputs.files }} \
+              --zeeschuimer-checkout ./zeeschuimer-checkout \
+              --output-manifest ./manifest.json
+          fi
+
+      - name: Build PR body
+        if: steps.changed.outputs.mode != 'none'
+        id: pr_body
+        env:
+          MODE: ${{ steps.changed.outputs.mode }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python - <<'EOF'
+          import json
+          import os
+          import subprocess
+
+          mode = os.environ["MODE"]
+          before = os.environ["BEFORE_SHA"]
+          after = os.environ["AFTER_SHA"]
+          run_id = os.environ["RUN_ID"]
+          event_name = os.environ["EVENT_NAME"]
+          repo = "${{ github.repository }}"
+
+          with open("manifest.json") as f:
+              manifest = json.load(f)
+
+          model = manifest.get("model", "(unknown)")
+          provider = manifest.get("provider", "ollama")
+          structured_output = manifest.get("structured_output", False)
+          entries = manifest.get("entries", [])
+
+          short_sha = after[:7]
+          lines = []
+          lines.append("> :robot: This PR was auto-generated by the [4CAT map_item sync workflow](https://github.com/{}/actions/runs/{}). It is a **draft** because the JS was produced by an LLM and needs human review and end-to-end extension testing before merging.".format(repo, run_id))
+          lines.append("")
+          lines.append("## Generation parameters")
+          lines.append("- **Model:** `{}` (provider: `{}`, structured output: `{}`)".format(model, provider, structured_output))
+          if mode == "bootstrap":
+              lines.append("- **Trigger:** manual `workflow_dispatch` with `bootstrap=true` (initial sync of all Zeeschuimer datasources).")
+          elif event_name == "workflow_dispatch":
+              lines.append("- **Trigger:** manual `workflow_dispatch` with explicit file list.")
+          else:
+              lines.append("- **Trigger:** push of [`{}`](https://github.com/{}/commit/{}) to 4CAT master.".format(short_sha, repo, after))
+          lines.append("")
+
+          ok = [e for e in entries if e["status"] == "ok"]
+          failed = [e for e in entries if e["status"] == "failed"]
+          skipped = [e for e in entries if e["status"] == "skipped"]
+
+          lines.append("## Summary")
+          lines.append("- :white_check_mark: {} translated".format(len(ok)))
+          lines.append("- :x: {} failed".format(len(failed)))
+          lines.append("- :grey_question: {} skipped".format(len(skipped)))
+          lines.append("")
+
+          for entry in ok:
+              lines.append("## `{}` -> `{}`".format(entry["python_file"], entry["js_file"]))
+              if entry.get("commentary"):
+                  lines.append("**LLM commentary:**")
+                  lines.append("")
+                  lines.append("> " + entry["commentary"].replace("\n", "\n> "))
+                  lines.append("")
+              if event_name == "push":
+                  try:
+                      diff = subprocess.check_output(
+                          ["git", "diff", "{}..{}".format(before, after), "--", entry["python_file"]],
+                          text=True,
+                      )
+                  except subprocess.CalledProcessError:
+                      diff = ""
+              else:
+                  diff = ""
+                  if diff.strip():
+                      lines.append("<details><summary>Python diff</summary>")
+                      lines.append("")
+                      lines.append("```diff")
+                      lines.append(diff.rstrip())
+                      lines.append("```")
+                      lines.append("</details>")
+                      lines.append("")
+
+          if failed:
+              lines.append("## Failures")
+              for entry in failed:
+                  lines.append("- `{}`: {}".format(entry["python_file"], entry.get("error", "(no error message)")))
+              lines.append("")
+
+          if skipped:
+              lines.append("## Skipped")
+              for entry in skipped:
+                  lines.append("- `{}`: {}".format(entry["python_file"], entry.get("error", "")))
+              lines.append("")
+
+          body = "\n".join(lines)
+          with open("pr_body.md", "w", encoding="utf-8") as f:
+              f.write(body)
+          print("Wrote pr_body.md ({} chars)".format(len(body)))
+          EOF
+
+      - name: Check there are JS changes to PR
+        if: steps.changed.outputs.mode != 'none'
+        id: have_changes
+        working-directory: zeeschuimer-checkout
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No JS changes produced by translation; not opening a PR."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update Zeeschuimer PR
+        if: steps.changed.outputs.mode != 'none' && steps.have_changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          path: zeeschuimer-checkout
+          token: ${{ steps.app_token.outputs.token }}
+          branch: auto/4cat-map-item-sync
+          title: "Auto-translated map_item updates from 4CAT @ ${{ github.sha }}"
+          commit-message: "chore: sync map_item from 4CAT ${{ github.sha }}"
+          body-path: pr_body.md
+          draft: true
