@@ -54,7 +54,7 @@ PLATFORM_MAP = {
     "datasources/xiaohongshu_comments/search_rednote_comments.py": "modules/rednote-comments.js",
 }
 
-DEFAULT_MODEL = "gemma3:4b"
+DEFAULT_MODEL = "qwen2.5-coder:14b"
 
 IMPORTS_MARKER_START = "// === auto-generated imports for map_item — DO NOT EDIT BY HAND ==="
 IMPORTS_MARKER_END = "// === end auto-generated imports ==="
@@ -78,9 +78,12 @@ LLM_SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
             "description": (
-                "Complete import statements (one per array entry) that map_item needs "
-                "and that are not already present in the existing module. Empty array "
-                "if none needed."
+                "Complete ES-module import statements that map_item needs. "
+                "Normally empty: Zeeschuimer's `js/lib.js` (which provides MappedItem, "
+                "MissingMappedField, normalize_url_encoding, strip_tags) is loaded as a "
+                "plain script, NOT an ES module — its declarations are already global, "
+                "so do not write `import { X } from '../js/lib.js'`. Only populate this "
+                "if you genuinely need to import from another ES module."
             ),
         },
         "helpers_to_add": {
@@ -107,8 +110,60 @@ SYSTEM_PROMPT = (
     "any imports it needs, any helper functions it depends on, and commentary "
     "for the human reviewer. You NEVER return the surrounding module file. "
     "You preserve the field names produced by the Python function exactly. "
-    "You do not invent fields not present in the Python output."
+    "You do not invent fields not present in the Python output. "
+    "You output raw JavaScript source — never wrap it in markdown code fences "
+    "(```js, ```javascript, etc.). The fields in your structured response are "
+    "already typed as code; fences make them invalid."
 )
+
+
+# Whitelist of helpers that Zeeschuimer makes available as globals at runtime.
+# `js/lib.js` is loaded as a plain <script>, not as an ES module, so its top-
+# level declarations are global — they must NOT be imported. Anything not on
+# this list must be inlined or added to `helpers_to_add`. Update this list
+# whenever new helpers are added to `js/lib.js`.
+AVAILABLE_JS_HELPERS = [
+    {
+        "name": "MappedItem",
+        "kind": "class",
+        "usage": "new MappedItem({field: value, ...})",
+        "note": "Wraps the return value of map_item. Always instantiate with `new`.",
+    },
+    {
+        "name": "MissingMappedField",
+        "kind": "class",
+        "usage": "new MissingMappedField(value, label)",
+        "note": "Represents a field that may legitimately be missing. Always instantiate with `new`.",
+    },
+    {
+        "name": "normalize_url_encoding",
+        "kind": "function",
+        "usage": "normalize_url_encoding(url)",
+        "note": "Direct port of the Python helper of the same name.",
+    },
+    {
+        "name": "strip_tags",
+        "kind": "function",
+        "usage": "strip_tags(html, convertNewlines = true)",
+        "note": "Direct port of the Python helper of the same name.",
+    },
+    {
+        "name": "formatUtcTimestamp",
+        "kind": "function",
+        "usage": "formatUtcTimestamp(timestamp)",
+        "note": "Formats a UTC timestamp as a readable string.",
+    }
+]
+
+
+def _format_available_helpers() -> str:
+    lines = []
+    for h in AVAILABLE_JS_HELPERS:
+        lines.append(
+            f"- `{h['name']}` ({h['kind']}, global) — {h['note']} "
+            f"Usage: `{h['usage']}`."
+        )
+    return "\n".join(lines)
 
 
 def is_zeeschuimer_datasource(python_path: Path) -> bool:
@@ -148,6 +203,7 @@ def discover_bootstrap_files(repo_root: Path) -> list[Path]:
 
 
 def build_user_prompt(python_source: str, existing_module_source: str, python_rel: str) -> str:
+    helpers_block = _format_available_helpers()
     return (
         f"# Source Python file (datasources/{python_rel})\n"
         "This is the file that just changed in 4CAT. The `map_item` function on the "
@@ -159,16 +215,72 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "passed to `map_item(item)` as `item`. Use it to understand the input shape "
         "and to match the existing code style (ES modules, `export` keyword, etc.).\n\n"
         f"```javascript\n{existing_module_source}\n```\n\n"
-        "# Task\n"
-        "Produce a JavaScript `map_item(item)` function that mirrors the Python "
-        "`map_item`. Re-implement any Python helpers it calls (e.g. `normalize_url_encoding`, "
-        "`urlparse`/`parse_qs`, `datetime` formatting) inline in JS — either inside "
-        "`map_item_function` or as separate snippets in `helpers_to_add`. If you reference "
-        "the `MappedItem` class, list its import in `imports_to_add` (it lives in `../js/lib.js`). "
-        "Use `export function map_item(item) { ... }` to match this module's style."
+        "# Available Zeeschuimer JS helpers (globals)\n"
+        "Zeeschuimer loads `js/lib.js` as a plain `<script>`, NOT as an ES "
+        "module. Its top-level declarations are global — available everywhere "
+        "without any `import`. Use them by name only. The following are the "
+        "helpers you may use; everything else must be implemented as JavaScript "
+        "(inline in `map_item_function` or as separate snippets in `helpers_to_add`).\n\n"
+        f"{helpers_block}\n\n"
+        "# Imports — almost always none\n"
+        "Do NOT write `import { MappedItem } from '../js/lib.js'` or any similar "
+        "statement for the helpers above — `lib.js` is a script, not a module, "
+        "and the import will fail at runtime. The `imports_to_add` field should "
+        "normally be EMPTY; only include an import if you genuinely need to pull "
+        "from another ES module (rare for `map_item`).\n\n"
+        "Also forbidden, because they don't exist in JavaScript:\n"
+        "- Anything from `common.lib.helpers` not listed above (e.g. `convert_to_int`, `timify`)\n"
+        "- Anything from `common.lib.exceptions`, `common.lib.user_input`, `backend.lib.*`\n"
+        "- Python stdlib modules (`datetime`, `urllib.parse`, `re`, `json`, `hashlib`, etc.) — use the JavaScript native equivalents instead.\n\n"
+        "# Python → JavaScript translation rules\n"
+        "- **Class instantiation**: JavaScript requires the `new` keyword. Python `MappedItem({...})` becomes JavaScript `new MappedItem({...})`. Same for `MissingMappedField`.\n"
+        "- **datetime**: Python `datetime.utcfromtimestamp(t)` → JS `new Date(t * 1000)`; `datetime.now()` → `new Date()`; `.strftime('%Y-%m-%d %H:%M:%S')` → manual formatting via `toISOString()` / `Date` getters.\n"
+        "- **URLs**: Python `urlparse(u)` / `parse_qs(q)` → JS `new URL(u)` / `url.searchParams`. The `URL` class auto-handles encoding.\n"
+        "- **regex**: Python `re.compile(p).search(s)` → JS `s.match(p)` or `new RegExp(p).exec(s)`. Watch out for differing flag syntax.\n"
+        "- **f-strings**: Python `f\"x {y}\"` → JS template literals `` `x ${y}` ``.\n"
+        "- **dict iteration**: Python `d.get(k, default)` → JS `d[k] ?? default` or `(d[k] !== undefined ? d[k] : default)`.\n"
+        "- **list comprehensions**: Python `[f(x) for x in xs if g(x)]` → JS `xs.filter(g).map(f)`.\n\n"
+        "# Common mistakes from past runs (the script lints for these and rejects matches)\n"
+        "- Python `dict.get(k)` / `dict.get(k, default)` does NOT exist in JavaScript. Replace EVERY `.get(...)` with `[k]` or `[k] ?? default`. Pinterest- and Instagram-style code has many of these — translate every one.\n"
+        "- Literal newlines inside string literals are a JS syntax error. Python `\"\\n\".join(xs)` becomes JS `xs.join(\"\\n\")` — keep the `\\n` as an escape sequence; do NOT put an actual newline character inside the quotes.\n"
+        "- `MappedItem` and `MissingMappedField` are CLASSES — always use `new MappedItem({...})` and `new MissingMappedField(...)`, never bare calls.\n"
+        "- `js/lib.js` is loaded as a script, NOT a module. Do NOT write `import { X } from '../js/lib.js'`. The helpers there are globals.\n"
+        "- Python keywords don't exist in JS: `None` → `null`, `True`/`False` → `true`/`false`, `def` → `function`.\n"
+        "- f-strings (`f\"x {y}\"`) don't exist in JS. Use template literals (`` `x ${y}` ``).\n\n"
+        "# Before submitting, verify your output\n"
+        "1. The function contains zero `.get(` calls.\n"
+        "2. Every `MappedItem(` and `MissingMappedField(` is preceded by `new `.\n"
+        "3. No string literal contains a raw newline character — use `\\n` escapes.\n"
+        "4. `imports_to_add` is empty unless you really need an ES-module import (it should NOT contain anything for `MappedItem` etc.).\n"
+        "5. No Python keywords (`None`, `True`, `False`, `def`, f-strings).\n\n"
+        "# Output format\n"
+        "Use `export function map_item(item) { ... }` to match this module's ES-module style. "
+        "Return raw JavaScript source — do NOT wrap fields in markdown code fences. "
+        "The `imports_to_add` field is normally an empty array (the helpers above are global, not imported). "
+        "The `helpers_to_add` field should contain full helper-function source (each entry one complete function)."
     )
 
 
+# Remove these code fences that keep appearing in the LLM output, even when explicitly told not to use them.
+_FENCE_OPEN = re.compile(r"^```(?:js|javascript|typescript|ts)?\s*\n?", re.IGNORECASE)
+_FENCE_CLOSE = re.compile(r"\n?```\s*$")
+
+
+def strip_code_fences(s: str) -> str:
+    """
+    Strip leading/trailing markdown code fences (```js, ```javascript, ``` etc.)
+    Idempotent; returns the input unchanged if no fences found. Defensive
+    post-processing because LLMs frequently wrap their answers in fences even
+    when explicitly told not to.
+    """
+    if not s:
+        return s
+    s = s.strip()
+    s = _FENCE_OPEN.sub("", s)
+    s = _FENCE_CLOSE.sub("", s)
+    return s.strip()
+
+# If all else fails...
 def parse_freetext_response(text: str) -> dict:
     """
     Fallback parser for when structured output is disabled or unreliable.
@@ -184,6 +296,129 @@ def parse_freetext_response(text: str) -> dict:
         "helpers_to_add": [],
         "commentary": commentary,
     }
+
+# Helper to check for common issues
+def _strip_js_comments(s: str) -> str:
+    """Remove // and /* */ comments so they don't trip pattern checks."""
+    s = re.sub(r"//[^\n]*", "", s)
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.DOTALL)
+    return s
+
+
+# Regex checks for known anti-patterns the LLM produces.
+# Each entry is (pattern, message). Stay conservative: false negatives are
+# fine, false positives block valid code so they're worse.
+LINT_PATTERNS = [
+    (
+        re.compile(r"\.get\("),
+        "Python `dict.get()` does not exist in JavaScript. Replace every `.get(k)` with `[k]` and every `.get(k, default)` with `[k] ?? default`.",
+    ),
+    (
+        re.compile(r"^\s*from\s+\S+\s+import\b", re.MULTILINE),
+        "Python-style `from X import Y` statement found. JavaScript uses `import { Y } from 'X'` syntax (and only when really needed — Zeeschuimer helpers are globals).",
+    ),
+    (
+        re.compile(r"import\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)\s+from\s+['\"]\.\.?/js/lib\.js['\"]"),
+        "Do not import from `js/lib.js` — it is loaded as a script, its declarations are global.",
+    ),
+    (
+        re.compile(r"\bNone\b"),
+        "Python `None` is not valid JavaScript. Use `null`.",
+    ),
+    (
+        re.compile(r"\bTrue\b"),
+        "Python `True` is not valid JavaScript. Use `true` (lowercase).",
+    ),
+    (
+        re.compile(r"\bFalse\b"),
+        "Python `False` is not valid JavaScript. Use `false` (lowercase).",
+    ),
+    (
+        re.compile(r"\bdef\s+\w+\s*\("),
+        "Python `def` keyword found. Use JavaScript `function name(...)` declaration syntax.",
+    ),
+    (
+        re.compile(r"\bf\"|\bf'"),
+        "Python f-string detected (`f\"...\"` or `f'...'`). Use JavaScript template literals (`` `...${x}...` ``).",
+    ),
+]
+
+
+# Lexer that matches JS string and template literals as whole units. Used to
+# check whether a single- or double-quoted literal contains a raw newline (a
+# JS syntax error). Template literals are allowed to span lines so they're
+# matched and skipped. Regex matches escapes (\\.) so embedded `\"` etc. don't
+# prematurely close the string.
+_JS_STRING_LITERAL = re.compile(
+    r'''
+        (?P<dq>"(?:[^"\\]|\\.)*")
+      | (?P<sq>'(?:[^'\\]|\\.)*')
+      | (?P<tl>`(?:[^`\\]|\\.)*`)
+    ''',
+    re.DOTALL | re.VERBOSE,
+)
+
+
+def _has_literal_newline_in_string(source: str) -> bool:
+    for m in _JS_STRING_LITERAL.finditer(source):
+        if m.group("tl"):
+            continue  # template literals legally span lines
+        if "\n" in m.group(0):
+            return True
+    return False
+
+
+def lint_translation(translation: dict) -> list:
+    """
+    Scan the generated JS for known bugs. Returns a list of error strings
+    (empty if clean). Runs on `map_item_function` and each `helpers_to_add`
+    entry. Comments are stripped before scanning to avoid false positives
+    on commentary text.
+    """
+    issues = []
+    sources = []
+    fn = translation.get("map_item_function") or ""
+    if fn:
+        sources.append(("map_item_function", fn))
+    for i, h in enumerate(translation.get("helpers_to_add") or []):
+        if isinstance(h, str) and h:
+            sources.append((f"helpers_to_add[{i}]", h))
+
+    for label, source in sources:
+        clean = _strip_js_comments(source)
+
+        seen = set()
+        for regex, message in LINT_PATTERNS:
+            if regex.search(clean) and message not in seen:
+                issues.append(f"[{label}] {message}")
+                seen.add(message)
+
+        # Class instantiation without `new` (variable-width lookbehind, so
+        # check the chars before each match manually).
+        for cls in ("MappedItem", "MissingMappedField"):
+            pattern = re.compile(rf"\b{cls}\s*\(")
+            reported = False
+            for m in pattern.finditer(clean):
+                before = clean[max(0, m.start() - 8) : m.start()]
+                if not re.search(r"\bnew\s+$", before):
+                    if not reported:
+                        issues.append(
+                            f"[{label}] `{cls}` instantiated without `new` keyword "
+                            f"(at offset {m.start()}). All class instantiations need `new`."
+                        )
+                        reported = True
+
+        # Literal newlines inside single- or double-quoted strings (a JS
+        # syntax error). The LLM sometimes emits e.g. `.join('\n')` as
+        # `.join('<actual newline>')` which doesn't parse.
+        if _has_literal_newline_in_string(clean):
+            issues.append(
+                f"[{label}] Literal newline inside a string literal — JS strings "
+                f"can't span lines without escape (`\"\\n\"`) or template literals "
+                f"(`` `\\n` ``)."
+            )
+
+    return issues
 
 
 def validate_translation(translation: dict) -> Optional[str]:
@@ -203,7 +438,7 @@ def validate_translation(translation: dict) -> Optional[str]:
 
 def splice_into_module(existing: str, translation: dict, python_rel: str) -> str:
     """
-    Idempotently insert / replace the auto-generated marker blocks in the JS
+    Insert / replace the auto-generated marker blocks in the JS
     module text.
 
     Raises ValueError if exactly one of (start, end) markers is present —
@@ -382,6 +617,7 @@ def translate_one(
     zeeschuimer_root: Path,
     use_structured_output: bool,
     stream: bool,
+    strict_lint: bool,
 ) -> dict:
     """
     Translate one Python file. Returns a manifest entry dict.
@@ -394,6 +630,8 @@ def translate_one(
         "commentary": "",
         "duration_seconds": None,
         "raw_response": None,
+        "lint_warnings": [],
+        "translation": None,
         "error": None,
     }
 
@@ -462,20 +700,47 @@ def translate_one(
         entry["error"] = "no translation produced (no error raised, no dict returned)"
         return entry
 
+    # Defensive: strip stray markdown code fences from the function source and
+    # each helper. Models wrap things in ```js even when instructed not to.
+    if isinstance(translation.get("map_item_function"), str):
+        translation["map_item_function"] = strip_code_fences(translation["map_item_function"])
+    helpers = translation.get("helpers_to_add")
+    if isinstance(helpers, list):
+        translation["helpers_to_add"] = [
+            strip_code_fences(h) if isinstance(h, str) else h for h in helpers
+        ]
+
     bad = validate_translation(translation)
     if bad:
+        entry["translation"] = translation
         entry["error"] = bad
         return entry
+
+    lint_issues = lint_translation(translation)
+    if lint_issues:
+        if strict_lint:
+            entry["translation"] = translation
+            entry["lint_warnings"] = lint_issues
+            entry["error"] = "Lint issues (--strict-lint):\n  - " + "\n  - ".join(lint_issues)
+            return entry
+        # Non-strict (default): record as warnings and let the file ship. The
+        # reviewer sees the issues in the PR body and fixes them by hand.
+        entry["lint_warnings"] = lint_issues
 
     try:
         spliced = splice_into_module(existing_module, translation, rel)
     except ValueError as e:
+        entry["translation"] = translation
         entry["error"] = str(e)
         return entry
 
     js_path.write_text(spliced, encoding="utf-8")
     entry["status"] = "ok"
     entry["commentary"] = translation.get("commentary", "").strip()
+    # Keep parsed translation on warning entries so the PR / reviewer can see
+    # exactly what was emitted alongside the warnings.
+    if entry["lint_warnings"]:
+        entry["translation"] = translation
     return entry
 
 
@@ -529,6 +794,16 @@ def main():
             "wastes LLM time."
         ),
     )
+    cli.add_argument(
+        "--strict-lint",
+        action="store_true",
+        help=(
+            "Treat lint findings (Python `.get()`, missing `new`, literal newlines "
+            "in strings, etc.) as failures rather than warnings. Default is "
+            "warnings — the file still ships and the PR body surfaces the "
+            "issues so the reviewer can fix them by hand."
+        ),
+    )
     args = cli.parse_args()
 
     dmi_ollama_key = os.environ.get("DMI_OLLAMA_KEY")
@@ -569,7 +844,8 @@ def main():
     print(
         f"Using model: {args.model} "
         f"(provider: ollama, structured_output: {use_structured_output}, "
-        f"stream: {args.stream}, fail_fast: {fail_fast})"
+        f"stream: {args.stream}, fail_fast: {fail_fast}, "
+        f"strict_lint: {args.strict_lint})"
     )
 
     entries = []
@@ -586,6 +862,7 @@ def main():
                 args.zeeschuimer_checkout.resolve(),
                 use_structured_output,
                 args.stream,
+                args.strict_lint,
             )
         except Exception as e:
             entry = {
@@ -601,7 +878,12 @@ def main():
         dur = entry.get("duration_seconds")
         dur_str = f" in {dur}s" if dur is not None else ""
         err_str = f" ({entry['error']})" if entry.get("error") else ""
-        print(f"  -> {entry['status']}{dur_str}{err_str}", flush=True)
+        warn_str = (
+            f" with {len(entry['lint_warnings'])} lint warning(s)"
+            if entry.get("lint_warnings")
+            else ""
+        )
+        print(f"  -> {entry['status']}{warn_str}{dur_str}{err_str}", flush=True)
 
         if entry["status"] == "failed" and not args.no_fail_fast:
             remaining = len(files) - len(entries)
@@ -620,6 +902,7 @@ def main():
         "structured_output": use_structured_output,
         "stream": args.stream,
         "fail_fast": fail_fast,
+        "strict_lint": args.strict_lint,
         "total_duration_seconds": overall_duration,
         "entries": entries,
     }
@@ -627,11 +910,13 @@ def main():
     args.output_manifest.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     n_ok = sum(1 for e in entries if e["status"] == "ok")
+    n_with_warnings = sum(1 for e in entries if e["status"] == "ok" and e.get("lint_warnings"))
     n_failed = sum(1 for e in entries if e["status"] == "failed")
     n_skipped = sum(1 for e in entries if e["status"] == "skipped")
     print(
         f"\nDone with model `{args.model}` in {overall_duration}s: "
-        f"{n_ok} ok, {n_failed} failed, {n_skipped} skipped."
+        f"{n_ok} ok ({n_with_warnings} with warnings), "
+        f"{n_failed} failed, {n_skipped} skipped."
     )
     print(f"Manifest written to {args.output_manifest}")
 
