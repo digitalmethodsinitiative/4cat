@@ -1,0 +1,14 @@
+# Bootstrap the Zeeschuimer map_item sync workflow
+# This is necessary to test workflow in PR (so far as I can tell)
+
+name: Sync Zeeschuimer map_item from 4CAT
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync-map-item:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Workflow scaffold is valid."
