@@ -1,13 +1,45 @@
-# Bootstrap the Zeeschuimer map_item sync workflow
-# This is necessary to test workflow in PR (so far as I can tell)
+# Auto-translate Zeeschuimer datasource `map_item` functions from Python to JS
+# and open a PR against digitalmethodsinitiative/zeeschuimer.
+#
+# Triggers on pushes to master that touch any Zeeschuimer datasource (or the
+# helper script itself). Also exposes a `workflow_dispatch` trigger with a
+# `bootstrap` input for the initial run that translates all 15 datasources at
+# once.
+#
+# Required secrets (configured in repo Settings -> Secrets and variables -> Actions):
+#   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net (already used by helper script)
+#   ZEESCHUIMER_APP_ID           - numeric App ID of the GitHub App installed on
+#                                  digitalmethodsinitiative/zeeschuimer with permissions
+#                                  contents:write + pull-requests:write (and nothing else)
+#   ZEESCHUIMER_APP_PRIVATE_KEY  - full PEM private key for that App (including BEGIN/END lines)
 
 name: Sync Zeeschuimer map_item from 4CAT
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'datasources/**/search_*.py'
+      - 'helper-scripts/map_item_converter.py'
+      - '.github/workflows/zeeschuimer_map_item_sync.yml'
   workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: 'Translate every Zeeschuimer datasource (initial sync). Ignored if "files" is set.'
+        type: boolean
+        default: false
+      files:
+        description: 'Space-separated list of datasource files to translate (e.g. "datasources/tiktok/search_tiktok.py"). Overrides bootstrap.'
+        type: string
+        default: ''
+      model:
+        description: 'Override LLM model on DMI Ollama (default: qwen2.5-coder:14b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
+        type: string
+        default: ''
 
 jobs:
-  sync-map-item:
+  sync:
+    name: Translate map_item and open Zeeschuimer PR
     runs-on: ubuntu-latest
     steps:
       - name: Checkout 4CAT
