@@ -34,25 +34,33 @@ sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."
 from common.lib.llm import LLMAdapter
 
 
-# 4CAT datasource path -> Zeeschuimer module path (relative to checkout root).
-# Verified against https://github.com/digitalmethodsinitiative/zeeschuimer/tree/master/modules
-# Note: facebook has no Zeeschuimer module today, so it's intentionally absent.
-PLATFORM_MAP = {
-    "datasources/douyin/search_douyin.py": "modules/douyin.js",
-    "datasources/gab/search_gab.py": "modules/gab.js",
-    "datasources/imgur/search_imgur.py": "modules/imgur.js",
-    "datasources/instagram/search_instagram.py": "modules/instagram.js",
-    "datasources/linkedin/search_linkedin.py": "modules/linkedin.js",
-    "datasources/ninegag/search_9gag.py": "modules/9gag.js",
-    "datasources/pinterest/search_pinterest.py": "modules/pinterest.js",
-    "datasources/threads/search_threads.py": "modules/threads.js",
-    "datasources/tiktok/search_tiktok.py": "modules/tiktok.js",
-    "datasources/tiktok_comments/search_tiktok_comments.py": "modules/tiktok-comments.js",
-    "datasources/truth/search_truth.py": "modules/truth.js",
-    "datasources/twitter-import/search_twitter.py": "modules/twitter.js",
-    "datasources/xiaohongshu/search_rednote.py": "modules/rednote.js",
-    "datasources/xiaohongshu_comments/search_rednote_comments.py": "modules/rednote-comments.js",
-}
+# 4CAT datasource path -> Zeeschuimer module path is derived by convention:
+# the Python file is `datasources/<dir>/search_<name>.py`; the JS module is
+# `modules/<name-with-hyphens>.js`. The convention only depends on the Python
+# *filename*, not the directory, so cases where they differ still work
+# (e.g. `xiaohongshu/search_rednote.py` -> `modules/rednote.js`,
+#  `twitter-import/search_twitter.py` -> `modules/twitter.js`).
+#
+# Datasources without a matching Zeeschuimer module (today: facebook) are
+# skipped automatically — the JS file existence check in `translate_one`
+# handles them without any explicit allow-list. New Zeeschuimer datasources
+# added to 4CAT are picked up automatically as long as Zeeschuimer ships the
+# matching `modules/<name>.js` file.
+def python_to_js_module(python_rel: str) -> Optional[str]:
+    """
+    Derive the Zeeschuimer module path for a 4CAT datasource Python file.
+    Returns None if the path doesn't follow `datasources/<dir>/search_*.py`.
+    """
+    parts = python_rel.split("/")
+    if len(parts) != 3 or parts[0] != "datasources":
+        return None
+    filename = parts[2]
+    if not filename.startswith("search_") or not filename.endswith(".py"):
+        return None
+    base = filename[len("search_"):-len(".py")]
+    if not base:
+        return None
+    return f"modules/{base.replace('_', '-')}.js"
 
 DEFAULT_MODEL = "qwen2.5-coder:14b"
 
@@ -189,17 +197,24 @@ def is_zeeschuimer_datasource(python_path: Path) -> bool:
     return False
 
 
-def discover_bootstrap_files(repo_root: Path) -> list[Path]:
+def discover_bootstrap_files(repo_root: Path, zeeschuimer_root: Path) -> list[Path]:
     """
-    Find every datasource file in PLATFORM_MAP whose class is a Zeeschuimer
-    datasource. Returns absolute paths.
+    Find every Python datasource that has a matching Zeeschuimer module.
+    Scans `datasources/*/search_*.py`, keeping only Zeeschuimer datasources
+    whose derived JS module exists in the checkout (so e.g. facebook, which
+    4CAT supports but Zeeschuimer does not, is silently dropped).
     """
     found = []
-    for rel in PLATFORM_MAP:
-        path = repo_root / rel
-        if path.exists() and is_zeeschuimer_datasource(path):
+    for path in sorted((repo_root / "datasources").glob("*/search_*.py")):
+        if not is_zeeschuimer_datasource(path):
+            continue
+        rel = path.relative_to(repo_root).as_posix()
+        js_rel = python_to_js_module(rel)
+        if not js_rel:
+            continue
+        if (zeeschuimer_root / js_rel).exists():
             found.append(path)
-    return sorted(found)
+    return found
 
 
 def build_user_prompt(python_source: str, existing_module_source: str, python_rel: str) -> str:
@@ -640,10 +655,10 @@ def translate_one(
         entry["error"] = "not a Zeeschuimer datasource (is_from_zeeschuimer != True)"
         return entry
 
-    js_rel = PLATFORM_MAP.get(rel)
+    js_rel = python_to_js_module(rel)
     if not js_rel:
         entry["status"] = "skipped"
-        entry["error"] = f"no Zeeschuimer module mapped for {rel}"
+        entry["error"] = f"could not derive Zeeschuimer module path from {rel} (expected `datasources/<dir>/search_*.py` form)"
         return entry
     entry["js_file"] = js_rel
 
@@ -813,7 +828,7 @@ def main():
     repo_root = Path(__file__).resolve().parent.parent
 
     if args.bootstrap:
-        files = discover_bootstrap_files(repo_root)
+        files = discover_bootstrap_files(repo_root, args.zeeschuimer_checkout.resolve())
         if not files:
             sys.exit("No Zeeschuimer datasources found to bootstrap.")
     else:
