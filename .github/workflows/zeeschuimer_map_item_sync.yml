@@ -10,5 +10,296 @@ jobs:
   sync-map-item:
     runs-on: ubuntu-latest
     steps:
-      - name: Placeholder
-        run: echo "Workflow scaffold is valid."
+      - name: Checkout 4CAT
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Determine changed datasource files
+        id: changed
+        run: |
+          # Manual run with explicit files takes precedence
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.files }}" ]; then
+            echo "mode=files" >> "$GITHUB_OUTPUT"
+            echo "files=${{ inputs.files }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.bootstrap }}" = "true" ]; then
+            echo "mode=bootstrap" >> "$GITHUB_OUTPUT"
+            echo "files=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'datasources/*/search_*.py' || true)
+          if [ -z "$changed" ]; then
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "files=" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=files" >> "$GITHUB_OUTPUT"
+            files=$(echo "$changed" | tr '\n' ' ')
+            echo "files=$files" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Exit early if nothing to do
+        if: steps.changed.outputs.mode == 'none'
+        run: |
+          echo "No Zeeschuimer datasource files changed; nothing to translate."
+          exit 0
+
+      - name: Set up Python
+        if: steps.changed.outputs.mode != 'none'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install LLM dependencies
+        if: steps.changed.outputs.mode != 'none'
+        run: |
+          # LLMAdapter (common/lib/llm.py) imports every provider's langchain
+          # package at module load, so all of these are required even though
+          # we only use the Ollama provider at runtime.
+          pip install \
+            langchain-core \
+            langchain-ollama \
+            langchain-openai \
+            langchain-anthropic \
+            langchain-google-genai \
+            langchain-mistralai \
+            langchain-deepseek \
+            pydantic \
+            requests
+
+      - name: Mint Zeeschuimer App token
+        if: steps.changed.outputs.mode != 'none'
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ZEESCHUIMER_APP_ID }}
+          private-key: ${{ secrets.ZEESCHUIMER_APP_PRIVATE_KEY }}
+          owner: digitalmethodsinitiative
+          repositories: zeeschuimer
+
+      - name: Checkout Zeeschuimer
+        if: steps.changed.outputs.mode != 'none'
+        uses: actions/checkout@v4
+        with:
+          repository: digitalmethodsinitiative/zeeschuimer
+          path: zeeschuimer-checkout
+          token: ${{ steps.app_token.outputs.token }}
+
+      - name: Run translation
+        if: steps.changed.outputs.mode != 'none'
+        env:
+          DMI_OLLAMA_KEY: ${{ secrets.DMI_OLLAMA_KEY }}
+          LLM_MODEL: ${{ inputs.model || 'qwen2.5-coder:14b' }}
+        run: |
+          if [ "${{ steps.changed.outputs.mode }}" = "bootstrap" ]; then
+            python helper-scripts/map_item_converter.py \
+              --bootstrap \
+              --zeeschuimer-checkout ./zeeschuimer-checkout \
+              --output-manifest ./manifest.json
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            # On push, skip files whose map_item AST is unchanged vs the
+            # commit before this push (avoids LLM time on incidental changes).
+            python helper-scripts/map_item_converter.py \
+              --files ${{ steps.changed.outputs.files }} \
+              --skip-unchanged-against "${{ github.event.before }}" \
+              --zeeschuimer-checkout ./zeeschuimer-checkout \
+              --output-manifest ./manifest.json
+          else
+            # workflow_dispatch with explicit files — translate as requested.
+            python helper-scripts/map_item_converter.py \
+              --files ${{ steps.changed.outputs.files }} \
+              --zeeschuimer-checkout ./zeeschuimer-checkout \
+              --output-manifest ./manifest.json
+          fi
+
+      - name: Emit workflow annotation for unknown helpers
+        if: steps.changed.outputs.mode != 'none'
+        run: |
+          python - <<'EOF'
+          import json
+          with open("manifest.json") as f:
+              manifest = json.load(f)
+          unknowns = manifest.get("aggregate_unknown_helpers") or []
+          if unknowns:
+              names = ", ".join(unknowns)
+              # ::warning:: surfaces in the Actions UI and in any GitHub
+              # notification feed, so 4CAT devs see this without depending
+              # on the Zeeschuimer-side PR review catching it.
+              print(
+                  f"::warning title=4CAT helpers used by map_item but not in "
+                  f"Zeeschuimer's lib.js::{names}. Consider porting these to "
+                  f"Zeeschuimer's js/lib.js and adding them to "
+                  f"AVAILABLE_JS_HELPERS in helper-scripts/map_item_converter.py."
+              )
+          EOF
+
+      - name: Build PR body
+        if: steps.changed.outputs.mode != 'none'
+        id: pr_body
+        env:
+          MODE: ${{ steps.changed.outputs.mode }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python - <<'EOF'
+          import json
+          import os
+          import subprocess
+
+          mode = os.environ["MODE"]
+          before = os.environ["BEFORE_SHA"]
+          after = os.environ["AFTER_SHA"]
+          run_id = os.environ["RUN_ID"]
+          event_name = os.environ["EVENT_NAME"]
+          repo = "${{ github.repository }}"
+
+          with open("manifest.json") as f:
+              manifest = json.load(f)
+
+          model = manifest.get("model", "(unknown)")
+          provider = manifest.get("provider", "ollama")
+          structured_output = manifest.get("structured_output", False)
+          stream = manifest.get("stream", False)
+          total_duration = manifest.get("total_duration_seconds")
+          aggregate_unknown_helpers = manifest.get("aggregate_unknown_helpers") or []
+          entries = manifest.get("entries", [])
+
+          short_sha = after[:7]
+          lines = []
+          lines.append("> :robot: This PR was auto-generated by the [4CAT map_item sync workflow](https://github.com/{}/actions/runs/{}). The JavaScript was produced by an LLM and **requires human review** before merging — including manual fixes for any lint warnings flagged below.".format(repo, run_id))
+          lines.append("")
+          lines.append("## Generation parameters")
+          lines.append("- **Model:** `{}` (provider: `{}`, structured output: `{}`, stream: `{}`)".format(model, provider, structured_output, stream))
+          if total_duration is not None:
+              lines.append("- **Total LLM time:** {}s".format(total_duration))
+          if mode == "bootstrap":
+              lines.append("- **Trigger:** manual `workflow_dispatch` with `bootstrap=true` (initial sync of all Zeeschuimer datasources).")
+          elif event_name == "workflow_dispatch":
+              lines.append("- **Trigger:** manual `workflow_dispatch` with explicit file list.")
+          else:
+              lines.append("- **Trigger:** push of [`{}`](https://github.com/{}/commit/{}) to 4CAT master.".format(short_sha, repo, after))
+          lines.append("")
+
+          ok = [e for e in entries if e["status"] == "ok"]
+          ok_with_warnings = [e for e in ok if e.get("lint_warnings")]
+          failed = [e for e in entries if e["status"] == "failed"]
+          skipped = [e for e in entries if e["status"] == "skipped"]
+
+          if aggregate_unknown_helpers:
+              # Loud, top-of-PR section directed at 4CAT (not Zeeschuimer)
+              # devs. Same team today, but framing it this way keeps it
+              # visible if the team grows or splits.
+              lines.append("## :rotating_light: Heads-up to 4CAT devs: unknown Python helpers")
+              lines.append("")
+              lines.append("The following helpers from `common.lib.*` / `backend.lib.*` are referenced by `map_item` (or its same-class siblings) but are NOT in the script's `AVAILABLE_JS_HELPERS` whitelist. The LLM had to inline them — likely with varying fidelity. Consider porting them to Zeeschuimer's `js/lib.js` and adding them to `AVAILABLE_JS_HELPERS` in `helper-scripts/map_item_converter.py` so future runs can reference them as globals.")
+              lines.append("")
+              for name in aggregate_unknown_helpers:
+                  using = sorted({e["python_file"] for e in entries if name in (e.get("unknown_helpers") or [])})
+                  lines.append("- **`{}`** — used by: {}".format(name, ", ".join("`{}`".format(p) for p in using)))
+              lines.append("")
+
+          lines.append("## Summary")
+          lines.append("- :white_check_mark: {} translated".format(len(ok)))
+          if ok_with_warnings:
+              lines.append("- :warning: {} translated with lint warnings (require manual fix)".format(len(ok_with_warnings)))
+          lines.append("- :x: {} failed".format(len(failed)))
+          lines.append("- :grey_question: {} skipped".format(len(skipped)))
+          lines.append("")
+
+          if ok:
+              lines.append("| Datasource | Module | Time | Warnings |")
+              lines.append("|---|---|---:|---:|")
+              for entry in ok:
+                  dur = entry.get("duration_seconds")
+                  dur_cell = "{}s".format(dur) if dur is not None else "—"
+                  warn_count = len(entry.get("lint_warnings") or [])
+                  warn_cell = ":warning: {}".format(warn_count) if warn_count else "—"
+                  lines.append("| `{}` | `{}` | {} | {} |".format(entry["python_file"], entry["js_file"], dur_cell, warn_cell))
+              lines.append("")
+
+          if ok_with_warnings:
+              lines.append("## :warning: Lint warnings — fix before merging")
+              lines.append("")
+              lines.append("The following datasources translated successfully but the static lint flagged issues that need human fixes. The auto-generated code was spliced into the JS module as-is; please patch the file directly in this PR.")
+              lines.append("")
+              for entry in ok_with_warnings:
+                  lines.append("**`{}` -> `{}`**".format(entry["python_file"], entry["js_file"]))
+                  for w in entry["lint_warnings"]:
+                      lines.append("- {}".format(w))
+                  lines.append("")
+
+          for entry in ok:
+              dur = entry.get("duration_seconds")
+              header_dur = " ({}s)".format(dur) if dur is not None else ""
+              warn_marker = " :warning:" if entry.get("lint_warnings") else ""
+              lines.append("## `{}` -> `{}`{}{}".format(entry["python_file"], entry["js_file"], header_dur, warn_marker))
+              if entry.get("commentary"):
+                  lines.append("**LLM commentary:**")
+                  lines.append("")
+                  lines.append("> " + entry["commentary"].replace("\n", "\n> "))
+                  lines.append("")
+              if event_name == "push":
+                  try:
+                      diff = subprocess.check_output(
+                          ["git", "diff", "{}..{}".format(before, after), "--", entry["python_file"]],
+                          text=True,
+                      )
+                  except subprocess.CalledProcessError:
+                      diff = ""
+              else:
+                  diff = ""
+              if diff.strip():
+                  lines.append("<details><summary>Python diff</summary>")
+                  lines.append("")
+                  lines.append("```diff")
+                  lines.append(diff.rstrip())
+                  lines.append("```")
+                  lines.append("</details>")
+                  lines.append("")
+
+          if failed:
+              lines.append("## Failures")
+              for entry in failed:
+                  dur = entry.get("duration_seconds")
+                  dur_str = " (after {}s)".format(dur) if dur is not None else ""
+                  lines.append("- `{}`{}: {}".format(entry["python_file"], dur_str, entry.get("error", "(no error message)")))
+              lines.append("")
+
+          if skipped:
+              lines.append("## Skipped")
+              for entry in skipped:
+                  lines.append("- `{}`: {}".format(entry["python_file"], entry.get("error", "")))
+              lines.append("")
+
+          body = "\n".join(lines)
+          with open("pr_body.md", "w", encoding="utf-8") as f:
+              f.write(body)
+          print("Wrote pr_body.md ({} chars)".format(len(body)))
+          EOF
+
+      - name: Check there are JS changes to PR
+        if: steps.changed.outputs.mode != 'none'
+        id: have_changes
+        working-directory: zeeschuimer-checkout
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No JS changes produced by translation; not opening a PR."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update Zeeschuimer PR
+        if: steps.changed.outputs.mode != 'none' && steps.have_changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          path: zeeschuimer-checkout
+          token: ${{ steps.app_token.outputs.token }}
+          branch: auto/4cat-map-item-sync
+          title: "Auto-translated map_item updates from 4CAT @ ${{ github.sha }}"
+          commit-message: "chore: sync map_item from 4CAT ${{ github.sha }}"
+          body-path: pr_body.md
+          draft: true
