@@ -269,16 +269,21 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "# Common mistakes from past runs (the script lints for these and rejects matches)\n"
         "- Python `dict.get(k)` / `dict.get(k, default)` does NOT exist in JavaScript. Replace EVERY `.get(...)` with `[k]` or `[k] ?? default`. Pinterest- and Instagram-style code has many of these — translate every one.\n"
         "- Literal newlines inside string literals are a JS syntax error. Python `\"\\n\".join(xs)` becomes JS `xs.join(\"\\n\")` — keep the `\\n` as an escape sequence; do NOT put an actual newline character inside the quotes.\n"
-        "- `MappedItem` and `MissingMappedField` are CLASSES — always use `new MappedItem({...})` and `new MissingMappedField(...)`, never bare calls.\n"
+        "- Regex literals `/.../` cannot span multiple lines. If the Python regex source contains a literal newline (e.g. inside a character class), encode it as `\\n` in the JS regex — never paste a raw newline into the `/.../` body.\n"
+        "- `MappedItem`, `MissingMappedField`, and `MapItemException` are CLASSES — always use `new MappedItem({...})`, `new MissingMappedField(...)`, `throw new MapItemException(...)`. Never call them bare.\n"
+        "- Python `'x' in some_string` is a SUBSTRING check; the JS `in` operator does NOT do this — on a string it throws TypeError. Use `someString.includes('x')` for substring tests. The JS `in` operator is only for object property names (`'key' in obj`).\n"
+        "- Empty containers are TRUTHY in JavaScript but FALSY in Python. After `const user = node.user ?? {}`, the variable is always truthy — `if (user)` is always true. Either guard on the original nullable BEFORE defaulting (`if (node.user) {...}`) or check `Object.keys(user).length` / `arr.length`. Same trap for `[]`.\n"
         "- `js/lib.js` is loaded as a script, NOT a module. Do NOT write `import { X } from '../js/lib.js'`. The helpers there are globals.\n"
         "- Python keywords don't exist in JS: `None` → `null`, `True`/`False` → `true`/`false`, `def` → `function`.\n"
         "- f-strings (`f\"x {y}\"`) don't exist in JS. Use template literals (`` `x ${y}` ``).\n\n"
         "# Before submitting, verify your output\n"
         "1. The function contains zero `.get(` calls.\n"
-        "2. Every `MappedItem(` and `MissingMappedField(` is preceded by `new `.\n"
-        "3. No string literal contains a raw newline character — use `\\n` escapes.\n"
+        "2. Every `MappedItem(`, `MissingMappedField(`, and `MapItemException(` is preceded by `new `.\n"
+        "3. No string literal or regex literal contains a raw newline character — use `\\n` escapes.\n"
         "4. `imports_to_add` is empty unless you really need an ES-module import (it should NOT contain anything for `MappedItem` etc.).\n"
-        "5. No Python keywords (`None`, `True`, `False`, `def`, f-strings).\n\n"
+        "5. No Python keywords (`None`, `True`, `False`, `def`, f-strings).\n"
+        "6. No `'literal' in someStringExpression` — those are substring checks; rewrite as `.includes(...)`.\n"
+        "7. No `if (x)` guards where `x` was defaulted to `{}` or `[]` — those are always-true in JS. Guard on the pre-default value or check `.length` / `Object.keys(...).length`.\n\n"
         "# Output format\n"
         "Use `export function map_item(item) { ... }` to match this module's ES-module style. "
         "Return raw JavaScript source — do NOT wrap fields in markdown code fences. "
@@ -367,6 +372,19 @@ LINT_PATTERNS = [
         re.compile(r"\bf\"|\bf'"),
         "Python f-string detected (`f\"...\"` or `f'...'`). Use JavaScript template literals (`` `...${x}...` ``).",
     ),
+    (
+        # Python-style substring test: 'lit' in expr.someStringMethod(...).
+        # The JS `in` operator only works on objects (checking property names);
+        # on a string it throws TypeError. Catch the obvious cases where the
+        # right-hand side ends in a method that's known to return a string.
+        re.compile(
+            r"""['"][^'"]*['"]\s+in\s+[\w.\[\]]+\.(?:"""
+            r"""toLowerCase|toUpperCase|toString|trim|trimStart|trimEnd|"""
+            r"""slice|substring|substr|concat|charAt|normalize|repeat|"""
+            r"""padStart|padEnd|replace|replaceAll)\s*\("""
+        ),
+        "Python-style substring check (`'x' in someString`) detected. The JS `in` operator only checks object property names and throws TypeError on a string. Use `someString.includes('x')` instead.",
+    ),
 ]
 
 
@@ -392,6 +410,26 @@ def _has_literal_newline_in_string(source: str) -> bool:
         if "\n" in m.group(0):
             return True
     return False
+
+
+# Heuristic openers for a regex literal: `.match(/`, `new RegExp(/`, etc.
+# Scoped to method-call contexts because regex `/` is hard to disambiguate
+# from division otherwise. False negatives are acceptable; false positives
+# would block valid code.
+_REGEX_LITERAL_OPENER = re.compile(
+    r"(?:\.(?:match|replace|replaceAll|split|search|matchAll|test|exec)\s*\(\s*"
+    r"|\bnew\s+RegExp\s*\(\s*)/"
+)
+
+
+def _uses_regex(source: str) -> bool:
+    """
+    Detect whether the source uses a regex in a recognized context
+    (`.match(/.../)`, `new RegExp(...)`, etc.). Current models translate
+    regex unreliably — this is a blanket "needs human review" flag, not a
+    bug detector. Reviewer must verify the regex behavior end-to-end.
+    """
+    return bool(_REGEX_LITERAL_OPENER.search(source))
 
 
 def lint_translation(translation: dict) -> list:
@@ -421,7 +459,7 @@ def lint_translation(translation: dict) -> list:
 
         # Class instantiation without `new` (variable-width lookbehind, so
         # check the chars before each match manually).
-        for cls in ("MappedItem", "MissingMappedField"):
+        for cls in ("MappedItem", "MissingMappedField", "MapItemException"):
             pattern = re.compile(rf"\b{cls}\s*\(")
             reported = False
             for m in pattern.finditer(clean):
@@ -442,6 +480,18 @@ def lint_translation(translation: dict) -> list:
                 f"[{label}] Literal newline inside a string literal — JS strings "
                 f"can't span lines without escape (`\"\\n\"`) or template literals "
                 f"(`` `\\n` ``)."
+            )
+
+        # Regex translation is unreliable on the current model — flag any
+        # regex use for manual reviewer verification rather than trying to
+        # detect specific failure modes (literal newlines, dropped escapes,
+        # flag-syntax differences, character-class drift). The reviewer is
+        # the source of truth here until we can upgrade the model.
+        if _uses_regex(clean):
+            issues.append(
+                f"[{label}] Regex detected. The current LLM translates regex "
+                f"unreliably (escapes, character classes, flags) — please verify "
+                f"the regex behavior against the Python original by hand."
             )
 
     return issues
