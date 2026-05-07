@@ -1,3 +1,4 @@
+<<<<<<< zeeschuimer_auto_map
 # Auto-translate Zeeschuimer datasource `map_item` functions from Python to JS
 # and open a draft PR per module against digitalmethodsinitiative/zeeschuimer.
 #
@@ -16,10 +17,15 @@
 #                                  digitalmethodsinitiative/zeeschuimer with permissions
 #                                  contents:write + pull-requests:write (and nothing else)
 #   ZEESCHUIMER_APP_PRIVATE_KEY  - full PEM private key for that App (including BEGIN/END lines)
+=======
+# Bootstrap the Zeeschuimer map_item sync workflow
+# This is necessary to test workflow in PR (so far as I can tell)
+>>>>>>> master
 
 name: Sync Zeeschuimer map_item from 4CAT
 
 on:
+<<<<<<< zeeschuimer_auto_map
   push:
     branches: [master]
     paths:
@@ -379,3 +385,13 @@ jobs:
           commit-message: "chore: sync map_item for ${{ matrix.target.module }} from 4CAT ${{ github.sha }}"
           body-path: pr_body.md
           draft: true
+=======
+  workflow_dispatch:
+
+jobs:
+  sync-map-item:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Workflow scaffold is valid."
+>>>>>>> master
