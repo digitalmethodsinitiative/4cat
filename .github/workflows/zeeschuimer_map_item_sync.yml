@@ -1,10 +1,14 @@
 # Auto-translate Zeeschuimer datasource `map_item` functions from Python to JS
-# and open a draft PR against digitalmethodsinitiative/zeeschuimer.
+# and open a draft PR per module against digitalmethodsinitiative/zeeschuimer.
 #
 # Triggers on pushes to master that touch any Zeeschuimer datasource (or the
 # helper script itself). Also exposes a `workflow_dispatch` trigger with a
 # `bootstrap` input for the initial run that translates all 15 datasources at
-# once.
+# once (single PR).
+#
+# Architecture: a `detect` job groups changed files by module and emits a
+# matrix; a `sync` job fans out one parallel run per module, each opening
+# (or updating) its own PR on a stable per-module branch.
 #
 # Required secrets (configured in repo Settings -> Secrets and variables -> Actions):
 #   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net (already used by helper script)
@@ -25,11 +29,11 @@ on:
   workflow_dispatch:
     inputs:
       bootstrap:
-        description: 'Translate every Zeeschuimer datasource (initial sync). Ignored if "files" is set.'
+        description: 'Translate every Zeeschuimer datasource (initial sync, single PR). Ignored if "files" is set.'
         type: boolean
         default: false
       files:
-        description: 'Space-separated list of datasource files to translate (e.g. "datasources/tiktok/search_tiktok.py"). Overrides bootstrap.'
+        description: 'Space-separated list of datasource files to translate (e.g. "datasources/tiktok/search_tiktok.py"). Overrides bootstrap. One PR per module.'
         type: string
         default: ''
       model:
@@ -38,53 +42,115 @@ on:
         default: ''
 
 jobs:
-  sync:
-    name: Translate map_item and open Zeeschuimer PR
+  detect:
+    name: Detect modules to translate
     runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - name: Checkout 4CAT
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Determine changed datasource files
-        id: changed
+      - name: Plan translation matrix
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUTS_FILES: ${{ inputs.files }}
+          INPUTS_BOOTSTRAP: ${{ inputs.bootstrap }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
         run: |
-          # Manual run with explicit files takes precedence
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.files }}" ]; then
-            echo "mode=files" >> "$GITHUB_OUTPUT"
-            echo "files=${{ inputs.files }}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.bootstrap }}" = "true" ]; then
-            echo "mode=bootstrap" >> "$GITHUB_OUTPUT"
-            echo "files=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          changed=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'datasources/*/search_*.py' || true)
-          if [ -z "$changed" ]; then
-            echo "mode=none" >> "$GITHUB_OUTPUT"
-            echo "files=" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=files" >> "$GITHUB_OUTPUT"
-            files=$(echo "$changed" | tr '\n' ' ')
-            echo "files=$files" >> "$GITHUB_OUTPUT"
-          fi
+          python - <<'EOF'
+          import json
+          import os
+          import subprocess
 
-      - name: Exit early if nothing to do
-        if: steps.changed.outputs.mode == 'none'
-        run: |
-          echo "No Zeeschuimer datasource files changed; nothing to translate."
-          exit 0
+          event_name = os.environ["EVENT_NAME"]
+          inputs_files = os.environ.get("INPUTS_FILES", "").strip()
+          inputs_bootstrap = os.environ.get("INPUTS_BOOTSTRAP", "").lower() == "true"
+          before = os.environ.get("BEFORE_SHA", "")
+          after = os.environ.get("AFTER_SHA", "")
+          out_path = os.environ["GITHUB_OUTPUT"]
+
+          def emit(mode, matrix):
+              with open(out_path, "a", encoding="utf-8") as f:
+                  f.write("mode={}\n".format(mode))
+                  f.write("matrix={}\n".format(json.dumps(matrix)))
+
+          # Bootstrap is special: one PR for all datasources.
+          # Explicit `files` input overrides bootstrap; honor that.
+          if event_name == "workflow_dispatch" and inputs_bootstrap and not inputs_files:
+              emit("bootstrap", [{"module": "bootstrap", "files": "", "bootstrap": True}])
+              print("Plan: bootstrap (single PR)")
+              raise SystemExit(0)
+
+          # Resolve the file list to translate.
+          if event_name == "workflow_dispatch" and inputs_files:
+              files = inputs_files.split()
+          else:
+              # push event: diff datasource files between before and after.
+              try:
+                  out = subprocess.check_output(
+                      ["git", "diff", "--name-only", before, after, "--",
+                       "datasources/*/search_*.py"],
+                      text=True,
+                  )
+              except subprocess.CalledProcessError:
+                  out = ""
+              files = [f for f in out.splitlines() if f.strip()]
+
+          # Group by module: datasources/<module>/search_*.py
+          modules = {}
+          for path in files:
+              parts = path.split("/")
+              if len(parts) >= 3 and parts[0] == "datasources":
+                  modules.setdefault(parts[1], []).append(path)
+
+          if not modules:
+              emit("none", [])
+              print("Plan: nothing to translate")
+              raise SystemExit(0)
+
+          matrix = [
+              {"module": mod, "files": " ".join(sorted(paths)), "bootstrap": False}
+              for mod, paths in sorted(modules.items())
+          ]
+          emit("files", matrix)
+          print("Plan: {} module(s)".format(len(matrix)))
+          for entry in matrix:
+              print("  - {}: {}".format(entry["module"], entry["files"]))
+          EOF
+
+  sync:
+    name: Sync ${{ matrix.target.module }}
+    needs: detect
+    if: needs.detect.outputs.mode != 'none'
+    runs-on: ubuntu-latest
+    # Per-module concurrency: a newer push to master supersedes any in-flight
+    # sync for the same module (LLM run gets cancelled, latest run wins).
+    # Each matrix instance gets its own group, so different modules don't block.
+    concurrency:
+      group: zeeschuimer-sync-${{ matrix.target.module }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.detect.outputs.matrix) }}
+    steps:
+      - name: Checkout 4CAT
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Set up Python
-        if: steps.changed.outputs.mode != 'none'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install LLM dependencies
-        if: steps.changed.outputs.mode != 'none'
         run: |
           # LLMAdapter (common/lib/llm.py) imports every provider's langchain
           # package at module load, so all of these are required even though
@@ -101,7 +167,6 @@ jobs:
             requests
 
       - name: Mint Zeeschuimer App token
-        if: steps.changed.outputs.mode != 'none'
         id: app_token
         uses: actions/create-github-app-token@v1
         with:
@@ -111,7 +176,6 @@ jobs:
           repositories: zeeschuimer
 
       - name: Checkout Zeeschuimer
-        if: steps.changed.outputs.mode != 'none'
         uses: actions/checkout@v4
         with:
           repository: digitalmethodsinitiative/zeeschuimer
@@ -119,28 +183,27 @@ jobs:
           token: ${{ steps.app_token.outputs.token }}
 
       - name: Run translation
-        if: steps.changed.outputs.mode != 'none'
         env:
           DMI_OLLAMA_KEY: ${{ secrets.DMI_OLLAMA_KEY }}
           LLM_MODEL: ${{ inputs.model || 'qwen2.5-coder:14b' }}
         run: |
-          if [ "${{ steps.changed.outputs.mode }}" = "bootstrap" ]; then
+          if [ "${{ matrix.target.bootstrap }}" = "true" ]; then
             python helper-scripts/map_item_converter.py \
               --bootstrap \
               --zeeschuimer-checkout ./zeeschuimer-checkout \
               --output-manifest ./manifest.json
           else
             python helper-scripts/map_item_converter.py \
-              --files ${{ steps.changed.outputs.files }} \
+              --files ${{ matrix.target.files }} \
               --zeeschuimer-checkout ./zeeschuimer-checkout \
               --output-manifest ./manifest.json
           fi
 
       - name: Build PR body
-        if: steps.changed.outputs.mode != 'none'
         id: pr_body
         env:
-          MODE: ${{ steps.changed.outputs.mode }}
+          MODULE: ${{ matrix.target.module }}
+          BOOTSTRAP: ${{ matrix.target.bootstrap }}
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
@@ -151,7 +214,8 @@ jobs:
           import os
           import subprocess
 
-          mode = os.environ["MODE"]
+          module = os.environ["MODULE"]
+          is_bootstrap = os.environ.get("BOOTSTRAP", "").lower() == "true"
           before = os.environ["BEFORE_SHA"]
           after = os.environ["AFTER_SHA"]
           run_id = os.environ["RUN_ID"]
@@ -176,12 +240,12 @@ jobs:
           lines.append("- **Model:** `{}` (provider: `{}`, structured output: `{}`, stream: `{}`)".format(model, provider, structured_output, stream))
           if total_duration is not None:
               lines.append("- **Total LLM time:** {}s".format(total_duration))
-          if mode == "bootstrap":
+          if is_bootstrap:
               lines.append("- **Trigger:** manual `workflow_dispatch` with `bootstrap=true` (initial sync of all Zeeschuimer datasources).")
           elif event_name == "workflow_dispatch":
-              lines.append("- **Trigger:** manual `workflow_dispatch` with explicit file list.")
+              lines.append("- **Trigger:** manual `workflow_dispatch` for `{}`.".format(module))
           else:
-              lines.append("- **Trigger:** push of [`{}`](https://github.com/{}/commit/{}) to 4CAT master.".format(short_sha, repo, after))
+              lines.append("- **Trigger:** push of [`{}`](https://github.com/{}/commit/{}) to 4CAT master (module: `{}`).".format(short_sha, repo, after, module))
           lines.append("")
 
           ok = [e for e in entries if e["status"] == "ok"]
@@ -266,10 +330,32 @@ jobs:
           with open("pr_body.md", "w", encoding="utf-8") as f:
               f.write(body)
           print("Wrote pr_body.md ({} chars)".format(len(body)))
+
+          # Title is single-module in the matrix path; bootstrap is its own
+          # special-case (one PR covering all 15 datasources).
+          ok_modules = []
+          for entry in ok:
+              parts = entry["python_file"].split("/")
+              if len(parts) >= 2 and parts[0] == "datasources":
+                  mod = parts[1]
+                  if mod not in ok_modules:
+                      ok_modules.append(mod)
+
+          if is_bootstrap:
+              title = "Auto-translated map_item updates from 4CAT (bootstrap, {} datasources)".format(len(ok_modules))
+          elif not ok_modules:
+              title = "Auto-translated map_item updates from 4CAT: {}".format(module)
+          else:
+              title = "Auto-translated map_item updates from 4CAT: {}".format(", ".join(ok_modules))
+
+          github_output = os.environ.get("GITHUB_OUTPUT")
+          if github_output:
+              with open(github_output, "a", encoding="utf-8") as f:
+                  f.write("title={}\n".format(title))
+          print("PR title: {}".format(title))
           EOF
 
       - name: Check there are JS changes to PR
-        if: steps.changed.outputs.mode != 'none'
         id: have_changes
         working-directory: zeeschuimer-checkout
         run: |
@@ -281,13 +367,15 @@ jobs:
           fi
 
       - name: Open or update Zeeschuimer PR
-        if: steps.changed.outputs.mode != 'none' && steps.have_changes.outputs.has_changes == 'true'
+        if: steps.have_changes.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           path: zeeschuimer-checkout
           token: ${{ steps.app_token.outputs.token }}
-          branch: auto/4cat-map-item-sync
-          title: "Auto-translated map_item updates from 4CAT @ ${{ github.sha }}"
-          commit-message: "chore: sync map_item from 4CAT ${{ github.sha }}"
+          # Stable per-module branch: a fresh push that retranslates the same
+          # module updates the same PR. Different modules never share a branch.
+          branch: auto/4cat-map-item-sync-${{ matrix.target.module }}
+          title: ${{ steps.pr_body.outputs.title }}
+          commit-message: "chore: sync map_item for ${{ matrix.target.module }} from 4CAT ${{ github.sha }}"
           body-path: pr_body.md
           draft: true
