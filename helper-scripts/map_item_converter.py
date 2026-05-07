@@ -160,7 +160,18 @@ AVAILABLE_JS_HELPERS = [
         "kind": "function",
         "usage": "formatUtcTimestamp(timestamp)",
         "note": "Formats a UTC timestamp as a readable string.",
-    }
+    },
+    {
+        "name": "MapItemException",
+        "kind": "class",
+        "usage": "throw new MapItemException(message)",
+        "note": (
+            "Mirror of 4CAT's `MapItemException`. Throw from `map_item` to "
+            "signal a known mapping failure (e.g. unrecognized item shape); "
+            "callers catch it, skip the item, and warn that the platform's "
+            "format may have shifted. Always instantiate with `new`."
+        ),
+    },
 ]
 
 
