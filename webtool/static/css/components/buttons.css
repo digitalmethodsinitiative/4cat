@@ -7,20 +7,24 @@ button.no-style {
   background: none
 }
 
-.button-like {
+.button-like, input[type=submit], .plain-page button {
     font-variant: small-caps;
     text-transform: lowercase;
 
-    color: var(--button-grey);
-    background: var(--button-bg-regular);
+    color: var(--button-bg-regular);
+    background: transparent;
 
     outline: var(--stroke) solid var(--button-bg-regular);
     border-radius: var(--radius);
     border-color: var(--button-bg-regular);
+    border-style: none;
 }
 
 .button-like a {
     display: block;
+}
+
+.button-like a, .plain-page button, input[type=submit] {
     padding: 8px 18px;
 }
 
@@ -33,11 +37,12 @@ button.no-style {
     height: 1.25em;
 }
 
-.button-like:hover, .with-dropdown ul li:hover, .with-dropdown:hover .dropdown-action-button::before {
-    color: var(--button-bg-regular);
-    background: var(--button-grey);
-    outline-color: var(--button-grey);
-    border-color: var(--button-grey);
+.button-like:hover, .with-dropdown ul li:hover, .with-dropdown:hover .dropdown-action-button::before, input[type=submit]:hover, .plain-page button:hover {
+    color: var(--button-grey);
+    background: var(--button-bg-regular);
+    outline-color: var(--button-bg-regular);
+    border-color: var(--button-bg-regular);
+    cursor: pointer;
 }
 
 .with-dropdown {

@@ -1,0 +1,40 @@
+.form-element {
+    display: grid;
+    grid-template-columns: 34% 66%;
+    align-items: center;
+    margin-bottom: var(--spacing-regular);
+}
+
+.form-element > label {
+    padding-right: var(--spacing-regular);
+    font-weight: bold;
+}
+
+.form-element :first-child:not(:last-child) {
+    text-align: right;
+}
+
+.form-element :last-child:not(:first-child) {
+    width: max-content;
+}
+
+.form-element :first-child:last-child {
+    width: 100%;
+}
+
+.form-element input {
+    background: var(--panel-bg-0);
+    border: 0;
+    border-bottom: var(--stroke) solid var(--panel-bg-2);
+    padding: var(--spacing-small);
+}
+
+.submit-container {
+    text-align: center;
+    margin: var(--spacing-regular) auto;
+}
+
+.form-footer {
+    text-align: center;
+    margin: var(--spacing-regular) auto;
+}

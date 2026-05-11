@@ -1,3 +1,7 @@
+:root {
+    interpolate-size: allow-keywords;
+}
+
 html {
     width: 100%;
     background: var(--bright);
@@ -33,4 +37,11 @@ nav li {
 .center-stage {
     width: var(--max-width);
     margin: 0 auto;
+}
+
+pre {
+    overflow: auto;
+    font-family: monospace;
+    padding: var(--spacing-regular);
+    background: var(--panel-bg-0);
 }

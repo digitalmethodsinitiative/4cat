@@ -17,9 +17,17 @@
     column-gap: var(--spacing-regular);
 }
 
-.dataset-metadata > nav > ul > li, .dataset-metadata .dropdown-action-button::before {
+.dataset-metadata > nav > ul > li {
     outline-color: var(--button-grey);
     background: transparent;
+}
+
+.dataset-metadata .button-like {
+    color: var(--bright);
+}
+
+.dataset-metadata .button-like:hover, .dataset-metadata .dropdown-action-button::before, .with-dropdown:hover .dropdown-action-button::before {
+    outline-color: var(--bright);
 }
 
 .dataset-metadata .badge-list, .dataset-metadata p.notice {

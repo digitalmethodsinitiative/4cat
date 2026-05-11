@@ -1,0 +1,21 @@
+.plain-page #main-content a {
+    color: var(--fourcat-accent);
+    text-decoration: underline;
+}
+
+.plain-page #main-content {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    border-bottom: 1px solid var(--button-grey);
+    padding-bottom: 2em;
+    font-size: var(--font-normal);
+}
+
+.plain-page.narrow #main-content {
+    max-width: calc(var(--max-width) * 0.5);
+}
+
+.plain-page h2, .plain-page h3, .plain-page h4, .plain-page h5 {
+    font-family: Chivo, sans-serif;
+    font-size: var(--font-h0);
+}
