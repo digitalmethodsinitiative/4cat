@@ -25,6 +25,7 @@ class CategorizeImagesCLIP(BasicProcessor):
     title = "Generate image captions using OpenAI's BLIP2 model"  # title displayed in UI
     description = "The BLIP2 model uses a pretrained image encoder combined with an LLM to generate image captions. The model can also be prompted and uses the image plus prompt to generate text responses."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    icon = "eye"
 
     # Processors designed to handle input from this Dataset
     followups = ["image-text-wall"]

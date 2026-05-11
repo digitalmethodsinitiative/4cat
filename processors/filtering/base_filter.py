@@ -23,6 +23,7 @@ class BaseFilter(BasicProcessor):
     category = "Filtering"  # category
     title = "Base Filter"  # title displayed in UI
     description = "This should not be available."
+    icon = "filter"
 
     item_ids = []
 

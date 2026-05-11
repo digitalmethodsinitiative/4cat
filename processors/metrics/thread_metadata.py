@@ -24,6 +24,7 @@ class ThreadMetadata(BasicProcessor):
         "that this extracted only on the basis of the items present this dataset."
     )  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "circle-info"
 
     followups = []
 

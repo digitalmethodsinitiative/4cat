@@ -27,6 +27,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
     title = "Generate images from text prompts"  # title displayed in UI
     description = "Given a list of prompts, generates images using the Stable Diffusion XL image model."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    icon = "images"
 
     followups = ImageDownloader.followups
 

@@ -28,6 +28,7 @@ class UploadAnnotations(BasicProcessor):
 				   "The first column should contain item IDs; subsequent columns become annotation fields. "
 				   "For CSV file uploads, comma is used as the separator. For text input, a custom separator can be specified.")
 	extension = "csv"
+	icon = "tags"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

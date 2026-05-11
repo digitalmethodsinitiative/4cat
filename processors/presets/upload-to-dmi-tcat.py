@@ -13,6 +13,7 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     title = "Upload to DMI-TCAT"  # title displayed in UI
     description = "Convert the dataset to a TCAT-compatible format and upload it to an available TCAT server."  # description displayed in UI
     extension = "html"
+    icon = "brand-twitter"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

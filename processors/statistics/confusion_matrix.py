@@ -24,6 +24,7 @@ class ConfusionMatrix(BasicProcessor):
     title = "Confusion matrix"  # title displayed in UI
     description = "Create a confusion matrix with data from two columns."  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI
+    icon = "table-columns"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

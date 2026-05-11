@@ -23,6 +23,7 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
                   "returned by the API, and image file names, are nodes. Edges are created between file names and " \
                   "labels if the label occurs for the image with that file name."
     extension = "gexf"  # extension of result file, used internally and in UI
+    icon = "circle-nodes"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

@@ -26,6 +26,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     title = "Upload to DMI-TCAT"  # title displayed in UI
     description = "Send a TCAT-ready JSON file to a particular DMI-TCAT server."  # description displayed in UI
     extension = "html"  # extension of result file, used internally and in UI
+    icon = "brand-twitter"
 
     config = {
         # TCAT Server Connection Info

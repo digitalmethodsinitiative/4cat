@@ -24,6 +24,7 @@ class ConvertText(BasicProcessor):
     description = ("Find text in selected fields, replace parts of it, and write to a new dataset. Converted texts can "
                    "also be added to the original dataset as annotations.")  # description displayed in UI
     extension = "csv"
+    icon = "arrow-turn-to-dots"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

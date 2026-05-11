@@ -20,6 +20,7 @@ class Perspective(BasicProcessor):
 	description = ("Use the Perspective API to score text with attributes on toxicity, "
 					"including 'toxicity', 'insult', and 'profanity'.")		# description displayed in UI
 	extension = "ndjson"  # extension of result file, used internally and in UI
+	icon = "hand-middle-finger"
 
 	references = [
 		"[Perspective API documentation](https://developers.perspectiveapi.com/s/about-the-api)",

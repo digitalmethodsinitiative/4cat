@@ -20,6 +20,7 @@ class CountPosts(BasicProcessor):
     title = "Count items per date"  # title displayed in UI
     description = "Counts how many items are in the dataset per date (or overall)."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "list-ol"
 
     followups = ["histogram"]
 

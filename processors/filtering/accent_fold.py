@@ -26,6 +26,7 @@ class AccentFoldingFilter(BasicProcessor):
     description = ("Replaces or transliterates non-Latin characters with the closest ASCII equivalent, converting e.g. "
                    "'á' to 'a', 'ç' to 'c', etc. This creates a new dataset.")
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "language"
 
 
     @classmethod

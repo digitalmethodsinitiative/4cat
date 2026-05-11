@@ -30,6 +30,7 @@ class URLFetcher(BasicProcessor):
     description = ("Fetches the page title and other metadata for URLs referenced in the dataset. Makes a request to "
                    "each URL, optionally following HTTP redirects.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "globe"
 
     followups = []
 

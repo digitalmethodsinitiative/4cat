@@ -24,6 +24,7 @@ class ThreadSplitter(BasicProcessor):
 	title = "Split by thread"  # title displayed in UI
 	description = "Split the dataset per thread. The result is a ZIP archive containing separate CSV files."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	icon = "scissors"
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

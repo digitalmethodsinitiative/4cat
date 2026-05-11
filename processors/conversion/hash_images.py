@@ -27,6 +27,7 @@ class ImageHasher(BasicProcessor):
     title = "Hash images"  # title displayed in UI
     description = "Convert images to text hashes for comparison and similarity detection."  # description displayed in UI
     extension = "csv"
+    icon = ""
 
     references = [
         "[Imagehash library](https://github.com/JohannesBuchner/imagehash?tab=readme-ov-file)",

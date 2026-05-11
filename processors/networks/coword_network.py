@@ -21,6 +21,7 @@ class CowordNetworker(ProcessorPreset):
                   "words that appear close to each other. Edges and nodes are weighted by the " \
                   "amount of co-word occurrences."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
+    icon = "circle-nodes"
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

@@ -28,6 +28,7 @@ class AudioToText(BasicProcessor):
     description = ("Detect speech and other sounds in audio and convert to text with either OpenAI's Whisper or "
                    " GPT models (GPT only via API).")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    icon = "closed-captioning"
 
     followups = []
 

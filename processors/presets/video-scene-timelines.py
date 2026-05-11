@@ -17,6 +17,7 @@ class VideoSceneTimelineCreator(ProcessorPreset):
                   "the video is visualised as a single frame. Scenes are detected algorithmically. The timelines " \
                   "for all videos are then stacked vertically and rendered as a single SVG file."
     extension = "svg"
+    icon = "film"
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

@@ -34,6 +34,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	title = "Side-by-side area graphs"  # title displayed in UI
 	description = "Generate area graphs showing prevalence per item over time. These are visualised side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
+	icon = "chart-area"
 
 	# a palette generated with https://medialab.github.io/iwanthue/
 	colours = ["#eb010a", "#495dff", "#f35f00", "#5137e0", "#ffeb45", "#d05edf",

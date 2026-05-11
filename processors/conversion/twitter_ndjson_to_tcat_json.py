@@ -19,6 +19,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
     title = "Convert to TCAT JSON"  # title displayed in UI
     description = "Convert a Twitter dataset to a TCAT-compatible format. This file can then be uploaded to TCAT."  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
+    icon = "square-js"
 
     followups = ["tcat-auto-upload"]
 

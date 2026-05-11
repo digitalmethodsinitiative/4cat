@@ -14,6 +14,7 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	title = "Histogram"  # title displayed in UI
 	description = "Create a histogram that shows the number of items over time."  # description displayed in UI
 	extension = "svg"
+	icon = "square-poll-vertical"
 
 	@staticmethod
 	def is_compatible_with(module=None, config=None):

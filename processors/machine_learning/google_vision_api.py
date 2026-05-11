@@ -34,6 +34,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                   "requests will be credited by Google to the owner of the API token you provide. Requires billing " \
                   "and Google Vision API enabled (this may take a few minutes)."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    icon = "eye"
 
     followups = ["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"]
 

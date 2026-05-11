@@ -26,6 +26,7 @@ class WikiURLCoLinker(BasicProcessor):
 	title = "Wikipedia category network"  # title displayed in UI
 	description = "Create a GEXF network file comprised network comprised of linked-to Wikipedia pages, linked to the categories they are part of. English Wikipedia only. Will only fetch the first 10,000 links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
+	icon = "circle-nodes"
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

@@ -35,6 +35,7 @@ class YouTubeMetadata(BasicProcessor):
 	description = ("Collect metadata from YouTube videos, channels, and playlists that are linked to in the dataset. "
 				   "Uses the YouTube API.")  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "brand-youtube"
 
 	followups = ["youtube-thumbnails"]
 

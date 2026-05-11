@@ -22,6 +22,7 @@ class QuoteRanker(BasicProcessor):
 	title = "Sort by most replied-to"  # title displayed in UI
 	description = "Sort posts by how often they were replied to by other posts in the dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "comments"
 
 	followups = []
 

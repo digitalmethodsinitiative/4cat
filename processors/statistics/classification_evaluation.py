@@ -25,6 +25,7 @@ class ClassificationEvaluation(BasicProcessor):
     description = ("Use labels from two columns to calculate evaluation metrics (accuracy, precision, recall, F1, "
                    "and Cohen's Kappa). Produces overall and per-label metrics. Also supports multi-label values.")
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "table-columns"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

@@ -32,6 +32,7 @@ class URLCoLinker(BasicProcessor):
 	description = "Create a GEXF network file comprised of URLs appearing together (in a post or thread). " \
 				  "Edges are weighted by amount of co-links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
+	icon = "circle-nodes"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

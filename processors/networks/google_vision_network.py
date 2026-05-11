@@ -24,6 +24,7 @@ class VisionTagNetworker(BasicProcessor):
                   "Google Vision API. Labels returned by the API are nodes. Labels occurring on the same image form" \
                   "edges."
     extension = "gexf"  # extension of result file, used internally and in UI
+    icon = "circle-nodes"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

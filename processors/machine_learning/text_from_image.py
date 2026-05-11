@@ -36,6 +36,7 @@ class ImageTextDetector(BasicProcessor):
     sort them into likely groupings based on locations within the original image.
     """
     extension = "ndjson"  # extension of result file, used internally and in UI
+    icon = "language"
 
     # Processors designed to handle input from this Dataset
     followups = ["image-text-wall"]

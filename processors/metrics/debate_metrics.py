@@ -29,6 +29,7 @@ class DebateMetrics(BasicProcessor):
 	title = "Debate metrics"  # title displayed in UI
 	description = "Returns a csv with meta-metrics per thread."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "circle-info"
 
 	followups = []
 

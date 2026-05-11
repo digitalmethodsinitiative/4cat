@@ -16,6 +16,7 @@ class AnnotationMetadata(BasicProcessor):
 	description = ("Download annotations and their metadata for this dataset. "
 				   "Includes annotation author, timestamp, type, etc.") # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "circle-info"
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

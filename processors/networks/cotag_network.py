@@ -22,6 +22,7 @@ class CoTaggerPreset(ProcessorPreset):
                   "Edges are weighted by the amount of tag co-occurrences; nodes " \
                   "are weighted by how often the tag appears in the dataset."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
+    icon = "circle-nodes"
 
 
     possible_tag_columns = {"tags", "hashtags", "groups"}

@@ -24,6 +24,7 @@ class PromptCompassRunner(ProcessorPreset):
     description = ("Choose prompts used in other LLM-based research to test on this dataset. Outcomes are added to the "
                    "original dataset as a new column.")
     extension = "ndjson"
+    icon = "robot"
 
     references = [
 	    "This processor is an implementation of the stand-alone tool [PromptCompass](https://github.com/ErikBorra/PromptCompass) by Erik Borra.",

@@ -18,6 +18,7 @@ class SimilarWords(ProcessorPreset):
 	description = ("Create a word2vec model to find words used in a similar context as the queried word(s). Only works "
 				   "with large datasets (e.g. 100,000+ items).")
 	extension = "csv"
+	icon = "comments"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

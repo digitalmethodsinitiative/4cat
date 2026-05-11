@@ -22,6 +22,7 @@ class GexfToCsv(BasicProcessor):
     title = "Export Network as CSV Spreadsheet"
     description = "Convert a GEXF network file to a CSV spreadsheet"
     extension = "csv"
+    icon = "file-csv"
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

@@ -24,6 +24,7 @@ class RegressionEvaluation(BasicProcessor):
     title = "Regression evaluation"  # title displayed in UI
     description = "Calculate regression metrics (MAE, MSE, R2, RMSE) between two numerical columns."
     extension = "csv"  # extension of result file, used internally in UI
+    icon = "table-columns"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

@@ -29,6 +29,7 @@ class LLMPrompter(BasicProcessor):
     description = ("Use LLMs for analysis, via APIs or locally. This can be used for tasks like classification, "
                    "entity extraction, or OCR. Supported APIs include OpenAI, Google, Anthropic, Mistral, and DeepSeek.")
     extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
+    icon = "robot"
 
     references = [
         "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307."

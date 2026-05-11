@@ -29,6 +29,7 @@ class AttributeRanker(BasicProcessor):
     title = "Count values"  # title displayed in UI
     description = "Count values in a dataset column, like URLs or hashtags (overall or per timeframe)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "list-ol"
 
     followups = []
 

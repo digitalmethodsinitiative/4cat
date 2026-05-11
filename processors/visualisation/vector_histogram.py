@@ -27,6 +27,7 @@ class SVGHistogramRenderer(BasicProcessor):
 	title = "Histogram"  # title displayed in UI
 	description = "Generates a histogram from time frequencies."  # description displayed in UI
 	extension = "svg"
+	icon = "square-poll-vertical"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

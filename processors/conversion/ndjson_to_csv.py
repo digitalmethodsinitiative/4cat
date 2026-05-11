@@ -25,6 +25,7 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 	description = "Create a CSV file from an NDJSON file. Note that some data may be lost as CSV files cannot " \
 				  "contain nested data."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "file-csv"
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

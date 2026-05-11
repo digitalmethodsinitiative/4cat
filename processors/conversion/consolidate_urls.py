@@ -27,6 +27,7 @@ class ConsolidateURLs(BasicProcessor):
     title = "Consolidate URLs"  # title displayed in UI
     description = "Retain only the domain (and optionally path) of URLs; used for custom networks (e.g. author + domains)"
     extension = "csv"
+    icon = "globe"
 
     # Common domain prefaces to remove
     domain_prefaces = ["m", "www"]

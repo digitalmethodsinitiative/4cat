@@ -32,6 +32,7 @@ class PixPlotGenerator(BasicProcessor):
     description = "Put all images from an archive into a PixPlot visualisation: an explorable map of images " \
                   "algorithmically grouped by similarity."
     extension = "html"  # extension of result file, used internally and in UI
+    icon = "images"
 
     followups = []
 

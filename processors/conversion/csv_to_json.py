@@ -19,6 +19,7 @@ class ConvertCSVToJSON(BasicProcessor):
 	title = "Convert to JSON"  # title displayed in UI
 	description = "Change a CSV file to a JSON file"  # description displayed in UI
 	extension = "json"  # extension of result file, used internally and in UI
+	icon = "square-js"
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

@@ -30,6 +30,7 @@ class ExtractURLs(BasicProcessor):
     title = "Extract and expand URLs"  # title displayed in UI
     description = "Extract any URLs from selected column(s) with the option to expand shortened URLs."
     extension = "csv"
+    icon = "globe"
 
     # taken from https://github.com/timleland/url-shorteners
     # current as of 9 April 2021

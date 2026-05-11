@@ -26,6 +26,7 @@ class ExportDatasets(BasicProcessor):
 	description = ("Creates a ZIP file containing the dataset and all processor results. This can also be uploaded to "
 				   "another 4CAT instance. Filters are not included. Results expire after one day.")  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	icon = "file-export"
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

@@ -26,6 +26,7 @@ class ColumnNetworker(BasicProcessor):
     description = "Create a GEXF network file comprised of linked values between a custom set of columns " \
                   "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
     extension = "gexf"
+    icon = "circle-nodes"
 
     references = [
         "Utilises [Networkx](https://networkx.org/)' built-in [Louvain](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html#networkx.algorithms.community.louvain.louvain_communities) and [greedy modularity](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.modularity_max.greedy_modularity_communities.html#networkx.algorithms.community.modularity_max.greedy_modularity_communities) community detection algorithms."

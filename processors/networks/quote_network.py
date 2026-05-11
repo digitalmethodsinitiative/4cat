@@ -24,6 +24,7 @@ class QuoteNetworkGrapher(BasicProcessor):
 	description = "Create a GEXF network file of posts replying to each other. " \
 				  "Each reference to another post creates an edge between posts. "  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
+	icon = "circle-nodes"
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):

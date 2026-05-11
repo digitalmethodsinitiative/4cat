@@ -32,6 +32,7 @@ class ImageGrapher(BasicProcessor):
                    "the images were sourced from. Suitable for use with Gephi's "
                    "'Image Preview' plugin.")
     extension = "gexf"  # extension of result file, used internally and in UI
+    icon = "circle-nodes"
 
 
     @classmethod

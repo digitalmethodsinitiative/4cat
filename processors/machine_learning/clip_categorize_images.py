@@ -27,6 +27,7 @@ class CategorizeImagesCLIP(BasicProcessor):
     description = ("Provide a list of categories and classify images with OpenAI's CLIP models. This will estimate "
                    "the likelihood an image belongs to a category (total of all category values will be 100%).")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    icon = "eye"
 
     followups = ["image-category-wall"]
 

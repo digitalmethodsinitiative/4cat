@@ -28,6 +28,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     description = ("Convert the Vision API output to a simplified CSV file. Also allows writing results as annotations "
                    "to the original dataset.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "file-csv"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

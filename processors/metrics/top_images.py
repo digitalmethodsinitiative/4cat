@@ -24,6 +24,7 @@ class TopImageCounter(BasicProcessor):
     title = "Rank image URLs"  # title displayed in UI
     description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "arrow-up-1-9"
 
     followups = ["image-downloader"]
 

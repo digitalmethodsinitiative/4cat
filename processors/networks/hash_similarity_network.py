@@ -26,6 +26,7 @@ class HashSimilarityNetworker(BasicProcessor):
     title = "Hash similarity network"
     description = "Calculate similarity of hashes and create a GEXF network file. Can identify near duplicate hashes."
     extension = "gexf"
+    icon = "circle-nodes"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

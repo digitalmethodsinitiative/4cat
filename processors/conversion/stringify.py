@@ -21,6 +21,7 @@ class Stringify(BasicProcessor):
 	title = "Merge texts"  # title displayed in UI
 	description = "Merges the data from the body column into a single text file. The result can be used for word clouds, word trees, etc."  # description displayed in UI
 	extension = "txt"  # extension of result file, used internally and in UI
+	icon = "file-lines"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

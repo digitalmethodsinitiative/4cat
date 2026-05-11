@@ -20,6 +20,7 @@ class UpdateTikTok(BasicProcessor):
     title = "Recollect TikTok data"  # title displayed in UI
     description = "Re-query TikTok URLs to update the dataset, e.g. to refresh video URLs or like counts."
     extension = "ndjson"
+    icon = "brand-tiktok"
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

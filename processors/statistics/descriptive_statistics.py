@@ -23,6 +23,7 @@ class DescriptiveStatistics(BasicProcessor):
     title = "Descriptive statistics"  # title displayed in UI
     description = "Calculate descriptive statistics (mean, median, std dev, etc.) for numerical columns."
     extension = "csv"  # extension of result file, used internally in UI
+    icon = "table-columns"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

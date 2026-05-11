@@ -16,6 +16,7 @@ class AnnotateImages(ProcessorPreset):
     description = "Use the Google Vision API to extract labels detected in the most-linked images from the dataset. Note that " \
                   "this is a paid service and will count towards your API credit."
     extension = "csv"
+    icon = "tags"
 
     references = [
         "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",

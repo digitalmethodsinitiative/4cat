@@ -28,6 +28,7 @@ class DatasetMerger(BasicProcessor):
     title = "Merge datasets"  # title displayed in UI
     description = "Merge this dataset with other datasets of the same format. A new dataset is " \
                   "created containing a combination of items from the original datasets."  # description displayed in UI
+    icon = "arrows-to-dot"
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

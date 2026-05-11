@@ -22,6 +22,7 @@ class ItemToAnnotation(BasicProcessor):
     description = ("Convert a regular dataset item to an annotation. This will show it as a separate value in the "
                    "Explorer. Item values must be numbers or strings.")  # description displayed in UI
     extension = "csv"
+    icon = "tags"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

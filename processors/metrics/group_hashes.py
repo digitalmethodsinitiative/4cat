@@ -20,6 +20,7 @@ class HashGrouper(BasicProcessor):
     title = "Group similar hashes"  # title displayed in UI
     description = "Calculate groups of similar hashes from a CSV file."  # description displayed in UI
     extension = "csv"
+    icon = "hashtag"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

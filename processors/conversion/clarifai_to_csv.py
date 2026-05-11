@@ -26,6 +26,7 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
     title = "Convert Clarifai results to CSV"  # title displayed in UI
     description = "Convert the Clarifai API output to a simplified CSV file."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "file-csv"
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

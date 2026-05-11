@@ -16,6 +16,7 @@ class NeologismExtractor(ProcessorPreset):
     description = ("Retrieve uncommon terms by deleting all words that appears in dictionary lists. Assumes English-"
                    "language data. Uses stopwords-iso as a stopword filter.")
     extension = "csv"
+    icon = "comment-medical"
 
     references = [
         "Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]

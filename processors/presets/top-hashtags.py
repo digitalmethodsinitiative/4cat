@@ -15,6 +15,7 @@ class TopHashtags(ProcessorPreset):
     title = "Top hashtags"  # title displayed in UI
     description = "Count how often each hashtag occurs in the dataset and sort by this value"
     extension = "csv"
+    icon = "hashtag"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

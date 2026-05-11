@@ -26,6 +26,7 @@ class ViewMetadata(BasicProcessor):
 	title = "View media metadata"  # title displayed in UI
 	description = "Reformats the .metadata.json file and calculates analytics"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "circle-info"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

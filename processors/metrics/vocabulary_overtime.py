@@ -21,6 +21,7 @@ class OvertimeAnalysis(BasicProcessor):
     title = "Over-time word counts"  # title displayed in UI
     description = "Determines the counts over time of particular set of words or phrases."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "chart-line"
 
     followups = []
 

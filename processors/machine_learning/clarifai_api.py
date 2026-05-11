@@ -32,6 +32,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \
                   "requests will be credited by Clarifai to the owner of the API token you provide."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    icon = "eye"
 
     followups = ["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"]
 
