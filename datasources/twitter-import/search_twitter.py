@@ -4,6 +4,7 @@ Import scraped X/Twitter data
 It's prohibitively difficult to scrape data from Twitter within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+import re
 from datetime import datetime
 
 from backend.lib.search import Search
@@ -56,21 +57,55 @@ class SearchTwitterViaZeeschuimer(Search):
         has_core = tweet.get("core", {}).get("user_results", {}).get("result", {}).get("core", False)
         user_key = "core" if has_core else "legacy"
 
+        # The inline user object can also be absent entirely (empty user_results)
+        # when Twitter de-duplicates user data elsewhere. Recover what we can: screen_name
+        # from any media expanded_url (it embeds the author), author_id from
+        # legacy.user_id_str; the rest stays blank.
+        has_user_inline = bool(tweet.get("core", {}).get("user_results", {}).get("result"))
+        if has_user_inline:
+            user_result = tweet["core"]["user_results"]["result"]
+            author_screen_name = user_result[user_key]["screen_name"]
+            author_fullname = user_result[user_key]["name"]
+            author_avatar_url = user_result["avatar"]["image_url"] if "avatar" in user_result else user_result["legacy"].get("profile_image_url_https", "")
+            author_banner_url = user_result["legacy"].get("profile_banner_url", "")
+            author_verified = user_result.get("is_blue_verified", "")
+        else:
+            author_screen_name = SearchTwitterViaZeeschuimer._screen_name_from_media(tweet.get("legacy", {}))
+            author_fullname = ""
+            author_avatar_url = ""
+            author_banner_url = ""
+            author_verified = ""
+
+        tweet_link = (f"https://x.com/{author_screen_name}/status/{tweet['id']}"
+                      if author_screen_name else f"https://x.com/i/web/status/{tweet['rest_id']}")
+
         timestamp = datetime.strptime(tweet["legacy"]["created_at"], "%a %b %d %H:%M:%S %z %Y")
         withheld = False
 
         retweet = tweet["legacy"].get("retweeted_status_result")
+        retweeted_user = ""
         if retweet:
             # make sure the full RT is included, by default this is shortened
             if "tweet" in retweet["result"]:
                 retweet["result"] = retweet["result"]["tweet"]
 
-            if retweet["result"].get("legacy", {}).get("withheld_scope"):
+            # The retweeted tweet is shaped like a regular tweet and can hit
+            # the same inline-user-missing quirks. Recover symmetrically with
+            # the outer tweet: prefer the inline user object, then fall back
+            # to a screen name embedded in any media expanded_url.
+            rt_result = retweet["result"]
+            rt_user_result = rt_result.get("core", {}).get("user_results", {}).get("result") or {}
+            if rt_user_result:
+                retweeted_user = rt_user_result.get(user_key, {}).get("screen_name", "") or \
+                                 rt_user_result.get("legacy", {}).get("screen_name", "")
+            if not retweeted_user:
+                retweeted_user = SearchTwitterViaZeeschuimer._screen_name_from_media(rt_result.get("legacy", {}))
+
+            if rt_result.get("legacy", {}).get("withheld_scope"):
                 withheld = True
-                tweet["legacy"]["full_text"] = retweet["result"]["legacy"]["full_text"]
+                tweet["legacy"]["full_text"] = rt_result["legacy"]["full_text"]
             else:
-                t_text = "RT @" + retweet["result"]["core"]["user_results"]["result"][user_key]["screen_name"] + \
-                      ": " + retweet["result"]["legacy"]["full_text"]
+                t_text = "RT @" + retweeted_user + ": " + rt_result["legacy"]["full_text"]
                 tweet["legacy"]["full_text"] = t_text
 
         quote_tweet = tweet.get("quoted_status_result")
@@ -79,6 +114,17 @@ class SearchTwitterViaZeeschuimer(Search):
             quote_tweet["result"] = quote_tweet["result"]["tweet"]
         # check if the quote tweet is available or not
         quote_withheld = True if (quote_tweet and "tombstone" in quote_tweet["result"]) else False
+
+        # Quote tweet may also have its inline user info absent; recover the
+        # screen name from any quoted-media expanded_url when that happens.
+        if quote_tweet and not quote_withheld:
+            quote_result = quote_tweet["result"]
+            if quote_result.get("core"):
+                quote_author = quote_result["core"]["user_results"]["result"].get(user_key, {}).get("screen_name", "")
+            else:
+                quote_author = SearchTwitterViaZeeschuimer._screen_name_from_media(quote_result.get("legacy", {}))
+        else:
+            quote_author = ""
 
         # extract media from tweet; if video, add thumbnail to images and video link to videos
         images = set()
@@ -114,14 +160,14 @@ class SearchTwitterViaZeeschuimer(Search):
             "thread_id": tweet["legacy"]["conversation_id_str"],
             "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(timestamp.timestamp()),
-            "link": f"https://x.com/{tweet['core']['user_results']['result'][user_key]['screen_name']}/status/{tweet['id']}",
+            "link": tweet_link,
             "body": tweet["legacy"]["full_text"],
-            "author": tweet["core"]["user_results"]["result"][user_key]["screen_name"],
-            "author_fullname": tweet["core"]["user_results"]["result"][user_key]["name"],
+            "author": author_screen_name,
+            "author_fullname": author_fullname,
             "author_id": tweet["legacy"]["user_id_str"],
-            "author_avatar_url": tweet["core"]["user_results"]["result"]["avatar"]["image_url"] if "avatar" in tweet["core"]["user_results"]["result"] else tweet["core"]["user_results"]["result"]["legacy"].get("profile_image_url_https", ""),
-            "author_banner_url": tweet["core"]["user_results"]["result"]["legacy"].get("profile_banner_url", ""), # key does not exist when author does not have a banner
-            "verified": tweet["core"]["user_results"]["result"].get("is_blue_verified", ""),
+            "author_avatar_url": author_avatar_url,
+            "author_banner_url": author_banner_url,
+            "verified": author_verified,
             "source": strip_tags(tweet["source"]),
             "language_guess": tweet["legacy"].get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive", False) or tweet["legacy"].get("possibly_sensitive", False) else "no",
@@ -131,11 +177,10 @@ class SearchTwitterViaZeeschuimer(Search):
             "quote_count": tweet["legacy"]["quote_count"],
             "impression_count": tweet.get("views", {}).get("count", ""),
             "is_retweet": "yes" if retweet else "no",
-            "retweeted_user": retweet["result"]["core"]["user_results"]["result"].get("legacy", {}).get("screen_name", "") if retweet else "",
+            "retweeted_user": retweeted_user,
             "is_quote_tweet": "yes" if quote_tweet else "no",
             "quote_tweet_id": quote_tweet["result"].get("rest_id", "") if quote_tweet else "",
-            "quote_author": quote_tweet["result"]["core"]["user_results"]["result"].get(user_key, {}).get("screen_name", "") if
-                        (quote_tweet and not quote_withheld) else "",
+            "quote_author": quote_author,
             "quote_body": quote_tweet["result"]["legacy"].get("full_text", "") if quote_tweet and not quote_withheld else "",
             "quote_images": ",".join(
                 [media["media_url_https"] for media in quote_tweet["result"]["legacy"].get("entities", {}).get("media", [])
@@ -228,6 +273,25 @@ class SearchTwitterViaZeeschuimer(Search):
                 tweet["legacy"]["place"]["bounding_box"]["coordinates"]) if tweet["legacy"].get("place") else "",
             "place_name": tweet["legacy"].get("place", {}).get("full_name", "") if tweet["legacy"].get("place") else "",
         }
+
+    @staticmethod
+    def _screen_name_from_media(legacy_obj):
+        """
+        Recover a tweet author's screen name from any embedded media URL.
+
+        Twitter's media `expanded_url` always has the form
+        `https://x.com/<screen_name>/status/<id>/...`, so when inline user
+        info is missing this is a reliable fallback.
+        """
+        if not isinstance(legacy_obj, dict):
+            return ""
+        for container in ("extended_entities", "entities"):
+            for m in legacy_obj.get(container, {}).get("media", []) or []:
+                url = m.get("expanded_url", "") if isinstance(m, dict) else ""
+                match = re.match(r"^https?://(?:x|twitter)\.com/([^/]+)/status/", url)
+                if match:
+                    return match.group(1)
+        return ""
 
     @staticmethod
     def get_centroid(box):
