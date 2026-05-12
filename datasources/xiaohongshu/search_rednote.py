@@ -9,6 +9,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
+from common.lib.exceptions import MapItemException
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.helpers import normalize_url_encoding
 
@@ -51,6 +52,14 @@ class SearchRedNote(Search):
         :param post:
         :return:
         """
+        # Reject "tile stub" items — minimal thumbnail entries captured from
+        # surfaces like the user hover_card API. They carry no post content
+        # (no user, no body, no engagement, no timestamp) and aren't usable
+        # as research rows.
+        if "note_card" not in post and "user" not in post and post.get("_zs-origin") != "html" and "note" not in post:
+            source = post.get("__import_meta", {}).get("source_url", "")
+            raise MapItemException(f"Xiaohongshu tile stub without post content (source: {source or 'unknown'})")
+
         if post.get("_zs-origin") == "html":
             return SearchRedNote.map_item_from_html(post)
         else:
