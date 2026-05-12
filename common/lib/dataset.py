@@ -2456,6 +2456,40 @@ class DataSet(FourcatModule):
                     f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn"
                 )
 
+    def warn_unmappable_signatures(self, processor=None, signatures=None):
+        """
+        Emit a single rolled-up admin/dev alert summarising all unmappable-item
+        signatures encountered during an import.
+
+        Complements `warn_unmappable_item`, which writes one entry per item to
+        the user-facing dataset log; this method writes one rolled-up message
+        to the dev-facing log channel (Slack), so admins get file:line and
+        counts in a single alert rather than a stack trace per dataset.
+
+        :param processor:  Processor calling this method
+        :param dict signatures:  Mapping of (filename, lineno) -> {count, error, samples}
+        """
+        if not signatures:
+            return
+
+        total = sum(s["count"] for s in signatures.values())
+        proc_label = processor.type if processor is not None else "?"
+        lines = [
+            f"Processor {proc_label} could not map {total} item(s) for dataset "
+            f"{self.key} ({len(signatures)} signature(s)):"
+        ]
+        for (filename, lineno), info in sorted(signatures.items(), key=lambda kv: kv[1]["count"], reverse=True):
+            loc = f"{filename}:{lineno}" if lineno else (filename or "?")
+            sample_preview = ", ".join(str(s) for s in info.get("samples", []))
+            tail = f" (e.g. items {sample_preview})" if sample_preview else ""
+            lines.append(f"  {loc} — {info['count']} item(s): {info.get('error', '')}{tail}")
+
+        message = "\n".join(lines)
+        if processor is not None and hasattr(processor, "log"):
+            processor.log.warning(message)
+        elif hasattr(self.db, "log"):
+            self.db.log.warning(message)
+
     # Annotation functions (most of it is handled in Annotations)
     def has_annotations(self) -> bool:
         """
