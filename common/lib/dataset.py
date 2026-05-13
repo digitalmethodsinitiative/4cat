@@ -566,9 +566,8 @@ class DataSet(FourcatModule):
                     mapped_item = own_processor.get_mapped_item(item)
                 except MapItemException as e:
                     if warn_unmappable:
-                        self.warn_unmappable_item(
-                            i, processor, e, warn_admins=unmapped_items is False
-                        )
+                        # Update dataset log for unmappable items.
+                        self.warn_unmappable_item(i, processor, e)
 
                     unmapped_items += 1
                     if max_unmappable and unmapped_items > max_unmappable:
@@ -2420,14 +2419,13 @@ class DataSet(FourcatModule):
         server = self.modules.config.get("flask.server_name")
         return f"{scheme}://{server}/download/{self.key}/"
 
-    def warn_unmappable_item(
-            self, item_count, processor=None, error_message=None, warn_admins=True
-    ):
+    def warn_unmappable_item(self, item_count, processor=None, error_message=None):
         """
-        Log an item that is unable to be mapped and warn administrators.
+        Log a per-item map_item failure to the dataset's own log.
 
         :param int item_count:			Item index
-        :param Processor processor:		Processor calling function8
+        :param Processor processor:		Processor calling function
+        :param error_message:			Optional exception or message
         """
         dataset_error_message = f"MapItemException (item {item_count}): {'is unable to be mapped! Check raw datafile.' if error_message is None else error_message}"
 
@@ -2439,22 +2437,6 @@ class DataSet(FourcatModule):
         )
         # Log error to dataset log
         closest_dataset.log(dataset_error_message)
-
-        if warn_admins:
-            if processor is not None:
-                processor.log.warning(
-                    f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}."
-                )
-            elif hasattr(self.db, "log"):
-                # borrow the database's log handler
-                self.db.log.warning(
-                    f"Unable to map item all items for dataset {closest_dataset.key}."
-                )
-            else:
-                # No other log available
-                raise DataSetException(
-                    f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn"
-                )
 
     def warn_unmappable_signatures(self, processor=None, signatures=None):
         """
