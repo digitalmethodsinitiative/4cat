@@ -951,6 +951,7 @@ class DataSet(FourcatModule):
         :param StatusType status_type:  Status type to set the dataset to.
           If omitted, set to SUCCESS if num_rows > 0, else EMPTY
         """
+        # Without this guard, a second finish() silently overwrites status_type (e.g. WARNING → SUCCESS).
         if self.data["is_finished"]:
             raise RuntimeError("Cannot finish a finished dataset again")
         
