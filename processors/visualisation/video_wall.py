@@ -199,7 +199,7 @@ class VideoWallGenerator(BasicProcessor):
 
         # unpack items and determine length of the item (for sorting)
         self.dataset.update_status("Unpacking files and reading metadata")
-        for item in base_dataset.iterate_items(immediately_delete=False):
+        for item in base_dataset.iterate_items(self, immediately_delete=False):
             if self.interrupted:
                 return ProcessorInterruptedException("Interrupted while unpacking files")
 

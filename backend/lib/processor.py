@@ -2,6 +2,7 @@
 Basic post-processor worker - should be inherited by workers to post-process results
 """
 import traceback
+import inspect as py_inspect
 import zipfile
 import typing
 import shutil
@@ -12,7 +13,7 @@ import os
 import re
 import time
 
-from pathlib import PurePath
+from pathlib import PurePath, Path
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet, StatusType
@@ -888,7 +889,24 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         try:
             mapped_item = cls.map_item(item)
         except (KeyError, IndexError) as e:
-            raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}")
+            # Walk the traceback to find the deepest frame inside the
+            # datasource's own map_item file, so the wrapped exception
+            # points at the access that failed rather than this line.
+            tb_frames = traceback.extract_tb(e.__traceback__)
+            chosen_frame = tb_frames[-1] if tb_frames else None
+            try:
+                map_item_file = Path(py_inspect.getfile(cls)).resolve()
+            except (TypeError, OSError):
+                map_item_file = None
+            if map_item_file is not None:
+                for frame in reversed(tb_frames):
+                    try:
+                        if Path(frame.filename).resolve() == map_item_file:
+                            chosen_frame = frame
+                            break
+                    except OSError:
+                        continue
+            raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}", frame=chosen_frame)
 
         if not mapped_item:
             raise MapItemException("Unable to map item!")

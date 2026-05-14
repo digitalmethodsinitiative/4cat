@@ -115,7 +115,7 @@ class VideoSceneFrames(BasicProcessor):
         errors = 0
         processed_frames = 0
         num_scenes = self.source_dataset.num_rows
-        for video in video_dataset.iterate_items():
+        for video in video_dataset.iterate_items(self):
             # Check for 4CAT's metadata JSON and copy it
             if video.file.name == '.metadata.json':
                 shutil.copy(video.file, staging_area)

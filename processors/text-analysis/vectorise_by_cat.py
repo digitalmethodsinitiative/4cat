@@ -178,7 +178,7 @@ class VectoriseByCategory(BasicProcessor):
 		category_column = self.parameters.get("category")
 		split_comma = self.parameters.get("split_categories")
 		file_to_category_mapping = {}
-		for row in category_dataset.iterate_items():
+		for row in category_dataset.iterate_items(self):
 			item_id = row.get("id")
 			if not item_id or not row.get(category_column) or item_id not in metadata:
 				# No item ID or category or metadata; skip
@@ -211,7 +211,7 @@ class VectoriseByCategory(BasicProcessor):
 		index = 0
 		# Each file is a token set (Tokenize processor separates tokens by dates or all) and contains a list of tokens for each document
 		# A single item/post may have multiple documents (e.g., if it was seperated by sentance)
-		for packed_tokens in self.source_dataset.iterate_items():
+		for packed_tokens in self.source_dataset.iterate_items(self):
 			if packed_tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue

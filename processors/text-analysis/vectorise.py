@@ -47,7 +47,7 @@ class Vectorise(BasicProcessor):
 
 		# go through all archived token sets and vectorise them
 		index = 0
-		for packed_tokens in self.source_dataset.iterate_items():
+		for packed_tokens in self.source_dataset.iterate_items(self):
 			if packed_tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
