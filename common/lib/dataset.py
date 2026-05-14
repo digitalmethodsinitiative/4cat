@@ -2046,13 +2046,84 @@ class DataSet(FourcatModule):
 
     def get_own_processor(self):
         """
-        Get the processor class that produced this dataset
+        Get the processor class corresponding to this dataset's data shape.
+
+        Normally this is the processor that produced the dataset, but for
+        datasets whose `type` was adopted from another datasource (e.g. by a
+        filter that copies its parent's NDJSON content verbatim), this is the
+        processor whose `map_item` / extension match the result file's
+        contents -- not necessarily the producing processor. See
+        `get_producer_processor` for the latter.
 
         :return:  Processor class, or `None` if not available.
         """
         processor_type = self.parameters.get("type", self.data.get("type"))
 
         return self.modules.processors.get(processor_type)
+
+    def get_producer_processor(self):
+        """
+        Get the processor class that actually produced this dataset.
+
+        Falls back to `get_own_processor()` for datasets whose `type` was not
+        rewritten via `adopt_type`. UI code that renders the parameter panel
+        should use this so labels/tooltips come from the producing processor's
+        options schema, not from a possibly-divergent data-shape processor.
+
+        :return:  Processor class, or `None` if not available.
+        """
+        producer_type = self.parameters.get("producer_type", self.data.get("type"))
+        return self.modules.processors.get(producer_type)
+
+    def adopt_type(self, new_type):
+        """
+        Rewrite this dataset's `type` to reflect a change in the result file's
+        data shape (e.g. after a filter has copied its parent's NDJSON content
+        verbatim into its result). The original producing processor's type is
+        preserved under `parameters["producer_type"]` on the first call, so
+        the UI can still look up the right options schema.
+
+        This is the only sanctioned path for rewriting `type` post-creation;
+        direct attribute assignment is blocked by `__setattr__`. `datasource`
+        is orthogonal -- adjust it separately via `change_datasource` if the
+        platform grouping also needs to change.
+
+        :param str new_type:  The type to adopt.
+        """
+        current_type = self.data.get("type")
+        if new_type == current_type:
+            return
+
+        if "producer_type" not in self.parameters:
+            # preserve only the original producer; chained adopt_type calls
+            # must not overwrite the first one
+            self.parameters = {**self.parameters, "producer_type": current_type}
+
+        # bypass the __setattr__ guard via the underlying DB update path
+        self.db.update("datasets", where={"key": self.key}, data={"type": new_type})
+        self.data["type"] = new_type
+
+    def get_displayable_parameters(self, config=None):
+        """
+        Return parameters annotated with the producing processor's options
+        schema, suitable for rendering in the UI's parameter panel.
+
+        The schema is sourced from `get_producer_processor()` so the original
+        producer's labels/tooltips survive an `adopt_type` rewrite. Sensitive
+        options and parameters not present in the schema are filtered out.
+
+        :param config:  Configuration reader, passed through to get_options.
+        :return list:  List of dicts: {"key", "value", "schema"}.
+        """
+        producer = self.get_producer_processor()
+        if not producer:
+            return []
+        options = producer.get_options(parent_dataset=self.top_parent(), config=config)
+        return [
+            {"key": k, "value": v, "schema": options[k]}
+            for k, v in self.parameters.items()
+            if k in options and v != "" and not options[k].get("sensitive")
+        ]
 
     def get_available_processors(self, config=None, exclude_hidden=False):
         """
@@ -2779,6 +2850,20 @@ class DataSet(FourcatModule):
         if attr in dir(self):
             super().__setattr__(attr, value)
             return
+
+        # `type` describes the data shape of the result file. It may diverge
+        # from the producing processor's type (e.g. a filter that copies its
+        # parent's NDJSON content verbatim). Direct rewrites would lose the
+        # producer identity needed by UI code; force callers through
+        # adopt_type() which preserves the original under parameters[
+        # "producer_type"].
+        if attr == "type" and self.data and self.data.get("type") and value != self.data["type"]:
+            raise AttributeError(
+                "Refusing to rewrite DataSet.type from %r to %r via direct attribute "
+                "assignment. Use DataSet.adopt_type() so the original producing "
+                "processor is preserved under parameters['producer_type']."
+                % (self.data["type"], value)
+            )
 
         if attr not in self.data:
             self.parameters[attr] = value
