@@ -440,6 +440,22 @@ def preview_items(key):
         except NotImplementedError:
             return error(404)
 
+        if not rows and dataset.num_rows > 0:
+            # Dataset claims to have items but iteration produced none — the
+            # result file is likely malformed or its extension is mismatched
+            # with its actual content. Surface to logs and to the user rather
+            # than silently rendering an empty preview.
+            g.log.warning(
+                f"Preview for dataset {dataset.key} (type: {dataset.type}, extension: "
+                f"{dataset.get_extension()}) yielded 0 items, but num_rows is "
+                f"{dataset.num_rows} — possible file/format corruption."
+            )
+            return render_template(
+                "components/error_message.html",
+                title="Preview not available",
+                message="This dataset's preview could not be generated. The result file may be corrupted or in an unexpected format. An administrator has been notified.",
+            )
+
         return render_template("preview/csv.html", rows=rows, max_items=preview_size,
                                dataset=dataset)
 
@@ -493,6 +509,20 @@ def preview_items(key):
             if infile.read(1) != "":
                 # not EOF
                 truncated = len(data)
+
+        if not data and dataset.num_rows > 0:
+            # Dataset claims to have items but the NDJSON file produced no
+            # lines — likely the file is empty or malformed despite num_rows
+            # being set. Surface this rather than render an empty preview.
+            g.log.warning(
+                f"Preview for dataset {dataset.key} (type: {dataset.type}, extension: ndjson) "
+                f"read 0 lines, but num_rows is {dataset.num_rows} — possible file corruption."
+            )
+            return render_template(
+                "components/error_message.html",
+                title="Preview not available",
+                message="This dataset's preview could not be generated. The result file may be corrupted or empty. An administrator has been notified.",
+            )
 
         return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
 
