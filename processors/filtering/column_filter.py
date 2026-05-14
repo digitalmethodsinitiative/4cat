@@ -281,5 +281,24 @@ class ColumnProcessorFilter(ColumnFilter):
         """
         return False
 
+    @classmethod
+    def get_extension(cls, parent_dataset=None):
+        # We write the parent's file format verbatim into the result file
+        # (see BaseFilter.process), so the dataset must be created with the
+        # parent's extension — not the BasicProcessor default of "csv". We
+        # can't rely on the is_filter() branch in BasicProcessor.get_extension
+        # because we deliberately report is_filter() == False for UI purposes.
+        if parent_dataset is not None:
+            return parent_dataset.get_extension()
+        return None
+
     def after_process(self):
         BasicProcessor.after_process(self)
+        # Inherit the source dataset's type and datasource so map_item resolves
+        # correctly on the filtered result (especially for NDJSON). Unlike
+        # BaseFilter, we deliberately keep this dataset attached to its parent
+        # rather than promoting it to a standalone top-level dataset.
+        self.dataset.type = self.source_dataset.type
+        self.dataset.datasource = self.source_dataset.parameters.get(
+            "datasource", self.source_dataset.type
+        )
