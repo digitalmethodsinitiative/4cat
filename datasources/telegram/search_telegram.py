@@ -728,19 +728,31 @@ class SearchTelegram(Search):
             attachment_data = json.dumps({property: attachment.get(property) for property in contact_data})
 
         elif attachment_type == "document":
-            # videos, etc
-            # This could add a separate routine for videos to make them a
-            # separate type, which could then be scraped later, etc
+            # The attachment_type becomes the mime top-level (video, audio,
+            # application, image, etc.). Populate attachment_data for every
+            # document so downloaders can pick them up; the actual download
+            # routine fetches a fresh file_reference via iter_messages anyway.
             attachment_type = message["media"]["document"]["mime_type"].split("/")[0]
-            if attachment_type == "video":
-                attachment = message["media"]["document"]
-                attachment_data = json.dumps({
-                    "id": attachment["id"],
-                    "dc_id": attachment["dc_id"],
-                    "file_reference": attachment["file_reference"],
-                })
+            attachment = message["media"]["document"]
+            attachment_data = json.dumps({
+                "id": attachment["id"],
+                "dc_id": attachment["dc_id"],
+                "file_reference": attachment["file_reference"],
+            })
+
+            # Populate attachment_filename from DocumentAttributeFilename if
+            # Telegram delivered one. Fall back to a synthesized name with the
+            # mime-derived extension so this column is never empty.
+            original_filename = next(
+                (a.get("file_name") for a in (attachment.get("attributes") or [])
+                 if isinstance(a, dict) and a.get("_type") == "DocumentAttributeFilename"),
+                None
+            )
+            if original_filename:
+                attachment_filename = original_filename
             else:
-                attachment_data = ""
+                ext = (attachment.get("mime_type") or "").split("/")[-1] or "bin"
+                attachment_filename = f"{thread_id}-{message['id']}.{ext}"
 
         # elif attachment_type in ("geo", "geo_live"):
         # untested whether geo_live is significantly different from geo
