@@ -1,4 +1,4 @@
-import {hsv2rgb, rgb2hsv, fetch_with_progress} from "./util.js";
+import {hsv2rgb, rgb2hsv, fetch_with_progress} from "./modules/util.js";
 
 const forceatlas2 = graphologyLibrary.layoutForceAtlas2;
 const circlepack = graphologyLibrary.layout.circlepack;

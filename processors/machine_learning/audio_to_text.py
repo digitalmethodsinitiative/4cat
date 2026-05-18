@@ -314,8 +314,8 @@ class AudioToText(BasicProcessor):
                 raise ProcessorInterruptedException("DMI Service Manager GPU busy")
         
             # Check advanced_settings
-            advanced_settings = self.parameters.get("advanced", False)
-            if advanced_settings:
+            advanced_settings = self.parameters.get("advanced", {})
+            if type(advanced_settings) is str:
                 try:
                     advanced_settings = json.loads(advanced_settings)
                 except ValueError:
@@ -513,10 +513,16 @@ class AudioToText(BasicProcessor):
 
         # Load the video metadata if available
         video_metadata = None
+        file_metadata_map = {}
         if staging_area.joinpath(".metadata.json").is_file():
             with open(staging_area.joinpath(".metadata.json")) as file:
                 video_metadata = json.load(file)
                 self.dataset.log("Found and loaded video metadata")
+
+            for video_id, video_data in video_metadata.items():
+                for file in video_data.get("files", []):
+                    file = ".".join(file["filename"].split(".")[:-1])
+                    file_metadata_map[file] = video_data
 
         self.dataset.update_status("Processing results...")
 
@@ -530,7 +536,7 @@ class AudioToText(BasicProcessor):
                 with open(output_dir.joinpath(result_filename), "r") as result_file:
                     result_data = json.loads("".join(result_file))
                     audio_name = ".".join(result_filename.split(".")[:-1])
-                    audio_metadata = video_metadata.get(audio_name, {}) if video_metadata else {}
+                    audio_metadata = file_metadata_map.get(audio_name, {}) if file_metadata_map else {}
                     fourcat_metadata = {
                         "audio_id": audio_name,
                         "model_host": model_host,

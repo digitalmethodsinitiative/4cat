@@ -172,7 +172,7 @@ class VideoStack(BasicProcessor):
         videos = []
 
         # unpack videos and determine length of the video (for sorting)
-        for video in video_dataset.iterate_items(immediately_delete=False):
+        for video in video_dataset.iterate_items(self, immediately_delete=False):
             if self.interrupted:
                 return ProcessorInterruptedException("Interrupted while unpacking videos")
 

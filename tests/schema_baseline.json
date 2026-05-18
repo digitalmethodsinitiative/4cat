@@ -1,0 +1,103 @@
+{
+  "access_tokens": [
+    "calls",
+    "expires",
+    "name",
+    "token"
+  ],
+  "annotations": [
+    "author",
+    "author_original",
+    "by_processor",
+    "dataset",
+    "field_id",
+    "from_dataset",
+    "id",
+    "item_id",
+    "label",
+    "metadata",
+    "options",
+    "timestamp",
+    "timestamp_created",
+    "type",
+    "value"
+  ],
+  "datasets": [
+    "annotation_fields",
+    "creator",
+    "id",
+    "is_finished",
+    "is_private",
+    "job",
+    "key",
+    "key_parent",
+    "num_rows",
+    "parameters",
+    "progress",
+    "query",
+    "result_file",
+    "software_file",
+    "software_source",
+    "software_version",
+    "status",
+    "timestamp",
+    "timestamp_finished",
+    "type"
+  ],
+  "datasets_owners": [
+    "key",
+    "name",
+    "role"
+  ],
+  "jobs": [
+    "attempts",
+    "details",
+    "id",
+    "interval",
+    "jobtype",
+    "queue_id",
+    "remote_id",
+    "timestamp",
+    "timestamp_after",
+    "timestamp_claimed",
+    "timestamp_lastclaimed"
+  ],
+  "metrics": [
+    "board",
+    "count",
+    "datasource",
+    "date",
+    "metric"
+  ],
+  "settings": [
+    "name",
+    "tag",
+    "value"
+  ],
+  "users": [
+    "is_deactivated",
+    "name",
+    "password",
+    "register_token",
+    "tags",
+    "timestamp_created",
+    "timestamp_seen",
+    "timestamp_token",
+    "userdata"
+  ],
+  "users_favourites": [
+    "key",
+    "name"
+  ],
+  "users_notifications": [
+    "allow_dismiss",
+    "canonical_id",
+    "id",
+    "is_dismissed",
+    "notification",
+    "notification_long",
+    "timestamp_expires",
+    "username",
+    "version_match"
+  ]
+}

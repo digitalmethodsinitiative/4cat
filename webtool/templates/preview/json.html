@@ -3,8 +3,8 @@
     <title>JSON preview - {{ dataset.get_results_path().name }}</title>
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/jquery-jsonviewer.css')}}">
-	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.6.3.min.js')}}"></script>
-    <script type="text/javascript" src="{{url_for('static', filename='js/jquery-jsonviewer.js')}}"></script>
+	<script type="text/javascript" src="{{url_for('static', filename='js/lib/jquery-3.6.3.min.js')}}"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='js/lib/jquery-jsonviewer.js')}}"></script>
 </head>
 <body class="json-preview">
 {% if truncated %}

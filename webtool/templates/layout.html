@@ -10,14 +10,14 @@
     <link href="{{ url_for("static", filename="fontawesome/css/solid.css") }}" rel="stylesheet">
     <link href="{{ url_for("static", filename="fontawesome/css/brands.css") }}" rel="stylesheet">
 
-	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.6.3.min.js')}}"></script>
-    <script type="text/javascript" src="{{url_for('static', filename='js/jquery-ui.min.js')}}"></script>
-	<script type="text/javascript" src="{{url_for('static', filename='js/svg-pan-zoom.min.js')}}"></script>
-    <script type="text/javascript" src="{{url_for('static', filename='js/zip.min.js')}}"></script>
+	<script type="text/javascript" src="{{url_for('static', filename='js/lib/jquery-3.6.3.min.js')}}"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='js/lib/jquery-ui.min.js')}}"></script>
+	<script type="text/javascript" src="{{url_for('static', filename='js/lib/svg-pan-zoom.min.js')}}"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='js/lib/zip.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/fourcat.js')}}"></script>
 
     {% if navigation.current == "about" %}
-    <script type="text/javascript" src="{{url_for('static', filename='js/bsky-embed.es.js')}}"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='js/lib/bsky-embed.es.js')}}"></script>
     {% endif %}
 
 	<!-- favicons -->

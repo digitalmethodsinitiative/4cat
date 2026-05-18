@@ -13,8 +13,6 @@ class ProcessorPreset(BasicProcessor):
 	"""	
 	def process(self):
 		"""
-		ALL PRESETS MUST PREPEND 'preset-' TO THEIR TYPE.
-
 		This queues a series of post-processors to run in sequence, with an
 		overarching dataset to which the results of the last processor in the
 		sequence are copied. The processor pipeline is then attached to the
@@ -89,6 +87,15 @@ class ProcessorPreset(BasicProcessor):
 			pipeline[-1]["parameters"]["next"] = [last]
 	
 		return pipeline
+	
+	@staticmethod
+	def is_preset():
+		"""
+		Is this processor a preset?
+
+		:return:  False
+		"""
+		return True
 	
 class ProcessorAdvancedPreset(ProcessorPreset):
 	"""

@@ -130,6 +130,17 @@ def robots():
         return Response(response=infile.read(), status=200, mimetype="text/plain")
 
 
+@component.route("/favicon.ico")
+def favicon():
+    """
+    Serve favicon from static directory
+
+    Redirect to the favicon in the static assets folder. This route handles
+    automatic browser requests for /favicon.ico without requiring login.
+    """
+    return redirect(url_for('static', filename='img/favicon/favicon.ico'))
+
+
 @component.route('/data-overview/')
 @component.route('/data-overview/<string:datasource>')
 @login_required

@@ -10,10 +10,10 @@
     <label for="image-zoom">
         {% if dataset.get_extension() == "mp4" %}
             <video controls height="100%">
-                <source src="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}" type="video/mp4">
+                <source src="{{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key) }}" type="video/mp4">
             </video>
         {% else %}
-        <img src="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}" alt="">
+        <img src="{{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key) }}" alt="">
         {% endif %}
     </label>
 </div>

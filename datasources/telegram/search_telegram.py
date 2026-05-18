@@ -16,12 +16,12 @@ from common.lib.helpers import convert_to_int, UserInput
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 from datetime import datetime
-from telethon import TelegramClient
+from telethon import TelegramClient, utils
 from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, \
     FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError, RPCError
 from telethon.tl.functions.channels import GetFullChannelRequest, SearchPostsRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.types import MessageEntityMention, InputPeerEmpty
+from telethon.tl.types import MessageEntityMention, InputPeerEmpty, PeerChannel
 
 
 
@@ -90,6 +90,7 @@ class SearchTelegram(Search):
         """
 
         max_entities = config.get("telegram-search.max_entities", 25)
+        max_entities_text = f" up to **{max_entities:,}**" if max_entities > 0 else ""
         options = {
             "intro": {
                 "type": UserInput.OPTION_INFO,
@@ -119,13 +120,19 @@ class SearchTelegram(Search):
             },
             "query-intro": {
                 "type": UserInput.OPTION_INFO,
-                "help": "Separate with commas or line breaks."
-            },
+                "help": (f"You can collect{max_entities_text} entities (e.g. users, hashtags, "
+                        f"groups, or channels) separated below with line breaks or commas. Private groups "
+                        f"require the numeric ID (e.g. -100123456789 from web.telegram.org). Date "
+                        f"ranges have **no** effect for [hashtag searches](https://telegram.org/blog/message-effects-and-more)"
+                        f", which will always simply return all matching messages in reverse "
+                        f"chronological order.")
+},
             "query": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Entities to scrape",
-                "tooltip": "Separate with commas or line breaks. Entities can be channel or group names, or hashtags. "
-                           "For hashtags, always include the # prefix."
+                "tooltip": "Separate with commas or line breaks. Entities can be channel or group names, hashtags, "
+                           "or numeric IDs for private channels/groups the account is already a member of (you "
+                           "can copy these from web.telegram.org URLs). For hashtags, always include the # prefix."
             },
             "max_posts": {
                 "type": UserInput.OPTION_TEXT,
@@ -169,14 +176,6 @@ class SearchTelegram(Search):
                 "default": False,
             }
         }
-
-        if max_entities:
-            options["query-intro"]["help"] = (f"You can collect messages from up to **{max_entities:,}** entities "
-                                              f"(channels, hashtags, or groups) at a time. Separate with line breaks "
-                                              f"or commas. Date ranges have **no** effect for [hashtag "
-                                              f"searches](https://telegram.org/blog/message-effects-and-more), which "
-                                              f"will always simply return all matching messages in reverse "
-                                              f"chronological order.")
 
         all_messages = config.get("telegram-search.can_query_all_messages", False)
         if all_messages:
@@ -313,6 +312,17 @@ class SearchTelegram(Search):
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         max_items = convert_to_int(parameters.get("items", 10), 10)
 
+        # If any query is a numeric ID, pre-fetch the dialog list so Telethon
+        # caches access_hash values for every channel/group the account is in.
+        # Without this, querying a private entity by ID alone raises KeyError
+        # / "Could not find the input entity" on a fresh session.
+        if any(re.match(r"^-?\d+$", q) for q in queries if q):
+            try:
+                self.dataset.update_status("Fetching dialog list to resolve numeric entity IDs")
+                await client.get_dialogs(limit=None)
+            except Exception as e:
+                self.dataset.log(f"Could not pre-fetch dialogs for numeric ID resolution: {e}")
+
         # Telethon requires the offset date to be a datetime date
         max_date = parameters.get("max_date")
         if max_date:
@@ -409,9 +419,13 @@ class SearchTelegram(Search):
                 entity_posts = 0
                 discovered = 0
                 iter_method = self.iter_hashtag_messages if (type(query) is str and query.startswith("#")) else self._client.iter_messages
+                # numeric IDs (e.g. from web.telegram.org URLs for private
+                # entities) need to be wrapped as PeerChannel before Telethon
+                # can look up the cached access_hash
+                entity = SearchTelegram.parse_numeric_entity(query)
 
                 try:
-                    async for message in iter_method(entity=query, offset_date=max_date):
+                    async for message in iter_method(entity=entity, offset_date=max_date):
                         entity_posts += 1
                         total_messages += 1
                         if self.interrupted:
@@ -714,19 +728,31 @@ class SearchTelegram(Search):
             attachment_data = json.dumps({property: attachment.get(property) for property in contact_data})
 
         elif attachment_type == "document":
-            # videos, etc
-            # This could add a separate routine for videos to make them a
-            # separate type, which could then be scraped later, etc
+            # The attachment_type becomes the mime top-level (video, audio,
+            # application, image, etc.). Populate attachment_data for every
+            # document so downloaders can pick them up; the actual download
+            # routine fetches a fresh file_reference via iter_messages anyway.
             attachment_type = message["media"]["document"]["mime_type"].split("/")[0]
-            if attachment_type == "video":
-                attachment = message["media"]["document"]
-                attachment_data = json.dumps({
-                    "id": attachment["id"],
-                    "dc_id": attachment["dc_id"],
-                    "file_reference": attachment["file_reference"],
-                })
+            attachment = message["media"]["document"]
+            attachment_data = json.dumps({
+                "id": attachment["id"],
+                "dc_id": attachment["dc_id"],
+                "file_reference": attachment["file_reference"],
+            })
+
+            # Populate attachment_filename from DocumentAttributeFilename if
+            # Telegram delivered one. Fall back to a synthesized name with the
+            # mime-derived extension so this column is never empty.
+            original_filename = next(
+                (a.get("file_name") for a in (attachment.get("attributes") or [])
+                 if isinstance(a, dict) and a.get("_type") == "DocumentAttributeFilename"),
+                None
+            )
+            if original_filename:
+                attachment_filename = original_filename
             else:
-                attachment_data = ""
+                ext = (attachment.get("mime_type") or "").split("/")[-1] or "bin"
+                attachment_filename = f"{thread_id}-{message['id']}.{ext}"
 
         # elif attachment_type in ("geo", "geo_live"):
         # untested whether geo_live is significantly different from geo
@@ -891,6 +917,14 @@ class SearchTelegram(Search):
             "views": message["views"] if message["views"] else "",
             # "forwards": message.get("forwards", MissingMappedField(0)),
             "reactions": reactions,
+            "restriction_reason": SearchTelegram.format_restriction_reasons(message.get("restriction_reason")),
+            "chat_restriction_reason": SearchTelegram.format_restriction_reasons(
+                message["_chat"].get("restriction_reason") if message.get("_chat") else None
+            ),
+            # noforwards = "Restrict Saving Content" is enabled. Media downloads
+            # will typically fail server-side with CHAT_FORWARDS_RESTRICTED.
+            "message_noforwards": "yes" if message.get("noforwards") else "no",
+            "chat_noforwards": "yes" if (message.get("_chat") and message["_chat"].get("noforwards")) else "no",
             "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(message["date"]),
             "timestamp_edited": datetime.fromtimestamp(message["edit_date"]).strftime("%Y-%m-%d %H:%M:%S") if message[
@@ -912,6 +946,18 @@ class SearchTelegram(Search):
             "attachment_data": attachment_data,
             "attachment_filename": attachment_filename
         })
+
+    @staticmethod
+    def format_restriction_reasons(reasons):
+        """
+        Format a list of serialized RestrictionReason dicts as a compact string.
+
+        Telegram tags content (messages or whole channels) with restriction
+        reasons that official clients use to hide it.
+        """
+        if not reasons or not isinstance(reasons, list):
+            return ""
+        return ",".join(f"{r.get('platform','')}:{r.get('reason','')}" for r in reasons if isinstance(r, dict))
 
     @staticmethod
     def get_media_type(media):
@@ -1026,9 +1072,16 @@ class SearchTelegram(Search):
         for item in items.split(","):
             if not item.strip():
                 continue
-            item = re.sub(r"^https?://t\.me/", "", item)
-            item = re.sub(r"^/?s/", "", item)
-            item = re.sub(r"[/]*$", "", item)
+            # web.telegram.org URLs put the numeric chat/channel ID in the
+            # fragment, e.g. https://web.telegram.org/k/#-1779618123 -- extract
+            # the ID so it can be used to query private entities
+            web_match = re.match(r"^https?://web\.telegram\.org/[ka]/#(-?\d+)/?$", item)
+            if web_match:
+                item = web_match.group(1)
+            else:
+                item = re.sub(r"^https?://t\.me/", "", item)
+                item = re.sub(r"^/?s/", "", item)
+                item = re.sub(r"[/]*$", "", item)
             sanitized_items.append(item)
 
         # the dates need to make sense as a range to search within
@@ -1185,6 +1238,35 @@ class SearchTelegram(Search):
             if i == 0:
                 # get fewer than we asked for? results exhausted
                 break
+
+    @staticmethod
+    def parse_numeric_entity(query):
+        """
+        Convert a numeric ID query to a Telethon Peer object.
+
+        Telegram exposes numeric IDs (e.g. in web.telegram.org URLs) for
+        private channels and groups, which have no @username to resolve.
+        Telethon needs the matching access_hash to actually query them; the
+        access_hash is only available if the session has previously
+        encountered the entity, which is why execute_queries() pre-warms
+        the cache via get_dialogs() when numeric IDs are present.
+
+        Accepts both raw IDs (e.g. 1779618123) and Telegram's "marked" form
+        (e.g. -1001779618123 for channels, -1234567 for legacy chats).
+        Returns the query unchanged if it isn't a pure numeric ID.
+        """
+        if not isinstance(query, str) or query.startswith("#"):
+            return query
+        if not re.match(r"^-?\d+$", query):
+            return query
+
+        numeric_id = int(query)
+        if numeric_id < 0:
+            # marked ID -- utils.resolve_id picks PeerChannel / PeerChat
+            real_id, peer_cls = utils.resolve_id(numeric_id)
+            return peer_cls(real_id)
+        # bare positive integer: assume a channel ID from web.telegram.org
+        return PeerChannel(numeric_id)
 
     @staticmethod
     def create_session_id(api_phone, api_id, api_hash):

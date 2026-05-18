@@ -2,10 +2,10 @@
 <head>
     <title>4CAT &bull; Network visualisation &bull; {{ dataset.get_label() }}
         ({{ dataset.get_results_path().name }})</title>
-    <script type="text/javascript" src="{{ url_for("static", filename="js/sigma/sigma.min.js") }}"></script>
-    <script type="text/javascript" src="{{ url_for("static", filename="js/sigma/graphology.min.js") }}"></script>
+    <script type="text/javascript" src="{{ url_for("static", filename="js/lib/sigma/sigma.min.js") }}"></script>
+    <script type="text/javascript" src="{{ url_for("static", filename="js/lib/sigma/graphology.min.js") }}"></script>
     <script type="text/javascript"
-            src="{{ url_for("static", filename="js/sigma/graphology-library.min.js") }}"></script>
+            src="{{ url_for("static", filename="js/lib/sigma/graphology-library.min.js") }}"></script>
     <link rel="stylesheet" type="text/css" href="{{ url_for("static", filename="css/sigma_network.css") }}">
     <link href="{{ url_for("static", filename="fontawesome/css/fontawesome.css") }}" rel="stylesheet">
     <link href="{{ url_for("static", filename="fontawesome/css/regular.css") }}" rel="stylesheet">
@@ -160,17 +160,17 @@
 </div>
 
 <!-- Where the network graph will be -->
-<div id="graph-container" data-source="{{ url_for('dataset.get_result', query_file=dataset.result_file) }}">
+<div id="graph-container" data-source="{{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key) }}">
 </div>
 
 <div id="loading">Loading...</div>
 
 {% if with_gephi_lite %}
-<a class="gephi-link" target="_blank" href="https://lite.gephi.org/?file={{ url_for('dataset.get_result', query_file=dataset.result_file, _external=True) }}">
+<a class="gephi-link" target="_blank" href="https://lite.gephi.org/?file={{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key, _external=True) }}">
     <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i> Open in Gephi Lite
 </a>
 
-<a class="retina-link" target="_blank" href="https://ouestware.gitlab.io/retina/#/graph/?url={{ url_for('dataset.get_result', query_file=dataset.result_file, _external=True) }}">
+<a class="retina-link" target="_blank" href="https://ouestware.gitlab.io/retina/#/graph/?url={{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key, _external=True) }}">
     <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i> Open in Retina
 </a>
 {% endif %}

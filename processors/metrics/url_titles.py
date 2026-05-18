@@ -194,14 +194,14 @@ class URLFetcher(BasicProcessor):
                 self.dataset.update_status(f"Processed {(urls_failed + urls_success):,} of {len(all_urls):,} URLs")
                 self.dataset.update_progress((urls_failed + urls_success) / len(all_urls))
 
-        # log warning if not everything succeeded
+        # and write everything to a CSV
         if urls_failed:
+            # log warning if not everything succeeded
             self.dataset.finish_with_warning(urls_success, f"{urls_failed:,} URL(s) could not be retrieved. See dataset "
                                        f"log for details.")
-
-        # and write everything to a CSV
-        self.dataset.finish(urls_success)
-        self.job.finish()
+        else:
+            self.dataset.finish(urls_success)
+            self.job.finish()
 
     @staticmethod
     def stream_url(response, *args, **kwargs):
