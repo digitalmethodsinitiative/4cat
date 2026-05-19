@@ -95,6 +95,7 @@ class InternalAPI(BasicWorker):
 		if client:
 			client.close()
 
+		server.close()
 		self.manager.log.info("Shutting down local API server")
 
 	def api_response(self, client, address):
