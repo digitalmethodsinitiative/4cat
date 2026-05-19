@@ -220,3 +220,25 @@ export function hsv2rgb(h, s, v) {
 
     return [r * 255, g * 255, b * 255];
 }
+
+/**
+ * Recursively reset form elements to default value
+ *
+ * We don't use form.reset() for two reasons:
+ * - We may want to reset a subset of a form
+ * - The *current* value of an element may not be the designated *default*
+ *   value of the element
+ *
+ * @param parent Parent node to recursively reset child nodes of
+ */
+export function reset_form_elements(parent) {
+    parent.childNodes.forEach(child => {
+        if(child instanceof HTMLElement) {
+            if (child.hasAttribute('data-default')) {
+                child.value = child.getAttribute('data-default');
+            } else {
+                reset_form_elements(child);
+            }
+        }
+    })
+}

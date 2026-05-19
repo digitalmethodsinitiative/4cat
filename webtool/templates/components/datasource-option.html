@@ -5,6 +5,28 @@
         <div class="form-intro"{% if settings.requires %}{% if settings.requires is string %} data-requires="{{ settings.requires|e }}"{% else %} data-requires='{{ settings.requires|tojson }}'{% endif %}{% endif %}>{{ settings.help|markdown|safe }}</div>
     {% elif settings.type in ["annotation", "annotations"] %}
         {# pass - a datasource should never need to annotate itself; this is for processor options only #}
+    {% elif settings.type == "multi_option" %}
+        <div class="form-multi-option-header">
+            <h4>{{ settings.help }}</h4>
+        </div>
+        <ol class="form-multi-option-wrapper">
+            {# always include an empty item #}
+            {% set empty_item = settings.options|propmap("default") %}
+            {% do settings.default.append(empty_item) %}
+            {% for item in settings.default %}
+                {% set outerloop = loop %}
+                {% set last_index = outerloop.index %}
+                <li class="form-multi-option-option" data-multi-option-index="{{ outerloop.index }}">
+                    {% for sub_option, sub_settings in settings.options.items() %}
+                        {% do sub_settings.update({"original_default": sub_settings.default, "default": item[sub_option]}) %}
+                        {% set sub_option = option ~ "-" ~ outerloop.index ~ "-" ~ sub_option %}
+                        {% with option=sub_option, settings=sub_settings %}
+                            {% include "components/datasource-option.html" %}
+                        {% endwith %}
+                    {% endfor %}
+                </li>
+            {% endfor %}
+        </ol>
     {% else %}
         <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}{% if settings.requires %}{% if settings.requires is string %} data-requires="{{ settings.requires|e }}"{% else %} data-requires='{{ settings.requires|tojson }}'{% endif %}{% endif %}>
             <label for="forminput-{{ option }}">{{ settings.help|markdown(True)|safe }}</label>
@@ -21,7 +43,7 @@
                 </p>
             {% endif %}
         {% elif settings.type == "string" %}
-            <input name="option-{{ option }}" id="forminput-{{ option }}"{% if settings.min is defined and settings.min is not none %} min="{{ settings.min }}"{% endif %}{% if settings.max is defined and settings.max is not none %} max="{{ settings.max }}"{% endif %}{% if settings.min is defined and settings.min is not none and settings.min|float > 0 %} step="{{ settings.min }}"{% elif settings.min is defined and settings.min is not none and settings.min|float == 0 %} step="any"{% endif %} type="{% if (settings.min is defined and settings.min is not none) or (settings.max is defined and settings.max is not none) %}number{% elif settings.password %}password{% else %}text{% endif %}" value="{{ settings.default }}">
+            <input name="option-{{ option }}" id="forminput-{{ option }}"{% if settings.min is defined and settings.min is not none %} min="{{ settings.min }}"{% endif %}{% if settings.max is defined and settings.max is not none %} max="{{ settings.max }}"{% endif %}{% if settings.min is defined and settings.min is not none and settings.min|float > 0 %} step="{{ settings.min }}"{% elif settings.min is defined and settings.min is not none and settings.min|float == 0 %} step="any"{% endif %} type="{% if (settings.min is defined and settings.min is not none) or (settings.max is defined and settings.max is not none) %}number{% elif settings.password %}password{% else %}text{% endif %}" value="{{ settings.default }}" data-default="{{ settings.original_default }}">
             {% if "tooltip" in settings %}
                 <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
     	        <p role="tooltip" id="tooltip-option-{{ option }}">
@@ -29,7 +51,7 @@
                 </p>
             {% endif %}
         {% elif settings.type == "date" %}
-            <input name="option-{{ option }}_proxy" id="forminput-{{ option }}" type="date" value="{{ settings.default }}">
+            <input name="option-{{ option }}_proxy" id="forminput-{{ option }}" type="date" value="{{ settings.default }}" data-default="{{ settings.original_default }}">
             <input name="option-{{ option }}" type="hidden" value="-1">
             {% if "tooltip" in settings %}
                 <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
@@ -55,7 +77,7 @@
             {% endif %}
         {% elif settings.type in ("json", "textarea") %}
             <textarea name="option-{{ option }}" id="forminput-{{ option }}"
-                      placeholder="{{ settings.tooltip }}">{{ settings.default }}</textarea>
+                      placeholder="{{ settings.tooltip }}" data-default="{{ settings.original_default }}">{{ settings.default }}</textarea>
             {% if "tooltip" in settings %}
                 <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
     	        <p role="tooltip" id="tooltip-option-{{ option }}">
@@ -63,7 +85,7 @@
                 </p>
             {% endif %}
         {% elif settings.type == "choice" %}
-            <select name="option-{{ option }}" id="forminput-{{ option }}">
+            <select name="option-{{ option }}" id="forminput-{{ option }}" data-default="{{ settings.original_default }}">
             {% for value, label in settings.options.items() %}
                 <option value="{{ value }}"{% if value == settings.default %} selected{% endif %}>{{ label }}</option>
             {% endfor %}
@@ -105,7 +127,7 @@
         {% elif settings.type == "hue" %}
                 <div>
                     {% set hue_id = uniqid() %}
-                    <input type="range" min="0" max="360" step="1" name="option-{{ option }}" id="forminput-{{ option }}"
+                    <input type="range" min="0" max="360" step="1" name="option-{{ option }}" id="forminput-{{ option }}" data-default="{{ settings.original_default }}"
                            class="hue-picker" value="{{ settings.default }}" data-saturation="{% if settings.saturation %}{{ settings.saturation }}{% else %}77{% endif %}"
                            data-value="{% if settings.value %}{{ settings.value }}{% else %}46{% endif %}" data-update-background="#colour-example-{{ hue_id }}">
                     <span class="colour-example" id="colour-example-{{ hue_id }}"></span>

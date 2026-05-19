@@ -241,6 +241,10 @@ with app.app_context():
         [FileSystemLoader(template_paths), FunctionLoader(get_datasource_explorer_templates)]
     )
 
+    # enable to {% do %} tag in jinja
+    app.jinja_env.add_extension("jinja2.ext.do")
+    app.jinja_env.add_extension("jinja2.ext.debug")
+
     # import custom jinja2 template filters
     # these also benefit from current_app
     import webtool.lib.template_filters  # noqa: E402

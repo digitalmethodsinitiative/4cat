@@ -195,6 +195,25 @@ def _jinja2_filter_markdown(text, trim_container=False):
 def _jinja2_filter_isbool(value):
     return isinstance(value, bool)
 
+@current_app.template_filter('propmap')
+def _jinja2_filter_propmap(data, property, default=None):
+    """
+    Select a property from a sequence of dicts
+
+    To map `{a: b: {prop: value}}` to `{a: value}` for a given `prop`. If
+    `data` is a dict, preserve key:value pairs. If the property does not exist
+    in a sequence item, use the `default` value.
+
+    :param data:  Sequence or dict to map
+    :param property:  Property to use for mapping
+    :param default:  Value to use if property does not exist in item
+    :return:  Mapped sequence or dict
+    """
+    if type(data) is dict:
+        return {k: v.get(property, default) for k, v in data.items()}
+    else:
+        return [v.get(property, default) for v in data.values()]
+
 @current_app.template_filter('json')
 def _jinja2_filter_json(data):
     return json.dumps(data)
@@ -428,6 +447,10 @@ def explorer_css(datasource, scope_class="explorer-content-container"):
 @current_app.template_filter('hasattr')
 def _jinja2_filter_hasattr(obj, attribute):
     return hasattr(obj, attribute)
+
+@current_app.template_filter('debug')
+def _jinja2_filter_debug(value):
+    print(value)
 
 @current_app.context_processor
 def inject_now():

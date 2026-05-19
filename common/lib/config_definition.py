@@ -443,16 +443,30 @@ config_definition = {
         "global": True
     },
     "flask.autologin.hostnames": {
-        "type": UserInput.OPTION_TEXT_JSON,
+        "type": UserInput.OPTION_MULTI_OPTION,
         "default": [],
+        "options": {
+            "hostname": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Host name or IP address"
+            }
+        },
         "help": "White-listed hostnames",
         "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and "
                    "Server Name. Front-end needs to be restarted for changed to apply.",
         "global": True
     },
     "flask.autologin.api": {
-        "type": UserInput.OPTION_TEXT_JSON,
+        "type": UserInput.OPTION_MULTI_OPTION,
         "default": [],
+        "options": {
+            "hostname": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Host name or IP address"
+            }
+        },
         "help": "White-list for API",
         "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. "
                    "Docker should include localhost and Server Name.  Front-end needs to be restarted for changed to "
@@ -579,43 +593,47 @@ config_definition = {
                 "to local or remote LLM servers. You can also set up your own LLM server using open source software such as "
                 "[Ollama](https://ollama.com/) and connect 4CAT to it using the settings below for your users."
     },
-    "llm.host_name": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "4CAT LLM Server",
-        "help": "Name of LLM Server in UI",
-        "tooltip": "The name that will be shown to users in the interface when selecting an LLM server (or API or custom).",
-        "global": True
-    },
-    "llm.provider_type": {
-        "type": UserInput.OPTION_CHOICE,
-        "help": "LLM Provider Type",
-        "default": "none",
+    "llm.services": {
+        "type": UserInput.OPTION_MULTI_OPTION,
+        "default": [],
+        "global": True,
+        "help": "LLM providers",
         "options": {
-            "ollama": "Ollama",
-            "none": "None",
-        },
-        "global": True,
-    },
-    "llm.server": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "",
-        "help": "LLM Server URL",
-        "tooltip": "The URL of the LLM server, e.g. http://localhost:5000",
-        "global": True
-    },
-    "llm.auth_type": {
-        "type": UserInput.OPTION_TEXT,
-        "help": "LLM Server Authentication Type",
-        "default": "",
-        "tooltip": "The authentication type required to connect to the server (e.g. 'X-API-KEY', 'Authorization'). Passed in the request header with the API key.",
-        "global": True,
-    },
-    "llm.api_key": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "",
-        "help": "LLM Server API Key",
-        "tooltip": "The API key to access the LLM server, if required.",
-        "global": True
+            "host_name": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "4CAT LLM Server",
+                "help": "Name of LLM Server in UI",
+                "tooltip": "The name that will be shown to users in the interface when selecting an LLM server (or API or custom).",
+            },
+            "provider_type": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "LLM Provider Type",
+                "default": "none",
+                "options": {
+                    "ollama": "Ollama",
+                    "litellm": "LiteLLM",
+                    "none": "None",
+                },
+            },
+            "server": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "LLM Server URL",
+                "tooltip": "The URL of the LLM server, e.g. http://localhost:5000",
+            },
+            "auth_type": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Authentication Header",
+                "default": "",
+                "tooltip": "The HTTP header used to authenticate with the server (e.g. 'X-API-KEY', 'Authorization'). Passed with the Authentication Key as value.",
+            },
+            "api_key": {
+                "type": UserInput.OPTION_TEXT,
+                "default": "",
+                "help": "Authentication Key",
+                "tooltip": "The API key to access the LLM server, if required.",
+            },
+        }
     },
     "llm.available_models": {
         "type": UserInput.OPTION_TEXT_JSON,
