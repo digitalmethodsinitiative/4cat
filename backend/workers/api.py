@@ -65,13 +65,13 @@ class InternalAPI(BasicWorker):
 				break
 			except OSError as e:
 				if has_time and not self.interrupted:
-					self.manager.log.info("Could not open port %i yet (%s), retrying in 10 seconds" % (self.port, e))
+					self.manager.log.info(f"Could not open port {self.port} yet ({e}), retrying in 10 seconds")
 					time.sleep(10.0)  # wait a few seconds before retrying
 					continue
-				self.manager.log.error("Port %s is already in use! Local API not available. Check if a residual 4CAT process may still be listening at the port." % self.port)
+				self.manager.log.error(f"Cannot listen at port {self.port} ({e})! Local API not available. Check if a residual 4CAT process may still be listening at the port.")
 				return
-			except ConnectionRefusedError:
-				self.manager.log.error("OS refused listening at port %i! Local API not available." % self.port)
+			except ConnectionRefusedError as e:
+				self.manager.log.error(f"OS refused listening at port {self.port} ({e})! Local API not available.")
 				return
 
 		server.listen()
@@ -79,6 +79,7 @@ class InternalAPI(BasicWorker):
 		self.manager.log.info("Local API listening for requests at %s:%s" % (self.host, self.port))
 
 		# continually listen for new connections
+		client = None
 		while not self.interrupted:
 			try:
 				client, address = server.accept()
@@ -90,6 +91,8 @@ class InternalAPI(BasicWorker):
 				continue
 
 			self.api_response(client, address)
+
+		if client:
 			client.close()
 
 		self.manager.log.info("Shutting down local API server")
