@@ -646,20 +646,29 @@ class ImageDownloader(BasicProcessor):
             raise InvalidDownloadedFileException(getattr(e, "message", str(e))) from e
 
     @staticmethod
-    def map_metadata(url, data):
+    def map_metadata(filename, item):
         """
-        Iterator to yield modified metadata for CSV
-
-        :param str url:  string that may contain URLs
-        :param dict data:  dictionary with metadata collected previously
-        :yield dict:  	  iterator containing reformated metadata
+        Yield CSV row(s) for a successful `items[filename]` entry.
         """
-        row = {
-            "url": url,
-            "number_of_posts_with_url": len(data.get("post_ids", [])),
-            "post_ids": ", ".join(data.get("post_ids", [])),
-            "filename": data.get("filename"),
-            "download_successful": data.get("success", ""),
+        yield {
+            "url": item.get("url", ""),
+            "number_of_posts_with_url": len(item.get("post_ids", [])),
+            "post_ids": ", ".join(item.get("post_ids", [])),
+            "filename": filename,
+            "download_successful": True,
         }
 
-        yield row
+    @staticmethod
+    def map_failure_metadata(failure):
+        """
+        Yield CSV row(s) for a `failures[]` entry.
+        """
+        yield {
+            "url": failure.get("url", ""),
+            "number_of_posts_with_url": len(failure.get("post_ids", [])),
+            "post_ids": ", ".join(failure.get("post_ids", [])),
+            "filename": "",
+            "download_successful": False,
+            "reason": failure.get("reason", ""),
+            "reason_description": failure.get("reason_description", ""),
+        }

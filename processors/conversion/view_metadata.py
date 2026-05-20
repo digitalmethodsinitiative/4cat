@@ -3,10 +3,8 @@ View .metadata.json
 
 Designed to work with any processor that has a 'map_metadata' method
 """
-import json
-import zipfile
-
 from backend.lib.processor import BasicProcessor
+from common.lib.exceptions import MetadataException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -59,20 +57,18 @@ class ViewMetadata(BasicProcessor):
 
 	def process(self):
 		"""
-		Grabs .metadata.json and reformats
+		Read .metadata.json from the parent archive and reformat as CSV using
+		the parent producer's `map_metadata` / `map_failure_metadata` hooks.
 		"""
 		self.dataset.update_status("Collecting .metadata.json file")
-		with zipfile.ZipFile(self.source_file, "r") as archive_file:
-			archive_contents = sorted(archive_file.namelist())
-			if '.metadata.json' not in archive_contents:
-				self.dataset.finish_with_error("Unable to identify metadata file")
-				return
-
-			staging_area = self.dataset.get_staging_area()
-			archive_file.extract(".metadata.json", staging_area)
-
-			with open(staging_area.joinpath(".metadata.json")) as file:
-				metadata_file = json.load(file)
+		try:
+			metadata = self.dataset.get_parent().read_media_metadata()
+		except FileNotFoundError:
+			self.dataset.finish_with_error("Unable to identify metadata file")
+			return
+		except MetadataException as e:
+			self.dataset.finish_with_error(f"Unable to read metadata: {e}")
+			return
 
 		parent_processor = self.dataset.get_parent().get_own_processor()
 		if parent_processor is None or not hasattr(parent_processor, "map_metadata"):
@@ -83,21 +79,24 @@ class ViewMetadata(BasicProcessor):
 		self.dataset.log(f"Collecting metadata created by {parent_processor.type}")
 
 		include_failed = self.parameters.get("include_failed", False)
+		map_failure = getattr(parent_processor, "map_failure_metadata", None)
 		rows = []
 		num_posts = 0
-		with self.dataset.get_results_path().open("w", encoding="utf-8", newline=""):
-			for key, value in metadata_file.items():
-				if not include_failed and not value.get("success", True):
-					continue
 
-				# Metadata may contain more than one row/item per key, value pair
-				for item in parent_processor.map_metadata(key, value):
-					rows.append(item)
+		for filename, item in metadata.iter_entries():
+			for row in parent_processor.map_metadata(filename, item):
+				rows.append(row)
+				num_posts += 1
+
+		if include_failed and map_failure is not None:
+			for failure in metadata.iter_failures():
+				for row in map_failure(failure):
+					rows.append(row)
 					num_posts += 1
 
 		# Finish up
 		self.dataset.update_status(f"Read metadata for {num_posts:,} item(s).")
-	
+
 		if rows:
 			self.write_csv_items_and_finish(rows)
 		else:
