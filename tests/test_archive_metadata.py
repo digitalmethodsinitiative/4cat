@@ -30,11 +30,14 @@ class FakeDataset:
 	def get_results_folder_path(self):
 		return self._results_folder
 
+	def get_own_processor(self):
+		return None
+
 
 # -- v1 writer / reader round-trip --
 
 def test_round_trip_minimal(tmp_path):
-	meta = MediaArchiveMetadata.new(datasource="image-downloader", from_dataset="src123")
+	meta = MediaArchiveMetadata.new(processor_type="image-downloader", from_dataset="src123")
 	meta.add_item("a.jpg", post_ids=["p1", "p2"], url="https://example.com/a")
 	meta.add_item("b.jpg", post_ids=["p3"])
 	meta.add_failure(post_ids=["p4"], reason="error",
@@ -45,7 +48,7 @@ def test_round_trip_minimal(tmp_path):
 
 	raw = json.loads(target.read_text())
 	assert raw["schema_version"] == 1
-	assert raw["datasource"] == "image-downloader"
+	assert raw["processor_type"] == "image-downloader"
 	assert raw["from_dataset"] == "src123"
 	assert set(raw["items"]) == {"a.jpg", "b.jpg"}
 	assert raw["items"]["a.jpg"] == {
@@ -62,7 +65,7 @@ def test_round_trip_minimal(tmp_path):
 
 
 def test_read_v1_from_zip(tmp_path):
-	meta = MediaArchiveMetadata.new(datasource="image-downloader", from_dataset="src")
+	meta = MediaArchiveMetadata.new(processor_type="image-downloader", from_dataset="src")
 	meta.add_item("a.jpg", post_ids=["1"], url="u")
 	meta.write(tmp_path)
 
@@ -72,13 +75,13 @@ def test_read_v1_from_zip(tmp_path):
 
 	loaded = MediaArchiveMetadata.read(FakeDataset("dskey", archive))
 	assert loaded.schema_version == CURRENT_SCHEMA_VERSION
-	assert loaded.datasource == "image-downloader"
+	assert loaded.processor_type == "image-downloader"
 	assert loaded.from_dataset == "src"
 	assert loaded.get_entry("a.jpg")["post_ids"] == ["1"]
 
 
 def test_read_v1_from_folder(tmp_path):
-	meta = MediaArchiveMetadata.new(datasource="image-downloader", from_dataset="src")
+	meta = MediaArchiveMetadata.new(processor_type="image-downloader", from_dataset="src")
 	meta.add_item("a.jpg", post_ids=["1"])
 	folder = tmp_path / "folder_dskey"
 	folder.mkdir()
@@ -214,21 +217,21 @@ def test_legacy_unsupported_schema_version_raises():
 # -- helper API --
 
 def test_filename_to_post_ids():
-	m = MediaArchiveMetadata.new(datasource="x", from_dataset="y")
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.add_item("a.jpg", post_ids=["1", "2"])
 	m.add_item("b.jpg", post_ids=["3"])
 	assert m.filename_to_post_ids() == {"a.jpg": ["1", "2"], "b.jpg": ["3"]}
 
 
 def test_post_ids_for():
-	m = MediaArchiveMetadata.new(datasource="x", from_dataset="y")
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.add_item("a.jpg", post_ids=["1"])
 	assert m.post_ids_for("a.jpg") == ["1"]
 	assert m.post_ids_for("missing.jpg") == []
 
 
 def test_add_item_normalizes_post_ids():
-	m = MediaArchiveMetadata.new(datasource="x", from_dataset="y")
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.add_item("a.jpg", post_ids="p1")          # bare string
 	m.add_item("b.jpg", post_ids=42)            # bare int
 	m.add_item("c.jpg", post_ids=[1, 2, 3])     # ints in list
@@ -238,14 +241,14 @@ def test_add_item_normalizes_post_ids():
 
 
 def test_add_item_duplicate_raises():
-	m = MediaArchiveMetadata.new(datasource="x", from_dataset="y")
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.add_item("a.jpg", post_ids=["1"])
 	with pytest.raises(MetadataException, match="already present"):
 		m.add_item("a.jpg", post_ids=["2"])
 
 
 def test_add_item_replace_overwrites():
-	m = MediaArchiveMetadata.new(datasource="x", from_dataset="y")
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.add_item("a.jpg", post_ids=["1"])
 	m.add_item("a.jpg", post_ids=["2"], replace=True)
 	assert m.post_ids_for("a.jpg") == ["2"]
@@ -254,21 +257,21 @@ def test_add_item_replace_overwrites():
 # -- validation --
 
 def test_validate_rejects_filename_mismatch(tmp_path):
-	m = MediaArchiveMetadata.new(datasource="x", from_dataset="y")
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.items["a.jpg"] = {"filename": "b.jpg", "post_ids": []}
 	with pytest.raises(MetadataException, match="must match its key"):
 		m.validate()
 
 
 def test_validate_rejects_non_list_post_ids():
-	m = MediaArchiveMetadata.new(datasource="x", from_dataset="y")
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.items["a.jpg"] = {"filename": "a.jpg", "post_ids": "p1"}
 	with pytest.raises(MetadataException, match="post_ids must be a list"):
 		m.validate()
 
 
 def test_validate_rejects_failure_without_reason():
-	m = MediaArchiveMetadata.new(datasource="x", from_dataset="y")
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.failures.append({"post_ids": [], "reason": ""})
 	with pytest.raises(MetadataException, match="reason"):
 		m.validate()
