@@ -9,7 +9,6 @@ class attributes to switch behavior for a different media type.
 """
 import asyncio
 import hashlib
-import json
 import re
 from collections import Counter
 
@@ -153,14 +152,15 @@ class TelegramVideoDownloader(BasicProcessor):
         """
         self.staging_area = self.dataset.get_staging_area()
         self.eventloop = None
-        self.metadata = {}
+        self.metadata = self.dataset.new_media_metadata(
+            processor_type=self.type, from_dataset=self.source_dataset.key
+        )
         self.reason_counts = Counter()
 
         asyncio.run(self.get_media())
 
         # finish up
-        with self.staging_area.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
-            json.dump(self.metadata, outfile)
+        self.metadata.write(self.staging_area)
 
         self.dataset.update_status(f"Compressing {self._media_label}s")
         successful = self.reason_counts.get("ok", 0)
@@ -318,21 +318,20 @@ class TelegramVideoDownloader(BasicProcessor):
                             reason_code, reason_text = self.categorize_download_error(e)
 
                     self.reason_counts[reason_code] += 1
-                    if not success:
+                    post_ids = [msg_id] if msg_id else []
+                    if success:
+                        self.metadata.add_item(filename, post_ids=post_ids)
+                    else:
                         msg_id_log = msg_id if msg_id else f"index {media_done:,}"
                         self.dataset.log(
                             f"Skipped {self._media_label} for message {msg_id_log} "
                             f"[{reason_code}]: {reason_text}")
                         self.flawless = False
-
-                    self.metadata[filename] = {
-                        "filename": filename,
-                        "success": success,
-                        "reason": reason_code,
-                        "reason_description": reason_text,
-                        "from_dataset": self.source_dataset.key,
-                        "post_ids": [msg_id] if msg_id else []
-                    }
+                        self.metadata.add_failure(
+                            post_ids=post_ids,
+                            reason=reason_code,
+                            reason_description=reason_text,
+                        )
                     media_done += 1
 
             except FloodError as e:
@@ -361,14 +360,11 @@ class TelegramVideoDownloader(BasicProcessor):
                 for mid in message_ids:
                     msg_id_full = f"{entity}-{mid}"
                     self.reason_counts[reason_code] += 1
-                    self.metadata[msg_id_full] = {
-                        "filename": "",
-                        "success": False,
-                        "reason": reason_code,
-                        "reason_description": reason_text,
-                        "from_dataset": self.source_dataset.key,
-                        "post_ids": [msg_id_full]
-                    }
+                    self.metadata.add_failure(
+                        post_ids=[msg_id_full],
+                        reason=reason_code,
+                        reason_description=reason_text,
+                    )
 
         # end-of-run outcome breakdown into the dataset log so researchers can
         # see counts per category without parsing per-message lines
@@ -381,17 +377,25 @@ class TelegramVideoDownloader(BasicProcessor):
             await client.disconnect()
 
     @classmethod
-    def map_metadata(cls, filename, data):
-        """
-        Iterator to yield modified metadata for CSV
-        """
-        row = {
-            cls._metadata_count_label: len(data.get("post_ids", [])),
-            "post_ids": ", ".join(map(str, data.get("post_ids", []))),
+    def map_metadata(cls, filename, item):
+        """Yield CSV row(s) for a successful items[filename] entry."""
+        yield {
+            cls._metadata_count_label: len(item.get("post_ids", [])),
+            "post_ids": ", ".join(map(str, item.get("post_ids", []))),
             "filename": filename,
-            "download_successful": data.get('success', ""),
-            "reason": data.get("reason", ""),
-            "reason_description": data.get("reason_description", "")
+            "download_successful": True,
+            "reason": "ok",
+            "reason_description": "",
         }
 
-        yield row
+    @classmethod
+    def map_failure_metadata(cls, failure):
+        """Yield CSV row(s) for a failures[] entry."""
+        yield {
+            cls._metadata_count_label: len(failure.get("post_ids", [])),
+            "post_ids": ", ".join(map(str, failure.get("post_ids", []))),
+            "filename": "",
+            "download_successful": False,
+            "reason": failure.get("reason", ""),
+            "reason_description": failure.get("reason_description", ""),
+        }

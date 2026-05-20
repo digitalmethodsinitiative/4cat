@@ -4,9 +4,7 @@ Download videos from URLs
 First attempt to download via request, but if that fails use yt-dlp.
 """
 import copy
-import json
 import re
-import shutil
 import time
 import zipfile
 from pathlib import Path
@@ -21,7 +19,7 @@ from yt_dlp.utils import ExistingVideoReached
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.dataset import DataSet
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException, MetadataException
 from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
 
 __author__ = "Dale Wahl"
@@ -958,16 +956,41 @@ class VideoDownloaderPlus(BasicProcessor):
         return result
 
     def _save_metadata(self, urls_dict, results_path):
-        """Save metadata to JSON file"""
+        """Save metadata to .metadata.json in the staging area."""
         self.dataset.update_status("Updating and saving metadata")
-        metadata = {
-            url: {
-                "from_dataset": self.source_dataset.key,
-                **sets_to_lists(data)
-            } for url, data in urls_dict.items()
-        }
-        with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
-            json.dump(metadata, outfile)
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type, from_dataset=self.source_dataset.key
+        )
+        for url, data in urls_dict.items():
+            data = sets_to_lists(data)
+            post_ids = list(data.get("post_ids", []))
+            files = data.get("files") or []
+            had_successful_file = False
+            for file in files:
+                if not isinstance(file, dict):
+                    continue
+                filename = file.get("filename")
+                if not filename or not file.get("success", True):
+                    continue
+                extra = dict(file.get("metadata") or {})
+                if data.get("downloader"):
+                    extra["downloader"] = data["downloader"]
+                # replace=True: yt-dlp playlists can in theory produce duplicate
+                # filenames if the same video appears twice; last write wins,
+                # matching the physical file on disk
+                metadata.add_item(filename, post_ids=post_ids, url=url,
+                                  extra=extra, replace=True)
+                had_successful_file = True
+
+            if not had_successful_file:
+                metadata.add_failure(
+                    post_ids=post_ids,
+                    reason="error",
+                    reason_description=data.get("error", "") or "",
+                    url=url,
+                )
+
+        metadata.write(results_path)
 
     def _log_statistics(self, total_urls):
         """Log comprehensive download statistics"""
@@ -1273,27 +1296,43 @@ class VideoDownloaderPlus(BasicProcessor):
 
         return num_copied
 
-    @staticmethod
-    def map_metadata(url, data):
-        """Iterator to yield modified metadata for CSV"""
-        row = {
-            "url": url,
-            "number_of_posts_with_url": len(data.get("post_ids", [])),
-            "post_ids": ", ".join(data.get("post_ids", [])),
-            "downloader": data.get("downloader", ""),
-            "download_successful": data.get('success', "")
-        }
+    YT_DLP_EXTRACTED_FIELDS = (
+        "title", "artist", "description", "view_count", "like_count",
+        "repost_count", "comment_count", "uploader", "creator", "uploader_id",
+    )
 
-        for file in data.get("files", [{}]):
-            row["filename"] = file.get("filename", "N/A")
-            yt_dlp_data = file.get("metadata", {})
-            for common_column in ["title", "artist", "description", "view_count", "like_count", "repost_count", "comment_count", "uploader", "creator", "uploader_id"]:
-                if yt_dlp_data:
-                    row[f"extracted_{common_column}"] = yt_dlp_data.get(common_column)
-                else:
-                    row[f"extracted_{common_column}"] = "N/A"
-            row["error"] = data.get("error", "N/A")
-            yield row
+    @classmethod
+    def map_metadata(cls, filename, item):
+        """Yield CSV row(s) for a successful items[filename] entry."""
+        extra = item.get("extra") or {}
+        row = {
+            "url": item.get("url", ""),
+            "number_of_posts_with_url": len(item.get("post_ids", [])),
+            "post_ids": ", ".join(item.get("post_ids", [])),
+            "downloader": extra.get("downloader", ""),
+            "download_successful": True,
+            "filename": filename,
+        }
+        for field in cls.YT_DLP_EXTRACTED_FIELDS:
+            row[f"extracted_{field}"] = extra.get(field, "N/A")
+        row["error"] = "N/A"
+        yield row
+
+    @classmethod
+    def map_failure_metadata(cls, failure):
+        """Yield CSV row(s) for a failures[] entry."""
+        row = {
+            "url": failure.get("url", ""),
+            "number_of_posts_with_url": len(failure.get("post_ids", [])),
+            "post_ids": ", ".join(failure.get("post_ids", [])),
+            "downloader": "",
+            "download_successful": False,
+            "filename": "",
+        }
+        for field in cls.YT_DLP_EXTRACTED_FIELDS:
+            row[f"extracted_{field}"] = "N/A"
+        row["error"] = failure.get("reason_description") or failure.get("reason") or "N/A"
+        yield row
 
 
 class DatasetVideoLibrary:

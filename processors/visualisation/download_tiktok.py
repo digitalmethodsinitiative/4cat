@@ -3,7 +3,6 @@ Refresh a TikTok datasource
 """
 import asyncio
 import datetime
-import json
 from io import BytesIO
 from pathlib import Path
 from PIL import Image, UnidentifiedImageError
@@ -122,7 +121,9 @@ class TikTokImageDownloader(BasicProcessor):
         urls_to_refresh = []
         url_to_item_id = {}
         max_fails_exceeded = 0
-        metadata = {}
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type, from_dataset=self.source_dataset.key
+        )
 
         # Loop through items and collect URLs
         for mapped_item in self.source_dataset.iterate_items(self):
@@ -164,12 +165,11 @@ class TikTokImageDownloader(BasicProcessor):
                         downloaded_media += 1
                         self.dataset.update_status(f"Downloaded image {downloaded_media}/{max_amount}")
 
-                        metadata[url] = {
-                                "filename": filename,
-                                "success": success,
-                                "from_dataset": self.source_dataset.key,
-                                "post_ids": [post_id]
-                        }
+                        metadata.add_item(
+                            filename,
+                            post_ids=[post_id],
+                            url=url,
+                        )
 
 
             if refresh_tiktok_urls:
@@ -225,29 +225,32 @@ class TikTokImageDownloader(BasicProcessor):
                             filename = ''
 
                     # Record metadata
-                    metadata[url] = {
-                            "filename": filename,
-                            "success": success,
-                            "from_dataset": self.source_dataset.key,
-                            "post_ids": [post_id]
-                    }
-
                     if success:
+                        metadata.add_item(
+                            filename,
+                            post_ids=[post_id],
+                            url=url,
+                        )
                         self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1
-                    elif not url:
-                        self.dataset.log(
-                            f"No {url_column} identified for {refreshed_mapped_item.get('tiktok_url')}, skipping")
                     else:
-                        self.dataset.log(f"Unable to save image for {url}, skipping")
+                        metadata.add_failure(
+                            post_ids=[post_id],
+                            reason="error",
+                            url=url,
+                        )
+                        if not url:
+                            self.dataset.log(
+                                f"No {url_column} identified for {refreshed_mapped_item.get('tiktok_url')}, skipping")
+                        else:
+                            self.dataset.log(f"Unable to save image for {url}, skipping")
 
                 # In case some images failed to download, we update our starting points
                 last_url_index += need_more
                 need_more = max_amount - downloaded_media
 
         # Write metadata file
-        with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
-            json.dump(metadata, outfile)
+        metadata.write(results_path)
 
         warning = None
         if downloaded_media < max_amount:
@@ -307,20 +310,25 @@ class TikTokImageDownloader(BasicProcessor):
         return picture, extension
 
     @staticmethod
-    def map_metadata(url, data):
-        """
-        Iterator to yield modified metadata for CSV
-
-        :param str url:  string that may contain URLs
-        :param dict data:  dictionary with metadata collected previously
-        :yield dict:  	  iterator containing reformated metadata
-        """
-        row = {
-            "url": url,
-            "number_of_posts_with_url": len(data.get("post_ids", [])),
-            "post_ids": ", ".join(data.get("post_ids", [])),
-            "filename": data.get("filename"),
-            "download_successful": data.get('success', "")
+    def map_metadata(filename, item):
+        """Yield CSV row(s) for a successful items[filename] entry."""
+        yield {
+            "url": item.get("url", ""),
+            "number_of_posts_with_url": len(item.get("post_ids", [])),
+            "post_ids": ", ".join(item.get("post_ids", [])),
+            "filename": filename,
+            "download_successful": True,
         }
 
-        yield row
+    @staticmethod
+    def map_failure_metadata(failure):
+        """Yield CSV row(s) for a failures[] entry."""
+        yield {
+            "url": failure.get("url", ""),
+            "number_of_posts_with_url": len(failure.get("post_ids", [])),
+            "post_ids": ", ".join(failure.get("post_ids", [])),
+            "filename": "",
+            "download_successful": False,
+            "reason": failure.get("reason", ""),
+            "reason_description": failure.get("reason_description", ""),
+        }
