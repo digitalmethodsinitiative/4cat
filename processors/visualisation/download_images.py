@@ -259,7 +259,9 @@ class ImageDownloader(BasicProcessor):
         ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0"
         downloaded_files = set()
         failures = []
-        metadata = {}
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type, from_dataset=self.source_dataset.key
+        )
 
         self.dataset.log(f"Filename prep for {len(urls)} URLs")
         # prepare filenames for each url
@@ -422,22 +424,22 @@ class ImageDownloader(BasicProcessor):
             if failure:
                 failures.append(url)
                 downloaded_file.unlink(missing_ok=True)
-
-            metadata[url] = {
-                "filename": self.filenames[url],
-                "url": self.resolve_url(url),
-                "success": not failure,
-                "from_dataset": self.source_dataset.key,
-                "post_ids": item_map[url],
-            }
+                metadata.add_failure(
+                    post_ids=item_map[url],
+                    reason="error",
+                    url=url,
+                )
+            else:
+                metadata.add_item(
+                    filename=self.filenames[url],
+                    post_ids=item_map[url],
+                    url=self.resolve_url(url),
+                )
 
             if self.complete:
                 break
 
-        with self.staging_area.joinpath(".metadata.json").open(
-            "w", encoding="utf-8"
-        ) as outfile:
-            json.dump(metadata, outfile)
+        metadata.write(self.staging_area)
 
         # delete supernumerary partially downloaded files
         self.flush_proxied_requests()  # get rid of remaining queue
@@ -450,7 +452,7 @@ class ImageDownloader(BasicProcessor):
         # finish up
         self.dataset.update_progress(1.0)
         self.write_archive_and_finish(
-            self.staging_area, len([x for x in metadata.values() if x.get("success")]),
+            self.staging_area, len(metadata),
             finish=False
         )
         if self.warning_message:
