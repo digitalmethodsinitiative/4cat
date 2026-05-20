@@ -162,8 +162,7 @@ def test_legacy_video_files_array(tmp_path):
 	assert m.get_entry("vid2.mp4")["post_ids"] == ["p1"]
 
 	# url is shared across the playlist's outputs
-	playlist_entries = m.entries_for_url("https://example.com/playlist")
-	assert {fn for fn, _ in playlist_entries} == {"vid1.mp4", "vid2.mp4"}
+	assert m.get_entry("vid2.mp4")["url"] == "https://example.com/playlist"
 
 	# failure preserved with description from `error`
 	assert len(m.failures) == 1

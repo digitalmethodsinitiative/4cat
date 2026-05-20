@@ -412,13 +412,6 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		entry = self.items.get(filename)
 		return list(entry.get("post_ids", [])) if entry else []
 
-	def entries_for_url(self, url: str) -> list:
-		"""
-		All items whose `url` field matches. Useful when a single source URL
-		produced multiple output files (e.g. yt-dlp on a playlist).
-		"""
-		return [(fn, e) for fn, e in self.items.items() if e.get("url") == url]
-
 	# -- some helpers for common access patterns --
 
 	def __len__(self) -> int:

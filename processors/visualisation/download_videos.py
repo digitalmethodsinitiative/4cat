@@ -18,9 +18,9 @@ from yt_dlp.utils import ExistingVideoReached
 
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
-from common.lib.dataset import DataSet
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
+from common.lib.media_archive_library import MediaArchiveLibrary
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -339,7 +339,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
         self.dataset.update_status('Collected %i urls.' % len(urls))
 
-        vid_lib = DatasetVideoLibrary(self.dataset, modules=self.modules)
+        vid_lib = MediaArchiveLibrary.collect(self.dataset, self.modules, ["video-downloader"])
 
         # Prepare staging area for videos and video tracking
         results_path = self.dataset.get_staging_area()
@@ -532,7 +532,7 @@ class VideoDownloaderPlus(BasicProcessor):
         :param dict url_dict: Dictionary to update with URL metadata
         :param bool skip_channels: Whether to skip known channels
         :param bool copy_if_existing: Whether to attempt to copy video from previous dataset if URL exists in library
-        :param DatasetVideoLibrary existing_video_library: Video library to check for existing videos if `copy_if_existing` is `True`
+        :param MediaArchiveLibrary existing_video_library: Video library to check for existing videos if `copy_if_existing` is `True`
         :param Path copy_output_path: Path to copy videos to if copied from library
         :return: None
         """
@@ -554,7 +554,6 @@ class VideoDownloaderPlus(BasicProcessor):
 
             # Initialize URL metadata
             url_dict[url]["success"] = False
-            url_dict[url]["retry"] = True
 
             # Skip known channels if not downloading channels
             if skip_channels and any([sub_url in url for sub_url in self.known_channels]):
@@ -570,38 +569,58 @@ class VideoDownloaderPlus(BasicProcessor):
 
     def _try_copy_from_library(self, url, urls_dict, vid_lib, results_path):
         """
-        Try to copy video from previously downloaded library
-        
+        Try to copy a video already fetched by a previous downloader run.
+
         :param str url: URL to check
         :param dict urls_dict: URLs dictionary to update
-        :param DatasetVideoLibrary vid_lib: Video library instance
+        :param MediaArchiveLibrary vid_lib: Video library instance
         :param Path results_path: Path to staging area
         :return dict: Result with 'copied', 'count', and 'skip' keys
         """
         result = {"copied": False, "count": 0, "skip": False}
-        
-        if url not in vid_lib.library:
+
+        hit = vid_lib.find(url)
+        if hit is None:
             return result
-            
-        previous_vid_metadata = vid_lib.library[url]
-        
-        if previous_vid_metadata.get('success', False):
-            # Use previous downloaded video
+
+        if hit.is_success:
+            # copy the previously downloaded file(s) instead of re-fetching
             try:
                 self.dataset.log(f"Copying previously downloaded video for url: {url}")
-                num_copied = self.copy_previous_video(previous_vid_metadata, results_path, vid_lib.previous_downloaders)
-                urls_dict[url] = previous_vid_metadata
+                num_copied = self.copy_previous_video(hit, results_path)
+                # keep this run's post_ids; fill in the download outcome
+                urls_dict[url].update(self._copied_url_fields(hit))
                 self.dataset.update_status("Copied previously downloaded video to current dataset.")
                 result["copied"] = True
                 result["count"] = num_copied
             except FailedToCopy as e:
                 self.dataset.log(f"{str(e)}; attempting to download again")
-        elif previous_vid_metadata.get("retry", True) is False:
-            urls_dict[url] = previous_vid_metadata
+        elif "not_a_video" in hit.reasons:
+            # a previous run established this URL is not a video; don't retry
+            urls_dict[url]["success"] = False
+            urls_dict[url]["reason"] = "not_a_video"
             self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
             result["skip"] = True
-            
+
         return result
+
+    @staticmethod
+    def _copied_url_fields(hit):
+        """
+        Build the `urls_dict` fields for a URL whose file(s) were copied from
+        a previous archive, from a successful `MediaLibraryHit`.
+        """
+        files = []
+        downloader = None
+        for filename, item in hit.entries:
+            extra = dict(item.get("extra") or {})
+            # `downloader` lived at URL level in the working dict, not per file
+            downloader = downloader or extra.pop("downloader", None)
+            files.append({"filename": filename, "success": True, "metadata": extra})
+        fields = {"success": True, "files": files}
+        if downloader:
+            fields["downloader"] = downloader
+        return fields
 
     def _process_direct_downloads(self, url_list, urls_dict, results_path, max_video_size,
                                    also_indirect, amount, last_domains, ignore_not_video):
@@ -777,7 +796,7 @@ class VideoDownloaderPlus(BasicProcessor):
             else:
                 self.dataset.log(f"NotVideoLinkError: {str(e)}")
                 urls_dict[url]["error"] = str(e)
-                urls_dict[url]["retry"] = False
+                urls_dict[url]["reason"] = "not_a_video"
                 result["not_a_video"] = True
                 
                 if last_domains.count(domain) >= 2:
@@ -791,7 +810,7 @@ class VideoDownloaderPlus(BasicProcessor):
         except NotAVideo as e:
             self.dataset.log(f"Request Error: {str(e)}")
             urls_dict[url]["error"] = str(e)
-            urls_dict[url]["retry"] = False
+            urls_dict[url]["reason"] = "not_a_video"
             result["not_a_video"] = True
             
             if last_domains.count(domain) >= 2:
@@ -985,7 +1004,7 @@ class VideoDownloaderPlus(BasicProcessor):
             if not had_successful_file:
                 metadata.add_failure(
                     post_ids=post_ids,
-                    reason="error",
+                    reason=data.get("reason") or "error",
                     reason_description=data.get("error", "") or "",
                     url=url,
                 )
@@ -1262,36 +1281,33 @@ class VideoDownloaderPlus(BasicProcessor):
             urls |= set([url for url in urls_from_text(string)])
         return list(urls)
 
-    def copy_previous_video(self, previous_vid_metadata, staging_area, previous_downloaders):
-        """Copy existing video to new staging area"""
-        num_copied = 0
-        dataset_key = previous_vid_metadata.get("file_dataset_key")
-        dataset = [dataset for dataset in previous_downloaders if dataset.key == dataset_key]
+    def copy_previous_video(self, hit, staging_area):
+        """
+        Copy the file(s) of a previously downloaded video into the current
+        staging area.
 
-        if "files" in previous_vid_metadata:
-            files = previous_vid_metadata.get('files')
-        elif "filename" in previous_vid_metadata:
-            files = [{"filename": previous_vid_metadata.get("filename"), "success": True}]
-        else:
-            raise FailedToCopy("Unable to read video metadata")
+        :param MediaLibraryHit hit:  a successful library lookup; its
+            `metadata.dataset` locates the source archive and `entries`
+            lists the files to copy.
+        :param Path staging_area:  where to extract the files to.
+        :return int:  number of files copied.
+        """
+        source_dataset = hit.metadata.dataset
+        if source_dataset is None:
+            raise FailedToCopy("Previous metadata is not bound to a dataset")
 
-        if not files:
+        filenames = [filename for filename, _ in hit.entries]
+        if not filenames:
             raise FailedToCopy("No file found in metadata")
 
-        if not dataset:
-            raise FailedToCopy(f"Dataset with key {dataset_key} not found")
-        else:
-            dataset = dataset[0]
-
-        with zipfile.ZipFile(dataset.get_results_path(), "r") as archive_file:
-            archive_contents = sorted(archive_file.namelist())
-
-            for file in files:
-                if file.get("filename") not in archive_contents:
-                    raise FailedToCopy(f"Previously downloaded video {file.get('filename')} not found")
-
-                self.dataset.log(f"Copying previously downloaded video {file.get('filename')} to new staging area")
-                archive_file.extract(file.get("filename"), staging_area)
+        num_copied = 0
+        with zipfile.ZipFile(source_dataset.get_results_path(), "r") as archive_file:
+            archive_contents = set(archive_file.namelist())
+            for filename in filenames:
+                if filename not in archive_contents:
+                    raise FailedToCopy(f"Previously downloaded video {filename} not found")
+                self.dataset.log(f"Copying previously downloaded video {filename} to new staging area")
+                archive_file.extract(filename, staging_area)
                 num_copied += 1
 
         return num_copied
@@ -1333,88 +1349,3 @@ class VideoDownloaderPlus(BasicProcessor):
             row[f"extracted_{field}"] = "N/A"
         row["error"] = failure.get("reason_description") or failure.get("reason") or "N/A"
         yield row
-
-
-class DatasetVideoLibrary:
-    """
-    Library for managing video downloads across multiple processors
-    """
-    def __init__(self, current_dataset, modules):
-        self.modules = modules
-        self.current_dataset = current_dataset
-        self.previous_downloaders = self.collect_previous_downloaders()
-        self.current_dataset.log(f"Previously video downloaders: {[downloader.key for downloader in self.previous_downloaders]}")
-
-        metadata_files = self.collect_all_metadata_files()
-
-        # Build library
-        library = {}
-        for metadata_file in metadata_files:
-            for url, data in metadata_file[1].items():
-                if data.get("success", False):
-                    # Always overwrite for success
-                    library[url] = {
-                        **data,
-                        "file_dataset_key": metadata_file[0]
-                    }
-                elif url not in library:
-                    # Do not overwrite failures, but do add if missing
-                    library[url] = {
-                        **data,
-                        "file_dataset_key": metadata_file[0]
-                    }
-
-        self.current_dataset.log(f"Total URLs previously seen: {len(library)}")
-        self.library = library
-
-    def collect_previous_downloaders(self):
-        """
-        Check for other video-downloader processors run on the dataset and create library for reference
-        """
-        # NOTE: this only checks parent dataset, not full ancestry (e.g. other filters with video downloaders)
-        parent_dataset = self.current_dataset.get_parent()
-        # Note: exclude current dataset
-        previous_downloaders = [child for child in parent_dataset.get_children() if 
-                              (child.type in ["video-downloader"] and child.key != self.current_dataset.key)]
-
-        # Check to see if filtered dataset
-        if "copied_from" in parent_dataset.parameters and parent_dataset.is_top_dataset():
-            try:
-                original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db, modules=self.modules)
-                previous_downloaders += [child for child in original_dataset.top_parent().get_children() if
-                                         (child.type in ["video-downloader"] and child.key != self.current_dataset.key)]
-            except DataSetException:
-                # parent dataset no longer exists!
-                pass
-
-        return previous_downloaders
-
-    def collect_metadata_file(self, dataset, staging_area):
-        """Collect metadata from a dataset's video archive"""
-        source_file = dataset.get_results_path()
-        if not source_file.exists():
-            return None
-
-        with zipfile.ZipFile(dataset.get_results_path(), "r") as archive_file:
-            archive_contents = sorted(archive_file.namelist())
-            if '.metadata.json' not in archive_contents:
-                return None
-
-            archive_file.extract(".metadata.json", staging_area)
-
-            with open(staging_area.joinpath(".metadata.json")) as file:
-                return json.load(file)
-
-    def collect_all_metadata_files(self):
-        """Collect all metadata files from previous downloaders"""
-        metadata_staging_area = self.current_dataset.get_staging_area()
-
-        metadata_files = [(downloader.key, self.collect_metadata_file(downloader, metadata_staging_area)) 
-                         for downloader in self.previous_downloaders]
-        metadata_files = [file for file in metadata_files if file[1] is not None]
-        self.current_dataset.log(f"Metadata files collected: {len(metadata_files)}; with {[len(urls[1]) for urls in metadata_files]}")
-
-        # Delete staging area
-        shutil.rmtree(metadata_staging_area)
-
-        return metadata_files
