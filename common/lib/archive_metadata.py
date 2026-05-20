@@ -47,14 +47,26 @@ class ArchiveMetadataFile:
 		# store the processor that created the archive and metadata
 		# leaving optional in cases we create metadata... some other way
 		self.processor_type = processor_type
-		# store the software version that created the archive and metadata
-		version = get_software_commit(dataset.get_own_processor())
-		self.software_version = version[0]
-		self.software_source = version[1]
+		# the 4CAT version that created the metadata: resolved by `new()`
+		self.software_version = None
+		self.software_source = None
 
 		# filename and schema
 		self._filename = filename or self.DEFAULT_FILENAME
 		self.schema_version = self.SCHEMA_VERSION
+
+	def _resolve_software_version(self) -> None:
+		"""
+		Record the 4CAT commit / repository creating this metadata.
+
+		Called by `new()` on the producer path. A no-op without a dataset to
+		resolve against (e.g. metadata constructed outside a processor run).
+		"""
+		if self.dataset is None:
+			return
+		commit, source = get_software_commit(self.dataset.get_own_processor())
+		self.software_version = commit
+		self.software_source = source
 
 	@classmethod
 	def read(cls, dataset, *, filename: Optional[str] = None):
@@ -211,8 +223,10 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			downloaded from.
 		:param filename:  metadata filename inside the archive.
 		"""
-		return cls(dataset, processor_type=processor_type, from_dataset=from_dataset,
-				   filename=filename)
+		instance = cls(dataset, processor_type=processor_type,
+					   from_dataset=from_dataset, filename=filename)
+		instance._resolve_software_version()
+		return instance
 
 	# -- schema population / legacy normalization --
 
