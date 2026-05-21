@@ -213,6 +213,22 @@ def test_legacy_unsupported_schema_version_raises():
 		m._populate_from_raw({"schema_version": 99, "items": {}})
 
 
+def test_legacy_single_file_preserves_top_level_extra():
+	"""Pre-v1 files kept producer data (e.g. the SD prompt) at the top level."""
+	legacy = {
+		"p1": {
+			"filename": "p1-cat.jpeg", "success": True, "post_ids": ["p1"],
+			"from_dataset": "src",
+			"prompt": "a cat", "negative-prompt": "a dog",
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+	assert m.get_entry("p1-cat.jpeg")["extra"] == {
+		"prompt": "a cat", "negative-prompt": "a dog",
+	}
+
+
 # -- helper API --
 
 def test_filename_to_post_ids():
@@ -295,3 +311,26 @@ def test_read_raises_when_file_missing_from_zip(tmp_path):
 	ds = FakeDataset("k", archive)
 	with pytest.raises(FileNotFoundError):
 		MediaArchiveMetadata.read(ds)
+
+
+def test_read_raises_metadata_exception_on_malformed_json(tmp_path):
+	"""A corrupt metadata file surfaces as MetadataException, not JSONDecodeError."""
+	archive = tmp_path / "bad.zip"
+	with zipfile.ZipFile(archive, "w") as zf:
+		zf.writestr(".metadata.json", "{ not valid json ]")
+	ds = FakeDataset("k", archive)
+	with pytest.raises(MetadataException, match="not valid JSON"):
+		MediaArchiveMetadata.read(ds)
+
+
+def test_v1_read_normalizes_integer_post_ids():
+	"""Integer post_ids in a v1 file are coerced to strings on read."""
+	raw = {
+		"schema_version": 1,
+		"items": {"a.jpg": {"filename": "a.jpg", "post_ids": [1, 2]}},
+		"failures": [{"post_ids": [3], "reason": "error"}],
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(raw)
+	assert m.get_entry("a.jpg")["post_ids"] == ["1", "2"]
+	assert m.failures[0]["post_ids"] == ["3"]

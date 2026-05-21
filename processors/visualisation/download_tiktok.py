@@ -169,6 +169,7 @@ class TikTokImageDownloader(BasicProcessor):
                             filename,
                             post_ids=[post_id],
                             url=url,
+                            replace=True,
                         )
 
 
@@ -230,6 +231,7 @@ class TikTokImageDownloader(BasicProcessor):
                             filename,
                             post_ids=[post_id],
                             url=url,
+                            replace=True,
                         )
                         self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1

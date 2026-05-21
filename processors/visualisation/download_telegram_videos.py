@@ -320,7 +320,7 @@ class TelegramVideoDownloader(BasicProcessor):
                     self.reason_counts[reason_code] += 1
                     post_ids = [msg_id] if msg_id else []
                     if success:
-                        self.metadata.add_item(filename, post_ids=post_ids)
+                        self.metadata.add_item(filename, post_ids=post_ids, replace=True)
                     else:
                         msg_id_log = msg_id if msg_id else f"index {media_done:,}"
                         self.dataset.log(

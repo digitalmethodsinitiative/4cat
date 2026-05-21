@@ -434,6 +434,7 @@ class ImageDownloader(BasicProcessor):
                     filename=self.filenames[url],
                     post_ids=item_map[url],
                     url=self.resolve_url(url),
+                    replace=True,
                 )
 
             if self.complete:

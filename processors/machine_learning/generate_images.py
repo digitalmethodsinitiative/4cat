@@ -280,7 +280,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
             filename = make_filename(prompt_id, data["prompt"])
             extra = {"prompt": data["prompt"], "negative-prompt": data["negative"]}
             if output_dir.joinpath(filename).exists():
-                metadata.add_item(filename, post_ids=[prompt_id], extra=extra)
+                metadata.add_item(filename, post_ids=[prompt_id], extra=extra, replace=True)
             else:
                 metadata.add_failure(post_ids=[prompt_id], reason="error",
                                      reason_description="Generated image not found on disk")

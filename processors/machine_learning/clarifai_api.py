@@ -253,7 +253,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 if save_annotations:
                     for label, confidence in all_annotations.items():
                         if confidence > annotation_threshold:
-                            for item_id in filename_to_post_ids[image]:
+                            for item_id in filename_to_post_ids.get(image, []):
                                 fourcat_annotations.append({
                                     "label": "clarifai_" + label,
                                     "value": confidence,
