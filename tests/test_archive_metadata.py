@@ -158,7 +158,14 @@ def test_legacy_video_files_array(tmp_path):
 	assert set(m.items) == {"vid1.mp4", "vid2.mp4"}
 	assert m.get_entry("vid1.mp4")["url"] == "https://example.com/playlist"
 	assert m.get_entry("vid1.mp4")["post_ids"] == ["p1"]
-	assert m.get_entry("vid1.mp4")["extra"] == {"title": "One", "view_count": 100}
+	# per-file yt-dlp metadata is flattened in, and the outer-level
+	# `downloader` is carried onto every file so nothing is lost
+	assert m.get_entry("vid1.mp4")["extra"] == {
+		"downloader": "yt_dlp", "title": "One", "view_count": 100,
+	}
+	assert m.get_entry("vid2.mp4")["extra"] == {
+		"downloader": "yt_dlp", "title": "Two",
+	}
 	assert m.get_entry("vid2.mp4")["post_ids"] == ["p1"]
 
 	# url is shared across the playlist's outputs
@@ -227,6 +234,30 @@ def test_legacy_single_file_preserves_top_level_extra():
 	assert m.get_entry("p1-cat.jpeg")["extra"] == {
 		"prompt": "a cat", "negative-prompt": "a dog",
 	}
+
+
+def test_legacy_failure_preserves_extra():
+	"""Producer data on a failed legacy entry survives under failure['extra']."""
+	legacy = {
+		"https://example.com/playlist": {
+			"success": True, "from_dataset": "src", "post_ids": ["p1"],
+			"downloader": "yt_dlp",
+			"files": [
+				{"filename": "good.mp4", "success": True, "metadata": {"title": "ok"}},
+				{"filename": "", "success": False, "error": "geo-blocked",
+				 "region": "NL"},
+			],
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+
+	assert len(m.failures) == 1
+	failure = m.failures[0]
+	assert failure["reason_description"] == "geo-blocked"
+	# the outer `downloader` and the per-file `region` are both kept; the
+	# promoted reason/error keys are not duplicated into extra
+	assert failure["extra"] == {"downloader": "yt_dlp", "region": "NL"}
 
 
 # -- helper API --

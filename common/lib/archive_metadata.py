@@ -253,14 +253,16 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 
 	def _populate_from_raw(self, raw: dict) -> None:
 		"""
-		Populate fields from a raw dict. v1 is trusted as-is; older shapes
+		Populate fields from a raw dict. v1 is read directly; older shapes
 		are translated through `_normalize_legacy`.
 		"""
 		if not isinstance(raw, dict):
 			raise MetadataException("Metadata file is not a JSON object.")
 
 		version = self._check_schema_version(raw)
-		if version == self.SCHEMA_VERSION and "items" in raw:
+		if version == self.SCHEMA_VERSION:
+			# current schema. `_check_schema_version` has already rejected any
+			# mismatching version, so this is the only non-legacy branch.
 			self.schema_version = version
 			self.from_dataset = raw.get("from_dataset", self.from_dataset)
 			# pretty sure we did not store the processor or version info previously
@@ -293,6 +295,9 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		(Telegram). Each entry has a `success` flag; failed entries become
 		`failures[]`, successful entries become `items[filename]`. The video
 		downloader's nested `files[]` list explodes to one item per file.
+		All producer-specific data is carried across into `extra` (items) or
+		the failure dict (failures) so the migration loses nothing — see
+		`_legacy_extra`.
 		"""
 		for outer_key, entry in raw.items():
 			if not isinstance(entry, dict):
@@ -310,19 +315,19 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					outer_key.startswith("http://") or outer_key.startswith("https://")):
 				url = outer_key
 
-			# existing `from_dataset`is correct if exists
+			# existing `from_dataset` is correct if exists
 			if entry.get("from_dataset"):
 				self.from_dataset = entry["from_dataset"]
 
 			success = entry.get("success", True)
 
 			if not success:
-				self.failures.append({
-					"post_ids": post_ids,
-					**({"url": url} if url is not None else {}),
-					"reason": entry.get("reason") or "error",
-					"reason_description": entry.get("reason_description") or entry.get("error") or "",
-				})
+				self.failures.append(self._legacy_failure(
+					post_ids, url,
+					entry.get("reason"),
+					entry.get("reason_description") or entry.get("error"),
+					entry,
+				))
 				continue
 
 			# `files` key from video downloader due to channels and playlists
@@ -334,25 +339,80 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					file_success = file.get("success", True)
 					file_filename = file.get("filename")
 					if not file_success:
-						self.failures.append({
-							"post_ids": post_ids,
-							**({"url": url} if url is not None else {}),
-							"reason": file.get("reason") or "error",
-							"reason_description": file.get("reason_description") or file.get("error") or "",
-						})
+						# the shared outer entry data is preserved alongside the
+						# per-file data so e.g. the video `downloader` survives
+						self.failures.append(self._legacy_failure(
+							post_ids, url,
+							file.get("reason"),
+							file.get("reason_description") or file.get("error"),
+							entry, file,
+						))
 						continue
 					if not file_filename:
 						continue
-					extra = dict(file.get("metadata") or {})
 					self.items[file_filename] = self._build_item(
-						file_filename, post_ids, url, extra
+						file_filename, post_ids, url, self._legacy_extra(entry, file)
 					)
 			elif entry.get("filename"):
 				filename = entry["filename"]
 				self.items[filename] = self._build_item(
-					filename, post_ids, url, dict(entry.get("extra") or {})
+					filename, post_ids, url, self._legacy_extra(entry)
 				)
 			# else: malformed-but-tolerated; drop
+
+	# Legacy entry keys promoted to first-class v1 fields, or pure structure;
+	# every other key is producer data and is preserved under `extra`.
+	_LEGACY_NON_EXTRA_KEYS = frozenset({
+		"filename", "post_ids", "post_id", "url", "from_dataset", "success",
+		"files", "metadata", "extra",
+	})
+	# Additionally promoted on the failure path: failures have no `extra` of
+	# their own, but carry these as first-class fields.
+	_LEGACY_FAILURE_KEYS = frozenset({"reason", "reason_description", "error"})
+
+	@classmethod
+	def _legacy_extra(cls, *sources, exclude=frozenset()) -> dict:
+		"""
+		Flatten producer data from one or more legacy dicts into a single flat
+		`extra` dict; later sources win on a key clash.
+
+		Pre-v1 files had no `extra` key — per-file data (yt-dlp dumps, the
+		Stable Diffusion `prompt`, the video `downloader`, ...) sat at the top
+		level or inside a `metadata` sub-dict. Everything not promoted to a
+		first-class v1 field is kept so the migration loses nothing. `extra`
+		is kept flat because v1 consumers read keys off it directly.
+		"""
+		skip = cls._LEGACY_NON_EXTRA_KEYS | exclude
+		extra = {}
+		for source in sources:
+			if not isinstance(source, dict):
+				continue
+			extra.update({k: v for k, v in source.items() if k not in skip})
+			# a `metadata` (yt-dlp dump) or explicit `extra` is flattened in
+			for nested_key in ("metadata", "extra"):
+				nested = source.get(nested_key)
+				if isinstance(nested, dict):
+					extra.update(nested)
+		return extra
+
+	@classmethod
+	def _legacy_failure(cls, post_ids, url, reason, reason_description,
+						*extra_sources) -> dict:
+		"""
+		Build a v1 failure dict from legacy data. Leftover producer data is
+		preserved under the failure's own `extra` key.
+		"""
+		failure = {
+			"post_ids": post_ids,
+			"reason": reason or "error",
+			"reason_description": reason_description or "",
+		}
+		if url is not None:
+			failure["url"] = url
+		extra = cls._legacy_extra(*extra_sources, exclude=cls._LEGACY_FAILURE_KEYS)
+		if extra:
+			failure["extra"] = extra
+		return failure
 
 	@staticmethod
 	def _build_item(filename: str, post_ids: list, url, extra: dict) -> dict:
