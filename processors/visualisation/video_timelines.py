@@ -2,7 +2,6 @@
 Create timelines from collections of video frames
 """
 import base64
-import json
 import io
 
 from PIL import Image
@@ -14,7 +13,7 @@ from svgwrite.image import Image as ImageElement
 from ural import is_url
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
 from common.lib.dataset import DataSet
@@ -78,7 +77,10 @@ class VideoTimelines(BasicProcessor):
         return module.type in ["video-frames", "video-scene-frames"]
 
     def process(self):
-        metadata = {}
+        try:
+            metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            metadata = None
         base_height = self.parameters.get("height", 100)
         fontsize = 12
 
@@ -109,11 +111,9 @@ class VideoTimelines(BasicProcessor):
                 # final iteration in which we finish things up (see below)
                 looping = False
 
-            # there is a metadata file, always read first, which we can use
+            # skip the metadata file (already read via read_media_metadata)
             if item.file.name == ".metadata.json":
-                with item.file.open() as infile:
-                    metadata = json.load(infile)
-                    continue
+                continue
 
             # skip if file is a real file but not an image
             if looping and item.file.suffix not in (".jpeg", ".jpg", ".png", ".gif"):
@@ -205,25 +205,23 @@ class VideoTimelines(BasicProcessor):
         determine an appropriate label. There is a generalised heuristic and
         some data source-specific pathways.
 
-        :param metadata:  Metadata as parsed from the 'Extract Frames' JSON
+        :param MediaArchiveMetadata metadata:  Loaded archive metadata.
         :return dict:  Filename -> label mapping
         """
-        mapping_dataset = {}
-        mapping_ids = {}
-        labels = {}
-
         if not metadata:
             return {}
 
-        for url, data in metadata.items():
-            if data.get('success'):
-                for filename in [f["filename"] for f in data.get("files", [])]:
-                    filename = ".".join(filename.split(".")[:-1])
-                    mapping_ids[filename] = data["post_ids"]
-                    if data.get("from_dataset", data.get("source_dataset")) not in mapping_dataset:
-                        mapping_dataset[data.get("from_dataset", data.get("source_dataset"))] = []
-                    mapping_dataset[data.get("from_dataset", data.get("source_dataset"))].append(filename)
-                    labels[filename] = filename
+        mapping_dataset = {}
+        mapping_ids = {}
+        labels = {}
+        from_dataset = metadata.from_dataset
+
+        for filename, item in metadata.iter_entries():
+            basename = filename.rsplit(".", 1)[0]
+            mapping_ids[basename] = item.get("post_ids", [])
+            if from_dataset:
+                mapping_dataset.setdefault(from_dataset, []).append(basename)
+            labels[basename] = basename
 
         for dataset, urls in mapping_dataset.items():
             dataset = DataSet(key=dataset, db=self.db, modules=self.modules).nearest("*-search")
