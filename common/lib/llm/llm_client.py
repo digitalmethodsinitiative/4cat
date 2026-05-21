@@ -29,10 +29,10 @@ class LLMProviderClient:
         :return LLMProviderClient:
         """
         # in-line import because we otherwise get circular import shenanigans
-        from common.lib.llm.ollama_client import OllamaClient
-        from common.lib.llm.litellm_client import LiteLLMClient
-        from common.lib.llm.lmstudio_client import LMStudioClient
-        from common.lib.llm.thirdparty_client import ThirdPartyClient
+        from common.lib.llm.clients.ollama_client import OllamaClient
+        from common.lib.llm.clients.litellm_client import LiteLLMClient
+        from common.lib.llm.clients.lmstudio_client import LMStudioClient
+        from common.lib.llm.clients.thirdparty_client import ThirdPartyClient
 
         for client_type in (OllamaClient, LiteLLMClient, LMStudioClient, ThirdPartyClient):
             if client_type.type == provider_config["type"]:

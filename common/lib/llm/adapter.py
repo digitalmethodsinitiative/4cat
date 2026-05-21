@@ -5,7 +5,6 @@ import mimetypes
 from pathlib import Path
 from typing import List, Optional, Union
 
-from langchain_community.chat_models import ChatLiteLLM
 from pydantic import SecretStr
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -141,7 +140,8 @@ class LLMAdapter:
             lc_messages = messages
 
         kwargs = {"temperature": temperature}
-        if self.provider["type"] in ("google", "ollama") or "o3" in self.model["local_id"] or "gpt-5" in self.model["local_id"]:
+        if self.provider["type"] in ("google", "ollama") or "o3" in self.model["local_id"] or "gpt-5" in self.model[
+            "local_id"]:
             kwargs = {}
 
         try:
@@ -152,10 +152,10 @@ class LLMAdapter:
         return response
 
     def create_multimodal_content(
-        self,
-        text: str,
-        media_urls: Optional[List[str]] = None,
-        media_files: Optional[List[Union[str, Path]]] = None,
+            self,
+            text: str,
+            media_urls: Optional[List[str]] = None,
+            media_files: Optional[List[Union[str, Path]]] = None,
     ) -> List[dict]:
         """
         Create multimodal content structure for LangChain messages with media URLs
@@ -204,11 +204,11 @@ class LLMAdapter:
         return content
 
     def _format_media_block(
-        self,
-        url: Optional[str] = None,
-        b64_data: Optional[str] = None,
-        mime_type: str = "image/jpeg",
-        media_category: str = "image",
+            self,
+            url: Optional[str] = None,
+            b64_data: Optional[str] = None,
+            mime_type: str = "image/jpeg",
+            media_category: str = "image",
     ) -> dict:
         """
         Format a single media block for the appropriate provider.

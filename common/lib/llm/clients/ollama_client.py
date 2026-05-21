@@ -11,6 +11,7 @@ import requests
 
 from common.lib.llm.llm_client import LLMProviderClient
 
+
 class OllamaClient(LLMProviderClient):
     type = "ollama"
 
@@ -187,13 +188,15 @@ class OllamaClient(LLMProviderClient):
             )
 
             if r.status_code != 200 and self.log:
-                self.log.warning(f"{self.__class__.__name__}: failed to pull model {model_id} from {self.base_url}, status code {r.status_code}: {r.text}")
+                self.log.warning(
+                    f"{self.__class__.__name__}: failed to pull model {model_id} from {self.base_url}, status code {r.status_code}: {r.text}")
 
             return r.status_code == 200
 
         except requests.RequestException as e:
             if self.log:
-                self.log.warning(f"{self.__class__.__name__}: failed to pull model {model_id} from {self.base_url}: {e}")
+                self.log.warning(
+                    f"{self.__class__.__name__}: failed to pull model {model_id} from {self.base_url}: {e}")
 
             return False
 
@@ -211,9 +214,11 @@ class OllamaClient(LLMProviderClient):
                 timeout=30,
             )
             if r.status_code != 200 and self.log:
-                self.log.warning(f"{self.__class__.__name__}: failed to delete model {model_id} from {self.base_url}, status code {r.status_code}: {r.text}")
+                self.log.warning(
+                    f"{self.__class__.__name__}: failed to delete model {model_id} from {self.base_url}, status code {r.status_code}: {r.text}")
             return r.status_code == 200
         except requests.RequestException as e:
             if self.log:
-                self.log.warning(f"{self.__class__.__name__}: failed to delete model {model_id} from {self.base_url}: {e}")
+                self.log.warning(
+                    f"{self.__class__.__name__}: failed to delete model {model_id} from {self.base_url}: {e}")
             return False

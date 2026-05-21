@@ -6,6 +6,7 @@ import json
 
 from common.lib.llm.llm_client import LLMProviderClient
 
+
 class ThirdPartyClient(LLMProviderClient):
     type = "api"
 

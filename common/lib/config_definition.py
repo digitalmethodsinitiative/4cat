@@ -581,7 +581,15 @@ config_definition = {
     },
     "llm.providers": {
         "type": UserInput.OPTION_MULTI_OPTION,
-        "default": [],
+        "default": [
+            {
+                "name": "Third-party APIs (OpenAI, Google, Claude, Mistral, etc)",
+                "type": "api",
+                "url": "",
+                "auth_header": "",
+                "auth_key": ""
+            }
+        ],
         "global": True,
         "help": "LLM providers",
         "options": {
@@ -598,7 +606,8 @@ config_definition = {
                 "options": {
                     "ollama": "Ollama",
                     "litellm": "LiteLLM",
-                    "api": "Third-party models via APIs (OpenAI, Mistral, etc)",
+                    "lmstudio": "LM Studio",
+                    "vllm": "vLLM",
                     "none": "None",
                 },
             },

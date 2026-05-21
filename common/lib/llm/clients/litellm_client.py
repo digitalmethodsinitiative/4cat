@@ -1,22 +1,23 @@
 """
-Centralized HTTP client for communicating with a vLLM server.
+Centralized HTTP client for communicating with a LiteLLM server.
 
-This class owns all direct HTTP calls to vLLM's REST API and provides shared
+This class owns all direct HTTP calls to LiteLLM's REST API and provides shared
 static helpers for capability parsing, display-name formatting, and building
 canonical llm.available_models entries. It is a plain helper with no 4CAT
 base-class dependency.
 
+This class is primarily intended for interfacing with LiteLLM, but since
+LiteLLM itself is mostly OpenAI API-compatible, this can be used to interface
+with the OpenAI API as well.
 """
-import requests
-
 from common.lib.llm.llm_client import LLMProviderClient
 
-class VLLMClient(LLMProviderClient):
-    type = "vllm"
+class LiteLLMClient(LLMProviderClient):
+    type = "litellm"
 
     _models_info_path = "/model/info"
     _models_info_key = "data"
-    _model_id_key = "model"
+    _model_id_key = "model_name"
 
     def parse_supported_media_types(self, meta: dict) -> list[str]:
         """
