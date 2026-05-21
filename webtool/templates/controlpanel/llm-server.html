@@ -33,12 +33,10 @@
             {% else %}
                 {% for provider in providers %}
                 <tr>
-                    <td><a href="{{ provider.url }}">{{ provider.name }}</a></td>
+                    <td><span class="property-badge">{{ provider.type }}</span> <a href="{{ provider.url }}">{{ provider.name }}</a></td>
                     <td>
                         {% if provider.status == "online" %}
                             <span style="color: green;"><i class="fa fa-check-circle" aria-hidden="true"></i> Online</span>
-                        {% elif provider.status == "not configured" %}
-                            <span style="color: grey;"><i class="fa fa-minus-circle" aria-hidden="true"></i> Not configured</span>
                         {% else %}
                             <span style="color: red;"><i class="fa fa-times-circle" aria-hidden="true"></i> {{ provider.status }}</span>
                         {% endif %}
@@ -64,23 +62,17 @@
                     <col>
                     <col>
                     <col>
-                    <col>
                     <col class="actions">
                 </colgroup>
                 <tr>
+                    <th>Name</th>
                     <th>Provider/model</th>
-                    <th>Display name</th>
                     <th>Capabilities</th>
                     <th>Status</th>
-                    <th>Actions</th>
                 </tr>
                 {% if available_models %}
                     {% for model_id, model in available_models.items() %}
                     <tr>
-                        <td>
-                            <span class="property-badge">{{ model.provider_type }}/{{ model.provider|hostname }}</span>
-                            {{ model.local_id }}
-                        </td>
                         <td>
                             {% if model.model_card %}
                                 <a href="{{ model.model_card }}" target="_blank" rel="noopener">{{ model.name }}</a>
@@ -89,14 +81,11 @@
                             {% endif %}
                         </td>
                         <td>
-                            <span class="property-badge">{{ model.supported_media_types | join(", ") }}</span>
+                            <span class="property-badge">{{ model.provider_type }}/{{ model.provider|hostname }}</span><br>
+                            {{ model.local_id }}
                         </td>
                         <td>
-                            {% if model_id in enabled_models %}
-                                <span style="color: green;"><i class="fa fa-check" aria-hidden="true"></i> Enabled</span>
-                            {% else %}
-                                <span style="color: grey;"><i class="fa fa-minus" aria-hidden="true"></i> Disabled</span>
-                            {% endif %}
+                            <span class="property-badge">{{ model.supported_media_types | join(", ") }}</span>
                         </td>
                         <td>
                             {% if model_id in enabled_models %}
@@ -128,7 +117,8 @@
                     <tr>
                         <td colspan="5">
                             {% if providers %}
-                                No models found. Use the <strong>Refresh</strong> button to fetch available models, or pull a new model below.
+                                No models found. Use the <strong>Refresh</strong> button to fetch available models, or
+                                install a new model below with compatible providers.
                             {% else %}
                                 No LLM providers configured.
                             {% endif %}

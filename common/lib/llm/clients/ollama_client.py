@@ -5,8 +5,6 @@ This class owns all direct HTTP calls to Ollama's REST API and provides shared s
 helpers for capability parsing, display-name formatting, and building canonical
 llm.available_models entries. It is a plain helper with no 4CAT base-class dependency.
 """
-
-import re
 import requests
 
 from common.lib.llm.llm_client import LLMProviderClient
@@ -18,6 +16,33 @@ class OllamaClient(LLMProviderClient):
     _models_info_path = "/api/tags"
     _models_info_key = "models"
     _model_id_key = "model"
+
+    def list_models(self) -> list[dict]:
+        """
+        List all models available.
+
+        For Ollama, get some additional model info via an extra API request.
+
+        :return list[dict]: List of models available.:
+        """
+        models = super().list_models()
+        result = []
+        for model in models:
+            try:
+                model_info = self._session.post(
+                    f"{self.base_url}/api/show",
+                    json={"model": model[self._model_id_key]},
+                    headers=self._headers,
+                    timeout=self.timeout,
+                ).json()
+                result.append({**model, "model_info": model_info["model_info"]})
+            except (requests.exceptions.HTTPError, KeyError) as e:
+                self.log.warning(
+                    f"{self.__class__.__name__}: failed to fetch additional model info for model {model[self._model_id_key]}: {e}")
+
+        return result
+
+
 
     def parse_supported_media_types(self, meta: dict) -> list[str]:
         """Derive the media types a model supports from its Ollama metadata.
@@ -71,97 +96,29 @@ class OllamaClient(LLMProviderClient):
         """
         Build a human-readable display name for a model.
 
-        :param dict meta:  Model metadata
-        :returns str:  Human-readable display name string.
+        :param model_id:    Raw Ollama model identifier (e.g. ``"llama3:8b"``).
+        :param meta:        ``/api/show`` response dict, or ``None``.
+        :returns:           Human-readable display name string.
         """
-        model_info = meta.get("model_info", {}) if meta else {}
-        model_id = self.get_global_model_id(meta)
-        details = meta.get("details", {}) if meta else {}
+        model_name = self.get_model_id(meta)
 
-        basename = None
-        for key in ("general.basename", "general.base_model.0.name"):
-            val = model_info.get(key)
-            if val:
-                basename = str(val).strip()
-                break
-        if not basename:
-            basename = model_id.split(":", 1)[0].replace("-", " ").replace("_", " ").strip() or model_id
+        extra_bits = []
+        if meta.get("model_info"):
+            if meta["model_info"].get("general.basename"):
+                model_name = meta["model_info"]["general.basename"]
 
-        def _parse_param_count(val):
-            if val is None:
-                return None
-            if isinstance(val, int):
-                return val
-            if isinstance(val, float):
-                return int(val)
-            s = str(val).strip().replace(",", "")
-            if not s:
-                return None
-            m = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*([BbMm])$", s)
-            if m:
-                num = float(m.group(1))
-                suf = m.group(2).upper()
-                return int(num * (1_000_000_000 if suf == "B" else 1_000_000))
-            try:
-                return int(float(s))
-            except Exception:
-                return None
+            if meta["model_info"].get("general.finetune"):
+                extra_bits.append(meta["model_info"]["general.finetune"])
 
-        def _humanize(n):
-            if n is None:
-                return None
-            n = int(n)
-            if n >= 1_000_000_000:
-                x = n / 1_000_000_000
-                s = f"{x:.1f}" if x < 10 else f"{int(round(x))}"
-                if s.endswith(".0"):
-                    s = s[:-2]
-                return f"{s}B"
-            if n >= 1_000_000:
-                x = n / 1_000_000
-                s = f"{x:.1f}" if x < 10 else f"{int(round(x))}"
-                if s.endswith(".0"):
-                    s = s[:-2]
-                return f"{s}M"
-            return f"{n:,}"
+            if meta["model_info"].get("general.size_label"):
+                extra_bits.append(meta["model_info"]["general.size_label"])
 
-        param_candidate = None
-        for key in ("parameter_size", "parameter_count"):
-            if key in details:
-                param_candidate = details.get(key)
-                break
-        if param_candidate is None:
-            param_candidate = model_info.get("general.parameter_count")
-        human = _humanize(_parse_param_count(param_candidate))
+        elif meta.get("details") and meta["details"].get("parameter_size"):
+            extra_bits.append(f"{meta['details']['parameter_size']} parameters")
 
-        size_label = model_info.get("general.size_label")
-        size_label_norm = str(size_label).strip() if size_label else None
+        model_name += f" ({', '.join(extra_bits)})"
 
-        tag = model_id.split(":", 1)[1].strip() if ":" in model_id else None
-
-        if tag:
-            tl = tag.lower()
-            if tl in ("latest", "stable", "current"):
-                suffix = f"{tag} · {human}" if human else tag
-            else:
-                m = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*([bBmM])$", tag)
-                if m:
-                    tag_size = f"{m.group(1)}{m.group(2).upper()}"
-                    if size_label_norm and size_label_norm.upper() == tag_size.upper():
-                        suffix = size_label_norm
-                    else:
-                        suffix = tag_size
-                else:
-                    suffix = f"{tag} · {human}" if human else tag
-        else:
-            if size_label_norm:
-                suffix = size_label_norm
-            elif human:
-                suffix = human
-            else:
-                return model_id
-
-        return f"{basename} ({suffix})"
+        return model_name
 
     def get_model_card_url(self, meta: dict) -> str:
         """

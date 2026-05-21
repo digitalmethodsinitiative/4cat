@@ -44,7 +44,7 @@ class LMStudioClient(LLMProviderClient):
         :param meta:        ``/api/show`` response dict, or ``None``.
         :returns:           Human-readable display name string.
         """
-        model_name = self.get_global_model_id(meta)
+        model_name = self.get_model_id(meta)
 
         if meta.get("display_name"):
             model_name = meta["display_name"]
