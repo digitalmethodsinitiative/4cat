@@ -55,13 +55,19 @@ class LLMPrompter(BasicProcessor):
         local_queue = "local_models" 
         if not dataset:
             return local_queue
+
+        model = dataset.parameters.get("model")
+        if model.startswith("api"):
+            # API-based models have their own queue - no local resources being
+            # used so can be concurrent
+            return f"llm-api-{dataset.key}"
         else:
-            if dataset.parameters.get('api_or_local', 'api') in ["local", "hosted"]:
-                # Hosted models also go in the local queue since they use the same shared LLM server
-                return local_queue
-        
-        # Queue per model/API type
-        return f"{cls.type}-{dataset.parameters.get('api_or_local', 'api')}-{dataset.parameters.get('api_model', 'none')}"
+            # use the model URL as the queue ID (extracted from the model
+            # global ID)
+            # this is not fool-proof, but does mean not more than one dataset
+            # runs per API server - in the scenario of these running locally,
+            # it means things do not run concurrently (which is good)
+            return f"llm-local-{dataset.parameters.get('model').split('-')[1]}"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -311,6 +317,7 @@ class LLMPrompter(BasicProcessor):
         # Text-based datasets
         if module.get_extension() in ["csv", "ndjson"]:
             return True
+
         # Media datasets (zip archives with images, video, or audio)
         if module.get_extension() == "zip" and module.get_media_type() in ("image", "video", "audio"):
             return True
@@ -345,9 +352,8 @@ class LLMPrompter(BasicProcessor):
 
         # Set value for batch length in prompts
         batches = max(1, min(self.parameters.get("batches", 1), self.source_dataset.num_rows))
-        use_batches = batches > 1
-        if media_columns or is_media_archive:  # no batching for media files
-            use_batches = False
+        use_batches = batches > 1 and not (media_columns or is_media_archive)  # no batching for media files
+
         if not use_batches:
             self.dataset.delete_parameter("batches")
 
