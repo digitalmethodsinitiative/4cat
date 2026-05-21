@@ -2,10 +2,9 @@
 Filter by unique images
 """
 import shutil
-import json
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.helpers import UserInput, hash_file
 
 __author__ = "Stijn Peeters"
@@ -76,7 +75,7 @@ class UniqueImageFilter(BasicProcessor):
         """
         seen_hashes = set()
         hash_map = {}
-        metadata = None
+        hash_type = self.parameters.get("hash-type")
         dupes = 0
         processed = 0
         staging_area = self.dataset.get_staging_area()
@@ -93,11 +92,9 @@ class UniqueImageFilter(BasicProcessor):
             processed += 1
 
             if image.file.name == ".metadata.json":
-                with image.file.open() as infile:
-                    metadata = json.load(infile)
                 continue
 
-            image_hash = hash_file(image.file, self.parameters.get("hash-type"))
+            image_hash = hash_file(image.file, hash_type)
 
             if image_hash not in seen_hashes:
                 seen_hashes.add(image_hash)
@@ -107,21 +104,37 @@ class UniqueImageFilter(BasicProcessor):
                 self.dataset.log(f"{image.file.name} is a duplicate of {hash_map[image_hash]} - skipping")
                 dupes += 1
 
-        new_metadata = {}
-        inverse_hashmap = {v: k for k, v in hash_map.items()}
-        if metadata:
-            for url, item in metadata.items():
-                if item["filename"] in inverse_hashmap:
-                    new_metadata[inverse_hashmap[item["filename"]]] = {
-                        **item,
-                        "hash": inverse_hashmap[item["filename"]],
-                        "hash_type": self.parameters.get("hash-type")
-                    }
-        else:
-            new_metadata = {hash_map[k]: {"filename": hash_map[k], "hash": k, "hash_type": self.parameters.get("hash-type")} for k in hash_map}
+        try:
+            source_metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            source_metadata = None
 
-        with staging_area.joinpath(".metadata.json").open("w") as outfile:
-            json.dump(new_metadata, outfile)
+        new_metadata = self.dataset.new_media_metadata(
+            processor_type=self.type,
+            from_dataset=(source_metadata.from_dataset if source_metadata else self.source_dataset.key),
+        )
+        inverse_hashmap = {v: k for k, v in hash_map.items()}
+        if source_metadata is not None:
+            for filename, item in source_metadata.iter_entries():
+                if filename not in inverse_hashmap:
+                    continue
+                extra = dict(item.get("extra") or {})
+                extra["hash"] = inverse_hashmap[filename]
+                extra["hash_type"] = hash_type
+                new_metadata.add_item(
+                    filename,
+                    post_ids=item.get("post_ids", []),
+                    url=item.get("url"),
+                    extra=extra,
+                )
+        else:
+            for h, filename in hash_map.items():
+                new_metadata.add_item(
+                    filename, post_ids=[],
+                    extra={"hash": h, "hash_type": hash_type},
+                )
+
+        new_metadata.write(staging_area)
 
         self.dataset.update_status(f"Image archive filtered, found {dupes:,} duplicate(s)", is_final=True)
         self.write_archive_and_finish(staging_area, len(hash_map), finish=True)

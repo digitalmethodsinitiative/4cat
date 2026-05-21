@@ -266,6 +266,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		"""
 		for outer_key, entry in raw.items():
 			if not isinstance(entry, dict):
+				# malformed; should not exist
 				continue
 
 			post_ids = entry.get("post_ids")
@@ -274,11 +275,13 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			post_ids = self._normalize_post_ids(post_ids)
 
 			url = entry.get("url")
+			# check if the key was a URL
 			if url is None and isinstance(outer_key, str) and (
 					outer_key.startswith("http://") or outer_key.startswith("https://")):
 				url = outer_key
 
-			if self.from_dataset is None and entry.get("from_dataset"):
+			# existing `from_dataset`is correct if exists
+			if entry.get("from_dataset"):
 				self.from_dataset = entry["from_dataset"]
 
 			success = entry.get("success", True)
@@ -292,6 +295,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 				})
 				continue
 
+			# `files` key from video downloader due to channels and playlists
 			files = entry.get("files")
 			if isinstance(files, list) and files:
 				for file in files:
