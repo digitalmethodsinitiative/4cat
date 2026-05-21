@@ -263,8 +263,17 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			self.software_version = raw.get("software_version")
 			self.software_source = raw.get("software_source")
 
-			self.items = dict(raw.get("items", {}))
-			self.failures = list(raw.get("failures", []))
+			# post_ids are string-coerced on write, but normalize on read too
+			# so consumers never have to: some source datasets use integer ids,
+			# and hand-edited or externally-produced files may carry them.
+			self.items = {
+				filename: self._normalize_entry_post_ids(entry)
+				for filename, entry in dict(raw.get("items", {})).items()
+			}
+			self.failures = [
+				self._normalize_entry_post_ids(failure)
+				for failure in list(raw.get("failures", []))
+			]
 			return
 
 		# version is None here (a mismatching version would have raised
@@ -403,6 +412,18 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		if isinstance(post_ids, (str, int)):
 			return [str(post_ids)]
 		return [str(p) for p in post_ids]
+
+	@classmethod
+	def _normalize_entry_post_ids(cls, entry):
+		"""
+		Return a copy of an item/failure dict with `post_ids` coerced to a
+		list of strings. Non-dict entries are returned unchanged.
+		"""
+		if not isinstance(entry, dict) or "post_ids" not in entry:
+			return entry
+		entry = dict(entry)
+		entry["post_ids"] = cls._normalize_post_ids(entry["post_ids"])
+		return entry
 
 	# -- access --
 
