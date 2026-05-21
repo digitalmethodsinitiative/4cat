@@ -2,12 +2,11 @@
 Hash images
 """
 import csv
-import json
 
 from PIL import UnidentifiedImageError
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.helpers import UserInput, hash_image, stringify_hash
 from processors.metrics.group_hashes import HashGrouper
 
@@ -117,50 +116,25 @@ class ImageHasher(BasicProcessor):
         group_by = self.parameters.get("group-by", False)
         similarity_pct = float(self.parameters.get("similarity-threshold", 4))
 
-        # Get staging area
-        staging_area = self.dataset.get_staging_area()
-
-        # Extract metadata if present
         try:
-            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
-        except FileNotFoundError:
-            metadata_file = None
+            source_metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            source_metadata = None
 
-        metadata_extra_fields = ["post_ids", "post_id", "url", "from_dataset"]
         image_data_by_filename = {}
-        if metadata_file:
-            with open(metadata_file) as file:
-                image_data = json.load(file)
-                for url, item in image_data.items():
-                    if "filename" in item:
-                        image_data_by_filename[item["filename"]] = item
-                    elif "files" in item:
-                        files = item.get('files')
-                        if not isinstance(files, list):
-                            self.log.warning(f"Invalid 'files' entry in metadata (expected list, got {type(files)}); cannot use file metadata")
-                            image_data_by_filename = {}
-                            break
-                        for file in files:
-                            if "filename" in file:
-                                # add extra fields from parent item if not present in file entry
-                                for key in metadata_extra_fields:
-                                    if key in file:
-                                        continue
-                                    elif key in item:
-                                        file[key] = item[key]
-                                image_data_by_filename[file["filename"]] = file
-                                
-                self.dataset.log("Found and loaded image metadata")
+        if source_metadata is not None:
+            for filename, item in source_metadata.iter_entries():
+                image_data_by_filename[filename] = item
+            self.dataset.log("Found and loaded image metadata")
         else:
             self.dataset.log("No image metadata found")
-            image_data_by_filename = {}
 
         # Set up CSV fieldnames (always include hash_size even if crhash to indicate 'None')
         base_fields = ["filename", "image_hash", "hash_type", "hash_size"]
+        metadata_extra_fields = ["post_ids", "url", "from_dataset"]
         fieldnames = (["group"] if group_by else []) + base_fields
         if image_data_by_filename:
-            example = next(iter(image_data_by_filename.values()))
-            fieldnames.extend([key for key in metadata_extra_fields if key in example.keys()])
+            fieldnames.extend(metadata_extra_fields)
 
         processed = 0
         skipped = 0
@@ -209,9 +183,10 @@ class ImageHasher(BasicProcessor):
         with self.dataset.get_results_path().open("w", newline="", encoding="utf-8") as output:
             writer = csv.DictWriter(output, fieldnames=fieldnames)
             writer.writeheader()
+            from_dataset = source_metadata.from_dataset if source_metadata else ""
             for it in items:
                 image_metadata = image_data_by_filename.get(it["filename"], {})
-                
+
                 # Convert hash object to string for CSV storage
                 hash_str = stringify_hash(it["hash_obj"], it["hash_type"])
                 row = {
@@ -221,10 +196,10 @@ class ImageHasher(BasicProcessor):
                     "image_hash": hash_str,
                     "hash_type": it["hash_type"],
                 }
-                # Add optional metadata fields if present
-                for key in fieldnames:
-                    if key not in row:
-                        row[key] = image_metadata.get(key, "")
+                if image_data_by_filename:
+                    row["post_ids"] = ", ".join(image_metadata.get("post_ids", []))
+                    row["url"] = image_metadata.get("url", "")
+                    row["from_dataset"] = from_dataset
                 writer.writerow(row)
 
         final_msg = f"Processed {processed:,} images"
