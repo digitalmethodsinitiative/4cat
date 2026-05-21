@@ -4,8 +4,6 @@ Manage LLM models
 from backend.lib.worker import BasicWorker
 from common.lib.llm.llm_client import LLMProviderClient
 
-import json
-
 class LLMProviderManager(BasicWorker):
 	"""
 	Manages LLM models

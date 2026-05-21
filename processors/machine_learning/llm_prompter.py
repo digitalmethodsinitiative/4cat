@@ -13,8 +13,6 @@ from json import JSONDecodeError
 from jsonschema.exceptions import ValidationError, SchemaError
 from datetime import datetime, timedelta
 
-from matplotlib.style.core import available
-
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
@@ -351,7 +349,6 @@ class LLMPrompter(BasicProcessor):
 
         # Set all variables through which we can reach the LLM
         api_key = ""
-        base_url = None
         client_kwargs = {}
 
         # load model and providermetadata

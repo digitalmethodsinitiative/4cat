@@ -3,8 +3,6 @@
 """
 import time
 
-import requests
-
 from flask import Blueprint, render_template, flash, get_flashed_messages, redirect, url_for, request, g
 from flask_login import login_required
 
