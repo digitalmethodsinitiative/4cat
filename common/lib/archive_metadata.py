@@ -98,10 +98,13 @@ class ArchiveMetadataFile:
 		instance._populate_from_raw(raw)
 		return instance
 
-	@staticmethod
-	def _load_raw(dataset, results_file: Path, filename: str) -> dict:
+	@classmethod
+	def _load_raw(cls, dataset, results_file: Path, filename: str) -> dict:
 		"""
 		Locate and JSON-decode the metadata file (zip member or folder).
+
+		:raises FileNotFoundError:  the file is not present.
+		:raises MetadataException:  the file is present but not valid JSON.
 		"""
 		# if the dataset has a zip archive, look inside it
 		if results_file.suffix == ".zip":
@@ -109,21 +112,34 @@ class ArchiveMetadataFile:
 				if filename not in archive.namelist():
 					raise FileNotFoundError(f"No metadata file {filename} in archive {results_file.name}.")
 				with archive.open(filename) as f:
-					return json.load(f)
+					return cls._decode_json(f, filename)
 
 		# it is possible we have a results folder w/ metadata instead; look there
 		results_folder = dataset.get_results_folder_path()
 		if not results_folder.is_dir():
 			raise FileNotFoundError(f"No metadata file {filename} found (no results folder).")
-		
+
 		# check that the file exists
 		metadata_path = results_folder / filename
 		if not metadata_path.is_file():
 			raise FileNotFoundError(f"No metadata file {filename} in {results_folder}.")
-		
+
 		# load the metadata!
 		with open(metadata_path) as f:
-			return json.load(f)
+			return cls._decode_json(f, filename)
+
+	@staticmethod
+	def _decode_json(fp, filename: str) -> dict:
+		"""
+		JSON-decode an open file object, surfacing decode errors as
+		`MetadataException`. Without this a corrupt metadata file raises
+		`json.JSONDecodeError`, which escapes the `(FileNotFoundError,
+		MetadataException)` handler every consumer uses.
+		"""
+		try:
+			return json.load(fp)
+		except json.JSONDecodeError as e:
+			raise MetadataException(f"Metadata file {filename} is not valid JSON: {e}") from e
 
 	@classmethod
 	def _check_schema_version(cls, raw: dict) -> Optional[int]:
@@ -170,7 +186,7 @@ class ArchiveMetadataFile:
 		# validate before writing; this will be a sanity check for fields (or whatever)
 		self.validate()
 
-		# write it first to a staging area, then move it to the target location 
+		# write it first to a staging area, then move it to the target location
 		# should avoid leaving a half-written file if something goes wrong
 		staging_area = Path(staging_area)
 		target = staging_area / filename
