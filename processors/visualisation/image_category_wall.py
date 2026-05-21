@@ -3,7 +3,6 @@ Create an image wall using categories.
 """
 import io
 import base64
-import json
 import math
 
 from svgwrite.image import Image as ImageElement
@@ -16,7 +15,7 @@ from PIL import Image
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -204,17 +203,16 @@ class ImageCategoryWallGenerator(BasicProcessor):
             filename_map = {filename.stem: [filename] for filename in staging_area.iterdir()}
         else:
             # Use image metadata to map post IDs to filenames
-            with open(staging_area.joinpath('.metadata.json')) as file:
-                image_data = json.load(file)
+            try:
+                metadata = image_dataset.read_media_metadata()
+            except (FileNotFoundError, MetadataException):
+                self.dataset.finish_with_error("No metadata file found")
+                return
             filename_map = {}
             # Images can belong to multiple posts; posts can have multiple images
-            for image in image_data.values():
-                if image.get("success"):
-                    for post_id in image.get("post_ids"):
-                        if post_id not in filename_map:
-                            filename_map[post_id] = [staging_area.joinpath(image.get("filename"))]
-                        else:
-                            filename_map[post_id].append(staging_area.joinpath(image.get("filename")))
+            for filename, item in metadata.iter_entries():
+                for post_id in item.get("post_ids", []):
+                    filename_map.setdefault(post_id, []).append(staging_area.joinpath(filename))
 
         # Organize posts into categories
         category_type = None

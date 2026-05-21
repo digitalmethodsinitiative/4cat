@@ -1,8 +1,6 @@
 """
 Make a bipartite Image-Item network
 """
-import json
-
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import hash_file
 
@@ -13,7 +11,7 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.user_input import UserInput
 
 
@@ -110,49 +108,45 @@ class ImageGrapher(BasicProcessor):
         column = self.parameters.get("column")
         hash_type = self.parameters.get("deduplicate")
         filename_filter = [".metadata.json"] if hash_type == "none" else []
-        metadata = None
         hashed = 0
 
-        # some maps to make sure we use the right value in the right place
-        # url or filename, original image or duplicate, etc
-        file_hash_map = {}
+        try:
+            metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            return self.dataset.finish_with_error("No valid metadata found in image archive - this processor can only "
+                                                  "be run on sets of images sourced from another 4CAT dataset.")
+
+        # File maps used during graph construction. With v1 metadata each
+        # entry is already keyed by filename, so the file_hash_map starts as
+        # the identity mapping; if image-value is "url" we'll resolve via
+        # file_url_map at edge-write time.
+        file_hash_map = {filename: filename for filename, _ in metadata.iter_entries()}
         hash_file_map = {}
         seen_hashes = set()
         id_file_map = {}
 
         for image in self.source_dataset.iterate_items(filename_filter=filename_filter):
             if image.file.name == ".metadata.json":
-                with image.file.open() as infile:
-                    try:
-                        metadata = json.load(infile)
-                        file_hash_map = {i: v["filename"] for i, v in metadata.items()} if self.parameters.get("image-value") == "url" else {i["filename"]: i["filename"] for i in metadata.values()}
-                    except json.JSONDecodeError:
-                        pass
-            else:
-                try:
-                    hashed += 1
-                    if hashed % 100 == 0:
-                        self.dataset.update_status(f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows-1:,} item(s)")
-                    self.dataset.update_progress(hashed / (self.source_dataset.num_rows-1) * 0.5)
-                    file_hash = hash_file(image.file, hash_type)
-                    file_hash_map[image.file.name] = file_hash
-                    if file_hash not in hash_file_map:
-                        hash_file_map[file_hash] = image.file.name
+                continue
+            try:
+                hashed += 1
+                if hashed % 100 == 0:
+                    self.dataset.update_status(f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows-1:,} item(s)")
+                self.dataset.update_progress(hashed / (self.source_dataset.num_rows-1) * 0.5)
+                file_hash = hash_file(image.file, hash_type)
+                file_hash_map[image.file.name] = file_hash
+                if file_hash not in hash_file_map:
+                    hash_file_map[file_hash] = image.file.name
+            except (FileNotFoundError, ValueError):
+                continue
 
-                except (FileNotFoundError, ValueError):
-                    continue
-
-        if not metadata:
-            return self.dataset.finish_with_error("No valid metadata found in image archive - this processor can only "
-                                                  "be run on sets of images sourced from another 4CAT dataset.")
-
-        file_url_map = {v["filename"]: u for u, v in metadata.items()}
-        for url, details in metadata.items():
-            for item_id in details.get("post_ids", []):
+        file_url_map = {filename: item.get("url", "") for filename, item in metadata.iter_entries()}
+        for filename, item in metadata.iter_entries():
+            for item_id in item.get("post_ids", []):
                 if self.source_dataset.type.endswith("-telegram"):
                     # telegram has weird IDs
-                    item_id = "-".join(details["filename"].split("-")[:-1]) + "-" + str(item_id)
-                id_file_map[item_id] = details["filename"]
+                    item_id = "-".join(filename.split("-")[:-1]) + "-" + str(item_id)
+                id_file_map[item_id] = filename
 
         root_dataset = self.get_root_dataset(self.dataset)
         self.for_cleanup.append(root_dataset)
