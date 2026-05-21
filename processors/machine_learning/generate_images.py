@@ -273,22 +273,23 @@ class StableDiffusionImageGenerator(BasicProcessor):
             return f"{id}-{safe_prompt}.jpeg"
 
         self.dataset.update_status("Verifying results")
-        with output_dir.joinpath(".metadata.json").open("w") as outfile:
-            metadata = {
-                prompt_id: {
-                    "from_dataset": self.source_dataset.key,
-                    "filename": make_filename(prompt_id, data["prompt"]),
-                    "success": output_dir.joinpath(make_filename(prompt_id, data["prompt"])).exists(),
-                    "post_ids": [prompt_id],
-                    "prompt": data["prompt"],
-                    "negative-prompt": data["negative"],
-                } for prompt_id, data in prompts.items()
-            }
-            json.dump(metadata, outfile)
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type, from_dataset=self.source_dataset.key
+        )
+        for prompt_id, data in prompts.items():
+            filename = make_filename(prompt_id, data["prompt"])
+            extra = {"prompt": data["prompt"], "negative-prompt": data["negative"]}
+            if output_dir.joinpath(filename).exists():
+                metadata.add_item(filename, post_ids=[prompt_id], extra=extra)
+            else:
+                metadata.add_failure(post_ids=[prompt_id], reason="error",
+                                     reason_description="Generated image not found on disk")
+        metadata.write(output_dir)
 
         shutil.rmtree(staging_area)
 
+        successful = len(metadata)
         self.dataset.update_status(
-            f"Generated {len([r for r in metadata.values() if r['success']]):,} image(s) for {len(prompts):,} prompt(s)",
+            f"Generated {successful:,} image(s) for {len(prompts):,} prompt(s)",
             is_final=True)
-        self.write_archive_and_finish(output_dir, num_items=len([r for r in metadata.values() if r['success']]))
+        self.write_archive_and_finish(output_dir, num_items=successful)

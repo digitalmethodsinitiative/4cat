@@ -10,7 +10,7 @@ from pathlib import Path
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -126,8 +126,12 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         processed = 0
         done = 0
 
-        # Get the .metadata.json file if we're writing annotations so we can add them to specific rows.
-        img_metadata = []
+        # Load the metadata file so we can attach source post IDs to annotations.
+        try:
+            source_metadata = self.source_dataset.read_media_metadata()
+            img_metadata = source_metadata.filename_to_post_ids()
+        except (FileNotFoundError, MetadataException):
+            img_metadata = {}
 
         # Loop through images
         for image in self.source_dataset.iterate_items():
@@ -138,13 +142,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             self.dataset.update_progress(done / total)
 
             if image.file.name.startswith(".") or image.file.suffix in (".json", ".log"):
-
-                # Get the .metadata.json file so we can also save item IDs.
-                if image.file.name == ".metadata.json":
-                    img_metadata = json.load(image.file.open())
-                    if img_metadata:
-                        img_metadata = {v["filename"]: v.get("post_ids", []) for v in img_metadata.values()}
-                else:
+                if image.file.name != ".metadata.json":
                     self.dataset.log(f"Skipping file {image.file.name}, probably not an image.")
                 continue
 

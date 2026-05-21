@@ -6,7 +6,7 @@ import json
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, DsmConnectionError
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
@@ -206,21 +206,19 @@ class CategorizeImagesCLIP(BasicProcessor):
             self.dataset.finish_with_error("Error with BLIP2 model; please contact 4CAT admins.")
             return
 
-        # Load the video metadata if available
+        # Load the image metadata if available. Key by basename because BLIP2
+        # results share the input image's stem but use a different extension.
         image_metadata = {}
         try:
-            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
-        except FileNotFoundError:
-            metadata_file = None
-        if metadata_file:
-            with open(metadata_file) as file:
-                image_data = json.load(file)
-                self.dataset.log("Found and loaded image metadata")
-                for url, data in image_data.items():
-                    if data.get('success'):
-                        data.update({"url": url})
-                        # using the filename without extension as the key; since that is how the results form their filename
-                        image_metadata[".".join(data['filename'].split(".")[:-1])] = data
+            source_metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            source_metadata = None
+        if source_metadata is not None:
+            self.dataset.log("Found and loaded image metadata")
+            from_dataset = source_metadata.from_dataset
+            for filename, item in source_metadata.iter_entries():
+                basename = filename.rsplit(".", 1)[0]
+                image_metadata[basename] = {**item, "from_dataset": from_dataset}
         else:
             self.dataset.log("No image metadata found")
 
