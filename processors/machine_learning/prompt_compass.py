@@ -3,7 +3,6 @@ Use a prompt from a preset list
 """
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
-from common.lib.llm.adapter import LLMAdapter
 
 from common.lib.exceptions import (
     QueryParametersException,
