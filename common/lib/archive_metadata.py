@@ -191,9 +191,14 @@ class ArchiveMetadataFile:
 		staging_area = Path(staging_area)
 		target = staging_area / filename
 		tmp = target.parent / (target.name + ".tmp")
-		with open(tmp, "w", encoding="utf-8") as f:
-			json.dump(self.to_dict(), f)
-		os.replace(tmp, target)
+		try:
+			with open(tmp, "w", encoding="utf-8") as f:
+				json.dump(self.to_dict(), f)
+			os.replace(tmp, target)
+		except Exception:
+			# don't leave a partial .tmp file behind to be zipped into the archive
+			tmp.unlink(missing_ok=True)
+			raise
 		return target
 
 
