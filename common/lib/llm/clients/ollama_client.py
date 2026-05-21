@@ -35,7 +35,7 @@ class OllamaClient(LLMProviderClient):
                     headers=self._headers,
                     timeout=self.timeout,
                 ).json()
-                result.append({**model, "model_info": model_info["model_info"]})
+                result.append({**model, "metadata": model_info})
             except (requests.exceptions.HTTPError, KeyError) as e:
                 self.log.warning(
                     f"{self.__class__.__name__}: failed to fetch additional model info for model {model[self._model_id_key]}: {e}")
@@ -61,10 +61,10 @@ class OllamaClient(LLMProviderClient):
                         Returns ``[]`` when ``meta`` is ``None`` (unknown — callers
                         should include the model, not block it).
         """
-        if meta is None:
+        if meta is None or not meta.get("metadata"):
             return []
 
-        capabilities = meta.get("capabilities", [])
+        capabilities = meta["metadata"].get("capabilities", [])
         media_types: list[str] = []
 
         _cap_map = {
@@ -103,15 +103,16 @@ class OllamaClient(LLMProviderClient):
         model_name = self.get_model_id(meta)
 
         extra_bits = []
-        if meta.get("model_info"):
-            if meta["model_info"].get("general.basename"):
-                model_name = meta["model_info"]["general.basename"]
+        if meta.get("metadata") and meta["metadata"].get("model_info"):
+            more_meta = meta["metadata"]["model_info"]
+            if more_meta.get("general.basename"):
+                model_name = more_meta["general.basename"]
 
-            if meta["model_info"].get("general.finetune"):
-                extra_bits.append(meta["model_info"]["general.finetune"])
+            if more_meta.get("general.finetune"):
+                extra_bits.append(more_meta["general.finetune"])
 
-            if meta["model_info"].get("general.size_label"):
-                extra_bits.append(meta["model_info"]["general.size_label"])
+            if more_meta.get("general.size_label"):
+                extra_bits.append(more_meta["general.size_label"])
 
         elif meta.get("details") and meta["details"].get("parameter_size"):
             extra_bits.append(f"{meta['details']['parameter_size']} parameters")
