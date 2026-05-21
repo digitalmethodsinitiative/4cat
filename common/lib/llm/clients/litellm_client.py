@@ -35,7 +35,7 @@ class LiteLLMClient(LLMProviderClient):
             media_types.add("image")
 
         if meta["model_info"].get("supports_audio_input"):
-            media_types.add("sound")
+            media_types.add("audio")
 
         # no way to tell if model supports embeddings input as far as I can see...
 

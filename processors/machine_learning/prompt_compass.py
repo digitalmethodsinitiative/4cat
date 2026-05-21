@@ -3,7 +3,7 @@ Use a prompt from a preset list
 """
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
-from common.lib.llm import LLMAdapter
+from common.lib.llm.adapter import LLMAdapter
 
 from common.lib.exceptions import (
     QueryParametersException,
@@ -64,25 +64,6 @@ class PromptCompassRunner(ProcessorPreset):
         return prompt_library
 
     @staticmethod
-    def get_available_models(config):
-        """
-        Get available model providers
-
-        Combine the list defined by the LLMAdapter with known local models.
-
-        :param config:  Configuration reader
-        :return dict:  Models and metadata
-        """
-        # get cached local models
-        models = config.get("llm.available_models", {})
-        models = {} if models == [] else models
-        models.update({k: v for k, v in LLMAdapter.get_models(config).items() if k not in ("none", "custom")})
-
-        models = {k: v for k, v in models.items() if "model_card" in v}
-
-        return models
-
-    @staticmethod
     def is_compatible_with(module=None, config=None):
         """
         Determine compatibility
@@ -108,15 +89,22 @@ class PromptCompassRunner(ProcessorPreset):
         :return:
         """
         prompt_library = cls.get_prompt_library(config)
-        available_models = cls.get_available_models(config)
+        available_models = config.get("llm.available_models", [])
+        enabled_model_ids = config.get("llm.enabled_models", [])
+        if not config.get("llm.access"):
+            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("api-")]
+
+        enabled_models = {k: v for k, v in available_models.items() if k in enabled_model_ids}
 
         options = {
             "model": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Model to use",
                 "tooltip": "Third-party models require an API key to run.",
-                "options": {("local/" if v["provider"] == "local" else f"{v['provider']}/") + k: v["name"] for k, v in available_models.items()},
-                "default": sorted(list(available_models.keys()), key=lambda k: k.startswith("local"))[-1]
+                "options": {
+                    model_id: model["name"] for model_id, model in enabled_models.items()
+                },
+                "default": sorted(list(enabled_models.keys()), key=lambda k: not k.startswith("api"))[-1]
             },
         }
 
@@ -136,7 +124,7 @@ class PromptCompassRunner(ProcessorPreset):
                 "cache": True,
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
                            "/api-keys). Note that this often involves billing.",
-                "requires": "model!^=local"
+                "requires": "model^=api"
             },
             "hide_think": {
                 "type": UserInput.OPTION_TOGGLE,
