@@ -415,6 +415,18 @@ def _jinja2_filter_parameter_str(url):
 
     return params
 
+@current_app.template_filter("hostname")
+def _jinja2_filter_hostname(url: str) -> str:
+    """
+    For a URL, return the hostname
+
+    If no hostname is found, return the original value
+
+    :param str url:
+    :return str:
+    """
+    return ural.get_hostname(url) or url
+
 
 @current_app.template_filter("explorer_css")
 def explorer_css(datasource, scope_class="explorer-content-container"):

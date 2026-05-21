@@ -349,6 +349,17 @@ article.small .form-element select[multiple] {
     margin-left: 20px;
 }
 
+.form-multi-option-wrapper .action-button:not(.hidden) {
+    position: absolute;
+    top: 0.5em;
+    left: 0.5em;
+    padding: 0 0.4em;
+}
+
+.form-multi-option-wrapper .action-button.delete-button {
+    left: 2.5em;
+}
+
 .form-multi-option-wrapper li::before {
     content: '';
     position: absolute;
@@ -472,6 +483,7 @@ h2 .inline-search input, h3 .inline-search input {
     overflow: hidden;
     box-sizing: border-box;
     border-width: 0;
+    padding: 0;
 }
 .ellipsis {
     font-weight: bold;

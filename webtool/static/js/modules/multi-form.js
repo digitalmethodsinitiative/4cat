@@ -6,12 +6,12 @@ export const multiForm = {
         actions.className = 'multi-form-actions';
 
         const add_button = document.createElement('button');
-        add_button.className = 'add-button';
+        add_button.className = 'add-button action-button';
         add_button.textContent = '+';
         add_button.addEventListener('click', multiForm.add_item);
 
         const delete_button = document.createElement('button');
-        delete_button.className = 'delete-button';
+        delete_button.className = 'delete-button action-button';
         delete_button.textContent = 'x';
         delete_button.addEventListener('click', multiForm.delete_item);
 
@@ -23,8 +23,10 @@ export const multiForm = {
             el.querySelectorAll('li').forEach(function (el) {
                 const el_actions = actions.cloneNode(true);
                 el.appendChild(el_actions);
-            })
-        })
+            });
+            multiForm.renumber(el);
+        });
+
     },
 
     handle_click: function (e) {
@@ -53,7 +55,6 @@ export const multiForm = {
         if(!confirm("Are you sure?")){
             return false;
         }
-
         const li = find_parent(e.target, 'li');
         const ol = find_parent(e.target, 'ol.form-multi-option-wrapper');
 
@@ -69,9 +70,11 @@ export const multiForm = {
         let index = 1;
         parent.querySelectorAll('li').forEach(function (el) {
             el.setAttribute('data-multi-option-index', index);
+            el.querySelector('.delete-button').classList.remove('hidden');
             multiForm.renumber_items(el, index);
             index += 1;
         })
+        parent.querySelector('li:last-child .delete-button').classList.add('hidden');
     },
 
     renumber_items: function(parent, index) {
@@ -81,7 +84,6 @@ export const multiForm = {
                 return;
             }
             for(const attribute of attributes) {
-                console.log(child);
                 if(child.hasAttribute(attribute)) {
                     child.setAttribute(attribute, child.getAttribute(attribute).replace(/-[0-9+]-/, `-${index}-`));
                 }

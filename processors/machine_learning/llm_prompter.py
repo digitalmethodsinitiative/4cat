@@ -13,10 +13,12 @@ from json import JSONDecodeError
 from jsonschema.exceptions import ValidationError, SchemaError
 from datetime import datetime, timedelta
 
+from matplotlib.style.core import available
+
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
-from common.lib.llm import LLMAdapter
+from common.lib.llm.adapter import LLMAdapter
 from backend.lib.processor import BasicProcessor
 
 class LLMPrompter(BasicProcessor):
@@ -66,20 +68,12 @@ class LLMPrompter(BasicProcessor):
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         # Check if 4CAT wide LLM server is available
-        if config.get("llm.access", False) and config.get("llm.server", ""):
-            # Check some models enabled
-            shared_llm_enabled_models = config.get("llm.enabled_models", [])
-            shared_llm_models = {model: model_metadata.get("name") for model, model_metadata in config.get("llm.available_models", {}).items() if model in shared_llm_enabled_models}
-            if not shared_llm_models:
-                shared_llm_name = False
-                shared_llm_default = ""
-            else:
-                shared_llm_name = config.get("llm.host_name", "4CAT LLM Server")
-                shared_llm_default = list(shared_llm_models.keys())[0] if shared_llm_models else ""
-        else:
-            shared_llm_name = False
-            shared_llm_default = ""
-            shared_llm_models = {}
+        available_models = config.get("llm.available_models", [])
+        enabled_model_ids = config.get("llm.enabled_models", [])
+        if not config.get("llm.access"):
+            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("api-")]
+
+        enabled_models = {k: v for k, v in available_models.items() if k in enabled_model_ids}
 
         # Determine if the parent dataset is a media archive (zip with images/video/audio)
         is_media_parent = False
@@ -94,13 +88,6 @@ class LLMPrompter(BasicProcessor):
             if parent_media_type in ("video", "audio"):
                 # Ollama and LM Studio currently only support text and image
                 hosted_and_local_available = False
-        
-        # Add additional sources for LLM Models
-        api_or_local_options = {"api": "API"}
-        if hosted_and_local_available:
-            api_or_local_options["local"] = "Local"
-            if shared_llm_name:
-                api_or_local_options["hosted"] = shared_llm_name
 
         options = {
             "ethics_warning1": {
@@ -108,21 +95,14 @@ class LLMPrompter(BasicProcessor):
                 "help": "Always <strong>test your prompt</strong> on a sample of rows, for instance by first using the "
                 "<strong>Random filter</strong> processor.",
             },
-            "api_or_local": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "Local or API",
-                "options": api_or_local_options,
-                "default": "api" if not shared_llm_name else "hosted",
-                "tooltip": "You can use 'local' models through Ollama and LM Studio as long as you have a valid "
-                "and accessible URL through which the model can be reached.",
-            },
-            "api_model": {
+            "model": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "API model",
-                "options": LLMAdapter.get_model_options(config),
+                "options": {
+                    model_id: model["name"] for model_id, model in enabled_models.items()
+                },
                 "default": "none",
                 "tooltip": "Select from the predefined model list or insert manually",
-                "requires": "api_or_local==api",
             },
             "api_key": {
                 "type": UserInput.OPTION_TEXT,
@@ -130,105 +110,9 @@ class LLMPrompter(BasicProcessor):
                 "help": "API key",
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
                 "/api-keys). Note that this often involves billing.",
-                "requires": "api_or_local==api",
+                "requires": "api_model^=api",
                 "sensitive": True,
-            },
-            "api_custom_model_provider": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "Model provider",
-                "requires": "api_model==custom",
-                "options": LLMAdapter.get_model_providers(config),
-                "tooltip": "API provider. Currently limited to this list.",
-            },
-            "api_custom_model_id": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Model ID",
-                "requires": "api_model==custom",
-                "tooltip": "E.g. 'mistral-small-2503'. Check the API provider's documentation on what model ID to use. "
-                "Fine-tuned models often require more info; OpenAI for instance requires the following "
-                "format: ft:[modelname]:[org_id]:[custom_suffix]:",
-                "default": "",
-            },
-            "local_info": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "api_or_local==local",
-                "help": "You can use local LLMs with LM Studio, Ollama, and vLLM. These applications need to be reachable by "
-                "this 4CAT server, e.g. by running them on the same machine. For LM Studio and vLLM, "
-                "use the Base URL to interface with any OpenAI-like API endpoint.",
-            },
-            "local_provider": {
-                "type": UserInput.OPTION_CHOICE,
-                "requires": "api_or_local==local",
-                "options": {
-                    "none": "",
-                    "lmstudio": "LM Studio",
-                    "ollama": "Ollama",
-                    "vllm": "vLLM",
-                },
-                "default": "none",
-                "help": "Local LLM provider",
-            },
-            "lmstudio-info": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "local_provider==lmstudio",
-                "help": "LM Studio is a desktop application to chat with LLMs, but that you can also run as a local "
-                "server. See [this link for intructions on how to run LM Studio as a server](https://lmstudio.ai/docs/"
-                "app/api). When the server is running, the endpoint is shown in the 'Developer' tab on the top "
-                "right (default: `http://localhost:1234/v1` or `http://host.docker.internal:1234/v1` in Docker). "
-                "4CAT will use the top-most model you have loaded. ",
-            },
-            "ollama-info": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "local_provider==ollama",
-                "help": "Ollama is a simple command-line application that lets you interface with a range of open-"
-                "source LLMs and that you can run as a local server. See [this link]"
-                "(https://github.com/ollama/ollama/blob/main/README.md#quickstart) for instructions.",
-            },
-            "vllm-info": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "local_provider==ollama",
-                "help": "[vLLM](https://docs.vllm.ai/en/latest/getting_started/quickstart/) is a framework for Linux "
-                "systems capable of fast inference with a single LLM. Communication is done through an "
-                "OpenAI-like API endpoint. Just change the base URL below and insert an optional API key.",
-            },
-            "local_base_url": {
-                "type": UserInput.OPTION_TEXT,
-                "requires": "api_or_local==local",
-                "default": "",
-                "help": "Base URL",
-                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1` or `http://host.docker.internal:1234/v1` for LM "
-                "Studio, `http://localhost:11434` or `http://host.docker.internal:11434` for Ollama, `http://localhost:8000` or `http://host.docker.internal:8000` for vLLM ).",
-            },
-            "lmstudio_api_key": {
-                "type": UserInput.OPTION_TEXT,
-                "default": "",
-                "help": "LM Studio API key",
-                "tooltip": "[optional] Uses `lm-studio` by default.",
-                "requires": "local_provider==lmstudio",
-                "sensitive": True,
-            },
-            "vllm_api_key": {
-                "type": UserInput.OPTION_TEXT,
-                "default": "",
-                "help": "vLLM API key",
-                "tooltip": "[optional] Empty by default.",
-                "requires": "local_provider==vllm",
-                "sensitive": True,
-            },
-            "ollama_model": {
-                "type": UserInput.OPTION_TEXT,
-                "requires": "local_provider==ollama",
-                "default": "",
-                "help": "Ollama model name",
-                "tooltip": "[required] for example 'llama3.2'",
-            },
-            "hosted_llm_model": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "LLM model",
-                "options": shared_llm_models,
-                "default": shared_llm_default,
-                "requires": "api_or_local==hosted",
-            },
+            }
         }
 
         if is_media_parent:
@@ -431,14 +315,8 @@ class LLMPrompter(BasicProcessor):
         return False
 
     def process(self):
-        
         self.dataset.update_status("Validating settings")
 
-        api_model = self.parameters.get("api_model")
-        if api_model == "none":
-            api_model = ""
-
-        modal_location = self.parameters.get("api_or_local", "api") 
         hide_think = self.parameters.get("hide_think", False)
 
         # Check if the source dataset is a media archive (zip with images/video/audio)
@@ -476,74 +354,22 @@ class LLMPrompter(BasicProcessor):
         base_url = None
         client_kwargs = {}
 
-        if modal_location == "local":
-            provider = self.parameters.get("local_provider", "")
-            base_url = self.parameters.get("local_base_url", "")
+        # load model and providermetadata
+        chosen_model_id = self.parameters.get("model")
+        available_models = {k: v for k, v in self.config.get("llm.available_models").items() if k in self.config.get("llm.enabled_models")}
+        if chosen_model_id not in available_models:
+            return self.dataset.finish_with_error(f"Model {chosen_model_id} not supported")
 
-            if not provider:
-                self.dataset.finish_with_error("Choose a local model provider")
-                return
+        model = available_models[chosen_model_id]
 
-            if provider == "lmstudio":
-                model = "lmstudio_model"
-                if not base_url:
-                    base_url = "http://127.0.0.1:1234/v1" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:1234/v1"
-                if not self.parameters.get("lmstudio_api_key"):
-                    api_key = "lm-studio"
-            elif provider == "ollama":
-                model = self.parameters.get("ollama_model", "")
-                if not model:
-                    self.dataset.finish_with_error("You need to provide a model name for Ollama (e.g. 'llama3.2')")
-                    return
-                if not base_url:
-                    base_url = "http://localhost:11434" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:11434"
-            elif provider == "vllm":
-                model = "vllm_model"
-                api_key = self.parameters.get("vllm_api_key", "")
-                if not base_url:
-                    base_url = "http://localhost:8000/v1"
-            else:
-                self.dataset.finish_with_error("Local provider not supported, choose either lmstudio or ollama")
-                return
+        if model["provider_type"] == "api" and not api_key:
+            return self.dataset.finish_with_error(f"No API key provided for model {chosen_model_id}")
 
-        elif modal_location == "hosted":
-            base_url = self.config.get("llm.server", "")
-            provider = self.config.get("llm.provider_type", "none").lower()
-            api_key = self.config.get("llm.api_key", "")
-            llm_auth_type = self.config.get("llm.auth_type", "")
-            model = self.parameters.get("hosted_llm_model", "")
-            if api_key and llm_auth_type:
-                client_kwargs = {
-                    "headers": {
-                        llm_auth_type: api_key
-                    }
-                }
-            if provider == "none" or not base_url:
-                self.dataset.finish_with_error("4CAT LLM server not properly configured; contact the administrator")
-                return
-        else:
-            if not api_model:
-               self.dataset.finish_with_error("Select an API model or insert one manually")
-               return
-            # Models can be set manually
-            if api_model == "custom":
-                model = self.parameters.get("api_custom_model_id", "")
-                provider = self.parameters.get("api_custom_model_provider", "")
-                if not model:
-                    self.dataset.finish_with_error("You must provide a valid API model name/ID")
-                    return
-                if not provider:
-                    self.dataset.finish_with_error("You must provide a valid API model provider")
-                    return
-            else:
-                model_info = LLMAdapter.get_models(self.config).get(api_model, {})
-                provider = model_info.get("provider")
-                model = api_model
+        available_providers = {p["url"]: p for p in self.config.get("llm.providers")}
+        if model["provider"] not in available_providers:
+            return self.dataset.finish_with_error(f"Model provider {model['provider']} unknown")
 
-            api_key = self.parameters.get("api_key") or self.config.get(f"api.{provider}.api_key", "")
-            if not api_key:
-                self.dataset.finish_with_error("You need to provide a valid API key")
-                return
+        provider = available_providers[model["provider"]]
 
         # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
@@ -589,14 +415,13 @@ class LLMPrompter(BasicProcessor):
         
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
-        base_url_str = "" if not base_url else f" at base URL '{base_url}'"
-        self.dataset.log(f"Using LLM provider '{provider}' with model '{model}'{base_url_str}")
+        base_url_str = "" if not provider["url"] else f" at base URL '{provider['url']}'"
+        self.dataset.log(f"Using LLM provider '{model['provider']}' with model '{model}'{base_url_str}")
         try:
             llm = LLMAdapter(
-                provider=provider,
+                config=self.config,
                 model=model,
                 api_key=api_key,
-                base_url=base_url,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 client_kwargs=client_kwargs
@@ -794,7 +619,7 @@ class LLMPrompter(BasicProcessor):
                             "prompt": prompt,
                             "temperature": temperature,
                             "max_tokens": max_tokens,
-                            "model": model,
+                            "model": model["local_id"],
                             "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                             "time_created_utc": time_created,
                             "batch_number": "",
@@ -822,7 +647,7 @@ class LLMPrompter(BasicProcessor):
                             for output_key, output_value in annotation_output.items():
 
                                 # Skip 'signature' and 'type' annotations for Google
-                                if provider == "google" and (
+                                if model["provider"] == "google" and (
                                     output_key.endswith(".signature")
                                     or output_key.endswith(".type")
                                 ):
@@ -857,7 +682,7 @@ class LLMPrompter(BasicProcessor):
                     self.dataset.update_progress(row / max_processed)
 
                     # Rate limits for different providers
-                    if provider == "mistral":
+                    if model["provider"] == "mistral":
                         time.sleep(1)
 
                     if limit_reached:
@@ -972,10 +797,9 @@ class LLMPrompter(BasicProcessor):
                                 json_schema = self.get_json_schema_for_batch(n_batched, custom_schema=json_schema_original)
                                 # `llm` becomes a RunnableSequence when used, so we'll need to reset it here
                                 llm = LLMAdapter(
-                                    provider=provider,
+                                    config=self.config,
                                     model=model,
                                     api_key=api_key,
-                                    base_url=base_url,
                                     temperature=temperature,
                                     max_tokens=max_tokens,
                                     client_kwargs=client_kwargs
@@ -990,7 +814,7 @@ class LLMPrompter(BasicProcessor):
 
                         batch_str = f" and {n_batched} items batched into the prompt" if use_batches else ""
                         self.dataset.update_status(f"Generating text at row {row:,}/"
-                                                   f"{max_processed:,} with {model}{batch_str}")
+                                                   f"{max_processed:,} with {model['name']}{batch_str}")
                         # Now finally generate some text!
                         try:
                             response = llm.generate_text(
@@ -1014,15 +838,9 @@ class LLMPrompter(BasicProcessor):
                             self.dataset.finish_with_warning(outputs, f"Not all items processed: {e}")
                             return
 
-                        # Set model name from the response for more details
-                        if hasattr(response, "response_metadata"):
-                            model = response.response_metadata.get("model_name", model)
-                            if "models/" in model:
-                                model = model.replace("models/", "")
-
                         if not response:
                             structured_warning = " with your specified JSON schema" if structured_output else ""
-                            warning = f"{model} could not return text{structured_warning}. Consider editing your prompt or changing settings."
+                            warning = f"{model['name']} could not return text{structured_warning}. Consider editing your prompt or changing settings."
                             self.dataset.finish_with_warning(outputs, warning)
                             return
 
@@ -1106,7 +924,7 @@ class LLMPrompter(BasicProcessor):
                                 "prompt": prompt if not use_batches else base_prompt,  # Insert dataset values if not batching
                                 "temperature": temperature,
                                 "max_tokens": max_tokens,
-                                "model": model,
+                                "model": model["local_id"],
                                 "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                                 "time_created_utc": time_created,
                                 "batch_number": n + 1 if use_batches else "",
@@ -1128,7 +946,7 @@ class LLMPrompter(BasicProcessor):
                                 for output_key, output_value in annotation_output.items():
 
                                     # Skip 'signature' and 'type' annotations for Google
-                                    if provider == "google" and output_key in ("extras.signature", ".type"):
+                                    if model["provider"] == "google" and output_key in ("extras.signature", ".type"):
                                         continue
 
                                     annotation = {
@@ -1146,7 +964,7 @@ class LLMPrompter(BasicProcessor):
                         n_batched = 0
 
                         # Rate limits for different providers
-                        if provider == "mistral":
+                        if model["provider"] == "mistral":
                             time.sleep(1)
 
                     # Write annotations in batches
@@ -1267,7 +1085,8 @@ class LLMPrompter(BasicProcessor):
         :param config:
         :return:
         """
-        if query["api_or_local"] == "api" and not query.get("api_key"):
+        is_external_api = query["model"].startswith("api-")
+        if is_external_api and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
 
         # For media archive datasets, use_media won't be present in the query
@@ -1283,7 +1102,7 @@ class LLMPrompter(BasicProcessor):
             raise QueryParametersException("You need to insert column name(s) in the user prompt within brackets "
                                            "(e.g. '[body]' or '[timestamp, author]')")
 
-        if query["api_or_local"] == "api" and not query.get("frontend-confirm"):
+        if is_external_api and not query.get("frontend-confirm"):
             raise QueryNeedsExplicitConfirmationException("Your data will be sent to a third-party service for "
                                                           "processing, which will share your data with them and is "
                                                           "likely to incur costs. Do you want to continue?")

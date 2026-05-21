@@ -9,6 +9,7 @@ from flask import Blueprint, render_template, flash, get_flashed_messages, redir
 from flask_login import login_required
 
 from webtool.lib.helpers import setting_required, error
+from common.lib.llm.llm_client import LLMProviderClient
 
 component = Blueprint("llm", __name__)
 
@@ -21,26 +22,30 @@ def llm_panel():
     LLM Server management panel
 
     Shows server status, available models, and controls to pull/delete/refresh
-    models. Pull, delete, and refresh operations are queued as OllamaManager
+    models. Pull, delete, and refresh operations are queued as LLMProviderManager
     jobs rather than run synchronously.
     """
     if not g.config.get("llm.access"):
         return error(403, message="LLM access is not enabled on this server.")
 
+    providers = g.config.get("llm.providers", [])
+
     if request.method == "POST":
         action = request.form.get("action", "").strip()
+        provider = request.form.get("provider", "").strip()
+        details = {"provider": provider} if provider else {}
 
         if action == "refresh":
             # Queue a one-time manual refresh job; use a timestamp-based remote_id
             # so it is always accepted even if a periodic job already exists.
-            g.queue.add_job("manage-ollama", details={"task": "refresh"},
-                            remote_id=f"manage-ollama-manual-{int(time.time())}")
+            g.queue.add_job("manage-llm", details={**details, "task": "refresh"},
+                            remote_id=f"manage-llm-manual-{int(time.time())}")
             flash("Model refresh job queued.")
 
         elif action == "pull":
             model_name = request.form.get("model_name", "").strip()
             if model_name:
-                g.queue.add_job("manage-ollama", details={"task": "pull"}, remote_id=model_name)
+                g.queue.add_job("manage-llm", details={**details, "task": "pull"}, remote_id=model_name)
                 flash(f"Pull job queued for model '{model_name}'.")
             else:
                 flash("Please provide a model name to pull.")
@@ -48,7 +53,7 @@ def llm_panel():
         elif action == "delete":
             model_name = request.form.get("model_name", "").strip()
             if model_name:
-                g.queue.add_job("manage-ollama", details={"task": "delete"}, remote_id=model_name)
+                g.queue.add_job("manage-llm", details={**details, "task": "delete"}, remote_id=model_name)
                 flash(f"Delete job queued for model '{model_name}'.")
 
         elif action == "enable":
@@ -73,23 +78,15 @@ def llm_panel():
 
     # --- GET: render panel ---
 
-    llm_server = g.config.get("llm.server", "")
-    server_status = "not configured"
+    for i, provider in enumerate(providers):
+        client = LLMProviderClient.get_client(g.config, provider)
 
-    if llm_server:
-        headers = {"Content-Type": "application/json"}
-        llm_api_key = g.config.get("llm.api_key", "")
-        llm_auth_type = g.config.get("llm.auth_type", "")
-        if llm_api_key and llm_auth_type:
-            headers[llm_auth_type] = llm_api_key
+        if provider_status := client.get_status():
+            server_status = "online" if provider_status == 200 else f"error (HTTP {provider_status})"
+        else:
+            server_status = "unreachable"
 
-        try:
-            resp = requests.get(f"{llm_server}/api/tags", headers=headers, timeout=5)
-            server_status = "online" if resp.status_code == 200 else f"error (HTTP {resp.status_code})"
-        except requests.Timeout:
-            server_status = "unreachable (timeout)"
-        except requests.RequestException as e:
-            server_status = f"unreachable ({e})"
+        providers[i]["status"] = server_status
 
     available_models = g.config.get("llm.available_models", {}) or {}
     enabled_models = list(g.config.get("llm.enabled_models", []) or [])
@@ -97,8 +94,7 @@ def llm_panel():
     return render_template(
         "controlpanel/llm-server.html",
         flashes=get_flashed_messages(),
-        llm_server=llm_server,
-        server_status=server_status,
+        providers=providers,
         available_models=available_models,
         enabled_models=enabled_models,
     )

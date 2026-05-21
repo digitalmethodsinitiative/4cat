@@ -1,9 +1,11 @@
 import json
 import base64
 import mimetypes
-import requests
+
 from pathlib import Path
 from typing import List, Optional, Union
+
+from langchain_community.chat_models import ChatLiteLLM
 from pydantic import SecretStr
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -18,111 +20,89 @@ from langchain_deepseek import ChatDeepSeek
 class LLMAdapter:
     def __init__(
             self,
-            provider: str,
-            model: str,
+            config,
+            model,
             api_key: Optional[str] = None,
-            base_url: Optional[str] = None,
             temperature: float = 0.1,
             max_tokens: int = 1000,
             client_kwargs: Optional[dict] = None,
     ):
         """
-        provider: 'openai', 'google', 'mistral', 'ollama', 'lmstudio', 'anthropic', 'deepseek'
-        model: model name (e.g., 'gpt-4o-mini', 'claude-3-opus', 'mistral-small', etc.)
-        api_key: API key if required (OpenAI, Claude, Google, Mistral)
-        base_url: for local models or Mistral custom endpoints
-        temperature: temperature hyperparameter,
-        max_tokens: how many output tokens may be used
-        client_kwargs: additional client parameters
+        Instantiate an adapter to interface with an LLM model
+
+        :param config:  4CAT config reader
+        :param model:  Model metadata (as in `llm.available_models` 4CAT setting)
+        :param api_key:  API key, if needed
+        :param temperature:  Temperature hyperparameter
+        :param max_tokens:  Max tokens to generate
+        :param client_kwargs:  Optional parameters for the LLM adapter class
         """
-        self.provider = provider.lower()
+        known_providers = {p['url']: p for p in config.get("llm.providers")}
+
         self.model = model
+        self.provider = known_providers.get(model['provider'])
         self.api_key = api_key
-        self.base_url = base_url
         self.temperature = temperature
         self.structured_output = False
         self.parser = None
         self.max_tokens = max_tokens
         self.client_kwargs = dict(client_kwargs) if client_kwargs else {}
+
         self.llm: BaseChatModel = self._load_llm()
 
     def _load_llm(self) -> BaseChatModel:
-        if self.provider == "openai":
-            kwargs = {}
-            if "o3" not in self.model:
-                kwargs["temperature"] = self.temperature # temperature not supported for all models
-            return ChatOpenAI(
-                model=self.model,
-                api_key=SecretStr(self.api_key),
-                base_url=self.base_url or "https://api.openai.com/v1",
-                max_tokens=self.max_tokens,
-                **kwargs
-            )
-        elif self.provider == "google":
-            return ChatGoogleGenerativeAI(
-                model=self.model,
-                temperature=self.temperature,
-                google_api_key=self.api_key,
-                max_tokens=self.max_tokens
-            )
-        elif self.provider == "anthropic":
-            return ChatAnthropic(
-                model_name=self.model,
-                temperature=self.temperature,
-                api_key=SecretStr(self.api_key),
-                max_tokens=self.max_tokens,
-                timeout=100,
-                stop=None
-            )
-        elif self.provider == "mistral":
-            return ChatMistralAI(
-                model_name=self.model,
-                temperature=self.temperature,
-                api_key=SecretStr(self.api_key),
-                base_url=self.base_url,  # Optional override
-                max_tokens=self.max_tokens,
-            )
-        elif self.provider == "deepseek":
-            return ChatDeepSeek(
-                model=self.model,
-                temperature=self.temperature,
-                api_key=SecretStr(self.api_key),
-                base_url=self.base_url,
-                max_tokens=self.max_tokens if self.max_tokens <= 8192 else 8192,
-            )
-        elif self.provider == "ollama":
-            ollama_adapter = ChatOllama(
-                model=self.model,
-                temperature=self.temperature,
-                base_url=self.base_url or "http://localhost:11434",
-                max_tokens=self.max_tokens,
-                client_kwargs=self.client_kwargs
-            )
-            self.model = ollama_adapter.model
-            return ollama_adapter
-        elif self.provider in {"vllm", "lmstudio"}:
+        chat_params = {
+            "model": self.model["local_id"],
+            "api_key": SecretStr(self.api_key),
+            "base_url": self.provider["url"],
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+
+        if self.provider["type"] == "openai":
+            if "o3" in self.model:
+                del chat_params["temperature"]
+            chat_params["base_url"] = self.provider["url"] or "https://api.openai.com/v1"
+            adapter_class = ChatOpenAI
+
+        elif self.provider["type"] == "google":
+            adapter_class = ChatGoogleGenerativeAI
+
+        elif self.provider["type"] == "anthropic":
+            chat_params.update({"timeout": 100, "stop": None})
+            adapter_class = ChatAnthropic
+
+        elif self.provider["type"] == "mistral":
+            adapter_class = ChatMistralAI
+
+        elif self.provider["type"] == "deepseek":
+            chat_params["max_tokens"] = min(self.max_tokens, 8192)
+            adapter_class = ChatDeepSeek
+
+        elif self.provider["type"] == "ollama":
+            adapter_class = ChatOllama
+            chat_params.update({"client_kwargs": self.client_kwargs})
+
+        elif self.provider["type"] == "litellm":
+            adapter_class = ChatOpenAI
+            if self.provider["auth_header"]:
+                chat_params.update({
+                    "default_headers": {
+                        self.provider["auth_header"]: self.provider["auth_key"]
+                    }
+                })
+
+        elif self.provider["type"] in {"vllm", "lmstudio", "litellm"}:
             # OpenAI-compatible local servers
             if self.provider == "lmstudio" and not self.api_key:
                 self.api_key = "lm-studio"
 
-            # For vLLM, query the server to get the actual model name. We can't leave this empty, unfortunately.
-            if self.provider == "vllm" and self.model=="vllm_model":
-                model_name = self.get_vllm_model_name(self.base_url, self.api_key)
-                self.model = model_name
-            else:
-                model_name = self.model if self.model else "lmstudio-model"
+            adapter_class = ChatOpenAI
 
-            llm = ChatOpenAI(
-                model=model_name,
-                temperature=self.temperature,
-                api_key=SecretStr(self.api_key),
-                base_url=self.base_url,
-                max_tokens=self.max_tokens,
-            )
-            self.model = llm.model_name
-            return llm
         else:
-            raise ValueError(f"Unsupported LLM provider: {self.provider}")
+            raise ValueError(f"{self.__class__.__name__} Unsupported LLM provider type: {self.provider['type']}")
+
+        return adapter_class(**chat_params)
 
     def generate_text(
             self,
@@ -161,7 +141,7 @@ class LLMAdapter:
             lc_messages = messages
 
         kwargs = {"temperature": temperature}
-        if self.provider in ("google", "ollama") or "o3" in self.model or "gpt-5" in self.model:
+        if self.provider["type"] in ("google", "ollama") or "o3" in self.model["local_id"] or "gpt-5" in self.model["local_id"]:
             kwargs = {}
 
         try:
@@ -305,31 +285,6 @@ class LLMAdapter:
         self.structured_output = True
 
     @staticmethod
-    def get_model_options(config) -> dict:
-        """
-        Returns model choice options for UserInput
-        """
-        models = LLMAdapter.get_models(config)
-        if not models:
-            return {}
-        options = {model_id: model_values["name"] for model_id, model_values in models.items()}
-        return options
-
-    @staticmethod
-    def get_model_providers(config) -> dict:
-        """
-        Returns available model providers through APIs
-        """
-        models = LLMAdapter.get_models(config)
-        if not models:
-            return {}
-        providers = list(set([model_values.get("provider", "") for model_values in models.values()]))
-        if not providers:
-            return {}
-        options = {provider: provider.capitalize() for provider in providers if provider}
-        return options
-
-    @staticmethod
     def get_models(config) -> dict:
         """
         Returns a dict with LLM models supported by 4CAT, either through an API or as a local option.
@@ -337,36 +292,6 @@ class LLMAdapter:
 
         :returns dict, A dict with model IDs as keys and details as values
         """
-        with (
-            config.get("PATH_ROOT")
-                    .joinpath("common/assets/llms.json")
-                    .open() as available_models
-        ):
-            available_models = json.loads(available_models.read())
-        return available_models
-
-
-    @staticmethod
-    def get_vllm_model_name(base_url: str, api_key: str = None) -> str:
-        """
-        Query vLLM server to get the name of the served model.
-        """
-
-        try:
-            # vLLM exposes available models at /v1/models endpoint
-            models_url = f"{base_url.rstrip('/')}/models"
-            headers = {}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-
-            response = requests.get(models_url, headers=headers, timeout=10)
-            response.raise_for_status()
-            models_data = response.json()
-
-            # Get the first available model
-            if models_data.get("data") and len(models_data["data"]) > 0:
-                return models_data["data"][0]["id"]
-            else:
-                raise ValueError("No models found on vLLM server")
-        except Exception as e:
-            raise ValueError(f"Could not retrieve model name from vLLM server: {e}")
+        available_models = config.get("llm.available_models", {})
+        enabled_models = config.get("llm.enabled_models", {})
+        return {k: v for k, v in available_models.items() if k in enabled_models}
