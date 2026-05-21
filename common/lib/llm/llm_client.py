@@ -31,7 +31,7 @@ class LLMProviderClient:
         # in-line import because we otherwise get circular import shenanigans
         from common.lib.llm.clients.ollama_client import OllamaClient
         from common.lib.llm.clients.litellm_client import LiteLLMClient
-        from common.lib.llm.clients.lmstudio_client import LMStudioClient
+        from common.lib.llm.clients.openai_client import LMStudioClient
         from common.lib.llm.clients.thirdparty_client import ThirdPartyClient
 
         for client_type in (OllamaClient, LiteLLMClient, LMStudioClient, ThirdPartyClient):
@@ -51,10 +51,16 @@ class LLMProviderClient:
         self.config = config
 
         self._meta = provider_config
-        self.base_url = provider_config["url"].rstrip("/")
+
+        self.timeout = timeout
         self.auth_type = provider_config.get("auth_header")
         self.auth_key = provider_config.get("auth_key")
         self.timeout = timeout
+
+        self.base_url = provider_config["url"].rstrip("/")
+        if self.base_url.endswith("v1"):
+            # get rid of the 'v1' - we'll add this in the path
+            self.base_url = f"{self.base_url[:-2]}"
 
         self._session = requests.Session()
         self._headers = {"Content-Type": "application/json"}

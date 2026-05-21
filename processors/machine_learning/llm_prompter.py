@@ -76,16 +76,12 @@ class LLMPrompter(BasicProcessor):
         # Determine if the parent dataset is a media archive (zip with images/video/audio)
         is_media_parent = False
         media_type = "media"
-        hosted_and_local_available = True
         if parent_dataset:
             parent_extension = parent_dataset.get_extension()
             parent_media_type = parent_dataset.get_media_type()
             if parent_extension == "zip" and parent_media_type in ("image", "video", "audio"):
                 is_media_parent = True
                 media_type = parent_media_type
-            if parent_media_type in ("video", "audio"):
-                # Ollama and LM Studio currently only support text and image
-                hosted_and_local_available = False
 
         options = {
             "ethics_warning1": {
@@ -115,179 +111,187 @@ class LLMPrompter(BasicProcessor):
 
         if is_media_parent:
             # Media-specific options: show info about media files being attached
-            options["media_info"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": f"The parent dataset contains <strong>{media_type}</strong> files that will be sent "
-                f"to the LLM with each prompt. Make sure to use a model that supports "
-                f"<strong>{media_type}</strong> input (e.g. vision models for images).<br>"
-                f"Not all models support all media types. If the model cannot process "
-                f"{media_type} files, an error will be returned during processing.",
-            }
-            options["system_prompt"] = {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "System prompt",
-                "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
-                "on the tone of the text. This processor may edit the system prompt to "
-                "ensure correct output. System prompts are included in the results file.",
-                "default": "",
-            }
-            options["prompt"] = {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "User prompt",
-                "tooltip": f"Describe what the model should do with each {media_type} file. "
-                f"No column brackets needed — {media_type} files are attached automatically.",
-                "default": "",
-            }
+            options.update({
+                "media_info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": f"The parent dataset contains <strong>{media_type}</strong> files that will be sent "
+                            f"to the LLM with each prompt. Make sure to use a model that supports "
+                            f"<strong>{media_type}</strong> input (e.g. vision models for images).<br>"
+                            f"Not all models support all media types. If the model cannot process "
+                            f"{media_type} files, an error will be returned during processing.",
+                },
+                "system_prompt": {
+                    "type": UserInput.OPTION_TEXT_LARGE,
+                    "help": "System prompt",
+                    "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
+                               "on the tone of the text. This processor may edit the system prompt to "
+                               "ensure correct output. System prompts are included in the results file.",
+                    "default": "",
+                },
+                "prompt": {
+                    "type": UserInput.OPTION_TEXT_LARGE,
+                    "help": "User prompt",
+                    "tooltip": f"Describe what the model should do with each {media_type} file. "
+                               f"No column brackets needed — {media_type} files are attached automatically.",
+                    "default": "",
+                }
+            })
+
         else:
-            # Text-based dataset options: column brackets, media URL toggle, batching
-            options["prompt_info"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": "<strong>How to prompt</strong><br>"
-                "Use `[brackets]` with column names to insert dataset items in the prompt. You "
-                "can place column brackets in different parts of the prompt or use multiple column names within"
-                ' a single column bracket to merge items.<br>Example 1: "Describe the topic '
-                'of this social media post in max. 3 words: `[body, tags]`"<br>Example 2: '
-                "\"Given the following hashtags: `[tags]`, answer whether they are 'related' or 'unrelated' "
-                'to the following text: `[body]`"<br><strong>Prompting is a delicate art</strong>. See '
-                "processor references on best prompting practices.<br>For predefined research prompts, see "
-                "e.g. [Prompt Compass](https://github.com/ErikBorra/PromptCompass/blob/main/prompts.json#L136) "
-                "or the [Anthropic Prompt Library](https://docs.anthropic.com/en/resources/prompt-library/"
-                "library).",
-            }
-            options["system_prompt"] = {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "System prompt",
-                "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
-                "on the tone of the text. This processor may edit the system prompt to "
-                "ensure correct output. System prompts are included in the results file.",
-                "default": "",
-            }
-            options["prompt"] = {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "User prompt",
-                "tooltip": "Use [brackets] with columns names.",
-                "default": "",
-            }
-            options["use_media"] = {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Add images",
-                "tooltip": "Add media URLs for multi-modal processing. Requires a model that supports vision.",
-                "default": False,
-            }
-            options["media_columns"] = {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Columns with image URL(s)",
-                "default": "",
-                "inline": True,
-                "tooltip": "Multiple columns can be selected.",
-                "requires": "use_media==true",
-            }
+            options.update({
+                # Text-based dataset options: column brackets, media URL toggle, batching
+                "prompt_info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": "<strong>How to prompt</strong><br>"
+                            "Use `[brackets]` with column names to insert dataset items in the prompt. You "
+                            "can place column brackets in different parts of the prompt or use multiple column names within"
+                            ' a single column bracket to merge items.<br>Example 1: "Describe the topic '
+                            'of this social media post in max. 3 words: `[body, tags]`"<br>Example 2: '
+                            "\"Given the following hashtags: `[tags]`, answer whether they are 'related' or 'unrelated' "
+                            'to the following text: `[body]`"<br><strong>Prompting is a delicate art</strong>. See '
+                            "processor references on best prompting practices.<br>For predefined research prompts, see "
+                            "e.g. [Prompt Compass](https://github.com/ErikBorra/PromptCompass/blob/main/prompts.json#L136) "
+                            "or the [Anthropic Prompt Library](https://docs.anthropic.com/en/resources/prompt-library/"
+                            "library).",
+                },
+                "system_prompt": {
+                    "type": UserInput.OPTION_TEXT_LARGE,
+                    "help": "System prompt",
+                    "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
+                               "on the tone of the text. This processor may edit the system prompt to "
+                               "ensure correct output. System prompts are included in the results file.",
+                    "default": "",
+                },
+                "prompt": {
+                    "type": UserInput.OPTION_TEXT_LARGE,
+                    "help": "User prompt",
+                    "tooltip": "Use [brackets] with columns names.",
+                    "default": "",
+                },
+                "use_media": {
+                    "type": UserInput.OPTION_TOGGLE,
+                    "help": "Add images",
+                    "tooltip": "Add media URLs for multi-modal processing. Requires a model that supports vision.",
+                    "default": False,
+                },
+                "media_columns": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Columns with image URL(s)",
+                    "default": "",
+                    "inline": True,
+                    "tooltip": "Multiple columns can be selected.",
+                    "requires": "use_media==true",
+                }
+            })
 
         # Common options for both text and media datasets
-        options["structured_output"] = {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Output structured JSON",
-            "tooltip": "Output in a JSON format instead of text. Note that your chosen model may not support "
-            "structured output.",
-            "default": False,
-        }
-        options["json_schema_info"] = {
-            "type": UserInput.OPTION_INFO,
-            "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
-            "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
-            "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
-            "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
-            "requires": "structured_output==true",
-        }
-        options["json_schema"] = {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "JSON schema",
-            "tooltip": "[required] A JSON schema that the structured output will adhere to",
-            "requires": "structured_output==true",
-            "default": "",
-        }
-        options["temperature"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Temperature",
-            "default": 0.1,
-            "coerce_type": float,
-            "max": 2.0,
-            "tooltip": "Temperature indicates how strict the model will gravitate towards the most "
-            "probable next token. A score close to 0 returns more predictable "
-            "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
-        }
+        options.update({
+            "structured_output": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Output structured JSON",
+                "tooltip": "Output in a JSON format instead of text. Note that your chosen model may not support "
+                           "structured output.",
+                "default": False,
+            },
+            "json_schema_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
+                        "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
+                        "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
+                        "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
+                "requires": "structured_output==true",
+            },
+            "json_schema": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "JSON schema",
+                "tooltip": "[required] A JSON schema that the structured output will adhere to",
+                "requires": "structured_output==true",
+                "default": "",
+            },
+            "temperature": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Temperature",
+                "default": 0.1,
+                "coerce_type": float,
+                "max": 2.0,
+                "tooltip": "Temperature indicates how strict the model will gravitate towards the most "
+                           "probable next token. A score close to 0 returns more predictable "
+                           "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
+            }
+        })
 
         if not is_media_parent:
-            options["truncate_input"] = {
+            options.update({
+                "truncate_input": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Max chars in input value",
+                    "default": 0,
+                    "coerce_type": int,
+                    "tooltip": "This value determines how many characters an inserted dataset value may have. 0 = unlimited.",
+                    "requires": "use_media==false",
+                },
+                "max_tokens": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Max output tokens",
+                    "default": 10000,
+                    "coerce_type": int,
+                    "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
+                               "text for common English text. This includes tokens spent for reasoning.",
+                },
+                "batches": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Items per prompt",
+                    "coerce_type": int,
+                    "default": 1,
+                    "tooltip": "How many dataset items to insert into the prompt. These will be inserted as a list "
+                               "wherever the column brackets are used (e.g. '[body]').",
+                    "requires": "use_media==false",
+                },
+                "batch_info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": "<strong>Note on batching:</strong> Batching may increase speed but reduce accuracy. Models "
+                            "need to support structured output for batching. This processor uses JSON schemas to ensure "
+                            "symmetry between input and output lengths, but models may struggle to match input and output "
+                            "values. Describe the dataset values in plurals in your prompt when batching. If you use "
+                            "multiple column brackets in your prompt, rows with any empty values are skipped.",
+                    "requires": "use_media==false",
+                }
+            })
+
+        options.update({
+            "ethics_warning3": {
+                "type": UserInput.OPTION_INFO,
+                "requires": "api_or_local==api",
+                "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
+                        "whether local open-source LLMs are also an option.</strong>",
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "label": "prompt outputs",
+                "default": False,
+            },
+            "hide_think": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Hide reasoning",
+                "default": False,
+                "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
+                           "removes this tag and its contents from the output.",
+            },
+            "limit": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Max chars in input value",
+                "help": "Only annotate this many items, then stop",
                 "default": 0,
                 "coerce_type": int,
-                "tooltip": "This value determines how many characters an inserted dataset value may have. 0 = unlimited.",
-                "requires": "use_media==false",
-            }
-
-        options["max_tokens"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Max output tokens",
-            "default": 10000,
-            "coerce_type": int,
-            "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
-            "text for common English text. This includes tokens spent for reasoning.",
-        }
-
-        if not is_media_parent:
-            options["batches"] = {
+                "min": 0,
+                "delegated": True,
+            },
+            "annotation_label": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Items per prompt",
-                "coerce_type": int,
-                "default": 1,
-                "tooltip": "How many dataset items to insert into the prompt. These will be inserted as a list "
-                "wherever the column brackets are used (e.g. '[body]').",
-                "requires": "use_media==false",
+                "help": "Label for the annotations to add to the dataset",
+                "default": "",
+                "delegated": True,
             }
-            options["batch_info"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": "<strong>Note on batching:</strong> Batching may increase speed but reduce accuracy. Models "
-                "need to support structured output for batching. This processor uses JSON schemas to ensure "
-                "symmetry between input and output lengths, but models may struggle to match input and output "
-                "values. Describe the dataset values in plurals in your prompt when batching. If you use "
-                "multiple column brackets in your prompt, rows with any empty values are skipped.",
-                "requires": "use_media==false",
-            }
-
-        options["ethics_warning3"] = {
-            "type": UserInput.OPTION_INFO,
-            "requires": "api_or_local==api",
-            "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
-            "whether local open-source LLMs are also an option.</strong>",
-        }
-        options["save_annotations"] = {
-            "type": UserInput.OPTION_ANNOTATION,
-            "label": "prompt outputs",
-            "default": False,
-        }
-        options["hide_think"] = {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Hide reasoning",
-            "default": False,
-            "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
-            "removes this tag and its contents from the output.",
-        }
-        options["limit"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Only annotate this many items, then stop",
-            "default": 0,
-            "coerce_type": int,
-            "min": 0,
-            "delegated": True,
-        }
-        options["annotation_label"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Label for the annotations to add to the dataset",
-            "default": "",
-            "delegated": True,
-        }
+        })
 
         # Get the media columns for the select media columns option
         if not is_media_parent and parent_dataset and parent_dataset.get_columns():
@@ -351,7 +355,7 @@ class LLMPrompter(BasicProcessor):
         api_key = ""
         client_kwargs = {}
 
-        # load model and providermetadata
+        # load model and provider metadata
         chosen_model_id = self.parameters.get("model")
         available_models = {k: v for k, v in self.config.get("llm.available_models").items() if k in self.config.get("llm.enabled_models")}
         if chosen_model_id not in available_models:
@@ -413,7 +417,7 @@ class LLMPrompter(BasicProcessor):
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
         base_url_str = "" if not provider["url"] else f" at base URL '{provider['url']}'"
-        self.dataset.log(f"Using LLM provider '{model['provider']}' with model '{model}'{base_url_str}")
+        self.dataset.log(f"Using LLM provider '{model['provider_type'] if provider['url'] else provider['provider']}' with model '{model['local_id']}'{base_url_str}")
         try:
             llm = LLMAdapter(
                 config=self.config,
@@ -996,7 +1000,7 @@ class LLMPrompter(BasicProcessor):
         # Final outputs
         time_end = time.time()
         time_progressed = str(timedelta(seconds=int(time_end - time_start)))
-        final_status = f"Finished, {model} generated text in {time_progressed}."
+        final_status = f"Finished, {model['local_id']} generated text in {time_progressed}."
         skipped_str = None if not skipped else f" Skipped {skipped} rows because of empty values."
         if skipped_str:
             self.dataset.finish_with_warning(i, final_status + skipped_str)

@@ -595,7 +595,7 @@ config_definition = {
         "options": {
             "name": {
                 "type": UserInput.OPTION_TEXT,
-                "default": "4CAT LLM Server",
+                "default": "",
                 "help": "Name of LLM Server in UI",
                 "tooltip": "The name that will be shown to users in the interface when selecting an LLM server (or API or custom).",
             },
@@ -606,8 +606,8 @@ config_definition = {
                 "options": {
                     "ollama": "Ollama",
                     "litellm": "LiteLLM",
-                    "lmstudio": "LM Studio",
-                    "vllm": "vLLM",
+                    "openai-like": "OpenAI compatible API (LM Studio, vLLM, etc)",
+                    "api": "Third-party models from OpenAI, Anthropic, Mistral, etc",
                     "none": "None",
                 },
             },

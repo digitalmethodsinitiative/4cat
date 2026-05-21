@@ -1,21 +1,20 @@
 """
-Centralized HTTP client for communicating with a vLLM server.
+Centralized HTTP client for communicating with an OpenAI compatible server.
 
-This class owns all direct HTTP calls to vLLM's REST API and provides shared
+This class owns all direct HTTP calls to an OpenAI style REST API and provides shared
 static helpers for capability parsing, display-name formatting, and building
 canonical llm.available_models entries. It is a plain helper with no 4CAT
 base-class dependency.
-
 """
 from common.lib.llm.llm_client import LLMProviderClient
 
 
-class VLLMClient(LLMProviderClient):
-    type = "vllm"
+class LMStudioClient(LLMProviderClient):
+    type = "openai-like"
 
-    _models_info_path = "/model/info"
-    _models_info_key = "data"
-    _model_id_key = "model"
+    _models_info_path = "/api/v1/models"
+    _models_info_key = "models"
+    _model_id_key = "key"
 
     def parse_supported_media_types(self, meta: dict) -> list[str]:
         """
@@ -25,15 +24,13 @@ class VLLMClient(LLMProviderClient):
         :returns:       Ordered list of supported media type strings.
                         Returns ``[]`` when ``meta`` is ``None``
         """
-        if meta is None or not meta.get("model_info"):
-            return []
-
         media_types = {"text"}  # far as I can tell, text is always supported
-        if meta["model_info"].get("supports_vision"):
-            media_types.add("image")
 
-        if meta["model_info"].get("supports_audio_input"):
-            media_types.add("sound")
+        if meta is None or not meta.get("capabilities"):
+            return list(media_types)
+
+        if meta["capabilities"].get("vision"):
+            media_types.add("image")
 
         # no way to tell if model supports embeddings input as far as I can see...
 
@@ -49,10 +46,16 @@ class VLLMClient(LLMProviderClient):
         """
         model_name = self.get_global_model_id(meta)
 
-        if meta.get("model_name"):
-            model_name = meta["model_name"]
+        if meta.get("display_name"):
+            model_name = meta["display_name"]
 
-        if meta["litellm_params"].get("model"):
-            model_name = "/".join(meta["litellm_params"].get("model").split("/")[1:])
+        extra_bits = []
+        if meta.get("publisher"):
+            extra_bits.append(meta["publisher"])
+
+        if meta.get("params_string"):
+            extra_bits.append(meta["params_string"])
+
+        model_name += f" ({', '.join(extra_bits)})"
 
         return model_name

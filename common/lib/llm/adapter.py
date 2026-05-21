@@ -61,7 +61,6 @@ class LLMAdapter:
         if self.provider["type"] == "openai":
             if "o3" in self.model:
                 del chat_params["temperature"]
-            chat_params["base_url"] = self.provider["url"] or "https://api.openai.com/v1"
             adapter_class = ChatOpenAI
 
         elif self.provider["type"] == "google":
@@ -82,19 +81,17 @@ class LLMAdapter:
             adapter_class = ChatOllama
             chat_params.update({"client_kwargs": self.client_kwargs})
 
-        elif self.provider["type"] == "litellm":
-            adapter_class = ChatOpenAI
+        elif self.provider["type"] in {"litellm", "openai-like"}:
+            url = f"{self.provider['url']}/" if not self.provider["url"].endswith("/") else self.provider['url']
+            url += "v1/" if not url.endswith("v1/") else ""
+
+            chat_params.update({"base_url": url})
             if self.provider["auth_header"]:
                 chat_params.update({
                     "default_headers": {
                         self.provider["auth_header"]: self.provider["auth_key"]
                     }
                 })
-
-        elif self.provider["type"] in {"vllm", "lmstudio", "litellm"}:
-            # OpenAI-compatible local servers
-            if self.provider == "lmstudio" and not self.api_key:
-                self.api_key = "lm-studio"
 
             adapter_class = ChatOpenAI
 
