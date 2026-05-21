@@ -55,3 +55,12 @@ class ThirdPartyClient(LLMProviderClient):
         entry["provider"] = meta["provider"]
 
         return entry
+
+    def get_model_card_url(self, meta: dict) -> str:
+        """
+        Get a URL for a model card for a given model
+
+        :param meta:  Model metadata
+        :return str:  Model card URL (empty string if unavailable)
+        """
+        return meta["model_card"] if meta["model_card"] else ""
