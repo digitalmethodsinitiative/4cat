@@ -17,6 +17,10 @@
         </div>
         {% endif %}
 
+        <p>
+            You can add and configure LLM providers via the 'LLM providers' tab on the <a href="{{ url_for("admin.manipulate_settings") }}">Settings</a> page.
+        </p>
+
         {# Server status #}
         <div class="user-panel">
             <table class="fullwidth cp-table">
@@ -27,7 +31,7 @@
             {% if not providers %}
                 <tr>
                     <td colspan="2">
-                        No LLM providers configured. You can add and configure servers via the 'LLM' tab on the <a href="{{ url_for("admin.manipulate_settings") }}">Settings</a> page.
+                        No LLM providers configured.
                     </td>
                 </tr>
             {% else %}
@@ -55,6 +59,12 @@
                 <button type="submit" class="small"><i class="fa fa-sync-alt" aria-hidden="true"></i> Refresh</button>
             </form>
         </h2>
+
+    {%  if update_running %}
+        <p class="form-notice">
+            Models are currently being refreshed or installed - reload the page to see up-to-date list.
+        </p>
+    {% endif %}
 
         <div class="user-panel">
             <table class="fullwidth notification-table cp-table">

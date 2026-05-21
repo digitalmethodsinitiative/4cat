@@ -89,10 +89,15 @@ def llm_panel():
     available_models = g.config.get("llm.available_models", {}) or {}
     enabled_models = list(g.config.get("llm.enabled_models", []) or [])
 
+    update_running = bool([
+        job for job in g.queue.get_all_jobs("manage-llm") if not job.data["interval"]
+    ])
+
     return render_template(
         "controlpanel/llm-server.html",
         flashes=get_flashed_messages(),
         providers=providers,
         available_models=available_models,
         enabled_models=enabled_models,
+        update_running=update_running,
     )
