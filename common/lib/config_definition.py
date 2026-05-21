@@ -575,9 +575,11 @@ config_definition = {
     # allows 4CAT LLM processors to connect to a local or remote LLM server
     "llm.intro": {
         "type": UserInput.OPTION_INFO,
-        "help": "4CAT LLM processors allow users to utilize common APIs (e.g. OpenAI, Google, Anthropic) as well as connect "
-                "to local or remote LLM servers. You can also set up your own LLM server using open source software such as "
-                "[Ollama](https://ollama.com/) and connect 4CAT to it using the settings below for your users."
+        "help": "4CAT LLM processors allow users to utilize common APIs (e.g. OpenAI, Google, Anthropic) as well as "
+                "connect to local or remote LLM servers. You can also set up your own LLM server using open source "
+                "software such as [Ollama](https://ollama.com/) and connect 4CAT to it using the settings below for "
+                "your users. After configuring providers you can enable and disable available models via the 'LLMs & "
+                "Providers' page in the Control Panel."
     },
     "llm.providers": {
         "type": UserInput.OPTION_MULTI_OPTION,
