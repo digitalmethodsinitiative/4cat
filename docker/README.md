@@ -13,6 +13,33 @@ https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT#install-4c
 
 Note: if your computer/server is already using some of the same ports that Docker wishes to use, you can modify the `.env` file in the home directory and change the ports that Docker uses. Any modifications to configuration files will require you to rebuild the docker images with `docker-compose up --build`.
 
+## Compose file variants
+
+4CAT ships several `docker-compose` files. Run the one that matches your situation by adding `-f <file>` to the `docker compose` command; the plain command uses `docker-compose.yml`.
+
+| File | What it does | When to use |
+|------|--------------|-------------|
+| `docker-compose.yml` | Pulls the released 4CAT image from Docker Hub. | Normal install. **Start here.** |
+| `docker-compose_build.yml` | Builds the image locally from this source tree instead of pulling it. | You are running a modified or unreleased copy of 4CAT. |
+| `docker-compose_dev.yml` | Override that bind-mounts your working copy into the container so source edits take effect without a rebuild. | Active development. Always combined with one of the files above. |
+| `docker-compose_public_ip.yml` | Like `docker-compose.yml`, but serves 4CAT at the machine's bare IP address. | Deploying to a server that has no domain name. |
+
+```
+# normal install (released image)
+docker compose up -d
+
+# build the image from local source
+docker compose -f docker-compose_build.yml up -d
+
+# build from local source, with live-reloading source edits
+docker compose -f docker-compose_build.yml -f docker-compose_dev.yml up -d
+
+# released image, with live-reloading source edits (no build step)
+docker compose -f docker-compose.yml -f docker-compose_dev.yml up -d
+```
+
+`docker-compose_dev.yml` can never be used on its own — it only adds volume mounts, so it must be layered onto a base file with a second `-f`. It works with either `docker-compose.yml` or `docker-compose_build.yml`: the base file controls where the image comes from, and the dev override controls whether your local source is live-mounted on top of it.
+
 ## Docker Trouble shooting
 
 1. localhost does not load and '4cat_frontend exited with code 3' found in console

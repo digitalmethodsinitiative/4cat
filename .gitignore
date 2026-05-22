@@ -31,6 +31,7 @@ stats.json
 news.json
 ANNOUNCEMENT.md
 backend/4cat.pid
+extensions
 
 # build artefacts
 startup/
