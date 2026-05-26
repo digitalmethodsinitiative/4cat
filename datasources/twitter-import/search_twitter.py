@@ -192,11 +192,11 @@ class SearchTwitterViaZeeschuimer(Search):
             "is_reply": "yes" if str(tweet["legacy"]["conversation_id_str"]) != str(tweet["rest_id"]) else "no",
             "replied_author": tweet["legacy"].get("in_reply_to_screen_name", ""),
             "is_withheld": "yes" if withheld else "no",
-            "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
-            "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"]["urls"]]),
+            "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"].get("hashtags", [])]),
+            "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"].get("urls", [])]),
             "images": ",".join(images),
             "videos": ",".join(videos),
-            "mentions": ",".join([media["screen_name"] for media in tweet["legacy"]["entities"]["user_mentions"]]),
+            "mentions": ",".join([mention["screen_name"] for mention in tweet["legacy"]["entities"].get("user_mentions", [])]),
             "long_lat": SearchTwitterViaZeeschuimer.get_centroid(
                 tweet["legacy"]["place"]["bounding_box"]["coordinates"]) if tweet["legacy"].get("place") else "",
             "place_name": tweet["legacy"].get("place", {}).get("full_name", "") if tweet["legacy"].get("place") else "",
@@ -260,15 +260,15 @@ class SearchTwitterViaZeeschuimer(Search):
             "replied_author": tweet["legacy"].get("in_reply_to_screen_name", "") if tweet["legacy"].get(
                 "in_reply_to_screen_name") else "",
             "is_withheld": "yes" if withheld else "no",
-            "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"]["hashtags"]]),
-            "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"]["urls"]]),
+            "hashtags": ",".join([hashtag["text"] for hashtag in tweet["legacy"]["entities"].get("hashtags", [])]),
+            "urls": ",".join([url.get("expanded_url", url["display_url"]) for url in tweet["legacy"]["entities"].get("urls", [])]),
             "images": ",".join(
                 [media["media_url_https"] for media in tweet["legacy"].get("extended_entities", {}).get("media", []) if
                  media["type"] == "photo"]),
             "videos": ",".join([media["video_info"]["variants"][0]["url"] for media in
                                 tweet["legacy"].get("extended_entities", {}).get("media", []) if
                                 media["type"] == "video"]),
-            "mentions": ",".join([media["screen_name"] for media in tweet["legacy"]["entities"]["user_mentions"]]),
+            "mentions": ",".join([mention["screen_name"] for mention in tweet["legacy"]["entities"].get("user_mentions", [])]),
             "long_lat": SearchTwitterViaZeeschuimer.get_centroid(
                 tweet["legacy"]["place"]["bounding_box"]["coordinates"]) if tweet["legacy"].get("place") else "",
             "place_name": tweet["legacy"].get("place", {}).get("full_name", "") if tweet["legacy"].get("place") else "",
