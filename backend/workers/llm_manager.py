@@ -76,6 +76,8 @@ class LLMProviderManager(BasicWorker):
 				self.log.warning(f"{self.__class__.__name__}: task '{task}' failed for model {model_name}")
 
 		if available_models is not None:
+			enabled_and_available = set(available_models.keys()) & set(self.config.get("llm.enabled_models", []))
 			self.config.set("llm.available_models", available_models)
+			self.config.set("llm.enabled_models", list(enabled_and_available)
 
 		self.job.finish()
