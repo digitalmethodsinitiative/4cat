@@ -9,6 +9,7 @@ import re
 from datetime import datetime
 
 from backend.lib.search import Search
+from common.lib.exceptions import MapItemException
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.helpers import normalize_url_encoding
 
@@ -51,6 +52,14 @@ class SearchRedNote(Search):
         :param post:
         :return:
         """
+        # Reject "tile stub" items — minimal thumbnail entries captured from
+        # surfaces like the user hover_card API. They carry no post content
+        # (no user, no body, no engagement, no timestamp) and aren't usable
+        # as research rows.
+        if "note_card" not in post and "user" not in post and post.get("_zs-origin") != "html" and "note" not in post:
+            source = post.get("__import_meta", {}).get("source_url", "")
+            raise MapItemException(f"Xiaohongshu tile stub without post content (source: {source or 'unknown'})")
+
         if post.get("_zs-origin") == "html":
             return SearchRedNote.map_item_from_html(post)
         else:
@@ -102,6 +111,8 @@ class SearchRedNote(Search):
         else:
             video_url = MissingMappedField("")
 
+        author = item["user"]["nickname"] if "nickname" in item["user"] else item["user"]["nick_name"]
+
         timestamp = item.get("time", None)
         return MappedItem({
             "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
@@ -112,7 +123,7 @@ class SearchRedNote(Search):
             "body": item.get("desc", "") if "desc" in item else MissingMappedField(""),
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", item["desc"])) if "desc" in item else MissingMappedField(""),
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
-            "author": item["user"]["nickname"],
+            "author": author,
             "author_avatar_url": item["user"]["avatar"],
             "image_urls": ",".join(images) if type(images) is list else images,
             "video_url": video_url,
@@ -152,6 +163,8 @@ class SearchRedNote(Search):
         else:
             likes = MissingMappedField("")
 
+        author = note["user"]["nickname"] if "nickname" in note["user"] else note["user"]["nick_name"]
+
         return MappedItem({
             "collected_from_url": normalize_url_encoding(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item["id"],
@@ -161,7 +174,7 @@ class SearchRedNote(Search):
             "body": note.get("desc", "") if "desc" in note else MissingMappedField(""),
             "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", note["desc"])) if "desc" in note else MissingMappedField(""),
             "timestamp": datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else MissingMappedField(""),
-            "author": note["user"]["nickname"],
+            "author": author,
             "author_avatar_url": note["user"]["avatar"],
             "image_url": image,
             "video_url": MissingMappedField(""),

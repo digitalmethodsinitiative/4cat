@@ -285,3 +285,24 @@ def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dat
         pytest.fail(f"The following datasources failed: {names}\n{failure_messages}")
     else:
         logger.info("All datasources passed successfully.")
+
+
+def test_dataset_finish_raises_on_double_finish(mock_dataset):
+    """
+    Regression guard for common/lib/dataset.py:986.
+
+    A second finish() call on an already-finished dataset would silently
+    overwrite status_type (e.g. downgrade WARNING → SUCCESS), since finish()
+    writes status_type directly via db.update and is not protected by the
+    no_status_updates flag that guards update_status. The raise turns that
+    silent corruption into a loud failure. If this test starts failing
+    because finish() was made idempotent, that change re-introduces the
+    bug class fixed in processors/metrics/url_titles.py.
+    """
+    from common.lib.dataset import StatusType
+
+    mock_dataset.data["is_finished"] = True
+    mock_dataset.data["status_type"] = StatusType.WARNING.value
+
+    with pytest.raises(RuntimeError, match="finished"):
+        mock_dataset.finish(5)
