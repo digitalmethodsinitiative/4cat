@@ -46,6 +46,8 @@ webtool/venv/
 *.ipynb
 venv/
 __pycache__/
+.claude/
+extensions
 
 # do not ignore interface images
 !webtool/static/img/*.png
