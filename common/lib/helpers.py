@@ -1474,3 +1474,20 @@ def hash_to_md5(string: str) -> str:
     Hash a string with an md5 hash.
     """
     return hashlib.md5(string.encode("utf-8")).hexdigest()
+
+
+def format_import_item(item):
+    """
+    Wrap a Zeeschuimer-format item for map_item processing.
+
+    This function extracts the raw payload from item["data"] and includes
+    all other fields as __import_meta. This ensures map_item receives the same
+    input.
+
+    :param dict item: Zeeschuimer item with "data" field
+    :return dict: Wrapped item ready for map_item
+    """
+    return {
+        **item.get("data", {}),
+        "__import_meta": {k: v for k, v in item.items() if k != "data"}
+    }
