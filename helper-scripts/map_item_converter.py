@@ -33,6 +33,10 @@ sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."
 
 from common.lib.llm import LLMAdapter
 
+# Sibling module — lives next to this script in helper-scripts/. Python adds the
+# script's directory to sys.path automatically when the file is run directly.
+from map_item_rules import RULES, get_regex_lint_rules
+
 
 # 4CAT datasource path -> Zeeschuimer module path is derived by convention:
 # the Python file is `datasources/<dir>/search_<name>.py`; the JS module is
@@ -185,6 +189,32 @@ def _format_available_helpers() -> str:
     return "\n".join(lines)
 
 
+def _format_past_errors(rules) -> str:
+    """
+    Render rule records as a bulleted block for the "things to get right"
+    prompt section. Each rule emits one bullet with its `prompt_rule`, plus
+    optional `Wrong:` / `Right:` example lines. Multi-line examples are
+    indented as code blocks.
+    """
+    lines = []
+    for rule in rules:
+        lines.append(f"- **{rule.id}** — {rule.prompt_rule}")
+        for label, snippet in (("Wrong", rule.bad), ("Right", rule.good)):
+            if not snippet:
+                continue
+            if "\n" in snippet:
+                lines.append(f"    {label}:")
+                lines.extend(f"        {line}" for line in snippet.split("\n"))
+            else:
+                lines.append(f"    {label}: `{snippet}`")
+    return "\n".join(lines)
+
+
+def _format_verification_checklist(rules) -> str:
+    items = [r.verify for r in rules if r.verify]
+    return "\n".join(f"{i + 1}. {item}" for i, item in enumerate(items))
+
+
 def is_zeeschuimer_datasource(python_path: Path) -> bool:
     """
     Returns True if the given Python file defines a 4CAT Search subclass with
@@ -230,6 +260,8 @@ def discover_bootstrap_files(repo_root: Path, zeeschuimer_root: Path) -> list[Pa
 
 def build_user_prompt(python_source: str, existing_module_source: str, python_rel: str) -> str:
     helpers_block = _format_available_helpers()
+    past_errors_block = _format_past_errors(RULES)
+    verification_block = _format_verification_checklist(RULES)
     return (
         f"# Source Python file (datasources/{python_rel})\n"
         "This is the file that just changed in 4CAT. The `map_item` function on the "
@@ -258,32 +290,12 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "- Anything from `common.lib.helpers` not listed above (e.g. `convert_to_int`, `timify`)\n"
         "- Anything from `common.lib.exceptions`, `common.lib.user_input`, `backend.lib.*`\n"
         "- Python stdlib modules (`datetime`, `urllib.parse`, `re`, `json`, `hashlib`, etc.) — use the JavaScript native equivalents instead.\n\n"
-        "# Python → JavaScript translation rules\n"
-        "- **Class instantiation**: JavaScript requires the `new` keyword. Python `MappedItem({...})` becomes JavaScript `new MappedItem({...})`. Same for `MissingMappedField`.\n"
-        "- **datetime**: Python `datetime.utcfromtimestamp(t)` → JS `new Date(t * 1000)`; `datetime.now()` → `new Date()`; `.strftime('%Y-%m-%d %H:%M:%S')` → manual formatting via `toISOString()` / `Date` getters.\n"
-        "- **URLs**: Python `urlparse(u)` / `parse_qs(q)` → JS `new URL(u)` / `url.searchParams`. The `URL` class auto-handles encoding.\n"
-        "- **regex**: Python `re.compile(p).search(s)` → JS `s.match(p)` or `new RegExp(p).exec(s)`. Watch out for differing flag syntax.\n"
-        "- **f-strings**: Python `f\"x {y}\"` → JS template literals `` `x ${y}` ``.\n"
-        "- **dict iteration**: Python `d.get(k, default)` → JS `d[k] ?? default` or `(d[k] !== undefined ? d[k] : default)`.\n"
-        "- **list comprehensions**: Python `[f(x) for x in xs if g(x)]` → JS `xs.filter(g).map(f)`.\n\n"
-        "# Common mistakes from past runs (the script lints for these and rejects matches)\n"
-        "- Python `dict.get(k)` / `dict.get(k, default)` does NOT exist in JavaScript. Replace EVERY `.get(...)` with `[k]` or `[k] ?? default`. Pinterest- and Instagram-style code has many of these — translate every one.\n"
-        "- Literal newlines inside string literals are a JS syntax error. Python `\"\\n\".join(xs)` becomes JS `xs.join(\"\\n\")` — keep the `\\n` as an escape sequence; do NOT put an actual newline character inside the quotes.\n"
-        "- Regex literals `/.../` cannot span multiple lines. If the Python regex source contains a literal newline (e.g. inside a character class), encode it as `\\n` in the JS regex — never paste a raw newline into the `/.../` body.\n"
-        "- `MappedItem`, `MissingMappedField`, and `MapItemException` are CLASSES — always use `new MappedItem({...})`, `new MissingMappedField(...)`, `throw new MapItemException(...)`. Never call them bare.\n"
-        "- Python `'x' in some_string` is a SUBSTRING check; the JS `in` operator does NOT do this — on a string it throws TypeError. Use `someString.includes('x')` for substring tests. The JS `in` operator is only for object property names (`'key' in obj`).\n"
-        "- Empty containers are TRUTHY in JavaScript but FALSY in Python. After `const user = node.user ?? {}`, the variable is always truthy — `if (user)` is always true. Either guard on the original nullable BEFORE defaulting (`if (node.user) {...}`) or check `Object.keys(user).length` / `arr.length`. Same trap for `[]`.\n"
-        "- `js/lib.js` is loaded as a script, NOT a module. Do NOT write `import { X } from '../js/lib.js'`. The helpers there are globals.\n"
-        "- Python keywords don't exist in JS: `None` → `null`, `True`/`False` → `true`/`false`, `def` → `function`.\n"
-        "- f-strings (`f\"x {y}\"`) don't exist in JS. Use template literals (`` `x ${y}` ``).\n\n"
+        "# Things to get right — past errors from this generator\n"
+        "Each item below has been observed in previous LLM output. The script lints "
+        "for many of them and surfaces matches as warnings on the PR. Translate accordingly.\n\n"
+        f"{past_errors_block}\n\n"
         "# Before submitting, verify your output\n"
-        "1. The function contains zero `.get(` calls.\n"
-        "2. Every `MappedItem(`, `MissingMappedField(`, and `MapItemException(` is preceded by `new `.\n"
-        "3. No string literal or regex literal contains a raw newline character — use `\\n` escapes.\n"
-        "4. `imports_to_add` is empty unless you really need an ES-module import (it should NOT contain anything for `MappedItem` etc.).\n"
-        "5. No Python keywords (`None`, `True`, `False`, `def`, f-strings).\n"
-        "6. No `'literal' in someStringExpression` — those are substring checks; rewrite as `.includes(...)`.\n"
-        "7. No `if (x)` guards where `x` was defaulted to `{}` or `[]` — those are always-true in JS. Guard on the pre-default value or check `.length` / `Object.keys(...).length`.\n\n"
+        f"{verification_block}\n\n"
         "# Output format\n"
         "Use `export function map_item(item) { ... }` to match this module's ES-module style. "
         "Return raw JavaScript source — do NOT wrap fields in markdown code fences. "
@@ -336,56 +348,11 @@ def _strip_js_comments(s: str) -> str:
     return s
 
 
-# Regex checks for known anti-patterns the LLM produces.
-# Each entry is (pattern, message). Stay conservative: false negatives are
-# fine, false positives block valid code so they're worse.
-LINT_PATTERNS = [
-    (
-        re.compile(r"\.get\("),
-        "Python `dict.get()` does not exist in JavaScript. Replace every `.get(k)` with `[k]` and every `.get(k, default)` with `[k] ?? default`.",
-    ),
-    (
-        re.compile(r"^\s*from\s+\S+\s+import\b", re.MULTILINE),
-        "Python-style `from X import Y` statement found. JavaScript uses `import { Y } from 'X'` syntax (and only when really needed — Zeeschuimer helpers are globals).",
-    ),
-    (
-        re.compile(r"import\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)\s+from\s+['\"]\.\.?/js/lib\.js['\"]"),
-        "Do not import from `js/lib.js` — it is loaded as a script, its declarations are global.",
-    ),
-    (
-        re.compile(r"\bNone\b"),
-        "Python `None` is not valid JavaScript. Use `null`.",
-    ),
-    (
-        re.compile(r"\bTrue\b"),
-        "Python `True` is not valid JavaScript. Use `true` (lowercase).",
-    ),
-    (
-        re.compile(r"\bFalse\b"),
-        "Python `False` is not valid JavaScript. Use `false` (lowercase).",
-    ),
-    (
-        re.compile(r"\bdef\s+\w+\s*\("),
-        "Python `def` keyword found. Use JavaScript `function name(...)` declaration syntax.",
-    ),
-    (
-        re.compile(r"\bf\"|\bf'"),
-        "Python f-string detected (`f\"...\"` or `f'...'`). Use JavaScript template literals (`` `...${x}...` ``).",
-    ),
-    (
-        # Python-style substring test: 'lit' in expr.someStringMethod(...).
-        # The JS `in` operator only works on objects (checking property names);
-        # on a string it throws TypeError. Catch the obvious cases where the
-        # right-hand side ends in a method that's known to return a string.
-        re.compile(
-            r"""['"][^'"]*['"]\s+in\s+[\w.\[\]]+\.(?:"""
-            r"""toLowerCase|toUpperCase|toString|trim|trimStart|trimEnd|"""
-            r"""slice|substring|substr|concat|charAt|normalize|repeat|"""
-            r"""padStart|padEnd|replace|replaceAll)\s*\("""
-        ),
-        "Python-style substring check (`'x' in someString`) detected. The JS `in` operator only checks object property names and throws TypeError on a string. Use `someString.includes('x')` instead.",
-    ),
-]
+# Regex checks for known anti-patterns. Sourced from the rule registry so
+# that prompt guidance and lint stay in sync. Bespoke checks below (class
+# instantiation, literal newlines, regex use) are not in the registry's
+# regex list — they're tied to records by `id`.
+LINT_PATTERNS = get_regex_lint_rules()
 
 
 # Lexer that matches JS string and template literals as whole units. Used to
