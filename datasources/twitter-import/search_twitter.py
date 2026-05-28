@@ -305,8 +305,13 @@ class SearchTwitterViaZeeschuimer(Search):
         :param list box:  The box as part of X/Twitter's response
         :return str:  Coordinate, as longitude,latitude.
         """
-        box = box[0]
-        return ",".join((
-            str(round((box[0][0] + box[1][0]) / 2, 6)),
-            str(round((box[0][1] + box[1][1]) / 2, 6)),
-        ))
+        try:
+            ring = box[0]
+            if len(ring) < 2 or not ring[0] or not ring[1]:
+                return ""
+            return ",".join((
+                str(round((ring[0][0] + ring[1][0]) / 2, 6)),
+                str(round((ring[0][1] + ring[1][1]) / 2, 6)),
+            ))
+        except (IndexError, TypeError):
+            return ""
