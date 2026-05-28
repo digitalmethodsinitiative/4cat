@@ -71,9 +71,7 @@ class PromptCompassRunner(ProcessorPreset):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return bool:
         """
-        models = PromptCompassRunner.get_available_models(config)
-        return (models
-                and module.is_top_dataset()
+        return (module.is_top_dataset()
                 and module.get_extension() in ("csv", "ndjson"))
 
     @classmethod

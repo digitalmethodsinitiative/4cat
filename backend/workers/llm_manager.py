@@ -78,6 +78,6 @@ class LLMProviderManager(BasicWorker):
 		if available_models is not None:
 			enabled_and_available = set(available_models.keys()) & set(self.config.get("llm.enabled_models", []))
 			self.config.set("llm.available_models", available_models)
-			self.config.set("llm.enabled_models", list(enabled_and_available)
+			self.config.set("llm.enabled_models", list(enabled_and_available))
 
 		self.job.finish()
