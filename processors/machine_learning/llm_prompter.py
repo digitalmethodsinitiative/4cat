@@ -379,15 +379,13 @@ class LLMPrompter(BasicProcessor):
             return self.dataset.finish_with_error(f"Model {chosen_model_id} not supported")
 
         model = available_models[chosen_model_id]
+        provider = self.config.get("llm.providers").get(model["provider"])
 
-        if model["provider_type"] == "api" and not api_key:
+        if not provider:
+            return self.dataset.finish_with_error(f"Model provider for {chosen_model_id} not currently available.")
+
+        if provider["type"] == "api" and not api_key:
             return self.dataset.finish_with_error(f"No API key provided for model {chosen_model_id}")
-
-        available_providers = {p["url"]: p for p in self.config.get("llm.providers")}
-        if model["provider"] not in available_providers:
-            return self.dataset.finish_with_error(f"Model provider {model['provider']} unknown")
-
-        provider = available_providers[model["provider"]]
 
         # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
@@ -434,7 +432,7 @@ class LLMPrompter(BasicProcessor):
         # Start LLM
         self.dataset.update_status("Connecting to LLM provider")
         base_url_str = "" if not provider["url"] else f" at base URL '{provider['url']}'"
-        self.dataset.log(f"Using LLM provider '{model['provider_type'] if provider['url'] else provider['provider']}' with model '{model['local_id']}'{base_url_str}")
+        self.dataset.log(f"Using LLM provider '{provider['_id']}' with model '{model['local_id']}'{base_url_str}")
         try:
             llm = LLMAdapter(
                 config=self.config,

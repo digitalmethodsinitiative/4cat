@@ -1,10 +1,10 @@
-from attr.validators import is_callable
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import QueryParametersException
 from werkzeug.datastructures import ImmutableMultiDict
 import json
 
 import re
+from itertools import chain
 
 class RequirementsNotMetException(Exception):
     """
@@ -435,9 +435,11 @@ class UserInput:
             # select box
             # one out of multiple options
             # return option if valid, or default
-            if choice not in settings.get("options"):
+            options = settings.get("options", [])
+            match_options = chain(*[list(o.keys()) for o in options.values()]) if type(options) is dict else options
+            if choice not in match_options:
                 if not silently_correct:
-                    raise QueryParametersException(f"Invalid value selected; must be one of {', '.join(settings.get('options', {}).keys())}. {settings}")
+                    raise QueryParametersException(f"Invalid value selected; must be one of {', '.join(match_options)}.")
                 else:
                     return settings.get("default", "")
             else:

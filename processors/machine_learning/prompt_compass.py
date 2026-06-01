@@ -211,24 +211,14 @@ class PromptCompassRunner():
         if short_name:
             self.dataset.update_label(f"PromptCompass ({short_name})")
 
-        chosen_model = "/".join(self.parameters.get("model").split("/")[1:])
-        models = self.get_available_models(self.config)
-        if chosen_model not in models:
+        if self.parameters.get("model") not in config.get("llm.enabled_models", []):
             return self.dataset.finish_with_error(f"Model {self.parameters['model']} is not available, halting processor.")
-
-        model = models[chosen_model]
 
         pipeline = [
             {
                 "type": "llm-prompter",
                 "parameters": {
-                    "api_or_local": "local" if model["provider"] == "local" else "api",
-                    "api_model": chosen_model if model["provider"] != "local" else "",
-                    "api_key": self.parameters.get("api_key"),
-                    "api_custom_model_provider": "",
-                    "local_provider": self.config.get("llm.provider_type"),
-                    "local_base_url": self.config.get("llm.server"),
-                    "ollama_model": chosen_model if model["provider"] == "local" else "",
+                    "model": self.parameters.get("model"),
                     "prompt": self.parameters[self.parameters["task"]],
                     "structured_output": False,
                     "temperature": self.parameters["temperature"],
