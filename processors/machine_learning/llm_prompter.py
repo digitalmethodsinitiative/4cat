@@ -70,14 +70,27 @@ class LLMPrompter(BasicProcessor):
             return f"llm-local-{dataset.parameters.get('model').split('-')[1]}"
 
     @classmethod
-    def get_options(cls, parent_dataset=None, config=None) -> dict:
-        # Check if 4CAT wide LLM server is available
+    def get_model_library(cls, config):
         available_models = config.get("llm.available_models", [])
         enabled_model_ids = config.get("llm.enabled_models", [])
+        providers = config.get("llm.providers", {})
         if not config.get("llm.access"):
             enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("api-")]
 
-        enabled_models = {k: v for k, v in available_models.items() if k in enabled_model_ids}
+        models_option = {}
+        for key, value in {k: v for k, v in available_models.items() if k in enabled_model_ids}.items():
+            provider = providers[value["provider"]]
+            if provider["name"] not in models_option:
+                models_option[provider["name"]] = {}
+
+            models_option[provider["name"]][key] = value["name"]
+
+        return models_option
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, config=None) -> dict:
+        # Check if 4CAT wide LLM server is available
+        models = cls.get_model_library(config)
 
         # Determine if the parent dataset is a media archive (zip with images/video/audio)
         is_media_parent = False
@@ -98,9 +111,7 @@ class LLMPrompter(BasicProcessor):
             "model": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "API model",
-                "options": {
-                    model_id: model["name"] for model_id, model in enabled_models.items()
-                },
+                "options": models,
                 "default": "none",
                 "tooltip": "Select from the predefined model list or insert manually",
             },
@@ -110,7 +121,7 @@ class LLMPrompter(BasicProcessor):
                 "help": "API key",
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
                 "/api-keys). Note that this often involves billing.",
-                "requires": "api_model^=api",
+                "requires": "model^=api",
                 "sensitive": True,
             }
         }
@@ -267,7 +278,7 @@ class LLMPrompter(BasicProcessor):
         options.update({
             "ethics_warning3": {
                 "type": UserInput.OPTION_INFO,
-                "requires": "api_or_local==api",
+                "requires": "model^=api-",
                 "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
                         "whether local open-source LLMs are also an option.</strong>",
             },

@@ -13,7 +13,7 @@ from processors.machine_learning.llm_prompter import LLMPrompter
 
 import json
 
-class PromptCompassRunner(ProcessorPreset):
+class PromptCompassRunner():
     """
     Run processor pipeline to feed prompts to LLM Prompter
     """
@@ -98,20 +98,19 @@ class PromptCompassRunner(ProcessorPreset):
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Model to use",
                 "tooltip": "Third-party models require an API key to run.",
-                "options": {
-                    model_id: model["name"] for model_id, model in enabled_models.items()
-                },
+                "options": LLMPrompter.get_model_library(config),
                 "default": sorted(list(enabled_models.keys()), key=lambda k: not k.startswith("api"))[-1]
             },
         }
 
-        for model, metadata in available_models.items():
-            model_key = metadata["provider"] + "/" + model
-            options[f"{model_key}-info"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": f"Read the [model card]({metadata['model_card']}) for {model}.",
-                "requires": f"model=={model_key}"
-            }
+        for model, metadata in enabled_models.items():
+            if metadata.get("model_card"):
+                model_key = metadata["provider"] + "/" + model
+                options[f"{model_key}-info"] = {
+                    "type": UserInput.OPTION_INFO,
+                    "help": f"Read the [model card]({metadata['model_card']}) for {model}.",
+                    "requires": f"model=={model_key}"
+                }
 
         options.update({
             "api_key": {
@@ -121,20 +120,20 @@ class PromptCompassRunner(ProcessorPreset):
                 "cache": True,
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
                            "/api-keys). Note that this often involves billing.",
-                "requires": "model^=api"
+                "requires": "model^=api-"
             },
             "hide_think": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Hide reasoning",
                 "default": False,
                 "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
-                           "removes this tag and its contents from the output.",
-                "requires": "model^=local/deepseek"
+                           "removes this tag and its contents from the output, if present.",
             },
             "temperature": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Temperature",
-                "tooltip": "Between 0 and 1. Higher temperatures increase variability and may lead to strange results",
+                "tooltip": "Between 0 and 1. Higher temperatures increase variability and may lead to strange "
+                           "results. Does not have an effect on all models.",
                 "coerce_type": float,
                 "min": 0.0,
                 "max": 1.0,

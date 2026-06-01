@@ -14,7 +14,7 @@ import requests
 
 class LLMProviderClient:
     _headers = {}
-    _meta = {}
+    provider_config = {}
 
     @staticmethod
     def get_client(config, provider_config: dict) -> "LLMProviderClient":
@@ -49,8 +49,7 @@ class LLMProviderClient:
         :param Logger log:  4CAT log handler
         """
         self.config = config
-
-        self._meta = provider_config
+        self.provider_config = provider_config
 
         self.timeout = timeout
         self.auth_type = provider_config.get("auth_header")
@@ -126,8 +125,7 @@ class LLMProviderClient:
             "local_id": self.get_model_id(meta),
             "name": self.format_display_name(meta),
             "model_card": self.get_model_card_url(meta),
-            "provider_type": self._meta["type"],
-            "provider": self._meta["url"],
+            "provider": self.provider_config["_id"],
             "supported_media_types": self.parse_supported_media_types(meta),
             "metadata": meta,
         }
@@ -193,4 +191,4 @@ class LLMProviderClient:
         :param dict meta:  Model metadata
         :return str:  Model ID
         """
-        return "-".join((self._meta["type"], self._meta["url"], self.get_model_id(meta)))
+        return "-".join((self.provider_config["type"], self.provider_config["url"], self.get_model_id(meta)))

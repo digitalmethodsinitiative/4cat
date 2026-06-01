@@ -39,8 +39,8 @@ class LLMProviderManager(BasicWorker):
 		model_name = self.job.data["remote_id"]
 		available_models = None
 
-		for provider_config in self.config.get("llm.providers", []):
-			if provider and provider != provider_config["url"]:
+		for provider_id, provider_config in self.config.get("llm.providers", {}).items():
+			if provider and provider != provider_id:
 				continue
 
 			try:

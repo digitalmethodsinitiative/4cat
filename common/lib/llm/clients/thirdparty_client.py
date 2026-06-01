@@ -52,7 +52,7 @@ class ThirdPartyClient(LLMProviderClient):
         :returns:               Dict ready to store under ``llm.available_models[model_id]``.
         """
         entry = super().build_model_entry(meta)
-        entry["provider"] = meta["provider"]
+        entry["provider_key"] = meta["provider"]
 
         return entry
 

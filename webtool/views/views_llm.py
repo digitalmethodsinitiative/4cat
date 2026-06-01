@@ -76,7 +76,7 @@ def llm_panel():
 
     # --- GET: render panel ---
 
-    for i, provider in enumerate(providers):
+    for provider_id, provider in providers.items():
         client = LLMProviderClient.get_client(g.config, provider)
 
         if provider_status := client.get_status():
@@ -84,7 +84,7 @@ def llm_panel():
         else:
             server_status = "unreachable"
 
-        providers[i]["status"] = server_status
+        providers[provider_id]["status"] = server_status
 
     available_models = g.config.get("llm.available_models", {}) or {}
     enabled_models = list(g.config.get("llm.enabled_models", []) or [])

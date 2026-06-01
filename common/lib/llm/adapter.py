@@ -36,7 +36,7 @@ class LLMAdapter:
         :param max_tokens:  Max tokens to generate
         :param client_kwargs:  Optional parameters for the LLM adapter class
         """
-        known_providers = {p['url']: p for p in config.get("llm.providers")}
+        known_providers = config.get("llm.providers", {})
 
         self.model = model
         self.provider = known_providers.get(model['provider'])
@@ -216,7 +216,7 @@ class LLMAdapter:
         :param media_category: "image", "video", or "audio"
         :returns: Provider-formatted content block
         """
-        if self.provider == "anthropic":
+        if self.provider["type"] == "anthropic":
             if media_category == "image":
                 if url:
                     return {"type": "image", "source": {"type": "url", "url": url}}
@@ -232,13 +232,13 @@ class LLMAdapter:
                     return {"type": "document", "source": {
                         "type": "base64", "media_type": mime_type, "data": b64_data
                     }}
-        elif self.provider == "google":
+        elif self.provider["type"] == "google":
             if url:
                 return {"type": "image_url", "image_url": {"url": url}}
             else:
                 data_uri = f"data:{mime_type};base64,{b64_data}"
                 return {"type": "image_url", "image_url": {"url": data_uri}}
-        elif self.provider == "ollama":
+        elif self.provider["type"] == "ollama":
             if media_category != "image":
                 raise ValueError(f"Ollama provider only supports image media, got category '{media_category}'")
             if url:
@@ -258,7 +258,7 @@ class LLMAdapter:
                 return {"type": "image_url", "image_url": {"url": url}}
             else:
                 data_uri = f"data:{mime_type};base64,{b64_data}"
-                if media_category == "audio" and self.provider == "openai":
+                if media_category == "audio" and self.provider["type"] == "openai":
                     return {"type": "input_audio", "input_audio": {
                         "data": b64_data, "format": mime_type.split("/")[-1]
                     }}
@@ -274,7 +274,7 @@ class LLMAdapter:
         json.dumps(json_schema)  # To validate / raise an error
 
         # LM Studio needs some more guidance
-        if self.provider == "lmstudio":
+        if self.provider["type"] == "lmstudio":
             json_schema = {"type": "json_schema", "json_schema": {"schema": json_schema}}
             self.llm = self.llm.bind(response_format=json_schema)
         else:

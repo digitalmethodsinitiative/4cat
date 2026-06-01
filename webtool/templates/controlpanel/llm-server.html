@@ -35,7 +35,7 @@
                     </td>
                 </tr>
             {% else %}
-                {% for provider in providers %}
+                {% for provider_id, provider in providers.items() %}
                 <tr>
                     <td><span class="property-badge">{{ provider.type }}</span> <a href="{{ provider.url }}">{{ provider.name }}</a></td>
                     <td>
@@ -91,7 +91,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <span class="property-badge">{{ model.provider_type }}/{{ model.provider|hostname }}</span><br>
+                            <span class="property-badge">{{ providers[model.provider]['type'] }}/{{ providers[model.provider].url|hostname }}</span><br>
                             {{ model.local_id }}
                         </td>
                         <td>
@@ -111,7 +111,7 @@
                                 <button type="submit" class="small"><i class="fa fa-toggle-on" aria-hidden="true"></i> Enable</button>
                             </form>
                             {% endif %}
-                            {% if model.provider_type == "ollama" %}
+                            {% if providers[model.provider].type == "ollama" %}
                             <form action="{{ url_for("llm.llm_panel") }}" method="POST" style="display:inline;">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="model_name" value="{{ model_id }}">
@@ -140,7 +140,9 @@
     </section>
 
     {# Pull a new model, if an ollama server is configured #}
-    {% if providers|selectattr("type", "equalto", "ollama")|list %}
+    {% set can_add_models = False %}
+    {% for provider_id, provider in providers.items() %}{% if provider.type == "ollama" %}{% set can_add_models = True %}{% endif %}{% endfor %}
+    {% if can_add_models %}
     <section>
         <h2><span>Install new LLMs</span></h2>
         <p>Enter a model name (e.g. <code>llama3:8b</code>) to make it available via the configured provider. For

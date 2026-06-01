@@ -9,6 +9,7 @@ The order of th dictionary below determines the order of the settings in the int
 
 """
 from common.lib.user_input import UserInput
+import re
 
 config_definition = {
     "datasources.intro": {
@@ -594,6 +595,7 @@ config_definition = {
         ],
         "global": True,
         "help": "LLM providers",
+        "dict_key": lambda v: re.sub(r"[^0-9a-zA-Z ]", "", v["name"]).lower().replace(" ", "-") + (("-" + v["url"].split("/")[2].lower()) if "://" in v["url"] else ""),
         "options": {
             "name": {
                 "type": UserInput.OPTION_TEXT,
@@ -617,7 +619,7 @@ config_definition = {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "LLM Server URL",
-                "tooltip": "The URL of the LLM server, e.g. http://localhost:5000",
+                "tooltip": "The URL of the LLM server, e.g. http://localhost:5000. Must start with a schema (e.g. 'https://').",
             },
             "auth_header": {
                 "type": UserInput.OPTION_TEXT,

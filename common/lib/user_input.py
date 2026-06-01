@@ -1,3 +1,4 @@
+from attr.validators import is_callable
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import QueryParametersException
 from werkzeug.datastructures import ImmutableMultiDict
@@ -203,7 +204,6 @@ class UserInput:
                         if input_index not in input_items:
                             input_items[input_index] = {}
 
-                        print(key, value)
                         input_items[input_index][option_item] = UserInput.parse_value(item_options[option_item], value, input_items[input_index], silently_correct)
 
                 # discard items that are only default values
@@ -217,7 +217,12 @@ class UserInput:
                     if not only_default:
                         parsed_input[option].append(item)
 
-                print(parsed_input[option])
+                # may define a mapper to make this a dict
+                if settings.get("dict_key"):
+                    if callable(settings["dict_key"]):
+                        parsed_input[option] = {settings["dict_key"](value): {**value, "_id": settings["dict_key"](value)} for value in parsed_input[option]}
+                    else:
+                        parsed_input[option] = {value[settings["dict_key"]]: {**value, "_id": value[settings["dict_key"]]} for value in parsed_input[option]}
 
             elif option not in input:
                 # not provided? use default

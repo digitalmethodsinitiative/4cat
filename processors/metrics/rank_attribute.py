@@ -82,9 +82,11 @@ class AttributeRanker(BasicProcessor):
                 "type": UserInput.OPTION_CHOICE,
                 "options": {
                     "none": "Use column value",
-                    "urls": "URLs",
-                    "hostnames": "Domain names",
-                    "level2-hostnames": "Second-level domain names (e.g. m.youtube.com -> youtube.com)",
+                    "URL-related": {
+                        "urls": "URLs",
+                        "hostnames": "Domain names",
+                        "level2-hostnames": "Second-level domain names (e.g. m.youtube.com -> youtube.com)",
+                    },
                     "hashtags": "Hashtags (words starting with #)",
                     "emoji": "Emoji (each used emoji in the column is counted individually)",
                     "occurrence": "Values (the number of comma-separated values in the given field)"
