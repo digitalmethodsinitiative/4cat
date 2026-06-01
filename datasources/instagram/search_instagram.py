@@ -36,6 +36,17 @@ class SearchInstagram(Search):
     MEDIA_TYPE_VIDEO = 2
     MEDIA_TYPE_CAROUSEL = 8
 
+    HASHTAG_REGEX = re.compile(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)")
+
+    @staticmethod
+    def extract_hashtags(caption):
+        """
+        Extract comma-joined hashtags from a caption, tolerating MissingMappedField.
+        """
+        if isinstance(caption, MissingMappedField):
+            return ""
+        return ",".join(SearchInstagram.HASHTAG_REGEX.findall(caption))
+
     def get_items(self, query):
         """
         Run custom search
@@ -152,7 +163,7 @@ class SearchInstagram(Search):
             "media_urls": media_urls,
 
             # Engagement
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)) if type(caption) is not MissingMappedField else "",
+            "hashtags": SearchInstagram.extract_hashtags(caption),
             "usertags": MissingMappedField(""), # Not available in this format
             "play_count": node.get("play_count", MissingMappedField(0)),
             
@@ -277,7 +288,7 @@ class SearchInstagram(Search):
             "media_urls": media_url,
 
             # Engagement
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", caption)),
+            "hashtags": SearchInstagram.extract_hashtags(caption),
             # Unsure if usertags will work; need data (this could raise it to attention...)
             "usertags": ",".join(
                 [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
@@ -456,7 +467,7 @@ class SearchInstagram(Search):
             "media_urls": ",".join(media_urls),
 
             # Engagement
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)) if type(caption) is not MissingMappedField else "",
+            "hashtags": SearchInstagram.extract_hashtags(caption),
             "usertags": usertags,
             "play_count": play_count,
             "likes_hidden": "yes" if no_likes else "no",

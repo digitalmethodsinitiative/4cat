@@ -11,7 +11,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
+from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache, format_import_item
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
 
 
@@ -187,10 +187,7 @@ class Search(BasicProcessor, ABC):
 					continue
 
 
-				new_item = {
-					**item["data"],
-					"__import_meta": {k: v for k, v in item.items() if k != "data"}
-				}
+				new_item = format_import_item(item)
 
 				# Check map item here!
 				if check_map_item:

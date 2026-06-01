@@ -11,6 +11,11 @@ export const query = {
     poll_interval: null,
     query_key: null,
 
+    // State for check_processor_queue's gate (see that function for the
+    // purpose of these). Initialized so the first poll on page load fires.
+    last_queue_empty: false,
+    last_processor_poll: 0,
+
     /**
      * Set up query status checkers and event listeners
      */
@@ -437,22 +442,44 @@ export const query = {
 
     check_processor_queue: function () {
         /*
-        Checks what processors are in the queue and keeps updating the option/run buttons
-        and already-queued processes buttons.
+        Polls the backend job queue and paints "X in queue" notices in two places:
+        - inside Run/Options buttons on processor-details cards (pre-flight: how
+          deep the global queue is for that processor type before the user clicks)
+        - inside already-queued result indicators in the Analysis results section
+          (position info for processors this dataset has queued but not started)
         */
         if (!document.hasFocus()) {
-            //don't hammer the server while user is looking at something else
+            // Don't hammer the server while the user is looking at another tab.
             return;
         }
+
+        // a locally-queued analysis is on the page. 
+        let has_local_queued = $('.processor-result-indicator.queued-button').length > 0;
+
+        // the backend was active as of our last check. (jobs running, update indicators)
+        let backend_was_active = !query.last_queue_empty;
+
+        // heartbeat 60s backstop. (did anyone else queue anything)
+        let heartbeat_due = (Date.now() - query.last_processor_poll) >= 60000;
+
+        if (!has_local_queued && !backend_was_active && !heartbeat_due) {
+            return;
+        }
+
+        query.last_processor_poll = Date.now();
 
         $.getJSON({
             url: getRelativeURL('api/status.json'),
             success: function (json) {
 
+                const queued_processes = json["items"]["backend"]["queued"];
+
+                // Remember whether the backend queue is empty so future ticks
+                // can downshift to heartbeat-only polling
+                query.last_queue_empty = !queued_processes.total;
+
                 // Remove previous notices
                 $(".queue-notice").html("");
-
-                const queued_processes = json["items"]["backend"]["queued"];
 
                 // Loop through all running processors
                 for (const queued_process in queued_processes) {
