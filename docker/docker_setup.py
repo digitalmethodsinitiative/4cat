@@ -28,7 +28,8 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     config_parser['SERVER']['public_port'] = os.environ['PUBLIC_PORT']
 
     # Set API
-    config_parser['API']['api_host'] = os.environ['API_HOST']  # set in .env; should be backend container_name in docker-compose.py unless frontend and backend are running together in one container
+    config_parser['API']['api_host'] = os.environ[
+        'API_HOST']  # set in .env; should be backend container_name in docker-compose.py unless frontend and backend are running together in one container
 
     # Database configuration
     config_parser['DATABASE']['db_name'] = os.environ['POSTGRES_DB']
@@ -110,14 +111,16 @@ if __name__ == "__main__":
 
         # Backend API
         config_parser.add_section('API')
-        config_parser['API']['api_port'] = '4444'  # backend internal port set in docker-compose.py; NOT API_PUBLIC_PORT as that is what port Docker exposes to host network
+        config_parser['API'][
+            'api_port'] = '4444'  # backend internal port set in docker-compose.py; NOT API_PUBLIC_PORT as that is what port Docker exposes to host network
 
         # File paths
         # Docker volumes are defined in docker-compose.yml; these rely on one shared volume `data` in the 4CAT root directory
         config_parser.add_section('PATHS')
         config_parser['PATHS']['path_images'] = 'data/images'  # shared volume defined in docker-compose.yml
         config_parser['PATHS']['path_data'] = 'data/datasets'  # shared volume defined in docker-compose.yml
-        config_parser['PATHS']['path_lockfile'] = 'backend'  # docker-entrypoint.sh looks for pid file here (in event Docker shutdown was not clean)
+        config_parser['PATHS'][
+            'path_lockfile'] = 'backend'  # docker-entrypoint.sh looks for pid file here (in event Docker shutdown was not clean)
         config_parser['PATHS']['path_sessions'] = 'data/sessions'  # shared volume defined in docker-compose.yml
         config_parser['PATHS']['path_logs'] = 'data/logs/'  # shared volume defined in docker-compose.yml
 
@@ -137,7 +140,8 @@ if __name__ == "__main__":
 
         config = ConfigManager()
         config.with_db(Database(logger=None, appname="docker-setup",
-				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT))
+                                dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD,
+                                host=config.DB_HOST, port=config.DB_PORT))
 
         for path in [config.get('PATH_DATA'),
                      config.get('PATH_IMAGES'),
@@ -187,10 +191,12 @@ if __name__ == "__main__":
         # Check to see if flask.server_name needs to be updated
         from common.config_manager import ConfigManager
         from common.lib.database import Database
+
         config = ConfigManager()
         config.with_db(Database(logger=None, appname="docker-setup",
-				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT))
-        
+                                dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD,
+                                host=config.DB_HOST, port=config.DB_PORT))
+
         public_port = int(config_parser['SERVER']['public_port'])
         # Port handling here is independent from HTTPS; default is 80
         default_port = 80
@@ -201,7 +207,8 @@ if __name__ == "__main__":
         # Warn only when localhost/IP lacks a required non-default port
         if existing_port is None and _is_ip_or_localhost(host) and public_port != default_port:
             formatted_host = _format_host(host)
-            print(f"Exposed PUBLIC_PORT {public_port} from .env file not included in Server Name; if you are not using a reverse proxy, you may need to update the Server Name variable.")
+            print(
+                f"Exposed PUBLIC_PORT {public_port} from .env file not included in Server Name; if you are not using a reverse proxy, you may need to update the Server Name variable.")
             print(
                 "You can do so by running the following command if you do not have access to the 4CAT frontend Control Panel:\n"
                 f"docker exec 4cat_backend python -c \"from common.config_manager import ConfigManager;config=ConfigManager();config.with_db();config.set('flask.server_name', '{formatted_host}:{public_port}');config.db.commit();\""
@@ -209,24 +216,29 @@ if __name__ == "__main__":
 
     # If an Ollama container is available on the Docker network, configure 4CAT to use it.
     ollama_url = 'http://ollama:11434'
+    ollama_id = f"ollama-{ollama_url.split('/')[-1]}"
     try:
         import requests
+
         try:
             resp = requests.get(f"{ollama_url}/api/tags", timeout=2)
             if resp.status_code == 200:
-                current_llm_server = config.get("llm.server")
-                if current_llm_server == ollama_url:
+                current_llm_providers = config.get("llm.providers")
+                if any([p["url"] == ollama_url for p in current_llm_providers]):
                     print("Ollama server already configured in 4CAT settings.")
-                elif current_llm_server and current_llm_server != ollama_url:
-                    # Previously configured LLM server is different; log a warning but do not overwrite user settings
-                    print(f"Warning: Detected Ollama server at {ollama_url} but llm.server is set to {current_llm_server}. To use the Ollama server, update the llm.server setting to {ollama_url} in the 4CAT Control Panel.")
                 else:
                     # set basic LLM settings so the initial admin user does not need to
                     # configure them manually for local development environments that
                     # include the Ollama sidecar.
-                    config.set('llm.provider_type', 'ollama')
-                    config.set('llm.server', ollama_url)
-                    config.set('llm.access', True)
+                    current_llm_providers[ollama_id] = {
+                        "name": "Ollama Server (4CAT, via Docker)",
+                        "url": ollama_url,
+                        "type": "ollama",
+                        "auth_header": "",
+                        "auth_key": "",
+                        "_id": ollama_id
+                    }
+                    config.set('llm.providers', current_llm_providers)
                     config.db.commit()
                     print('Detected Ollama on Docker network; configured LLM settings to use it.')
         except requests.RequestException:

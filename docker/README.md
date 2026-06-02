@@ -99,8 +99,8 @@ for you. You can skip to step 2 below.
 
 #### Manual configuration (or to verify/change settings)
 
-1. Log in as admin and open **Control Panel → Settings**.
-2. Confirm or set the following LLM fields:
+1. Log in as admin and open **Control Panel → Settings → LLM Providers**.
+2. Confirm that a provider with the following settings is present:
 
    | Setting | Value |
    |---|---|
@@ -109,7 +109,7 @@ for you. You can skip to step 2 below.
    | LLM Access | enabled |
 
 3. Save settings.
-4. Open **Control Panel → LLM Server** (visible once *LLM Access* is enabled).
+4. Open **Control Panel → LLMs & Providers** (visible once *LLM Access* is enabled).
 5. Use the **Refresh** button to load available models, then **Pull** a model
    (e.g. `llama3.2:3b`) to download it from the Ollama library.
 6. Enable the models you want to make available to users.
@@ -137,7 +137,7 @@ point 4CAT directly at that server:
 
 - **On the same host**: use `http://host.docker.internal:11434` as the LLM Server URL.
 - **Remote server**: use the server's reachable URL and configure any required
-  API key in the *LLM Server API Key* and *LLM Server Authentication Type* settings.
+  API key in the *Authentication header* and *Authentication key* settings.
 
 In both cases, configure the LLM settings manually via **Control Panel → Settings**
 (see *Manual configuration* above), using the appropriate server URL instead of
