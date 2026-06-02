@@ -13,7 +13,8 @@ from processors.machine_learning.llm_prompter import LLMPrompter
 
 import json
 
-class PromptCompassRunner():
+
+class PromptCompassRunner(ProcessorPreset):
     """
     Run processor pipeline to feed prompts to LLM Prompter
     """
@@ -25,8 +26,8 @@ class PromptCompassRunner():
     extension = "ndjson"
 
     references = [
-	    "This processor is an implementation of the stand-alone tool [PromptCompass](https://github.com/ErikBorra/PromptCompass) by Erik Borra.",
-	    "See the processor options for references to the sources of each prompt in the library."
+        "This processor is an implementation of the stand-alone tool [PromptCompass](https://github.com/ErikBorra/PromptCompass) by Erik Borra.",
+        "See the processor options for references to the sources of each prompt in the library."
     ]
 
     @staticmethod
@@ -39,7 +40,7 @@ class PromptCompassRunner():
         prompt_library_file = config.get("PATH_ROOT").joinpath("common/assets/prompt_library.json")
         if not prompt_library_file.exists():
             return []
-        
+
         with prompt_library_file.open(encoding="utf-8") as infile:
             prompt_library = json.load(infile)
 
@@ -149,7 +150,7 @@ class PromptCompassRunner():
         })
 
         for i, task in enumerate(prompt_library):
-            task_key = f"task-{i+1}"
+            task_key = f"task-{i + 1}"
             options[task_key] = {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "requires": f"task=={task_key}",
@@ -212,7 +213,8 @@ class PromptCompassRunner():
             self.dataset.update_label(f"PromptCompass ({short_name})")
 
         if self.parameters.get("model") not in config.get("llm.enabled_models", []):
-            return self.dataset.finish_with_error(f"Model {self.parameters['model']} is not available, halting processor.")
+            return self.dataset.finish_with_error(
+                f"Model {self.parameters['model']} is not available, halting processor.")
 
         pipeline = [
             {
@@ -233,7 +235,6 @@ class PromptCompassRunner():
         ]
 
         return pipeline
-
 
     @staticmethod
     def validate_query(query, request, config):
