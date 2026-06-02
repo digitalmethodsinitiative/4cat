@@ -619,7 +619,9 @@ config_definition = {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "LLM Server URL",
-                "tooltip": "The URL of the LLM server, e.g. http://localhost:5000. Must start with a schema (e.g. 'https://').",
+                "tooltip": "The URL of the LLM server, e.g. http://localhost:5000. Must start with a schema "
+                           "(e.g. 'https://'). When trying to connect to localhost while running 4CAT in Docker, use "
+                           "'host.docker.internal' as a hostname instead.",
             },
             "auth_header": {
                 "type": UserInput.OPTION_TEXT,
