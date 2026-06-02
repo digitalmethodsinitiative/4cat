@@ -584,15 +584,15 @@ config_definition = {
     },
     "llm.providers": {
         "type": UserInput.OPTION_MULTI_OPTION,
-        "default": [
-            {
+        "default": {
+            "thirdparty-models": {
                 "name": "Third-party APIs (OpenAI, Google, Claude, Mistral, etc)",
                 "type": "api",
                 "url": "",
                 "auth_header": "",
                 "auth_key": ""
             }
-        ],
+        },
         "global": True,
         "help": "LLM providers",
         "dict_key": lambda v: re.sub(r"[^0-9a-zA-Z ]", "", v["name"]).lower().replace(" ", "-") + (("-" + v["url"].split("/")[2].lower()) if "://" in v["url"] else ""),
