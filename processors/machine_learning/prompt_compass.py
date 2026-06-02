@@ -1,6 +1,9 @@
 """
 Use a prompt from a preset list
 """
+import json
+from itertools import chain
+
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 
@@ -10,9 +13,6 @@ from common.lib.exceptions import (
 )
 
 from processors.machine_learning.llm_prompter import LLMPrompter
-
-import json
-
 
 class PromptCompassRunner(ProcessorPreset):
     """
