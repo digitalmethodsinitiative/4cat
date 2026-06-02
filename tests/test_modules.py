@@ -1,3 +1,4 @@
+import traceback
 import pytest
 import time
 import json
@@ -218,7 +219,8 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
                 processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
             except Exception as e:
                 # Log the failure and add it to the failures list
-                logger.error(f"Processor {processor_name} failed in get_options: {e}")
+                trace = traceback.TracebackException.from_exception(e).stack[-1]
+                logger.error(f"Processor {processor_name} failed in get_options: {e} (in {trace.filename.split('/')[-1]}:{trace.lineno})")
                 failures.append((processor_name, str(e)))
 
             # Check if processor Class has "options" attribute
@@ -230,11 +232,13 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
             try:
                 processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
             except Exception as e:
-                logger.error(f"Processor {processor_name} failed in process(): {e}")
+                trace = traceback.TracebackException.from_exception(e).stack[-1]
+                logger.error(f"Processor {processor_name} failed in process(): {e} (in {trace.filename.split('/')[-1]}:{trace.lineno})")
                 failures.append((processor_name, str(e)))
 
         except Exception as e:
-            logger.error(f"Processor {processor_name} failed while setting up: {e}")
+            trace = traceback.TracebackException.from_exception(e).stack[-1]
+            logger.error(f"Processor {processor_name} failed while setting up: {e} (in {trace.filename.split('/')[-1]}:{trace.lineno})")
             failures.append((processor_name, str(e)))
 
 
