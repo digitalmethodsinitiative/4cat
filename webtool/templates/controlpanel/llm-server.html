@@ -140,9 +140,7 @@
     </section>
 
     {# Pull a new model, if an ollama server is configured #}
-    {% set can_add_models = False %}
-    {% for provider_id, provider in providers.items() %}{% if provider.type == "ollama" %}{% set can_add_models = True %}{% endif %}{% endfor %}
-    {% if can_add_models %}
+    {% if providers.values()|selectattr("type", "equalto", "ollama")|list %}
     <section>
         <h2><span>Install new LLMs</span></h2>
         <p>Enter a model name (e.g. <code>llama3:8b</code>) to make it available via the configured provider. For
