@@ -653,9 +653,10 @@ config_definition = {
     },
     "llm.access": {
         "type": UserInput.OPTION_TOGGLE,
-        "help": "LLM Access",
+        "help": "Local LLM Access",
         "default": False,
-        "tooltip": "Use tags or individual users to allow access to the LLM server (or set True in global for all).",
+        "tooltip": "If disabled, can only use LLMs from the 'Third-party models' provider. Can be configured per user "
+                   "or tag.",
     },
     # TODO: add setting to restrict models per user/group?
     
