@@ -1,9 +1,5 @@
 """
 Centralized HTTP client for communicating with an Ollama server.
-
-This class owns all direct HTTP calls to Ollama's REST API and provides shared static
-helpers for capability parsing, display-name formatting, and building canonical
-llm.available_models entries. It is a plain helper with no 4CAT base-class dependency.
 """
 import requests
 
@@ -47,19 +43,19 @@ class OllamaClient(LLMProviderClient):
     def parse_supported_media_types(self, meta: dict) -> list[str]:
         """Derive the media types a model supports from its Ollama metadata.
 
-        **Primary path**: reads ``meta["capabilities"]``:
-        - ``"completion"`` → ``"text"``
-        - ``"vision"``     → ``"image"``
-        - ``"embedding"``  → ``"embedding"``
+        **Primary path**: reads `meta["capabilities"]`:
+        - `"completion"` → `"text"`
+        - `"vision"`     → `"image"`
+        - `"embedding"`  → `"embedding"`
 
-        **Fallback path** (used when capabilities are absent or only yield ``"text"``):
-        inspects GGUF ``model_info`` / ``details`` for vision signals and adds
-        ``"image"`` if any are found.
+        **Fallback path** (used when capabilities are absent or only yield `"text"`):
+        inspects GGUF `model_info` / `details` for vision signals and adds
+        `"image"` if any are found.
 
-        :param meta:    ``/api/show`` response dict, or ``None``.
-        :returns:       Ordered list of supported media type strings.
-                        Returns ``[]`` when ``meta`` is ``None`` (unknown — callers
-                        should include the model, not block it).
+        :param dict meta:  `/api/show` response dict, or `None`.
+        :returns list[str]:  Ordered list of supported media type strings.
+          Returns `[]` when `meta` is `None` (unknown — callers should
+          include the model, not block it).
         """
         if meta is None or not meta.get("metadata"):
             return []
@@ -96,9 +92,8 @@ class OllamaClient(LLMProviderClient):
         """
         Build a human-readable display name for a model.
 
-        :param model_id:    Raw Ollama model identifier (e.g. ``"llama3:8b"``).
-        :param meta:        ``/api/show`` response dict, or ``None``.
-        :returns:           Human-readable display name string.
+        :param dict meta:  `/api/show` response dict, or `None`.
+        :returns str:  Human-readable display name string.
         """
         model_name = self.get_model_id(meta)
 
@@ -125,17 +120,18 @@ class OllamaClient(LLMProviderClient):
         """
         Get a URL for a model card for a given model
 
-        :param meta:  Model metadata
+        :param dict meta:  Model metadata
         :return str:  Model card URL (empty string if unavailable)
         """
         return f"https://ollama.com/library/{meta['model']}"
 
     def pull_model(self, model_id: str, stream: bool = False) -> bool:
-        """Pull a model from the Ollama registry.
+        """
+        Pull a model from the Ollama registry.
 
-        :param model_id:    Model name (e.g. ``"llama3:8b"``).
-        :param stream:      Whether to stream the response (default ``False``).
-        :returns:           ``True`` on success, ``False`` on failure.
+        :param dict model_id:  Model name (e.g. `"llama3:8b"`).
+        :param str stream:  Whether to stream the response (default `False`).
+        :returns bool:  `True` on success, `False` on failure.
         """
         try:
             r = self._session.post(
@@ -159,10 +155,11 @@ class OllamaClient(LLMProviderClient):
             return False
 
     def delete_model(self, model_id: str) -> bool:
-        """Delete a model from the Ollama server.
+        """
+        Delete a model from the Ollama server.
 
-        :param model_id:    Model name (e.g. ``"llama3:8b"``).
-        :returns:           ``True`` on success, ``False`` on failure.
+        :param str model_id:  Model name (e.g. `"llama3:8b"`).
+        :returns bool:  `True` on success, `False` on failure.
         """
         try:
             r = self._session.delete(

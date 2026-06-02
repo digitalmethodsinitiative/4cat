@@ -34,6 +34,9 @@ class LLMProviderManager(BasicWorker):
 		return {"remote_id": "manage-llm-refresh", "interval": 86400}
 
 	def work(self):
+		"""
+		Manage LLM models and providers
+		"""
 		task = self.job.details.get("task", "refresh") if self.job.details else "refresh"
 		provider = self.job.details.get("provider", "") if self.job.details else None
 		model_name = self.job.data["remote_id"]

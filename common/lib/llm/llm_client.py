@@ -26,15 +26,15 @@ class LLMProviderClient:
         :param config:  4CAT config reader
         :param dict provider_config:  Provider parameters, as configured in
           4CAT
-        :return LLMProviderClient:
+        :return LLMProviderClient:  A client object appropriate for the provider.
         """
         # in-line import because we otherwise get circular import shenanigans
         from common.lib.llm.clients.ollama_client import OllamaClient
         from common.lib.llm.clients.litellm_client import LiteLLMClient
-        from common.lib.llm.clients.openai_client import LMStudioClient
+        from common.lib.llm.clients.openai_client import OpenAICompatibleClient
         from common.lib.llm.clients.thirdparty_client import ThirdPartyClient
 
-        for client_type in (OllamaClient, LiteLLMClient, LMStudioClient, ThirdPartyClient):
+        for client_type in (OllamaClient, LiteLLMClient, OpenAICompatibleClient, ThirdPartyClient):
             if client_type.type == provider_config["type"]:
                 return client_type(config, provider_config)
 
@@ -44,6 +44,7 @@ class LLMProviderClient:
         """
         HTTP client for an LLM Provider
 
+        :param config:  4CAT config reader
         :param dict provider_config:  Provider parameters, as configured in 4CAT
         :param int timeout: Default request timeout in seconds.
         :param Logger log:  4CAT log handler
@@ -91,9 +92,10 @@ class LLMProviderClient:
             return False
 
     def list_models(self) -> list[dict]:
-        """List available models from the Ollama server.
+        """
+        List available models from the LLM server.
 
-        :returns:   List of model dicts, or ``[]`` on failure.
+        :returns:   List of model dicts (un-mapped), or `[]` on failure.
         """
         try:
             r = self._session.get(
@@ -113,12 +115,10 @@ class LLMProviderClient:
 
     def build_model_entry(self, meta: dict) -> dict:
         """
-        Build a canonical ``llm.available_models`` entry for a model.
+        Build a canonical `llm.available_models` entry for a model.
 
-        :param model_id:        Raw model identifier.
-        :param display_name:    Human-readable name (from ``format_display_name``).
-        :param meta:            ``/api/show`` response dict, or ``None`` if unavailable.
-        :returns:               Dict ready to store under ``llm.available_models[model_id]``.
+        :param meta:  `/api/show` response dict, or `None` if unavailable.
+        :returns:  Dict ready to store under `llm.available_models[model_id]`.
         """
         return {
             "id": self.get_global_model_id(meta),
@@ -134,27 +134,28 @@ class LLMProviderClient:
         """
         Get a URL for a model card for a given model
 
-        :param meta:  Model metadata
+        :param dict meta:  Model metadata
         :return str:  Model card URL (empty string if unavailable)
         """
         return ""
 
     @abstractmethod
     def parse_supported_media_types(self, meta: dict) -> list[str]:
-        """Derive the media types a model supports from its Ollama metadata.
+        """
+        Derive the media types a model supports from its Ollama metadata.
 
-        **Primary path**: reads ``meta["capabilities"]``:
-        - ``"completion"`` → ``"text"``
-        - ``"vision"``     → ``"image"``
-        - ``"embedding"``  → ``"embedding"``
+        **Primary path**: reads `meta["capabilities"]`:
+        - `"completion"` → `"text"`
+        - `"vision"`     → `"image"`
+        - `"embedding"`  → `"embedding"`
 
-        **Fallback path** (used when capabilities are absent or only yield ``"text"``):
-        inspects GGUF ``model_info`` / ``details`` for vision signals and adds
-        ``"image"`` if any are found.
+        **Fallback path** (used when capabilities are absent or only yield `"text"`):
+        inspects GGUF `model_info` / `details` for vision signals and adds
+        `"image"` if any are found.
 
-        :param meta:    ``/api/show`` response dict, or ``None``.
+        :param meta:    `/api/show` response dict, or `None`.
         :returns:       Ordered list of supported media type strings.
-                        Returns ``[]`` when ``meta`` is ``None`` (unknown — callers
+                        Returns `[]` when `meta` is `None` (unknown — callers
                         should include the model, not block it).
         """
         pass

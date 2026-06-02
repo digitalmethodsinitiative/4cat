@@ -20,7 +20,7 @@ class LLMAdapter:
     def __init__(
             self,
             config,
-            model,
+            model: dict,
             api_key: Optional[str] = None,
             temperature: float = 0.1,
             max_tokens: int = 1000,
@@ -30,11 +30,11 @@ class LLMAdapter:
         Instantiate an adapter to interface with an LLM model
 
         :param config:  4CAT config reader
-        :param model:  Model metadata (as in `llm.available_models` 4CAT setting)
-        :param api_key:  API key, if needed
-        :param temperature:  Temperature hyperparameter
-        :param max_tokens:  Max tokens to generate
-        :param client_kwargs:  Optional parameters for the LLM adapter class
+        :param dict model:  Model metadata (as in `llm.available_models` 4CAT setting)
+        :param str api_key:  API key, if needed
+        :param float temperature:  Temperature hyperparameter
+        :param int max_tokens:  Max tokens to generate
+        :param dict client_kwargs:  Optional parameters for the LLM adapter class
         """
         known_providers = config.get("llm.providers", {})
 
@@ -50,6 +50,11 @@ class LLMAdapter:
         self.llm: BaseChatModel = self._load_llm()
 
     def _load_llm(self) -> BaseChatModel:
+        """
+        Load appropriate langchain chat class
+
+        :return BaseChatModel:  Langchain chat model for interfacing with model
+        """
         chat_params = {
             "model": self.model["local_id"],
             "api_key": SecretStr(self.api_key),
@@ -265,6 +270,11 @@ class LLMAdapter:
                 return {"type": "image_url", "image_url": {"url": data_uri}}
 
     def set_structure(self, json_schema):
+        """
+        Set desired response JSON schema
+
+        :param json_schema:
+        """
         if not json_schema:
             raise ValueError("json_schema is None")
 
@@ -280,15 +290,3 @@ class LLMAdapter:
         else:
             self.llm = self.llm.with_structured_output(json_schema)
         self.structured_output = True
-
-    @staticmethod
-    def get_models(config) -> dict:
-        """
-        Returns a dict with LLM models supported by 4CAT, either through an API or as a local option.
-        Make sure to keep up-to-date!
-
-        :returns dict, A dict with model IDs as keys and details as values
-        """
-        available_models = config.get("llm.available_models", {})
-        enabled_models = config.get("llm.enabled_models", {})
-        return {k: v for k, v in available_models.items() if k in enabled_models}
