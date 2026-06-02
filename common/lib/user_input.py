@@ -72,8 +72,6 @@ class UserInput:
         if type(input) is not dict and type(input) is not ImmutableMultiDict:
             raise TypeError("input must be a dictionary or ImmutableMultiDict")
 
-        print(input)
-
         if type(input) is ImmutableMultiDict:
             # we are not using to_dict, because that messes up multi-selects
             input = {key: input.getlist(key) for key in input}
@@ -436,7 +434,12 @@ class UserInput:
             # one out of multiple options
             # return option if valid, or default
             options = settings.get("options", [])
-            match_options = chain(*[list(o.keys()) for o in options.values()]) if type(options) is dict else options
+
+            # if we have a categorised set of options, look deeper to get
+            # valid option values
+            is_categorised = all([type(o) is dict for o in options.values()])
+            match_options = chain(*[list(o.keys()) for o in options.values()]) if is_categorised else options
+
             if choice not in match_options:
                 if not silently_correct:
                     raise QueryParametersException(f"Invalid value selected; must be one of {', '.join(match_options)}.")
