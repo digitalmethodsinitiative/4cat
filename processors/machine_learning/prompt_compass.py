@@ -35,6 +35,7 @@ class PromptCompassRunner(ProcessorPreset):
         """
         Get prompt library from file
 
+        :param config:  Config reader
         :return list:  List of prompts and metadata
         """
         prompt_library_file = config.get("PATH_ROOT").joinpath("common/assets/prompt_library.json")
@@ -212,7 +213,7 @@ class PromptCompassRunner(ProcessorPreset):
         if short_name:
             self.dataset.update_label(f"PromptCompass ({short_name})")
 
-        if self.parameters.get("model") not in config.get("llm.enabled_models", []):
+        if self.parameters.get("model") not in self.config.get("llm.enabled_models", []):
             return self.dataset.finish_with_error(
                 f"Model {self.parameters['model']} is not available, halting processor.")
 
