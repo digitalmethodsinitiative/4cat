@@ -73,7 +73,7 @@ class LLMPrompter(BasicProcessor):
 
     @classmethod
     def get_model_library(cls, config):
-        available_models = config.get("llm.available_models", [])
+        available_models = config.get("llm.available_models", {})
         enabled_model_ids = config.get("llm.enabled_models", [])
         providers = config.get("llm.providers", {})
         if not config.get("llm.access"):

@@ -88,7 +88,7 @@ class PromptCompassRunner(ProcessorPreset):
         :return:
         """
         prompt_library = cls.get_prompt_library(config)
-        available_models = config.get("llm.available_models", [])
+        available_models = config.get("llm.available_models", {})
         enabled_model_ids = config.get("llm.enabled_models", [])
         if not config.get("llm.access"):
             enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("api-")]
@@ -101,7 +101,7 @@ class PromptCompassRunner(ProcessorPreset):
                 "help": "Model to use",
                 "tooltip": "Third-party models require an API key to run.",
                 "options": LLMPrompter.get_model_library(config),
-                "default": sorted(list(enabled_models.keys()), key=lambda k: not k.startswith("api"))[-1]
+                "default": sorted(list(enabled_models.keys()), key=lambda k: not k.startswith("api"))[-1] if enabled_models else ""
             },
         }
 
