@@ -5,6 +5,8 @@ Prompt LLMs.
 import re
 import time
 import json
+from itertools import chain
+
 import jsonschema
 import requests
 
@@ -1104,6 +1106,10 @@ class LLMPrompter(BasicProcessor):
         is_external_api = query["model"].startswith("api-")
         if is_external_api and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
+
+        allowed_models = LLMPrompter.get_model_library(config)
+        if query["model"] not in chain(*[v.values() for v in allowed_models.values()]):
+            raise QueryParametersException(f"The '{query['model']}' model is not currently available.")
 
         # For media archive datasets, use_media won't be present in the query
         is_media_archive = "use_media" not in query

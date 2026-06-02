@@ -249,6 +249,10 @@ class PromptCompassRunner(ProcessorPreset):
         :param config:
         :return:
         """
+        allowed_models = LLMPrompter.get_model_library(config)
+        if query["model"] not in chain(*[v.values() for v in allowed_models.values()]):
+            raise QueryParametersException(f"The '{query['model']}' model is not currently available.")
+
         if not query["model"].startswith("local") and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
 
