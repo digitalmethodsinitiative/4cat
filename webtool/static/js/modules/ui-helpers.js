@@ -150,7 +150,7 @@ export const ui_helpers = {
             $('.button-container button').attr('disabled', 'disabled');
             button.find('i').removeClass('fa-power-off').addClass('fa-sync-alt').addClass('fa-spin');
             fetch(url, {method: 'POST'}).then(response => response.json()).then(response => {
-                popup.alert(response['message'], 'Front-end restart: ' + response['status']);
+                popup.alert(response.message, 'Front-end restart: ' + response.status);
             }).catch(e => {}).finally(() => {
                 button.find('i').removeClass('fa-sync-alt').removeClass('fa-spin').addClass('fa-power-off');
                 $('.button-container button').removeAttr('disabled');
@@ -221,7 +221,7 @@ export const ui_helpers = {
         }
 
         let method = $(this).attr('data-confirm-method') ? $(this).attr('data-confirm-method') : 'GET';
-        let result = prompt('Please confirm that you want to ' + action + '. This cannot be undone.');
+        let result = confirm('Please confirm that you want to ' + action + '. This cannot be undone.');
         let html = '';
         let url = $(this).attr('href');
 
@@ -445,10 +445,8 @@ export const ui_helpers = {
                         other_value = other_value[0];
                     } else if(operator === '~=') {
                         // multi-item array + ~=: is value a member of this array?
-                        if((other_value.indexOf(value) < 0) !== negated) {
-                            return false;
-                        }
-                        return true; // handled; skip scalar checks below
+                        return (other_value.indexOf(value) < 0) === negated;
+                         // handled; skip scalar checks below
                     } else if(!negated) {
                         // other operators on multi-item arrays are not meaningful: treat as not satisfied
                         return false;
