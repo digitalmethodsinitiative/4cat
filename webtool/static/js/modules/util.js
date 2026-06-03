@@ -141,22 +141,22 @@ export function hsv2hsl(h, s, v) {
  * Assumes r, g, and b are contained in the set [0, 255] and
  * returns h, s, and v in the set [0, 1].
  *
- * @param   Number  r       The red color value
- * @param   Number  g       The green color value
- * @param   Number  b       The blue color value
+ * @param r       The red color value
+ * @param g       The green color value
+ * @param b       The blue color value
  * @return  Array           The HSV representation
  */
 export function rgb2hsv(r, g, b)
 {
-    r /= 255, g /= 255, b /= 255;
+    r /= 255; g /= 255; b /= 255;
 
-    var max = Math.max(r, g, b), min = Math.min(r, g, b);
-    var h, s, v = max;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, v = max;
 
-    var d = max - min;
-    s = max == 0 ? 0 : d / max;
+    const d = max - min;
+    s = max === 0 ? 0 : d / max;
 
-    if (max == min) {
+    if (max === min) {
         h = 0; // achromatic
     } else {
         switch (max) {
@@ -183,38 +183,38 @@ export function rgb2hsv(r, g, b)
  * Assumes h, s, and v are contained in the set [0, 1] and
  * returns r, g, and b in the set [0, 255].
  *
- * @param   Number  h       The hue
- * @param   Number  s       The saturation
- * @param   Number  v       The value
+ * @param h       The hue
+ * @param s       The saturation
+ * @param v       The value
  * @return  Array           The RGB representation
  */
 export function hsv2rgb(h, s, v) {
-    var r, g, b;
+    let r, g, b;
 
-    var i = Math.floor(h * 6);
-    var f = h * 6 - i;
-    var p = v * (1 - s);
-    var q = v * (1 - f * s);
-    var t = v * (1 - (1 - f) * s);
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const p = v * (1 - s);
+    const q = v * (1 - f * s);
+    const t = v * (1 - (1 - f) * s);
 
     switch (i % 6) {
         case 0:
-            r = v, g = t, b = p;
+            r = v; g = t; b = p;
             break;
         case 1:
-            r = q, g = v, b = p;
+            r = q; g = v; b = p;
             break;
         case 2:
-            r = p, g = v, b = t;
+            r = p; g = v; b = t;
             break;
         case 3:
-            r = p, g = q, b = v;
+            r = p; g = q; b = v;
             break;
         case 4:
-            r = t, g = p, b = v;
+            r = t; g = p; b = v;
             break;
         case 5:
-            r = v, g = p, b = q;
+            r = v; g = p; b = q;
             break;
     }
 
