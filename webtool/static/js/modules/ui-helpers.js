@@ -1,5 +1,5 @@
 import {popup} from "./popup.js";
-import {find_parent} from "./util.js";
+import {find_parent, hsv2hsl} from "./util.js";
 
 export const ui_helpers = {
     /**
