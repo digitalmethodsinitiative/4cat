@@ -3,7 +3,6 @@ Create an image wall with text captions
 """
 import io
 import base64
-import json
 import math
 import textwrap
 
@@ -17,7 +16,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -145,21 +144,19 @@ class ImageTextWallGenerator(BasicProcessor):
         max_text_len = 0
         filename_to_text_mapping = {}
         if text_dataset.type in ImageTextWallGenerator.combined_dataset:
-            # For datasets with both images and text, use .metadata.json
-            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file)
-            if metadata_file is None:
+            # For datasets with both images and text (Stable Diffusion output),
+            # the prompt is stored as item.extra.prompt in the archive metadata.
+            try:
+                metadata = text_dataset.read_media_metadata()
+            except (FileNotFoundError, MetadataException):
                 self.dataset.finish_with_error("No metadata file found")
                 return
-            with metadata_file.open() as f:
-                metadata = json.load(f)
-            for item in metadata.values():
+            for filename, item in metadata.iter_entries():
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while collecting text")
-                if "filename" in item:
-                    # "image-downloader-stable-diffusion" datasets
-                    image_text = item.get("prompt", "")
-                    max_text_len = max(max_text_len, len(image_text))
-                    filename_to_text_mapping[item["filename"]] = image_text
+                image_text = (item.get("extra") or {}).get("prompt", "")
+                max_text_len = max(max_text_len, len(image_text))
+                filename_to_text_mapping[filename] = image_text
         else:
             # For datasets with separate images and text
             for item in text_dataset.iterate_items(self):

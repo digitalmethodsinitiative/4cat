@@ -1,12 +1,11 @@
 """
 Detect scenes in videos
 """
-import json
 import os
 from scenedetect import open_video, SceneManager, VideoOpenFailure
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, MetadataException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -185,17 +184,16 @@ class VideoSceneDetector(BasicProcessor):
 		self.dataset.update_status("Detecting video scenes")
 		total_possible_videos = self.source_dataset.num_rows - deduct_metadata  # exclude metadata file on UNIX
 		processed_videos = 0
-		video_metadata = None
+		try:
+			video_metadata = self.source_dataset.read_media_metadata()
+		except (FileNotFoundError, MetadataException):
+			video_metadata = None
 		collected_scenes = {}
 		for original_video in self.source_dataset.iterate_items(self, immediately_delete=False):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while detecting video scenes")
 
-			# Check for 4CAT's metadata JSON and copy it
 			if original_video.file.name == ".metadata.json":
-				# Keep it and move on
-				with open(original_video.file) as file:
-					video_metadata = json.load(file)
 				continue
 			elif original_video.file.name == "video_archive":
 				# yt-dlp file
@@ -275,39 +273,29 @@ class VideoSceneDetector(BasicProcessor):
 					num_posts += 1
 		else:
 			self.dataset.update_status("Saving video scene results")
-			for url, video_data in video_metadata.items():
-				if video_data.get('success'):
-					files = video_data.get('files') if 'files' in video_data else [{"filename": video_data.get("filename"), "success":True}]
-					for file in files:
-						if not file.get("success") or file.get("filename") not in collected_scenes:
-							continue
-							
-						# List types are not super fun for CSV
-						if 'post_ids' in video_data:
-							video_data['post_ids'] = ','.join(video_data['post_ids'])
+			from_dataset = video_metadata.from_dataset
+			for filename, item in video_metadata.iter_entries():
+				if filename not in collected_scenes:
+					continue
+				post_ids = item.get("post_ids", [])
+				post_ids_csv = ','.join(post_ids)
+				for i, scene in enumerate(collected_scenes[filename]):
+					rows.append({
+						'id': filename + '_scene_' + str(i + 1),
+						'url': item.get("url", ""),
+						"from_dataset": from_dataset,
+						**scene,
+						"post_ids": post_ids_csv,
+					})
+					num_posts += 1
 
-
-						for i, scene in enumerate(collected_scenes[file.get('filename')]):
-							rows.append({
-								'id': file.get('filename') + '_scene_' + str(i+1),  # best if all datasets have unique identifier
-								'url': url,
-								"from_dataset": video_data.get("from_dataset"),
-								**scene,
-								"post_ids": ','.join(video_data.get("post_ids", [])),
+					if save_annotations and i == 0:
+						for item_id in post_ids:
+							annotations.append({
+								"label": "scene_amount",
+								"value": scene.get("num_scenes_detected", ""),
+								"item_id": item_id,
 							})
-							num_posts += 1
-
-							# Write amount of scenes for first scene detected
-							if save_annotations and i == 0:
-								item_ids = video_data.get("post_ids", [])
-								item_ids = [item_ids] if isinstance(item_ids, str) else item_ids
-								for item_id in item_ids:
-									annotation = {
-										"label": "scene_amount",
-										"value": scene.get("num_scenes_detected", ""),
-										"item_id": item_id
-									}
-									annotations.append(annotation)
 
 		if save_annotations and annotations:
 			self.save_annotations(annotations)

@@ -8,7 +8,7 @@ from requests.exceptions import ConnectionError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
@@ -511,18 +511,20 @@ class AudioToText(BasicProcessor):
                 self.dataset.update_status(f"Got {i + 1} transcription{s} from OpenAI")
                 self.dataset.update_progress((i + 1) / max_files)
 
-        # Load the video metadata if available
-        video_metadata = None
+        # Load the source archive's metadata if available. Map by
+        # extension-less filename: the transcription result files share their
+        # stem with the input audio (e.g. `foo.wav` -> `foo.json`).
         file_metadata_map = {}
-        if staging_area.joinpath(".metadata.json").is_file():
-            with open(staging_area.joinpath(".metadata.json")) as file:
-                video_metadata = json.load(file)
-                self.dataset.log("Found and loaded video metadata")
-
-            for video_id, video_data in video_metadata.items():
-                for file in video_data.get("files", []):
-                    file = ".".join(file["filename"].split(".")[:-1])
-                    file_metadata_map[file] = video_data
+        try:
+            source_metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            source_metadata = None
+        if source_metadata is not None:
+            self.dataset.log("Found and loaded audio metadata")
+            from_dataset = source_metadata.from_dataset
+            for filename, item in source_metadata.iter_entries():
+                basename = filename.rsplit(".", 1)[0]
+                file_metadata_map[basename] = {**item, "from_dataset": from_dataset}
 
         self.dataset.update_status("Processing results...")
 

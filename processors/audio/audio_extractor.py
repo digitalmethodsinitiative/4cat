@@ -10,7 +10,7 @@ from pathlib import Path
 import oslex
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -89,6 +89,20 @@ class AudioExtractor(BasicProcessor):
         if max_files != 0:
             total_possible_videos = min(total_possible_videos, max_files)
 
+        # Read the source video archive's metadata so each extracted audio
+        # file can carry its video's provenance (source posts, URL).
+        try:
+            source_metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            source_metadata = None
+
+        # Build our own metadata describing the audio files we produce,
+        # rather than passing the (video-keyed) source metadata through.
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type,
+            from_dataset=(source_metadata.from_dataset if source_metadata else self.source_dataset.key),
+        )
+
         processed_videos = 0
         written = 0
 
@@ -97,9 +111,9 @@ class AudioExtractor(BasicProcessor):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
-            # Check for 4CAT's metadata JSON and copy it
+            # the source archive's metadata describes videos; we write our
+            # own (audio-keyed) metadata below, so skip the original
             if item.file.name == '.metadata.json':
-                shutil.copy(item.file, output_dir.joinpath(".metadata.json"))
                 continue
 
             if max_files != 0 and processed_videos >= max_files:
@@ -123,9 +137,23 @@ class AudioExtractor(BasicProcessor):
             ffmpeg_output = result.stdout.decode("utf-8")
             ffmpeg_error = result.stderr.decode("utf-8")
 
-            audio_file = output_dir.joinpath(f"{vid_name}.wav")
+            audio_filename = f"{vid_name}.wav"
+            audio_file = output_dir.joinpath(audio_filename)
+
+            # carry the source video's provenance onto the extracted audio
+            video_item = source_metadata.get_entry(item.file.name) if source_metadata else None
+            post_ids = video_item.get("post_ids", []) if video_item else []
+            source_url = video_item.get("url") if video_item else None
+            extra = dict(video_item.get("extra") or {}) if video_item else {}
+
             if audio_file.exists():
                 written += 1
+                metadata.add_item(audio_filename, post_ids=post_ids, url=source_url,
+                                  extra=extra, replace=True)
+            else:
+                metadata.add_failure(post_ids=post_ids, reason="extraction_failed",
+                                     reason_description=f"ffmpeg exited with code {result.returncode}",
+                                     url=source_url)
 
             if ffmpeg_output:
                 with open(str(output_dir.joinpath(f"{vid_name}_stdout.log")), 'w', encoding="utf-8") as outfile:
@@ -142,6 +170,10 @@ class AudioExtractor(BasicProcessor):
 
             self.dataset.update_status(f"Extracted audio from {written} of {processed_videos} attempted videos")
             self.dataset.update_progress(min(1, processed_videos / max(total_possible_videos, 1)))
+
+        # Write our own metadata describing the extracted audio files (and
+        # any extraction failures), keyed by audio filename.
+        metadata.write(output_dir)
 
         # Finish up
         warning = f"Extracted {written}/{processed_videos} audio files, check the logs for errors." \

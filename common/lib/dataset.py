@@ -2305,77 +2305,41 @@ class DataSet(FourcatModule):
         :param list item_ids:   A list of item IDs to limit the filename retrieval to.
         returns dict: item_id as key and a list of tuples (child dataset key -> filename) as items
         """
-        children = self.get_children()
+        from common.lib.exceptions import MetadataException
 
+        children = self.get_children()
         if not children:
             return {}
 
-        media_map = {}
-
-        # Get children that are image/video downloaders
         media_datasets = [
             p for p in children
             if ("video-downloader" in p.type or "image-downloader" in p.type) and p.data.get("num_rows", 0) > 0 and p.is_finished()
         ]
 
-        # Loop through media datasets and create a map of dataset key -> filenames
-        # Skip files that were downloaded multiple times
+        media_map = {}
         seen_files = set()
+        item_ids = [str(i_id) for i_id in item_ids]
 
         for media_dataset in media_datasets:
-            for item in media_dataset.iterate_items():
+            try:
+                metadata = media_dataset.read_media_metadata()
+            except (FileNotFoundError, MetadataException):
+                continue
 
-                if item.file.name == ".metadata.json":
-                    with item.file.open() as infile:
-                        metadata = json.load(infile)
+            for filename, entry in metadata.iter_entries():
+                post_ids = [str(p_id) for p_id in entry.get("post_ids", [])]
+                if not post_ids:
+                    continue
+                if item_ids and not any(p_id in item_ids for p_id in post_ids):
+                    continue
 
-                        for url_key, item_metadata in metadata.items():
-                            media_items = set()
-                            post_ids = item_metadata.get("post_ids", [])  # Required
-
-                            if not post_ids:
-                                continue
-
-                            # Make sure we're matching and passing strings
-                            post_ids = [str(p_id) for p_id in post_ids]
-                            item_ids = [str(i_id) for i_id in item_ids]
-
-                            # Skip items that are not in the requested item_ids
-                            if item_ids and not any(p_id in item_ids for p_id in post_ids):
-                                continue
-
-                            # Single file (images usually format like this)
-                            is_success = item_metadata.get("success", True)
-
-                            if is_success and "filename" in item_metadata:
-                                media_info = (media_dataset.key, item_metadata["filename"])
-                                media_items.add(media_info)
-
-                            # Multiple files (videos with the 'files' array)
-                            if item_metadata.get("files"):
-                                for file in item_metadata["files"]:
-                                    if file.get("success") and "filename" in file:
-                                        media_info = (media_dataset.key, file["filename"])
-                                        media_items.add(media_info)
-
-                            if not media_items:
-                                continue
-
-                            # Append to post_id list
-                            for post_id in post_ids:
-                                if post_id not in media_map:
-                                    media_map[post_id] = []
-
-                                for media_item in media_items:
-                                    if media_item not in media_map[post_id]:
-                                        # Don't add post_id -> filename couplings that we've already seen
-                                        media_ref = (post_id, media_item[1])
-                                        if media_ref not in seen_files:
-                                            media_map[post_id].append(media_item)
-                                        seen_files.add(media_ref)
-
-                    # break after .metadata.json
-                    break
+                media_info = (media_dataset.key, filename)
+                for post_id in post_ids:
+                    media_ref = (post_id, filename)
+                    if media_ref in seen_files:
+                        continue
+                    seen_files.add(media_ref)
+                    media_map.setdefault(post_id, []).append(media_info)
 
         return media_map
 
@@ -2394,6 +2358,33 @@ class DataSet(FourcatModule):
         # get 4CAT version (presumably to ensure export is compatible with import)
         metadata["current_4CAT_version"] = get_software_version()
         return metadata
+
+    def read_media_metadata(self, filename=".metadata.json"):
+        """
+        Load this dataset's media-archive `.metadata.json`.
+
+        Returns a `MediaArchiveMetadata` instance. Legacy formats are
+        normalized on load so callers always see the current schema.
+
+        Raises `FileNotFoundError` if no metadata file is present and
+        `MetadataException` if the dataset is unfinished or the file is
+        malformed.
+        """
+        from common.lib.archive_metadata import MediaArchiveMetadata
+        return MediaArchiveMetadata.read(self, filename=filename)
+
+    def new_media_metadata(self, from_dataset, processor_type, filename=".metadata.json"):
+        """
+        Empty `MediaArchiveMetadata` container for a processor producing a
+        media archive for this dataset.
+
+        :param str from_dataset:  key of the *source* dataset whose posts are
+            being downloaded from (this is generally not the same as `self`).
+        :param str processor_type:  type of the processor, used for metadata.
+        """
+        from common.lib.archive_metadata import MediaArchiveMetadata
+        return MediaArchiveMetadata.new(self, processor_type=processor_type,
+                                        from_dataset=from_dataset, filename=filename)
 
     def get_result_url(self):
         """

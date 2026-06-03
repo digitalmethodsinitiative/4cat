@@ -5,7 +5,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import csv
-import json
 import shutil
 import zipfile
 
@@ -16,7 +15,7 @@ from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 
 from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorAdvancedPreset
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, MetadataException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -203,7 +202,10 @@ class VideoHasher(BasicProcessor):
         output_dir = self.dataset.get_staging_area()
 
         video_hashes = {}
-        video_metadata = None
+        try:
+            video_metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            video_metadata = None
         total_possible_videos = max((min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
         processed_videos = 0
 
@@ -216,9 +218,6 @@ class VideoHasher(BasicProcessor):
                 break
 
             if video.file.name == '.metadata.json':
-                # Keep it and move on
-                with video.file.open() as file:
-                    video_metadata = json.load(file)
                 continue
             elif video.file.name == "video_archive":
                 # yt-dlp file
@@ -262,16 +261,6 @@ class VideoHasher(BasicProcessor):
         rows = []
         annotations = []
         if video_metadata is None:
-            # Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
-            try:
-                metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, output_dir)
-            except FileNotFoundError:
-                metadata_path = None
-            if metadata_path:
-                with open(metadata_path) as file:
-                    video_metadata = json.load(file)
-
-        if video_metadata is None:
             self.dataset.log(
                 "No video metadata (i.e., from video downloader) found; unable to connect original posts. Saving video hashes only.")
 
@@ -287,43 +276,31 @@ class VideoHasher(BasicProcessor):
                 num_posts += 1
         else:
             self.dataset.update_status("Saving video hash results")
-            for url, data in video_metadata.items():
-                if not data.get("success"):
+            from_dataset = video_metadata.from_dataset
+            for filename, item in video_metadata.iter_entries():
+                if filename not in video_hashes:
                     continue
-                if "files" in data:
-                    files = data.get('files')
-                elif "filename" in data:
-                    files = [{"filename": data.get("filename"), "success": True}]
-                else:
-                    self.dataset.log(f"Metadata Error: {url} with {data}")
-                    continue
+                video_hash = video_hashes[filename].get('videohash')
+                post_ids = item.get("post_ids", [])
+                rows.append({
+                    'id': filename,
+                    'url': item.get("url", ""),
+                    "from_dataset": from_dataset,
+                    'video_hash': video_hash.hash,
+                    'video_duration': video_hash.video_duration,
+                    'video_count': len(post_ids),
+                    "post_ids": ','.join(str(p) for p in post_ids),
+                    'video_collage_filename': video_hashes[filename].get('video_collage_filename'),
+                })
+                if save_annotations:
+                    for item_id in post_ids:
+                        annotations.append({
+                            "label": "video-hash",
+                            "value": video_hash.hash,
+                            "item_id": item_id
+                        })
 
-                for file in files:
-                    if not file.get("success"):
-                        continue
-                    if file.get('filename') not in video_hashes:
-                        self.dataset.log(f"Metadata Error: {file.get('filename')} with {url} - {data}")
-                        continue
-                    video_hash = video_hashes[file.get('filename')].get('videohash')
-                    rows.append({
-                        'id': file.get('filename'),  # best if all datasets have unique identifier
-                        'url': url,
-                        "from_dataset": data.get("from_dataset"),
-                        'video_hash': video_hash.hash,
-                        'video_duration': video_hash.video_duration,
-                        'video_count': len(data.get('post_ids', [])),
-                        "post_ids": ','.join([str(post_id) for post_id in data.get("post_ids", [])]),
-                        'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
-                    })
-                    if save_annotations:
-                        for item_id in data.get("post_ids", []):
-                            annotations.append({
-                                "label": "video-hash",
-                                "value": video_hash.hash,
-                                "item_id": item_id
-                            })
-
-                    num_posts += 1
+                num_posts += 1
 
 
         writer = None
