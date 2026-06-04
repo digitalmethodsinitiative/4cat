@@ -14,7 +14,6 @@ from flask import Blueprint, current_app, jsonify, request, render_template, ren
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import error, setting_required, parse_markdown
-from webtool.views.api_map_item import MissingMappedFieldEncoder
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
 	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException
@@ -24,6 +23,7 @@ from common.lib.dataset import DataSet
 from common.lib.helpers import UserInput, call_api
 from common.lib.user import User
 from backend.lib.worker import BasicWorker
+from common.lib.item_mapping import MissingMappedField
 
 component = Blueprint("toolapi", __name__)
 api_ratelimit = current_app.limiter.shared_limit("3 per second", scope="api")
@@ -32,6 +32,21 @@ API_SUCCESS = 200
 API_FAIL = 404
 
 csv.field_size_limit(1024 * 1024 * 1024)
+
+def _get_search_class(modules, datasource_id):
+	"""
+	Look up the search/import class for a datasource.
+
+	Abstracts the ModuleCollector convention where worker keys append a suffix
+	to the datasource ID. Most use `-search`, some (e.g. twitter-import) use
+	`-import`. Returns None if no matching worker is found.
+
+	TODO: ModuleCollector should expose this directly.
+	"""
+	return (
+		modules.workers.get(f"{datasource_id}-search")
+		or modules.workers.get(f"{datasource_id}-import")
+	)
 
 @component.route("/api/")
 @api_ratelimit
@@ -1415,6 +1430,64 @@ def export_packed_dataset(key=None, component=None):
 	else:
 		return error(406, error="Dataset component unknown")
 
+@component.route("/api/datasources/")
+@api_ratelimit
+@current_app.openapi.endpoint("tool")
+def list_datasources():
+	"""
+	List all available datasources with map_item support.
+
+	Returns all datasources that have a map_item function, including a flag
+	indicating if they're from Zeeschuimer. Caller can filter as needed.
+
+	:return: JSON object with array of datasource metadata
+
+	:return-schema: {
+		type=object,
+		properties={
+			datasources={
+				type=array,
+				items={
+					type=object,
+					properties={
+						id={type=string},
+						name={type=string},
+						has_map_item={type=boolean},
+						is_from_zeeschuimer={type=boolean}
+					}
+				}
+			}
+		}
+	}
+	"""
+	
+	available = []
+	for datasource_id, metadata in g.modules.datasources.items():
+		search_class = _get_search_class(g.modules, datasource_id)
+		if not search_class:
+			continue
+
+		available.append({
+			"id": datasource_id,
+			"name": metadata.get("name", datasource_id),
+			"is_from_zeeschuimer": getattr(search_class, "is_from_zeeschuimer", False),
+			"has_map_item": hasattr(search_class, "map_item") and callable(getattr(search_class, "map_item"))
+		})
+
+	return jsonify({
+		"datasources": sorted(available, key=lambda x: x["id"])
+	}), 200
+
+class MissingMappedFieldEncoder(json.JSONEncoder):
+	"""Custom JSON encoder to serialize MissingMappedField objects."""
+
+	def default(self, obj):
+		if isinstance(obj, MissingMappedField):
+			return {
+				"__missing": True,
+				"value": obj.value
+			}
+		return super().default(obj)
 
 @component.route("/api/dataset/<string:key>/items/", methods=["GET", "HEAD"])
 @api_ratelimit
