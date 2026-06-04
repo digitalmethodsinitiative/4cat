@@ -591,9 +591,14 @@ def splice_into_module(existing: str, translation: dict, python_rel: str) -> str
             "module — refusing to overwrite. Restore both markers or remove both."
         )
     if has_imports_start and has_imports_end:
+        # Replacement is a callable, NOT a string: a string replacement runs
+        # through re's escape processing, so backslashes in the generated JS
+        # (regex literals like `/\w+/`, `"\n"` escapes, `\g<...>`) would be
+        # corrupted or raise `re.error`. A callable's return value is inserted
+        # verbatim.
         updated = re.sub(
             re.escape(IMPORTS_MARKER_START) + r".*?" + re.escape(IMPORTS_MARKER_END) + r"\n?",
-            imports_block,
+            lambda _match: imports_block,
             updated,
             count=1,
             flags=re.DOTALL,
@@ -614,9 +619,13 @@ def splice_into_module(existing: str, translation: dict, python_rel: str) -> str
             "module — refusing to overwrite. Restore both markers or remove both."
         )
     if has_main_start and has_main_end:
+        # Callable replacement (see note on the imports block above): the
+        # generated JS routinely contains `\w`/`\d` regex escapes and `"\n"`
+        # string escapes, which a string replacement would either mangle into
+        # a raw newline or reject with `re.error: bad escape`.
         updated = re.sub(
             re.escape(BLOCK_MARKER_START) + r".*?" + re.escape(BLOCK_MARKER_END) + r"\n?",
-            main_block,
+            lambda _match: main_block,
             updated,
             count=1,
             flags=re.DOTALL,
