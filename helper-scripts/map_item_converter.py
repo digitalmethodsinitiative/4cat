@@ -712,15 +712,102 @@ def format_raw_summary(d: dict) -> str:
     )
 
 
+def build_json_format_instructions(schema: dict) -> str:
+    """
+    Render an LLM_SCHEMA-shaped JSON schema into prompt instructions, for
+    `prompt` output mode where no response_format is sent. Single source of
+    truth stays the schema: keys, types, and descriptions all come from it.
+    """
+    props = schema.get("properties", {})
+    required = schema.get("required", list(props))
+    field_lines = []
+    shape_lines = []
+    for key in required:
+        spec = props.get(key, {})
+        typ = spec.get("type", "string")
+        desc = " ".join(spec.get("description", "").split())
+        field_lines.append(f'- "{key}" ({typ}): {desc}'.rstrip())
+        shape_lines.append(f'  "{key}": <{typ}>')
+    return (
+        "Respond with ONLY a single JSON object — no markdown, no ``` code "
+        "fences, no prose before or after it. The object must have exactly "
+        "these keys:\n"
+        + "\n".join(field_lines)
+        + "\n\nShape:\n{\n"
+        + ",\n".join(shape_lines)
+        + "\n}\n\n"
+        "String values must be valid JSON strings (escape newlines as \\n, "
+        "quotes as \\\"). Array values must be JSON arrays of strings (use [] "
+        "when empty)."
+    )
+
+
+def parse_json_object(text: str) -> Optional[dict]:
+    """
+    Pull a JSON object out of a model reply in `prompt` output mode. Tries the
+    whole (fence-stripped) text first, then falls back to the first balanced
+    {...} span. Returns None if nothing parses to a dict.
+    """
+    if not text:
+        return None
+    candidate = strip_code_fences(text).strip()
+    for attempt in (candidate, _first_brace_span(candidate)):
+        if not attempt:
+            continue
+        try:
+            parsed = json.loads(attempt)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _first_brace_span(text: str) -> Optional[str]:
+    """Return the first balanced {...} substring, or None. Brace-depth scan that
+    ignores braces inside JSON string literals (respecting backslash escapes)."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
+
+
 def translate_one(
     llm: LLMAdapter,
     python_path: Path,
     repo_root: Path,
     zeeschuimer_root: Path,
     strict_lint: bool,
+    structured: bool = True,
 ) -> dict:
     """
     Translate one Python file. Returns a manifest entry dict.
+
+    :param structured: When True (default), the schema was bound via
+        `set_structure` and the model returns a parsed dict. When False
+        (prompt mode), we ask for JSON in the prompt and parse the reply text
+        ourselves — for models/proxies whose response_format is broken.
     """
     rel = python_path.relative_to(repo_root).as_posix()
     entry = {
@@ -756,36 +843,50 @@ def translate_one(
     python_source = python_path.read_text(encoding="utf-8")
     existing_module = js_path.read_text(encoding="utf-8")
     user_prompt = build_user_prompt(python_source, existing_module, rel)
+    # Prompt mode: no response_format is sent, so spell out the JSON contract in
+    # the prompt itself and parse the reply text ourselves below.
+    if not structured:
+        user_prompt = user_prompt + "\n\n" + build_json_format_instructions(LLM_SCHEMA)
 
     started = time.monotonic()
     raw_response: Optional[str] = None
     translation: Optional[dict] = None
     llm_error: Optional[str] = None
-
-    # Structured output with include_raw=True (bound via `set_structure` in
-    # main()): `generate_text` returns a {"raw", "parsed", "parsing_error"}
-    # wrapper instead of raising on a parse failure, so we can record *why* a
-    # translation failed (see describe_raw) rather than getting an opaque
-    # "Invalid json output:" with an empty payload.
     diagnostics: Optional[dict] = None
+
     try:
         response = llm.generate_text(user_prompt, system_prompt=SYSTEM_PROMPT)
-        if isinstance(response, dict) and "raw" in response and "parsed" in response:
-            diagnostics = describe_raw(response.get("raw"))
-            parsed = response.get("parsed")
-            parse_err = response.get("parsing_error")
-            if parsed is not None:
-                translation = parsed
+        if structured:
+            # Structured output bound with include_raw=True (see set_structure in
+            # main()): `generate_text` returns a {"raw", "parsed",
+            # "parsing_error"} wrapper instead of raising on a parse failure, so
+            # we can record *why* a translation failed (see describe_raw) rather
+            # than getting an opaque "Invalid json output:" with an empty payload.
+            if isinstance(response, dict) and "raw" in response and "parsed" in response:
+                diagnostics = describe_raw(response.get("raw"))
+                parsed = response.get("parsed")
+                parse_err = response.get("parsing_error")
+                if parsed is not None:
+                    translation = parsed
+                else:
+                    detail = f": {parse_err}" if parse_err else ""
+                    llm_error = f"structured output not parseable{detail}"
+            elif isinstance(response, dict):
+                translation = response
             else:
-                detail = f": {parse_err}" if parse_err else ""
-                llm_error = f"structured output not parseable{detail}"
-        elif isinstance(response, dict):
-            translation = response
+                llm_error = (
+                    f"Expected dict from structured output, got "
+                    f"{type(response).__name__}"
+                )
         else:
-            llm_error = (
-                f"Expected dict from structured output, got "
-                f"{type(response).__name__}"
-            )
+            # Prompt mode: `response` is a plain AIMessage. Capture diagnostics
+            # off it, then parse JSON out of its text content ourselves.
+            diagnostics = describe_raw(response)
+            text = response.content if isinstance(response.content, str) else str(response.content)
+            raw_response = text
+            translation = parse_json_object(text)
+            if translation is None:
+                llm_error = "could not parse a JSON object from the model reply"
     except Exception as e:
         raw_response = extract_raw_from_exception(e)
         llm_error = f"LLM call failed: {e}"
@@ -895,6 +996,19 @@ def main():
         ),
     )
     cli.add_argument(
+        "--output-mode",
+        choices=["structured", "prompt"],
+        default=os.environ.get("LLM_OUTPUT_MODE", "structured"),
+        help=(
+            "How JSON is requested. 'structured' (default) binds the schema via "
+            "response_format / function calling — reliable on backends that "
+            "support it. 'prompt' asks for JSON in the prompt and parses the "
+            "reply text, for models/proxies whose response_format is broken "
+            "(e.g. gpt-oss-120b on llmproxy.uva.nl, which returns null content "
+            "with any response_format). Default: structured, or $LLM_OUTPUT_MODE."
+        ),
+    )
+    cli.add_argument(
         "--no-fail-fast",
         action="store_true",
         help=(
@@ -946,30 +1060,28 @@ def main():
         client_kwargs={"headers": {"X-API-KEY": provider_api_key}},
     )
 
-    # Structured output is the only mode: the schema-constrained dict is what
-    # makes splicing reliable. Fail fast if the model/endpoint can't bind it
-    # rather than producing unparseable output.
+    # Structured output (default): bind the schema so the model returns a
+    # schema-validated dict — what makes splicing reliable. include_raw=True
+    # gives us the raw AIMessage on failure for diagnosis. Fail fast if the
+    # model/endpoint can't bind it rather than producing unparseable output.
     #
-    # method="json_schema": use the backend's constrained decoding so the
-    # answer channel itself is forced to match LLM_SCHEMA. This is far more
-    # robust than the default tool-calling path for reasoning models (e.g.
-    # gpt-oss) served over a litellm/vLLM proxy, where the answer can land in
-    # the wrong channel and come back as empty, unparseable output.
-    # strict=False: LLM_SCHEMA is a plain schema fine for guided decoding but
-    # not OpenAI strict-mode (no additionalProperties:false), so don't enforce
-    # strict. include_raw=True: get the raw AIMessage on failure for diagnosis.
-    try:
-        llm.set_structure(
-            LLM_SCHEMA, method="json_schema", strict=False, include_raw=True
-        )
-    except Exception as e:
-        sys.exit(f"Error: could not enable structured output: {e}")
+    # `prompt` mode skips this entirely: no response_format is sent, the JSON
+    # contract is spelled out in the prompt, and we parse the reply text
+    # ourselves. Use it for models/proxies whose response_format is broken —
+    # e.g. gpt-oss-120b on llmproxy.uva.nl returns null content with any
+    # response_format, but answers cleanly when just asked for JSON.
+    structured = args.output_mode == "structured"
+    if structured:
+        try:
+            llm.set_structure(LLM_SCHEMA, include_raw=True)
+        except Exception as e:
+            sys.exit(f"Error: could not enable structured output: {e}")
 
     fail_fast = not args.no_fail_fast
     print(
         f"Using model: {args.model} "
-        f"(provider: {args.llm_provider}, fail_fast: {fail_fast}, "
-        f"strict_lint: {args.strict_lint})"
+        f"(provider: {args.llm_provider}, output_mode: {args.output_mode}, "
+        f"fail_fast: {fail_fast}, strict_lint: {args.strict_lint})"
     )
 
     entries = []
@@ -985,6 +1097,7 @@ def main():
                 repo_root,
                 args.zeeschuimer_checkout.resolve(),
                 args.strict_lint,
+                structured=structured,
             )
         except Exception as e:
             entry = {
@@ -1021,6 +1134,7 @@ def main():
     manifest = {
         "model": args.model,
         "provider": args.llm_provider,
+        "output_mode": args.output_mode,
         "fail_fast": fail_fast,
         "strict_lint": args.strict_lint,
         "total_duration_seconds": overall_duration,
