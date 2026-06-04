@@ -335,22 +335,6 @@ def strip_code_fences(s: str) -> str:
     s = _FENCE_CLOSE.sub("", s)
     return s.strip()
 
-# If all else fails...
-def parse_freetext_response(text: str) -> dict:
-    """
-    Fallback parser for when structured output is disabled or unreliable.
-    Looks for a fenced JS block (the function) and treats remaining text as
-    commentary.
-    """
-    js_match = re.search(r"```(?:js|javascript)\s*\n(.*?)```", text, re.DOTALL)
-    map_item_function = js_match.group(1).strip() if js_match else ""
-    commentary = re.sub(r"```(?:js|javascript)\s*\n.*?```", "", text, flags=re.DOTALL).strip()
-    return {
-        "map_item_function": map_item_function,
-        "imports_to_add": [],
-        "helpers_to_add": [],
-        "commentary": commentary,
-    }
 
 # Helper to check for common issues
 def _strip_js_comments(s: str) -> str:
@@ -662,71 +646,6 @@ def splice_into_module(existing: str, translation: dict, python_rel: str) -> str
     return updated
 
 
-REASONING_KEYS = ("reasoning_content", "reasoning", "thinking", "thought")
-
-
-def _extract_reasoning(chunk) -> str:
-    """
-    Pull reasoning/thinking tokens off a LangChain chunk. Different model
-    families surface them under different keys, so try several.
-    """
-    kwargs = getattr(chunk, "additional_kwargs", None) or {}
-    for key in REASONING_KEYS:
-        val = kwargs.get(key)
-        if isinstance(val, str) and val:
-            return val
-    return ""
-
-
-def call_llm_streaming(llm: LLMAdapter, user_prompt: str, system_prompt: str) -> str:
-    """
-    Stream the LLM response to stderr chunk-by-chunk and return the accumulated
-    *visible content* (reasoning tokens are surfaced live but NOT included in
-    the returned string — they aren't part of the parseable answer).
-
-    For reasoning models like gpt-oss / deepseek-r1, the model spends a long
-    time emitting reasoning tokens before producing the visible answer; without
-    surfacing them the stream looks frozen. We mark the reasoning vs content
-    transitions so the user can tell what phase the model is in.
-    """
-    from langchain_core.messages import HumanMessage, SystemMessage
-
-    messages = []
-    if system_prompt:
-        messages.append(SystemMessage(content=system_prompt))
-    messages.append(HumanMessage(content=user_prompt))
-
-    sys.stderr.write("\n--- LLM stream begin ---\n")
-    sys.stderr.flush()
-
-    content_chunks: list[str] = []
-    state: Optional[str] = None  # "reasoning" | "content"
-
-    for chunk in llm.llm.stream(messages):
-        reasoning = _extract_reasoning(chunk)
-        content = getattr(chunk, "content", "") or ""
-
-        if reasoning:
-            if state != "reasoning":
-                sys.stderr.write("\n--- reasoning ---\n")
-                state = "reasoning"
-            sys.stderr.write(reasoning)
-            sys.stderr.flush()
-
-        if content:
-            if state != "content":
-                # transitioning from reasoning (or nothing) to visible output
-                sys.stderr.write("\n--- output ---\n")
-                state = "content"
-            sys.stderr.write(content)
-            sys.stderr.flush()
-            content_chunks.append(content)
-
-    sys.stderr.write("\n--- LLM stream end ---\n")
-    sys.stderr.flush()
-    return "".join(content_chunks)
-
-
 def extract_raw_from_exception(exc: BaseException) -> Optional[str]:
     """
     Pull whatever raw LLM output we can find off a LangChain exception. Tries
@@ -745,8 +664,6 @@ def translate_one(
     python_path: Path,
     repo_root: Path,
     zeeschuimer_root: Path,
-    use_structured_output: bool,
-    stream: bool,
     strict_lint: bool,
 ) -> dict:
     """
@@ -792,32 +709,19 @@ def translate_one(
     translation: Optional[dict] = None
     llm_error: Optional[str] = None
 
+    # Structured output: `generate_text` returns the schema-validated dict
+    # directly (LLM_SCHEMA was bound via `set_structure` in main()).
     try:
-        if stream:
-            raw_response = call_llm_streaming(llm, user_prompt, SYSTEM_PROMPT)
-            translation = parse_freetext_response(raw_response)
-        elif use_structured_output:
-            try:
-                response = llm.generate_text(user_prompt, system_prompt=SYSTEM_PROMPT)
-            except Exception as e:
-                raw_response = extract_raw_from_exception(e)
-                llm_error = f"LLM call failed: {e}"
-                response = None
-            if response is not None:
-                if isinstance(response, dict):
-                    translation = response
-                    # Structured-output success doesn't expose the raw text.
-                else:
-                    llm_error = (
-                        f"Expected dict from structured output, got "
-                        f"{type(response).__name__}"
-                    )
+        response = llm.generate_text(user_prompt, system_prompt=SYSTEM_PROMPT)
+        if isinstance(response, dict):
+            translation = response
         else:
-            response = llm.generate_text(user_prompt, system_prompt=SYSTEM_PROMPT)
-            raw_response = getattr(response, "content", str(response))
-            translation = parse_freetext_response(raw_response)
+            llm_error = (
+                f"Expected dict from structured output, got "
+                f"{type(response).__name__}"
+            )
     except Exception as e:
-        raw_response = raw_response or extract_raw_from_exception(e)
+        raw_response = extract_raw_from_exception(e)
         llm_error = f"LLM call failed: {e}"
 
     entry["duration_seconds"] = round(time.monotonic() - started, 2)
@@ -901,20 +805,6 @@ def main():
         help=f"Ollama model to use (default: {DEFAULT_MODEL}, or $LLM_MODEL).",
     )
     cli.add_argument(
-        "--no-structured-output",
-        action="store_true",
-        help="Disable JSON-schema structured output; parse the response as free text.",
-    )
-    cli.add_argument(
-        "--stream",
-        action="store_true",
-        help=(
-            "Stream LLM output to stderr as it is generated, so you can watch a "
-            "slow model work. Implies --no-structured-output (streaming and "
-            "structured output don't mix cleanly)."
-        ),
-    )
-    cli.add_argument(
         "--no-fail-fast",
         action="store_true",
         help=(
@@ -963,23 +853,18 @@ def main():
         client_kwargs={"headers": {"X-API-KEY": dmi_ollama_key}},
     )
 
-    use_structured_output = not args.no_structured_output and not args.stream
-    if use_structured_output:
-        try:
-            llm.set_structure(LLM_SCHEMA)
-        except Exception as e:
-            print(
-                f"Warning: could not enable structured output ({e}); "
-                "falling back to free-text parsing.",
-                file=sys.stderr,
-            )
-            use_structured_output = False
+    # Structured output is the only mode: the schema-constrained dict is what
+    # makes splicing reliable. Fail fast if the model/endpoint can't bind it
+    # rather than producing unparseable output.
+    try:
+        llm.set_structure(LLM_SCHEMA)
+    except Exception as e:
+        sys.exit(f"Error: could not enable structured output: {e}")
 
     fail_fast = not args.no_fail_fast
     print(
         f"Using model: {args.model} "
-        f"(provider: ollama, structured_output: {use_structured_output}, "
-        f"stream: {args.stream}, fail_fast: {fail_fast}, "
+        f"(provider: ollama, fail_fast: {fail_fast}, "
         f"strict_lint: {args.strict_lint})"
     )
 
@@ -995,8 +880,6 @@ def main():
                 python_path,
                 repo_root,
                 args.zeeschuimer_checkout.resolve(),
-                use_structured_output,
-                args.stream,
                 args.strict_lint,
             )
         except Exception as e:
@@ -1020,7 +903,7 @@ def main():
         )
         print(f"  -> {entry['status']}{warn_str}{dur_str}{err_str}", flush=True)
 
-        if entry["status"] == "failed" and not args.no_fail_fast:
+        if entry["status"] == "failed" and fail_fast:
             remaining = len(files) - len(entries)
             if remaining > 0:
                 print(
@@ -1034,8 +917,6 @@ def main():
     manifest = {
         "model": args.model,
         "provider": "ollama",
-        "structured_output": use_structured_output,
-        "stream": args.stream,
         "fail_fast": fail_fast,
         "strict_lint": args.strict_lint,
         "total_duration_seconds": overall_duration,
