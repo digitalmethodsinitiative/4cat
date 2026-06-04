@@ -11,6 +11,12 @@
 <!-- Custom JavaScript for Explorer-specific functions -->
 <script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
 
+<!-- HTMX for reactive server-side events -->
+<script type="text/javascript" src="{{url_for('static', filename='js/htmx.min.js')}}"></script>
+
+<!-- Alpine.js for reactive client-side events -->
+<script type="text/javascript" src="{{url_for('static', filename='js/alpine.min.js')}}"></script>
+
 <!-- Load some variables for which we need Jinja2 -->
 <script type="text/javascript">
 
@@ -71,5 +77,8 @@ for (const a in annotation_fields) {
 
 {% include "explorer/pagination.html" %}
 
-<div id="save-annotations-notice">Annotations saved</div>
+<template x-if="annotationsSaved">
+    {% include "explorer/partials/save-confirmation.html" %}
+</template>
+
 {% endblock %}

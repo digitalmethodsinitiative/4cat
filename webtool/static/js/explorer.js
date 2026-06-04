@@ -514,7 +514,8 @@ function init() {
 
 				success: function (response) {
 					save_annotations.html("<i class='fas fa-save'></i> Save annotations");
-					annotations.notifySaved();
+					alpine.saved = true;
+					setTimeout(() => alpine.saved = false, 2500);
 				},
 				error: function (error) {
 					console.log(error)
@@ -556,15 +557,6 @@ function init() {
 			if (warn_field.hasClass("hidden")) {
 				warn_field.removeClass("hidden");
 				warn_field.fadeIn(200);
-			}
-		},
-
-		notifySaved: function() {
-			// Flash a fixed div with the notice that annotations are saved.
-			let notice = $("#save-annotations-notice");
-			if (!notice.is(":visible")) {
-				notice.fadeIn(300);
-				notice.delay(1500).fadeOut(1000);
 			}
 		},
 
