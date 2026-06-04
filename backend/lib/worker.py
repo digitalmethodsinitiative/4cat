@@ -253,7 +253,15 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         )
 
         start_time = time.time()
+        stdout = None
+        stderr = None
         while process.poll() is None:
+            try:
+                stdout, stderr = process.communicate(timeout=0.1)
+                continue
+            except subprocess.TimeoutExpired:
+                pass
+
             if self.interrupted > self.INTERRUPT_NONE or (timeout and time.time() > start_time + timeout):
                 if self.interrupted == self.INTERRUPT_NONE:
                     self.log.info(f"Interruptable process {command[0]} for worker of type {self.type} timed out, "
@@ -295,7 +303,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             
             time.sleep(0.1)
 
-        stdout, stderr = process.communicate()
+        if stdout is None or stderr is None:
+            stdout, stderr = process.communicate()
+
         return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
     @abc.abstractmethod
