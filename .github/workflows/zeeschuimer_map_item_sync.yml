@@ -57,6 +57,10 @@ on:
         description: 'Override LLM model on LLM provider (default: qwen2.5-coder:14b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
         type: string
         default: ''
+      output_mode:
+        description: 'Override LLM structured output (structured or prompt); some models do not support structured output (e.g. gpt-oss-120b)'
+        type: string
+        default: 'structured'
 
 # Least privilege: this workflow's own GITHUB_TOKEN only needs to read the 4CAT
 permissions:
@@ -167,6 +171,7 @@ jobs:
           LLM_PROVIDER: ${{ inputs.llm_provider || 'ollama' }}
           LLM_BASE_URL: ${{ inputs.llm_base_url || 'https://ollama.digitalmethods.net' }}
           LLM_MODEL: ${{ inputs.model || 'qwen2.5-coder:14b' }}
+          LLM_OUTPUT_MODE: ${{ inputs.model || 'structured' }}
           # Pass matrix values through env rather than interpolating. 
           # IS_BOOTSTRAP is always the literal true/false the detect job emitted
           # MODULE_FILES is a list of paths the detect job already validated against 
