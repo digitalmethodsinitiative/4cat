@@ -40,6 +40,11 @@ class TranslationError:
     good: Optional[str] = None
     verify: Optional[str] = None
     lint_pattern: Optional[re.Pattern] = None
+    # Message surfaced on the PR when `lint_pattern` matches. Defaults to
+    # `prompt_rule`; set it separately when the regex is heuristic and can
+    # false-positive, so the reviewer-facing warning can carry that caveat
+    # without bloating the LLM prompt.
+    lint_message: Optional[str] = None
 
 
 RULES: list[TranslationError] = [
@@ -103,6 +108,13 @@ RULES: list[TranslationError] = [
         good="user['name'] ?? 'anonymous'",
         verify="The function contains zero `.get(` calls.",
         lint_pattern=re.compile(r"\.get\("),
+        lint_message=(
+            "`.get(` call found. Python `dict.get(k[, default])` does not exist "
+            "in JavaScript — use `[k]` / `[k] ?? default`. NOTE: this check is a "
+            "plain substring match, so it also flags legitimate JS `.get()` on "
+            "`Map`, `URLSearchParams`, `Headers`, etc. — ignore the warning if "
+            "the receiver is one of those."
+        ),
     ),
 
     # ---- `in` operator: substring check vs key existence ----
@@ -314,10 +326,15 @@ RULES: list[TranslationError] = [
 
 def get_regex_lint_rules() -> list[tuple[re.Pattern, str]]:
     """
-    Return all (pattern, message) pairs for the regex-based lint pass.
+    Return all (pattern, message) pairs for the regex-based lint pass. The
+    message is the rule's `lint_message` when set, else its `prompt_rule`.
 
     Bespoke lint checks (class instantiation, literal newlines, regex use)
     are NOT included here — they live in `map_item_converter.lint_translation`
     and are tied to records by `id` in comments.
     """
-    return [(r.lint_pattern, r.prompt_rule) for r in RULES if r.lint_pattern is not None]
+    return [
+        (r.lint_pattern, r.lint_message or r.prompt_rule)
+        for r in RULES
+        if r.lint_pattern is not None
+    ]
