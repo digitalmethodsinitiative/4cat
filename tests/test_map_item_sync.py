@@ -301,7 +301,7 @@ def test_plan_matrix_rejects_shell_injection_paths():
 def test_build_pr_body_single_module_title_and_warnings():
     manifest = {
         "model": "qwen2.5-coder:14b", "provider": "ollama",
-        "structured_output": True, "stream": False, "total_duration_seconds": 12.3,
+        "total_duration_seconds": 12.3,
         "entries": [{
             "python_file": "datasources/tiktok/search_tiktok.py",
             "js_file": "modules/tiktok.js", "status": "ok", "duration_seconds": 5.0,
@@ -373,3 +373,104 @@ def test_set_output_noop_without_env(monkeypatch):
     monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
     # must not raise when not running under Actions
     map_item_ci.set_output("title", "anything")
+
+
+# --------------------------------------------------------------------------- #
+# splice — refuse to duplicate a pre-existing map_item on first sync (review #2)
+# --------------------------------------------------------------------------- #
+
+def test_splice_refuses_preexisting_map_item_without_markers():
+    """First sync (no markers) must NOT append a second `map_item` when the
+    module already declares one — that would be a JS redeclaration error."""
+    existing = "export function map_item(item) { return item; }\n"
+    with pytest.raises(ValueError):
+        mic.splice_into_module(
+            existing,
+            _translation("export function map_item(i){ return new MappedItem({}); }"),
+            "datasources/x/search_x.py",
+        )
+
+
+def test_splice_refuses_preexisting_const_map_item():
+    existing = "const map_item = (item) => item;\n"
+    with pytest.raises(ValueError):
+        mic.splice_into_module(
+            existing,
+            _translation("export function map_item(i){ return new MappedItem({}); }"),
+            "datasources/x/search_x.py",
+        )
+
+
+def test_splice_allows_commented_map_item_without_markers():
+    """A `map_item` declaration that exists only inside a comment must not trip
+    the guard (comments are stripped before the check)."""
+    existing = "// old: export function map_item(item) {}  (removed)\nconst a = 1;\n"
+    out = mic.splice_into_module(
+        existing,
+        _translation("export function map_item(i){ return new MappedItem({}); }"),
+        "datasources/x/search_x.py",
+    )
+    assert mic.BLOCK_MARKER_START in out
+
+
+# --------------------------------------------------------------------------- #
+# _code_fence — PR-body diff can't be closed early by its own backticks (#5)
+# --------------------------------------------------------------------------- #
+
+def test_code_fence_default_three_backticks():
+    assert map_item_ci._code_fence("no backticks here", "diff") == ("```diff", "```")
+
+
+def test_code_fence_grows_past_inner_backticks():
+    # longest run inside is 4 backticks -> fence must be 5
+    open_f, close_f = map_item_ci._code_fence("a ``` b ```` c", "diff")
+    assert open_f == "`````diff"
+    assert close_f == "`````"
+
+
+def test_build_pr_body_diff_fence_survives_backticks():
+    manifest = {"entries": [{
+        "python_file": "datasources/a/search_a.py", "js_file": "modules/a.js", "status": "ok",
+    }]}
+
+    def fake_diff(before, after, path):
+        # a Python diff whose body itself contains a ``` fence
+        return "diff --git a/x b/x\n+doc = '''\n+```\n+'''"
+
+    _, body = map_item_ci.build_pr_body(
+        manifest, module="a", is_bootstrap=False, before="X", after="Y",
+        run_id="1", event_name="push", repo="org/4cat", python_diff=fake_diff,
+    )
+    # outer fence is longer than the inner ``` so the block isn't closed early
+    assert "````diff" in body
+
+
+# --------------------------------------------------------------------------- #
+# extract_llm_requirements — single source of truth from setup.py (review #3)
+# --------------------------------------------------------------------------- #
+
+def test_extract_llm_requirements_filters_and_preserves_specifiers():
+    setup_py = '''
+core_packages = {
+    "Flask~=3.0",
+    "langchain_core",
+    "langchain_ollama",
+    "pydantic",
+    "requests~=2.27",
+    "requests_futures",
+    "ruff",
+}
+processor_packages = {
+    "numpy",
+    "beautifulsoup4",
+}
+'''
+    reqs = map_item_ci.extract_llm_requirements(setup_py)
+    assert "langchain_core" in reqs
+    assert "langchain_ollama" in reqs
+    assert "pydantic" in reqs
+    assert "requests~=2.27" in reqs          # version specifier preserved verbatim
+    assert "requests_futures" not in reqs    # name-equality, not substring match
+    assert "Flask~=3.0" not in reqs
+    assert "ruff" not in reqs
+    assert reqs == sorted(reqs)              # output is sorted
