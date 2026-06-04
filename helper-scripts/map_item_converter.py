@@ -342,10 +342,52 @@ def parse_freetext_response(text: str) -> dict:
 
 # Helper to check for common issues
 def _strip_js_comments(s: str) -> str:
-    """Remove // and /* */ comments so they don't trip pattern checks."""
-    s = re.sub(r"//[^\n]*", "", s)
-    s = re.sub(r"/\*.*?\*/", "", s, flags=re.DOTALL)
-    return s
+    """
+    Remove `//` line comments and `/* */` block comments so they don't trip the
+    pattern checks, while preserving the contents of string and template
+    literals. A naive `re.sub(r"//[^\n]*", "", s)` would eat the `//` in a URL
+    like `"https://example.com"` and mangle the string, producing bogus lint
+    warnings (e.g. spurious "literal newline in string").
+
+    A small scanner tracks string state. It deliberately does NOT try to
+    distinguish a regex literal from division — `/` is only acted on when it
+    begins `//` or `/*`, neither of which is a valid start to a regex literal
+    in practice (an empty regex is written `/(?:)/`).
+    """
+    out = []
+    i, n = 0, len(s)
+    quote = None  # active string delimiter: ' " or `
+    while i < n:
+        c = s[i]
+        if quote is not None:
+            out.append(c)
+            if c == "\\" and i + 1 < n:  # escape: copy the next char verbatim
+                out.append(s[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+            i += 1
+            continue
+        if c in ("'", '"', "`"):
+            quote = c
+            out.append(c)
+            i += 1
+            continue
+        if c == "/" and i + 1 < n and s[i + 1] == "/":
+            i += 2
+            while i < n and s[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and s[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (s[i] == "*" and s[i + 1] == "/"):
+                i += 1
+            i += 2  # skip the closing */
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
 
 
 # Regex checks for known anti-patterns. Sourced from the rule registry so
