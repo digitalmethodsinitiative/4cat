@@ -864,6 +864,7 @@ def main():
         provider=provider,
         model=args.model,
         base_url=base_url,
+        api_key=provider_api_key,
         temperature=0.2,
         max_tokens=8192,
         client_kwargs={"headers": {"X-API-KEY": provider_api_key}},
