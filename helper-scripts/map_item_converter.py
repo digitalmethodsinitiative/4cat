@@ -507,7 +507,9 @@ def validate_translation(translation: dict) -> Optional[str]:
     Returns None if the translation passes basic sanity checks, else a string
     describing what went wrong.
     """
-    fn = translation.get("map_item_function", "").strip()
+    # `or ""` not a default: structured output can yield an explicit null for a
+    # required field, and `None.strip()` would raise instead of being reported.
+    fn = (translation.get("map_item_function") or "").strip()
     if not fn:
         return "LLM returned empty map_item_function"
     if not re.search(r"\bmap_item\b", fn):

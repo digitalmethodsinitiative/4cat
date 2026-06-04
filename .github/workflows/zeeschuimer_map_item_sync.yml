@@ -27,8 +27,9 @@ on:
   push:
     branches: [master]
     paths:
+      # Only datasource changes drive a push-triggered translation: the detect
+      # job's plan-matrix diffs `datasources/**` and nothing else
       - 'datasources/**/search_*.py'
-      - 'helper-scripts/map_item_converter.py'
       - '.github/workflows/zeeschuimer_map_item_sync.yml'
   workflow_dispatch:
     inputs:
@@ -44,6 +45,10 @@ on:
         description: 'Override LLM model on DMI Ollama (default: qwen2.5-coder:14b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
         type: string
         default: ''
+
+# Least privilege: this workflow's own GITHUB_TOKEN only needs to read the 4CAT
+permissions:
+  contents: read
 
 jobs:
   detect:
@@ -118,10 +123,15 @@ jobs:
           # only use the Ollama provider at runtime. Derive the exact list from
           # setup.py (single source of truth) so it can't drift from what 4CAT
           # declares; we install only this LLM subset, not all of 4CAT, to keep
-          # the job light. The specs contain no shell metacharacters.
-          LLM_DEPS="$(python helper-scripts/map_item_ci.py llm-requirements)"
-          echo "Installing from setup.py: $LLM_DEPS"
-          pip install $LLM_DEPS
+          # the job light. Write the specs to a requirements file (one per line)
+          # and install with `-r`, rather than an unquoted `pip install $VAR`:
+          # that way a version specifier that contains a shell metacharacter
+          # (e.g. a future `langchain_core>=0.3` pin — `>` is redirection) can't
+          # be misparsed by the shell.
+          python helper-scripts/map_item_ci.py llm-requirements > llm-requirements.txt
+          echo "Installing from setup.py:"
+          cat llm-requirements.txt
+          pip install -r llm-requirements.txt
 
       - name: Mint Zeeschuimer App token
         id: app_token

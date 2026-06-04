@@ -54,7 +54,7 @@ def _dist_name(spec: str) -> str:
     """Bare distribution name from a requirement spec: strip version, extras,
     and environment markers. `requests~=2.27` -> `requests`,
     `Flask_Limiter[memcached]` -> `Flask_Limiter`."""
-    return re.split(r"[<>=!~;\[ ]", spec, 1)[0].strip()
+    return re.split(r"[<>=!~;\[ ]", spec, maxsplit=1)[0].strip()
 
 
 def extract_llm_requirements(setup_py_source: str) -> list[str]:
@@ -445,8 +445,10 @@ def _cmd_llm_requirements() -> int:
     if not specs:
         print("error: no LLM requirements found in setup.py core_packages", file=sys.stderr)
         return 1
-    # stdout only — the workflow captures this via `pip install $(... llm-requirements)`.
-    print(" ".join(specs))
+    # One spec per line (valid requirements.txt): the workflow redirects this to
+    # a file and runs `pip install -r`, so a specifier containing a shell
+    # metacharacter (`>=`, `<`) is never word-split or treated as a redirection.
+    print("\n".join(specs))
     return 0
 
 
