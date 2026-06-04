@@ -18,6 +18,8 @@ Usage:
         --zeeschuimer-checkout ../zeeschuimer \\
         --output-manifest /tmp/manifest.json
 """
+from __future__ import annotations
+
 import argparse
 import ast
 import json
@@ -27,11 +29,21 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."))
 
-from common.lib.llm import LLMAdapter
+# NOTE: `common.lib.llm.LLMAdapter` (and the langchain stack it pulls in) is
+# imported lazily inside main(), not at module load. That keeps the pure
+# helpers here — path derivation, splicing, linting — importable for unit
+# tests without the heavy LLM dependencies installed. `from __future__ import
+# annotations` makes the `LLMAdapter` type hints below strings, so they don't
+# need the import at definition time either.
+if TYPE_CHECKING:
+    # Resolved only by type checkers / linters (never at runtime), so the
+    # `llm: LLMAdapter` annotations below have a defined name without forcing
+    # the langchain import.
+    from common.lib.llm import LLMAdapter
 
 # Sibling module — lives next to this script in helper-scripts/. Python adds the
 # script's directory to sys.path automatically when the file is run directly.
@@ -903,6 +915,11 @@ def main():
             sys.exit("No Zeeschuimer datasources found to bootstrap.")
     else:
         files = [Path(f).resolve() for f in args.files]
+
+    # Imported here (not at module top) so the pure helpers above stay
+    # importable for tests without the langchain stack. See note near the
+    # imports at the top of this file.
+    from common.lib.llm import LLMAdapter
 
     llm = LLMAdapter(
         provider="ollama",
