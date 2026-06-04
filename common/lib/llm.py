@@ -303,7 +303,25 @@ class LLMAdapter:
                     }}
                 return {"type": "image_url", "image_url": {"url": data_uri}}
 
-    def set_structure(self, json_schema):
+    def set_structure(self, json_schema, method=None, include_raw=False, strict=None):
+        """
+        Bind a JSON schema so the model returns schema-validated structured output.
+
+        :param json_schema: JSON schema dict (or JSON string) describing the output.
+        :param method: How structured output is enforced. None uses LangChain's
+            per-provider default (usually "function_calling", which binds a tool).
+            For reasoning models served over an OpenAI-compatible proxy, pass
+            "json_schema" — constrained decoding forces the answer channel itself
+            to match the schema, rather than relying on a clean tool call that the
+            model may emit in the wrong channel (yielding empty, unparseable output).
+        :param include_raw: When True, structured-output calls return a
+            {"raw", "parsed", "parsing_error"} dict instead of raising on a parse
+            failure, so callers can inspect the raw AIMessage (finish_reason,
+            reasoning channel, token usage) to diagnose what went wrong.
+        :param strict: Passed through to with_structured_output when not None.
+            Use strict=False for schemas that don't satisfy OpenAI strict-mode
+            requirements but are fine for a guided-decoding backend (e.g. vLLM).
+        """
         if not json_schema:
             raise ValueError("json_schema is None")
 
@@ -317,7 +335,12 @@ class LLMAdapter:
             json_schema = {"type": "json_schema", "json_schema": {"schema": json_schema}}
             self.llm = self.llm.bind(response_format=json_schema)
         else:
-            self.llm = self.llm.with_structured_output(json_schema)
+            kwargs = {"include_raw": include_raw}
+            if method:
+                kwargs["method"] = method
+            if strict is not None:
+                kwargs["strict"] = strict
+            self.llm = self.llm.with_structured_output(json_schema, **kwargs)
         self.structured_output = True
 
     @staticmethod
