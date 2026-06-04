@@ -533,6 +533,17 @@ def validate_translation(translation: dict) -> Optional[str]:
     return None
 
 
+# A pre-existing top-level `map_item` declaration. Used on the first sync (no
+# markers yet) to refuse appending a SECOND declaration, which would be a JS
+# redeclaration error. Conservative: matches only real declaration forms
+# (`function map_item`, `const/let/var map_item =`), not incidental mentions;
+# comments are stripped before this is applied.
+_PREEXISTING_MAP_ITEM_RE = re.compile(
+    r"(?:export\s+)?(?:async\s+)?function\s+map_item\b"
+    r"|(?:export\s+)?(?:const|let|var)\s+map_item\s*="
+)
+
+
 def splice_into_module(existing: str, translation: dict, python_rel: str) -> str:
     """
     Insert / replace the auto-generated marker blocks in the JS
@@ -540,7 +551,9 @@ def splice_into_module(existing: str, translation: dict, python_rel: str) -> str
 
     Raises ValueError if exactly one of (start, end) markers is present —
     that means the file is corrupted or partially hand-edited and we should
-    refuse to touch it.
+    refuse to touch it. Also raises ValueError on the first sync (no markers
+    yet) if the module already defines its own `map_item`, since appending a
+    second declaration would not parse.
     """
     main_block_body = []
     for helper in translation.get("helpers_to_add", []):
@@ -631,6 +644,17 @@ def splice_into_module(existing: str, translation: dict, python_rel: str) -> str
             flags=re.DOTALL,
         )
     else:
+        # First sync for this module (no markers yet): appending is only safe if
+        # the module doesn't already declare its own `map_item`. Two declarations
+        # would be a JS redeclaration error. Strip comments first so a commented-
+        # out or merely-referenced `map_item` doesn't trip the check.
+        if _PREEXISTING_MAP_ITEM_RE.search(_strip_js_comments(updated)):
+            raise ValueError(
+                "Module already defines `map_item` outside the auto-generated "
+                f"markers. Wrap that function in the `{BLOCK_MARKER_START}` / "
+                f"`{BLOCK_MARKER_END}` markers (or remove it) so the sync can "
+                "replace it in place — refusing to append a second declaration."
+            )
         if not updated.endswith("\n"):
             updated += "\n"
         updated += "\n" + main_block
