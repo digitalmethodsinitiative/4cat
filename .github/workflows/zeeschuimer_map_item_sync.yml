@@ -197,7 +197,10 @@ jobs:
 
       - name: Open or update Zeeschuimer PR
         if: steps.have_changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
+        # Third-party action that operates with a write token to the Zeeschuimer
+        # repo — pinned to a full commit SHA (the v6 release) rather than the
+        # mutable `@v6` tag, so a tag move can't silently change what runs here.
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
         with:
           path: zeeschuimer-checkout
           token: ${{ steps.app_token.outputs.token }}
