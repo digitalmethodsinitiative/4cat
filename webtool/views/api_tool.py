@@ -10,10 +10,11 @@ import csv
 import os
 
 from flask import Blueprint, current_app, jsonify, request, render_template, render_template_string, redirect, url_for, flash, \
-	get_flashed_messages, send_from_directory, g
+	get_flashed_messages, send_from_directory, stream_with_context, g
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import error, setting_required, parse_markdown
+from webtool.views.api_map_item import MissingMappedFieldEncoder
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
 	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException
@@ -1413,3 +1414,160 @@ def export_packed_dataset(key=None, component=None):
 
 	else:
 		return error(406, error="Dataset component unknown")
+
+
+@component.route("/api/dataset/<string:key>/items/", methods=["GET", "HEAD"])
+@api_ratelimit
+@login_required
+@current_app.openapi.endpoint("tool")
+def dataset_items(key):
+	"""
+	Get a dataset's mapped items as JSON.
+
+	Returns the same per-item content as the CSV download at
+	`/mapped-result/<key>/` (datasource `map_item` applied, annotations
+	merged in by default), but as JSON. Two response modes:
+
+	- Default (paginated): a JSON envelope `{key, offset, limit, total,
+	  returned, next_offset, items}`. `next_offset` is `null` on the last
+	  page. Default `limit` is 100, max 1000.
+	- Stream (`?stream=true`): the entire dataset as NDJSON (one JSON
+	  object per line). `offset` and `limit` are ignored.
+
+	Paginated mode re-reads the dataset file from the start on every
+	request (it skips `offset` rows before yielding), so use `?stream=true` 
+	to enumerate the full dataset in one pass.
+
+	ZIP archive datasets are not supported and will return 400; download
+	the archive directly instead.
+
+	Responds to HEAD with the same status code and headers as GET but no
+	body — useful as a cheap metadata probe. Every response carries
+	`X-4CAT-Dataset-Type`, `X-4CAT-Dataset-Datasource`,
+	`X-4CAT-Dataset-Num-Rows`, `X-4CAT-Dataset-Is-Finished`,
+	`X-4CAT-Dataset-Extension`, and `X-4CAT-Dataset-Key`.
+
+	Authenticate via the `Authentication` header or `?access-token` query
+	parameter using a 4CAT access token.
+
+	:param str key: Dataset key.
+	:request-param int ?offset: Skip this many rows before returning items
+	                            (paginated mode only, default 0).
+	:request-param int ?limit: Return at most N items, 1-1000
+	                           (paginated mode only, default 100).
+	:request-param bool ?stream: If truthy, stream the full dataset as
+	                             NDJSON instead of paginating.
+	:request-param bool ?annotations: Include annotation columns
+	                                  (default true).
+	:request-param str ?missing_fields: How to represent fields that were
+	                                    missing in the source data. One of
+	                                    `default` (replace with the
+	                                    datasource's fallback value; the
+	                                    same behavior as the CSV export) or
+	                                    `keep` (preserve as
+	                                    `{"__missing": true, "value": ...}`
+	                                    in the JSON output so the caller
+	                                    can distinguish missing from
+	                                    present). Default `default`.
+	:request-param str ?access-token: Access token; only required if not
+	                                  logged in currently.
+
+	:return: JSON envelope (paginated) or NDJSON stream.
+	:return-error 404: If the dataset does not exist.
+	:return-error 403: If the dataset is private and the caller is not an
+	                   owner.
+	:return-error 400: If query parameters are invalid, or the dataset's
+	                   storage format is not iterable as items (e.g. ZIP).
+	"""
+	try:
+		dataset = DataSet(key=key, db=g.db, modules=g.modules)
+	except DataSetException:
+		return error(404, error="Dataset not found.")
+
+	if dataset.is_private and not (
+			g.config.get("privileges.can_view_private_datasets")
+			or dataset.is_accessible_by(current_user)):
+		return error(403, error="This dataset is private.")
+
+	if dataset.get_extension() == "zip":
+		return error(400, error="ZIP archive datasets cannot be served as JSON items; download the archive directly.")
+
+	# add headers for metadata (useful for HEAD requests and because Stijn hates sharing)
+	headers = {
+		"X-4CAT-Dataset-Key": dataset.key,
+		"X-4CAT-Dataset-Type": dataset.type,
+		"X-4CAT-Dataset-Num-Rows": str(dataset.num_rows),
+		"X-4CAT-Dataset-Is-Finished": "true" if dataset.is_finished() else "false",
+	}
+	datasource = dataset.parameters.get("datasource")
+	if datasource:
+		headers["X-4CAT-Dataset-Datasource"] = datasource
+
+	if request.method == "HEAD":
+		return current_app.response_class(status=200, headers=headers)
+
+	truthy = ("true", "1", "yes")
+	falsy = ("false", "0", "no")
+	stream = request.args.get("stream", "").lower() in truthy
+	include_annotations = request.args.get("annotations", "true").lower() not in falsy
+
+	missing_fields = request.args.get("missing_fields", "default").lower()
+	if missing_fields not in ("default", "keep"):
+		return error(400, error="`missing_fields` must be 'default' or 'keep'")
+
+	iter_kwargs = {
+		"warn_unmappable": False,
+		"get_annotations": include_annotations,
+		"map_missing": missing_fields,
+	}
+
+	if stream:
+		def ndjson_stream():
+			for item in dataset.iterate_items(**iter_kwargs):
+				yield json.dumps(item, cls=MissingMappedFieldEncoder) + "\n"
+
+		return current_app.response_class(
+			stream_with_context(ndjson_stream()),
+			mimetype="application/x-ndjson",
+			headers=headers,
+		)
+
+	# Paginated mode
+	try:
+		offset = int(request.args.get("offset", 0))
+	except ValueError:
+		return error(400, error="`offset` must be an integer")
+	if offset < 0:
+		return error(400, error="`offset` must be non-negative")
+
+	try:
+		limit = int(request.args.get("limit", 100))
+	except ValueError:
+		return error(400, error="`limit` must be an integer")
+
+	MAX_LIMIT = 1000
+	if limit < 1 or limit > MAX_LIMIT:
+		return error(400, error=f"`limit` must be between 1 and {MAX_LIMIT}; use ?stream=true for the full dataset")
+
+	items = list(itertools.islice(
+		dataset.iterate_items(offset=offset, **iter_kwargs),
+		limit
+	))
+
+	total = dataset.num_rows
+	end = offset + len(items)
+	next_offset = end if end < total else None
+
+	return current_app.response_class(
+		json.dumps({
+			"key": dataset.key,
+			"type": dataset.type,
+			"offset": offset,
+			"limit": limit,
+			"total": total,
+			"returned": len(items),
+			"next_offset": next_offset,
+			"items": items,
+		}, cls=MissingMappedFieldEncoder),
+		mimetype="application/json"
+	)
