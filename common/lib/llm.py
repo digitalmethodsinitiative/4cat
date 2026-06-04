@@ -125,20 +125,18 @@ class LLMAdapter:
             url = f"{self.base_url}/" if not self.base_url.endswith("/") else self.base_url
             url += "v1/" if not url.endswith("v1/") else ""
 
-            chat_params = {
-                    "default_headers": {
-                        "x-litellm-api-key": f"Bearer {self.api_key}"
-                    }
-                }
-            
             llm = ChatOpenAI(
                 model=self.model,
                 temperature=self.temperature,
                 api_key=SecretStr(self.api_key),
                 base_url=url,
                 max_tokens=self.max_tokens,
-                client_kwargs=chat_params
+                default_headers={
+                        "x-litellm-api-key": f"Bearer {self.api_key}"
+                    }
             )
+            self.model = llm.model_name
+            return llm
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
