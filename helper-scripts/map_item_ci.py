@@ -14,6 +14,11 @@ heavy import here would break it.
 Usage (from the 4CAT repo root):
     python helper-scripts/map_item_ci.py plan-matrix
     python helper-scripts/map_item_ci.py build-pr-body --manifest manifest.json --out pr_body.md
+    python helper-scripts/map_item_ci.py llm-requirements
+
+`llm-requirements` prints the langchain/pydantic/requests pip specs read from
+setup.py, so the workflow installs the same LLM stack 4CAT declares instead of
+a hand-maintained list that can drift.
 
 `plan-matrix` reads EVENT_NAME / INPUTS_FILES / INPUTS_BOOTSTRAP / BEFORE_SHA /
 AFTER_SHA from the environment and writes `mode` and `matrix` to $GITHUB_OUTPUT.
@@ -24,6 +29,7 @@ $GITHUB_OUTPUT.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
@@ -44,6 +50,44 @@ DATASOURCE_PATH_RE = re.compile(r"^datasources/[A-Za-z0-9_-]+/search_[A-Za-z0-9_
 _DATASOURCE_PATHSPEC = "datasources/*/search_*.py"
 
 
+def _dist_name(spec: str) -> str:
+    """Bare distribution name from a requirement spec: strip version, extras,
+    and environment markers. `requests~=2.27` -> `requests`,
+    `Flask_Limiter[memcached]` -> `Flask_Limiter`."""
+    return re.split(r"[<>=!~;\[ ]", spec, 1)[0].strip()
+
+
+def extract_llm_requirements(setup_py_source: str) -> list[str]:
+    """
+    Pull the LLM dependency specs (langchain*, pydantic, requests) straight out
+    of setup.py's package sets. The sync job installs only this subset (not all
+    of 4CAT) to stay light, but deriving it from setup.py means the list can't
+    silently drift from what the app actually declares — and it picks up new
+    langchain providers automatically.
+
+    Returns sorted, de-duplicated requirement strings with whatever version
+    specifiers setup.py uses.
+    """
+    specs = set()
+    for node in ast.walk(ast.parse(setup_py_source)):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(t, ast.Name) and t.id in ("core_packages", "processor_packages")
+            for t in node.targets
+        ):
+            continue
+        for elt in getattr(node.value, "elts", []):
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                specs.add(elt.value)
+
+    return sorted(
+        spec
+        for spec in specs
+        if _dist_name(spec).startswith("langchain") or _dist_name(spec) in ("pydantic", "requests")
+    )
+
+
 def _git_diff_names(before: str, after: str) -> list[str]:
     """
     Names of datasource search files changed between two commits. Returns an
@@ -56,7 +100,9 @@ def _git_diff_names(before: str, after: str) -> list[str]:
             ["git", "diff", "--name-only", before, after, "--", _DATASOURCE_PATHSPEC],
             text=True,
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, OSError):
+        # CalledProcessError: range can't resolve (shallow clone). OSError /
+        # FileNotFoundError: git not on PATH. Either way, "can't tell" == "nothing".
         return []
     return [line for line in out.splitlines() if line.strip()]
 
@@ -125,14 +171,28 @@ def plan_matrix(
 
 
 def _git_python_diff(before: str, after: str, python_file: str) -> str:
-    """`git diff before..after -- <python_file>`; "" if the range can't resolve."""
+    """`git diff before..after -- <python_file>`; "" if the range can't resolve
+    or git isn't available."""
     try:
         return subprocess.check_output(
             ["git", "diff", "{}..{}".format(before, after), "--", python_file],
             text=True,
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, OSError):
         return ""
+
+
+def _code_fence(content: str, lang: str = "") -> tuple[str, str]:
+    """
+    Return `(open, close)` markdown code-fence markers long enough that nothing
+    inside `content` can close the block early. A diff (or LLM text) may itself
+    contain a ``` run or an HTML tag like `</details>`; GitHub renders those
+    literally only while the fence stays intact, so we use one more backtick
+    than the longest run already present (minimum three).
+    """
+    longest = max((len(run) for run in re.findall(r"`+", content)), default=0)
+    ticks = "`" * max(3, longest + 1)
+    return ticks + lang, ticks
 
 
 def build_pr_body(
@@ -156,8 +216,6 @@ def build_pr_body(
 
     model = manifest.get("model", "(unknown)")
     provider = manifest.get("provider", "ollama")
-    structured_output = manifest.get("structured_output", False)
-    stream = manifest.get("stream", False)
     total_duration = manifest.get("total_duration_seconds")
     entries = manifest.get("entries", [])
 
@@ -171,11 +229,7 @@ def build_pr_body(
     )
     lines.append("")
     lines.append("## Generation parameters")
-    lines.append(
-        "- **Model:** `{}` (provider: `{}`, structured output: `{}`, stream: `{}`)".format(
-            model, provider, structured_output, stream
-        )
-    )
+    lines.append("- **Model:** `{}` (provider: `{}`)".format(model, provider))
     if total_duration is not None:
         lines.append("- **Total LLM time:** {}s".format(total_duration))
     if is_bootstrap:
@@ -259,11 +313,12 @@ def build_pr_body(
         else:
             diff = ""
         if diff.strip():
+            fence_open, fence_close = _code_fence(diff, "diff")
             lines.append("<details><summary>Python diff</summary>")
             lines.append("")
-            lines.append("```diff")
+            lines.append(fence_open)
             lines.append(diff.rstrip())
-            lines.append("```")
+            lines.append(fence_close)
             lines.append("</details>")
             lines.append("")
 
@@ -383,6 +438,18 @@ def _cmd_build_pr_body(manifest_path: str, out_path: str) -> int:
     return 0
 
 
+def _cmd_llm_requirements() -> int:
+    setup_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "setup.py")
+    with open(setup_py, encoding="utf-8") as f:
+        specs = extract_llm_requirements(f.read())
+    if not specs:
+        print("error: no LLM requirements found in setup.py core_packages", file=sys.stderr)
+        return 1
+    # stdout only — the workflow captures this via `pip install $(... llm-requirements)`.
+    print(" ".join(specs))
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -393,12 +460,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     body.add_argument("--manifest", required=True, help="Path to the translation manifest JSON.")
     body.add_argument("--out", required=True, help="Where to write the PR body markdown.")
 
+    sub.add_parser(
+        "llm-requirements",
+        help="Print the LLM pip requirements (langchain*/pydantic/requests) from setup.py.",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "plan-matrix":
         return _cmd_plan_matrix()
     if args.command == "build-pr-body":
         return _cmd_build_pr_body(args.manifest, args.out)
+    if args.command == "llm-requirements":
+        return _cmd_llm_requirements()
     parser.error("unknown command")
     return 2
 

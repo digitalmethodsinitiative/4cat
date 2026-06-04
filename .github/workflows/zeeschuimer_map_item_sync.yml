@@ -3,8 +3,9 @@
 #
 # Triggers on pushes to master that touch any Zeeschuimer datasource (or the
 # helper script itself). Also exposes a `workflow_dispatch` trigger with a
-# `bootstrap` input for the initial run that translates all 15 datasources at
-# once (single PR).
+# `bootstrap` input for the initial run that translates every Zeeschuimer
+# datasource at once (single PR). Datasources without a matching Zeeschuimer
+# module — e.g. facebook — are skipped automatically.
 #
 # Architecture: a `detect` job groups changed files by module and emits a
 # matrix; a `sync` job fans out one parallel run per module, each opening
@@ -113,18 +114,14 @@ jobs:
       - name: Install LLM dependencies
         run: |
           # LLMAdapter (common/lib/llm.py) imports every provider's langchain
-          # package at module load, so all of these are required even though
-          # we only use the Ollama provider at runtime.
-          pip install \
-            langchain-core \
-            langchain-ollama \
-            langchain-openai \
-            langchain-anthropic \
-            langchain-google-genai \
-            langchain-mistralai \
-            langchain-deepseek \
-            pydantic \
-            requests
+          # package at module load, so all of them are required even though we
+          # only use the Ollama provider at runtime. Derive the exact list from
+          # setup.py (single source of truth) so it can't drift from what 4CAT
+          # declares; we install only this LLM subset, not all of 4CAT, to keep
+          # the job light. The specs contain no shell metacharacters.
+          LLM_DEPS="$(python helper-scripts/map_item_ci.py llm-requirements)"
+          echo "Installing from setup.py: $LLM_DEPS"
+          pip install $LLM_DEPS
 
       - name: Mint Zeeschuimer App token
         id: app_token
