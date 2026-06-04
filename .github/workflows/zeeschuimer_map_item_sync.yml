@@ -15,7 +15,7 @@
 # splicing live in `helper-scripts/map_item_converter.py`.
 #
 # Required secrets (configured in repo Settings -> Secrets and variables -> Actions):
-#   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net (already used by helper script)
+#   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net
 #   ZEESCHUIMER_APP_ID           - numeric App ID of the GitHub App installed on
 #                                  digitalmethodsinitiative/zeeschuimer with permissions
 #                                  contents:write + pull-requests:write (and nothing else)
@@ -41,8 +41,20 @@ on:
         description: 'Space-separated list of datasource files to translate (e.g. "datasources/tiktok/search_tiktok.py"). Overrides bootstrap. One PR per module.'
         type: string
         default: ''
+      llm_provider:
+        description: 'LLM provider type used by LLMAdapter (default: ollama)'
+        type: string
+        default: 'ollama'
+      llm_base_url:
+        description: 'LLM provider URL (default: https://ollama.digitalmethods.net)'
+        type: string
+        default: 'https://ollama.digitalmethods.net'
+      llm_api_key:
+        description: 'LLM API key (default uses GitHub secret DMI_OLLAMA_KEY)'
+        type: string
+        default: ''
       model:
-        description: 'Override LLM model on DMI Ollama (default: qwen2.5-coder:14b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
+        description: 'Override LLM model on LLM provider (default: qwen2.5-coder:14b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
         type: string
         default: ''
 
@@ -151,7 +163,9 @@ jobs:
 
       - name: Run translation
         env:
-          DMI_OLLAMA_KEY: ${{ secrets.DMI_OLLAMA_KEY }}
+          PROVIDER_API_KEY: ${{ inputs.llm_api_key || secrets.DMI_OLLAMA_KEY }}
+          LLM_PROVIDER: ${{ inputs.llm_provider || 'ollama' }}
+          LLM_BASE_URL: ${{ inputs.llm_base_url || 'https://ollama.digitalmethods.net' }}
           LLM_MODEL: ${{ inputs.model || 'qwen2.5-coder:14b' }}
           # Pass matrix values through env rather than interpolating. 
           # IS_BOOTSTRAP is always the literal true/false the detect job emitted

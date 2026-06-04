@@ -13,7 +13,7 @@ locates a marker block in the existing JS module and replaces its contents,
 preserving every hand-written line outside the markers.
 
 Usage:
-    DMI_OLLAMA_KEY=... python helper-scripts/map_item_converter.py \\
+    PROVIDER_API_KEY=... python helper-scripts/map_item_converter.py \\
         --files datasources/tiktok/search_tiktok.py \\
         --zeeschuimer-checkout ../zeeschuimer \\
         --output-manifest /tmp/manifest.json
@@ -78,6 +78,8 @@ def python_to_js_module(python_rel: str) -> Optional[str]:
         return None
     return f"modules/{base.replace('_', '-')}.js"
 
+DEFAULT_LLM_PROVIDER = "ollama"
+DEFAULT_BASE_URL = "https://ollama.digitalmethods.net"
 DEFAULT_MODEL = "qwen2.5-coder:14b"
 
 IMPORTS_MARKER_START = "// === auto-generated imports for map_item — BLOCK REPLACED AUTOMATICALLY ==="
@@ -802,6 +804,16 @@ def main():
         help="Where to write the JSON manifest of results.",
     )
     cli.add_argument(
+        "--llm_provider",
+        default=os.environ.get("LLM_PROVIDER", DEFAULT_LLM_PROVIDER),
+        help=f"LLM provider to use (default: {DEFAULT_LLM_PROVIDER} or $LLM_PROVIDER).",
+    )
+    cli.add_argument(
+        "--base_url",
+        default=os.environ.get("LLM_BASE_URL", DEFAULT_BASE_URL),
+        help=f"Base URL for the LLM API (default: {DEFAULT_BASE_URL}, or $LLM_BASE_URL).",
+    )
+    cli.add_argument(
         "--model",
         default=os.environ.get("LLM_MODEL", DEFAULT_MODEL),
         help=f"Ollama model to use (default: {DEFAULT_MODEL}, or $LLM_MODEL).",
@@ -828,9 +840,9 @@ def main():
     )
     args = cli.parse_args()
 
-    dmi_ollama_key = os.environ.get("DMI_OLLAMA_KEY")
-    if not dmi_ollama_key:
-        sys.exit("Error: DMI_OLLAMA_KEY environment variable not set.")
+    provider_api_key = os.environ.get("PROVIDER_API_KEY")
+    if not provider_api_key:
+        sys.exit("Error: PROVIDER_API_KEY environment variable not set.")
 
     repo_root = Path(__file__).resolve().parent.parent
 
@@ -845,14 +857,16 @@ def main():
     # importable for tests without the langchain stack. See note near the
     # imports at the top of this file.
     from common.lib.llm import LLMAdapter
+    provider = args.llm_provider.lower()
+    base_url = args.base_url
 
     llm = LLMAdapter(
-        provider="ollama",
+        provider=provider,
         model=args.model,
-        base_url="https://ollama.digitalmethods.net",
+        base_url=base_url,
         temperature=0.2,
         max_tokens=8192,
-        client_kwargs={"headers": {"X-API-KEY": dmi_ollama_key}},
+        client_kwargs={"headers": {"X-API-KEY": provider_api_key}},
     )
 
     # Structured output is the only mode: the schema-constrained dict is what
@@ -866,7 +880,7 @@ def main():
     fail_fast = not args.no_fail_fast
     print(
         f"Using model: {args.model} "
-        f"(provider: ollama, fail_fast: {fail_fast}, "
+        f"(provider: {args.llm_provider}, fail_fast: {fail_fast}, "
         f"strict_lint: {args.strict_lint})"
     )
 
@@ -918,7 +932,7 @@ def main():
     overall_duration = round(time.monotonic() - overall_started, 2)
     manifest = {
         "model": args.model,
-        "provider": "ollama",
+        "provider": args.llm_provider,
         "fail_fast": fail_fast,
         "strict_lint": args.strict_lint,
         "total_duration_seconds": overall_duration,
