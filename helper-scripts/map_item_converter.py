@@ -663,6 +663,55 @@ def extract_raw_from_exception(exc: BaseException) -> Optional[str]:
     return None
 
 
+def describe_raw(raw) -> Optional[dict]:
+    """
+    Summarize the raw AIMessage from an `include_raw=True` structured-output call
+    so a failed (or surprising) translation is diagnosable from CI logs alone,
+    even when the JSON manifest artifact is lost.
+
+    The key signal is `finish_reason`: "length" means the model was truncated
+    mid-output (raise --max-tokens); "stop" with empty `content` but a populated
+    reasoning channel means a reasoning model put its answer where the
+    structured-output parser can't see it (a structured-output *method* problem,
+    not a token-budget one).
+    """
+    if raw is None:
+        return None
+    meta = getattr(raw, "response_metadata", {}) or {}
+    addl = getattr(raw, "additional_kwargs", {}) or {}
+    content = getattr(raw, "content", "") or ""
+    if not isinstance(content, str):
+        content = str(content)
+    # Reasoning models surface their analysis channel under varying keys
+    # depending on provider/proxy; check the common ones.
+    reasoning = (
+        addl.get("reasoning_content")
+        or addl.get("reasoning")
+        or meta.get("reasoning_content")
+        or ""
+    )
+    if not isinstance(reasoning, str):
+        reasoning = str(reasoning)
+    return {
+        "finish_reason": meta.get("finish_reason"),
+        "content_chars": len(content),
+        "reasoning_chars": len(reasoning),
+        "token_usage": meta.get("token_usage") or meta.get("usage"),
+        "content_preview": content[:500],
+        "reasoning_preview": reasoning[:500],
+    }
+
+
+def format_raw_summary(d: dict) -> str:
+    """One-line, CI-log-friendly rendering of describe_raw()."""
+    return (
+        f"finish_reason={d.get('finish_reason')!r} "
+        f"content_chars={d.get('content_chars')} "
+        f"reasoning_chars={d.get('reasoning_chars')} "
+        f"token_usage={d.get('token_usage')}"
+    )
+
+
 def translate_one(
     llm: LLMAdapter,
     python_path: Path,
@@ -713,11 +762,24 @@ def translate_one(
     translation: Optional[dict] = None
     llm_error: Optional[str] = None
 
-    # Structured output: `generate_text` returns the schema-validated dict
-    # directly (LLM_SCHEMA was bound via `set_structure` in main()).
+    # Structured output with include_raw=True (bound via `set_structure` in
+    # main()): `generate_text` returns a {"raw", "parsed", "parsing_error"}
+    # wrapper instead of raising on a parse failure, so we can record *why* a
+    # translation failed (see describe_raw) rather than getting an opaque
+    # "Invalid json output:" with an empty payload.
+    diagnostics: Optional[dict] = None
     try:
         response = llm.generate_text(user_prompt, system_prompt=SYSTEM_PROMPT)
-        if isinstance(response, dict):
+        if isinstance(response, dict) and "raw" in response and "parsed" in response:
+            diagnostics = describe_raw(response.get("raw"))
+            parsed = response.get("parsed")
+            parse_err = response.get("parsing_error")
+            if parsed is not None:
+                translation = parsed
+            else:
+                detail = f": {parse_err}" if parse_err else ""
+                llm_error = f"structured output not parseable{detail}"
+        elif isinstance(response, dict):
             translation = response
         else:
             llm_error = (
@@ -730,6 +792,9 @@ def translate_one(
 
     entry["duration_seconds"] = round(time.monotonic() - started, 2)
     entry["raw_response"] = raw_response
+    if diagnostics is not None:
+        entry["diagnostics"] = diagnostics
+        print(f"  -> {format_raw_summary(diagnostics)}", flush=True)
 
     if llm_error:
         entry["error"] = llm_error
@@ -819,6 +884,17 @@ def main():
         help=f"Ollama model to use (default: {DEFAULT_MODEL}, or $LLM_MODEL).",
     )
     cli.add_argument(
+        "--max-tokens",
+        type=int,
+        default=int(os.environ.get("LLM_MAX_TOKENS", "50000")),
+        help=(
+            "Max output tokens (a ceiling, not a target). Reasoning models like "
+            "gpt-oss spend tokens in their analysis channel before emitting the "
+            "answer; too low a ceiling truncates mid-reasoning and yields empty "
+            "output. Default: 50000, or $LLM_MAX_TOKENS."
+        ),
+    )
+    cli.add_argument(
         "--no-fail-fast",
         action="store_true",
         help=(
@@ -866,15 +942,26 @@ def main():
         base_url=base_url,
         api_key=provider_api_key,
         temperature=0.2,
-        max_tokens=8192,
+        max_tokens=args.max_tokens,
         client_kwargs={"headers": {"X-API-KEY": provider_api_key}},
     )
 
     # Structured output is the only mode: the schema-constrained dict is what
     # makes splicing reliable. Fail fast if the model/endpoint can't bind it
     # rather than producing unparseable output.
+    #
+    # method="json_schema": use the backend's constrained decoding so the
+    # answer channel itself is forced to match LLM_SCHEMA. This is far more
+    # robust than the default tool-calling path for reasoning models (e.g.
+    # gpt-oss) served over a litellm/vLLM proxy, where the answer can land in
+    # the wrong channel and come back as empty, unparseable output.
+    # strict=False: LLM_SCHEMA is a plain schema fine for guided decoding but
+    # not OpenAI strict-mode (no additionalProperties:false), so don't enforce
+    # strict. include_raw=True: get the raw AIMessage on failure for diagnosis.
     try:
-        llm.set_structure(LLM_SCHEMA)
+        llm.set_structure(
+            LLM_SCHEMA, method="json_schema", strict=False, include_raw=True
+        )
     except Exception as e:
         sys.exit(f"Error: could not enable structured output: {e}")
 
