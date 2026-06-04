@@ -8,7 +8,10 @@
 #
 # Architecture: a `detect` job groups changed files by module and emits a
 # matrix; a `sync` job fans out one parallel run per module, each opening
-# (or updating) its own PR on a stable per-module branch.
+# (or updating) its own PR on a stable per-module branch. The planning
+# and PR-body logic are in `helper-scripts/map_item_ci.py` (# unit-tested 
+# in tests/test_map_item_sync.py); the LLM translation and JS
+# splicing live in `helper-scripts/map_item_converter.py`.
 #
 # Required secrets (configured in repo Settings -> Secrets and variables -> Actions):
 #   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net (already used by helper script)
@@ -52,7 +55,19 @@ jobs:
       - name: Checkout 4CAT
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # Full history: the push-event plan diffs `github.event.before`
+          # against `github.sha`. A shallow clone may not contain `before` for
+          # a multi-commit push, in which case the diff resolves to nothing and
+          # the change is silently skipped.
+          fetch-depth: 0
+
+      - name: Set up Python
+        # `detect` runs map_item_ci.py (stdlib only — no LLM deps installed
+        # here), but still needs a `python` on PATH; don't rely on the runner
+        # image happening to provide one.
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Plan translation matrix
         id: plan
@@ -62,67 +77,10 @@ jobs:
           INPUTS_BOOTSTRAP: ${{ inputs.bootstrap }}
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
-        run: |
-          python - <<'EOF'
-          import json
-          import os
-          import subprocess
-
-          event_name = os.environ["EVENT_NAME"]
-          inputs_files = os.environ.get("INPUTS_FILES", "").strip()
-          inputs_bootstrap = os.environ.get("INPUTS_BOOTSTRAP", "").lower() == "true"
-          before = os.environ.get("BEFORE_SHA", "")
-          after = os.environ.get("AFTER_SHA", "")
-          out_path = os.environ["GITHUB_OUTPUT"]
-
-          def emit(mode, matrix):
-              with open(out_path, "a", encoding="utf-8") as f:
-                  f.write("mode={}\n".format(mode))
-                  f.write("matrix={}\n".format(json.dumps(matrix)))
-
-          # Bootstrap is special: one PR for all datasources.
-          # Explicit `files` input overrides bootstrap; honor that.
-          if event_name == "workflow_dispatch" and inputs_bootstrap and not inputs_files:
-              emit("bootstrap", [{"module": "bootstrap", "files": "", "bootstrap": True}])
-              print("Plan: bootstrap (single PR)")
-              raise SystemExit(0)
-
-          # Resolve the file list to translate.
-          if event_name == "workflow_dispatch" and inputs_files:
-              files = inputs_files.split()
-          else:
-              # push event: diff datasource files between before and after.
-              try:
-                  out = subprocess.check_output(
-                      ["git", "diff", "--name-only", before, after, "--",
-                       "datasources/*/search_*.py"],
-                      text=True,
-                  )
-              except subprocess.CalledProcessError:
-                  out = ""
-              files = [f for f in out.splitlines() if f.strip()]
-
-          # Group by module: datasources/<module>/search_*.py
-          modules = {}
-          for path in files:
-              parts = path.split("/")
-              if len(parts) >= 3 and parts[0] == "datasources":
-                  modules.setdefault(parts[1], []).append(path)
-
-          if not modules:
-              emit("none", [])
-              print("Plan: nothing to translate")
-              raise SystemExit(0)
-
-          matrix = [
-              {"module": mod, "files": " ".join(sorted(paths)), "bootstrap": False}
-              for mod, paths in sorted(modules.items())
-          ]
-          emit("files", matrix)
-          print("Plan: {} module(s)".format(len(matrix)))
-          for entry in matrix:
-              print("  - {}: {}".format(entry["module"], entry["files"]))
-          EOF
+        # Validates paths against a strict datasource shape (dropping anything
+        # else) and writes `mode` + `matrix` to $GITHUB_OUTPUT. See
+        # helper-scripts/map_item_ci.py.
+        run: python helper-scripts/map_item_ci.py plan-matrix
 
   sync:
     name: Sync ${{ matrix.target.module }}
@@ -143,7 +101,9 @@ jobs:
       - name: Checkout 4CAT
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # Full history so the PR-body builder can `git diff before..after`
+          # for the changed Python file (see map_item_ci.py build-pr-body).
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -186,15 +146,26 @@ jobs:
         env:
           DMI_OLLAMA_KEY: ${{ secrets.DMI_OLLAMA_KEY }}
           LLM_MODEL: ${{ inputs.model || 'qwen2.5-coder:14b' }}
+          # Pass matrix values through env rather than interpolating. 
+          # IS_BOOTSTRAP is always the literal true/false the detect job emitted
+          # MODULE_FILES is a list of paths the detect job already validated against 
+          # `datasources/<module>/search_<name>.py` shape (no shell
+          # metacharacters), so the unquoted `$MODULE_FILES` expansion is safe
+          # and still word-splits into multiple --files arguments.
+          IS_BOOTSTRAP: ${{ matrix.target.bootstrap }}
+          MODULE_FILES: ${{ matrix.target.files }}
         run: |
-          if [ "${{ matrix.target.bootstrap }}" = "true" ]; then
+          if [ "$IS_BOOTSTRAP" = "true" ]; then
+            # Bootstrap translates every datasource in one run; --no-fail-fast
+            # so one datasource failing doesn't abort the whole initial sync.
             python helper-scripts/map_item_converter.py \
               --bootstrap \
+              --no-fail-fast \
               --zeeschuimer-checkout ./zeeschuimer-checkout \
               --output-manifest ./manifest.json
           else
             python helper-scripts/map_item_converter.py \
-              --files ${{ matrix.target.files }} \
+              --files $MODULE_FILES \
               --zeeschuimer-checkout ./zeeschuimer-checkout \
               --output-manifest ./manifest.json
           fi
@@ -208,152 +179,10 @@ jobs:
           AFTER_SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
           EVENT_NAME: ${{ github.event_name }}
-        run: |
-          python - <<'EOF'
-          import json
-          import os
-          import subprocess
-
-          module = os.environ["MODULE"]
-          is_bootstrap = os.environ.get("BOOTSTRAP", "").lower() == "true"
-          before = os.environ["BEFORE_SHA"]
-          after = os.environ["AFTER_SHA"]
-          run_id = os.environ["RUN_ID"]
-          event_name = os.environ["EVENT_NAME"]
-          repo = "${{ github.repository }}"
-
-          with open("manifest.json") as f:
-              manifest = json.load(f)
-
-          model = manifest.get("model", "(unknown)")
-          provider = manifest.get("provider", "ollama")
-          structured_output = manifest.get("structured_output", False)
-          stream = manifest.get("stream", False)
-          total_duration = manifest.get("total_duration_seconds")
-          entries = manifest.get("entries", [])
-
-          short_sha = after[:7]
-          lines = []
-          lines.append("> :robot: This PR was auto-generated by the [4CAT map_item sync workflow](https://github.com/{}/actions/runs/{}). The JavaScript was produced by an LLM and **requires human review** before merging — including manual fixes for any lint warnings flagged below.".format(repo, run_id))
-          lines.append("")
-          lines.append("## Generation parameters")
-          lines.append("- **Model:** `{}` (provider: `{}`, structured output: `{}`, stream: `{}`)".format(model, provider, structured_output, stream))
-          if total_duration is not None:
-              lines.append("- **Total LLM time:** {}s".format(total_duration))
-          if is_bootstrap:
-              lines.append("- **Trigger:** manual `workflow_dispatch` with `bootstrap=true` (initial sync of all Zeeschuimer datasources).")
-          elif event_name == "workflow_dispatch":
-              lines.append("- **Trigger:** manual `workflow_dispatch` for `{}`.".format(module))
-          else:
-              lines.append("- **Trigger:** push of [`{}`](https://github.com/{}/commit/{}) to 4CAT master (module: `{}`).".format(short_sha, repo, after, module))
-          lines.append("")
-
-          ok = [e for e in entries if e["status"] == "ok"]
-          ok_with_warnings = [e for e in ok if e.get("lint_warnings")]
-          failed = [e for e in entries if e["status"] == "failed"]
-          skipped = [e for e in entries if e["status"] == "skipped"]
-
-          lines.append("## Summary")
-          lines.append("- :white_check_mark: {} translated".format(len(ok)))
-          if ok_with_warnings:
-              lines.append("- :warning: {} translated with lint warnings (require manual fix)".format(len(ok_with_warnings)))
-          lines.append("- :x: {} failed".format(len(failed)))
-          lines.append("- :grey_question: {} skipped".format(len(skipped)))
-          lines.append("")
-
-          if ok:
-              lines.append("| Datasource | Module | Time | Warnings |")
-              lines.append("|---|---|---:|---:|")
-              for entry in ok:
-                  dur = entry.get("duration_seconds")
-                  dur_cell = "{}s".format(dur) if dur is not None else "—"
-                  warn_count = len(entry.get("lint_warnings") or [])
-                  warn_cell = ":warning: {}".format(warn_count) if warn_count else "—"
-                  lines.append("| `{}` | `{}` | {} | {} |".format(entry["python_file"], entry["js_file"], dur_cell, warn_cell))
-              lines.append("")
-
-          if ok_with_warnings:
-              lines.append("## :warning: Lint warnings — fix before merging")
-              lines.append("")
-              lines.append("The following datasources translated successfully but the static lint flagged issues that need human fixes. The auto-generated code was spliced into the JS module as-is; please patch the file directly in this PR.")
-              lines.append("")
-              for entry in ok_with_warnings:
-                  lines.append("**`{}` -> `{}`**".format(entry["python_file"], entry["js_file"]))
-                  for w in entry["lint_warnings"]:
-                      lines.append("- {}".format(w))
-                  lines.append("")
-
-          for entry in ok:
-              dur = entry.get("duration_seconds")
-              header_dur = " ({}s)".format(dur) if dur is not None else ""
-              warn_marker = " :warning:" if entry.get("lint_warnings") else ""
-              lines.append("## `{}` -> `{}`{}{}".format(entry["python_file"], entry["js_file"], header_dur, warn_marker))
-              if entry.get("commentary"):
-                  lines.append("**LLM commentary:**")
-                  lines.append("")
-                  lines.append("> " + entry["commentary"].replace("\n", "\n> "))
-                  lines.append("")
-              if event_name == "push":
-                  try:
-                      diff = subprocess.check_output(
-                          ["git", "diff", "{}..{}".format(before, after), "--", entry["python_file"]],
-                          text=True,
-                      )
-                  except subprocess.CalledProcessError:
-                      diff = ""
-              else:
-                  diff = ""
-              if diff.strip():
-                  lines.append("<details><summary>Python diff</summary>")
-                  lines.append("")
-                  lines.append("```diff")
-                  lines.append(diff.rstrip())
-                  lines.append("```")
-                  lines.append("</details>")
-                  lines.append("")
-
-          if failed:
-              lines.append("## Failures")
-              for entry in failed:
-                  dur = entry.get("duration_seconds")
-                  dur_str = " (after {}s)".format(dur) if dur is not None else ""
-                  lines.append("- `{}`{}: {}".format(entry["python_file"], dur_str, entry.get("error", "(no error message)")))
-              lines.append("")
-
-          if skipped:
-              lines.append("## Skipped")
-              for entry in skipped:
-                  lines.append("- `{}`: {}".format(entry["python_file"], entry.get("error", "")))
-              lines.append("")
-
-          body = "\n".join(lines)
-          with open("pr_body.md", "w", encoding="utf-8") as f:
-              f.write(body)
-          print("Wrote pr_body.md ({} chars)".format(len(body)))
-
-          # Title is single-module in the matrix path; bootstrap is its own
-          # special-case (one PR covering all 15 datasources).
-          ok_modules = []
-          for entry in ok:
-              parts = entry["python_file"].split("/")
-              if len(parts) >= 2 and parts[0] == "datasources":
-                  mod = parts[1]
-                  if mod not in ok_modules:
-                      ok_modules.append(mod)
-
-          if is_bootstrap:
-              title = "Auto-translated map_item updates from 4CAT (bootstrap, {} datasources)".format(len(ok_modules))
-          elif not ok_modules:
-              title = "Auto-translated map_item updates from 4CAT: {}".format(module)
-          else:
-              title = "Auto-translated map_item updates from 4CAT: {}".format(", ".join(ok_modules))
-
-          github_output = os.environ.get("GITHUB_OUTPUT")
-          if github_output:
-              with open(github_output, "a", encoding="utf-8") as f:
-                  f.write("title={}\n".format(title))
-          print("PR title: {}".format(title))
-          EOF
+          REPO: ${{ github.repository }}
+        # Reads manifest.json, writes pr_body.md, and writes `title` to
+        # $GITHUB_OUTPUT (delimiter form, injection-safe). See map_item_ci.py.
+        run: python helper-scripts/map_item_ci.py build-pr-body --manifest manifest.json --out pr_body.md
 
       - name: Check there are JS changes to PR
         id: have_changes
