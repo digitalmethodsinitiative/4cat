@@ -132,7 +132,7 @@ class LLMAdapter:
                 }
             
             llm = ChatOpenAI(
-                model=model_name,
+                model=self.model,
                 temperature=self.temperature,
                 api_key=SecretStr(self.api_key),
                 base_url=url,
