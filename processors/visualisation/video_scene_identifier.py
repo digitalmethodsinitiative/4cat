@@ -474,6 +474,16 @@ class VideoSceneDetector(BasicProcessor):
 				'total_video_duration': total_duration,
 			})
 
+		# pyscenedetect puts the end of the last scene (i.e. the end of the
+		# video in this case) as last frame num + 1
+		# however, this frame number is technically incorrect, since e.g. if a
+		# video has 2808 frames, this number would be 2808 - which implies it
+		# is 1-indexed, but otherwise frames are 0-indexed
+		# anyway, ffmpeg won't want to select frame 2808 later in that case, so
+		# correct the number to a valid 0-indexed number
+		while scenes[-1]["end_frame"] >= total_frames:
+			scenes[-1]["end_frame"] -= 1
+
 		return scenes
 
 	def get_new_scene_manager(self):
