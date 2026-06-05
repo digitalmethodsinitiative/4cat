@@ -75,7 +75,7 @@ class VideoSceneDetector(BasicProcessor):
 				"type": UserInput.OPTION_INFO,
 				"help": "A simple and fast algorithm that calculates a difference score between frames based on their "
 						"colour difference. More pixels with different colours is a higher difference score. A score "
-						"higher than 0.3 has a reasonable chance of indicating a new shot/scene.",
+						"higher than 0.3 often has a reasonable chance of indicating a new shot/scene.",
 				"requires": "detector_type==ffmpeg_select"
 			},
 			"cd-info": {
