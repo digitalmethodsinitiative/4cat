@@ -26,6 +26,7 @@ core_packages = {
 	"langchain_mistralai",
 	"langchain_deepseek",
 	"markdown2==2.4.2",
+	"natsort",
 	"oslex",
 	"packaging",
 	"psutil~=5.0",
