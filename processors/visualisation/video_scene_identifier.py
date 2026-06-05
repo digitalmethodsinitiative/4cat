@@ -58,6 +58,7 @@ class VideoSceneDetector(BasicProcessor):
 		:param config ConfigManager|None config:  Configuration reader (context-aware)
 		:return dict:   Options for this processor
 		"""
+
 		options = {
 			"detector_type": {
 				"help": "Type of detection algorithm",
@@ -110,12 +111,11 @@ class VideoSceneDetector(BasicProcessor):
 			"min_scene_len": {
 				"help": "Minimum length of scene in frames",
 				"type": UserInput.OPTION_TEXT,
-				"tooltip": "Note: this can vary length of scene in time based on video framerate (24fps in many cases, but "
-						"not always)",
+				"tooltip": "Note: this can vary length of scene in time based on video framerate (24fps in many cases, "
+						   "but not always)",
 				"coerce_type": int,
 				"default": 15,
-				"min": 1,
-				"requires": "detector_type!=ffmpeg_select"
+				"min": 1
 			},
 			"luma_only": {
 				"type": UserInput.OPTION_TOGGLE,
@@ -197,7 +197,6 @@ class VideoSceneDetector(BasicProcessor):
 				"default": False
 			}
 		}
-
 		# only offer ffmpeg option if we actually have ffmpeg
 		ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
 		if not ffmpeg_path or not os.path.exists(ffmpeg_path):
@@ -350,9 +349,10 @@ class VideoSceneDetector(BasicProcessor):
 		command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
 		command.extend(["-i", oslex.quote(str(original_video.file))])
 		# select all frames with a diff to the previous frame of > 0
-		# make sure to always select at least the very first frame (n=0)
+		# make sure to always select at least first and last frames
+		# frames are 0-indexed, so the last frame is total_frames-1
 		command.extend(["-vf",
-                r"select=(gte(scene\,0)+eq(n\,0)),metadata=print:file='pipe\:1'",
+                fr"select=(gte(scene\,0)+eq(n\,0)+eq(n\,{total_frames-1})),metadata=print:file='pipe\:1'",
                 "-an", "-f", "null", os.devnull
 		])
 
@@ -361,6 +361,7 @@ class VideoSceneDetector(BasicProcessor):
 			raise SceneDetectionException("ffmpeg did not return any results. The video may be unreadable")
 
 		# parse ffmpeg output into a nice list of frame info dicts
+		# some borrowing from https://github.com/slhck/scenecut-extractor/
 		frame = {}
 		frames = []
 		for line in result.stdout.splitlines():
@@ -374,7 +375,7 @@ class VideoSceneDetector(BasicProcessor):
 				frame = {
 					"frame": int(matches["frame"]),
 					"pts": float(matches["pts"]),
-					"pts_time": matches["pts_time"]
+					"pts_time": float(matches["pts_time"])
 				}
 			elif line.startswith("lavfi.scene_score"):
 				frame.update({
@@ -385,9 +386,6 @@ class VideoSceneDetector(BasicProcessor):
 
 		if not frames:
 			raise SceneDetectionException("No frames were processed by ffmpeg. The video may be unreadable.")
-
-		if len(frames) < 2:
-			raise SceneDetectionException("No keyframes were detected in the video.")
 
 		# always include the very first and very last frames as keyframes
 		# this means even in a video with no transitions that meet the
@@ -402,14 +400,19 @@ class VideoSceneDetector(BasicProcessor):
 				previous = key_frame
 				continue
 
+			# ignore key frame if within minimum scene length
+			diff = key_frame["frame"] - previous["frame"]
+			if diff < self.parameters.get("min_scene_len"):
+				continue
+
 			scenes.append({
 				"start_frame": previous["frame"],
 				"start_time": FrameTimecode(previous["pts_time"], fps).get_timecode(),
-				#"start_fps": None,
 				"end_frame": key_frame["frame"],
 				"end_time": FrameTimecode(key_frame["pts_time"], fps).get_timecode(),
-				#"end_fps": None,
 				"scene_num": len(scenes) + 1,
+				"scene_frames": diff,
+				"scene_duration": FrameTimecode(key_frame["pts_time"] - previous["pts_time"], fps).get_timecode(),
 				"num_scenes_detected": len(key_frames),
 				"total_video_frames": total_frames,
 				"total_video_duration": length_timecode
