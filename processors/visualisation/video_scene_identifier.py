@@ -435,7 +435,7 @@ class VideoSceneDetector(BasicProcessor):
 		# Open video
 		video = open_video(str(original_video.file))
 
-		total_frames = video.duration.get_frames()
+		total_frames = video.duration.frame_num
 		total_duration = video.duration.get_timecode()
 
 		# Run detector
@@ -447,14 +447,14 @@ class VideoSceneDetector(BasicProcessor):
 		if len(scene_list) == 0:
 			# No scenes detected; record as one scene
 			# TODO: any reason to make this optional?
-			scenes[original_video.file.name].append({
-				'start_frame': video.base_timecode.get_frames(),
+			scenes.append({
+				'start_frame': video.base_timecode.frame_num,
 				'start_time': video.base_timecode.get_timecode(),
-				#'start_fps': video.base_timecode.get_framerate(),
 				'end_frame': total_frames,
 				'end_time': total_duration,
-				#'end_fps': video.duration.get_framerate(),
 				'scene_num': 1,
+				"scene_frames": total_frames,
+				"scene_duration": total_duration,
 				'num_scenes_detected': 1,
 				'total_video_frames': total_frames,
 				'total_video_duration': total_duration,
@@ -462,13 +462,13 @@ class VideoSceneDetector(BasicProcessor):
 
 		for i, scene in enumerate(scene_list):
 			scenes.append({
-				'start_frame': scene[0].get_frames(),
+				'start_frame': scene[0].frame_num,
 				'start_time': scene[0].get_timecode(),
-				#'start_fps': scene[0].get_framerate(),
-				'end_frame': scene[1].get_frames(),
+				'end_frame': scene[1].frame_num,
 				'end_time': scene[1].get_timecode(),
-				#'end_fps': scene[1].get_framerate(),
 				'scene_num': i + 1,
+				"scene_frames": (scene[1].frame_num - scene[0].frame_num),
+				"scene_duration": (scene[1] - scene[0]).get_timecode(),
 				'num_scenes_detected': len(scene_list),
 				'total_video_frames': total_frames,
 				'total_video_duration': total_duration,
@@ -496,7 +496,7 @@ class VideoSceneDetector(BasicProcessor):
 				AdaptiveDetector(adaptive_threshold=self.parameters.get("ad_adaptive_threshold"),
 								 min_scene_len=self.parameters.get("min_scene_len"),
 								 luma_only=self.parameters.get("luma_only"),
-								 min_delta_hsv=self.parameters.get("ad_min_delta_hsv"),
+								 min_content_val=self.parameters.get("ad_min_delta_hsv"),
 								 window_width=self.parameters.get("ad_window_width"), ))
 		elif self.parameters.get("detector_type") == 'threshold_detector':
 			from scenedetect.detectors import ThresholdDetector
