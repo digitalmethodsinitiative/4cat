@@ -37,29 +37,34 @@ else:
     print("    ...does not exist, filling with currently configured proviers")
     provider_type = db.fetchone("SELECT value FROM settings WHERE name = 'llm.provider_type'")
     providers = {}
-    if not provider_type:
+    if not provider_type or not provider_type.get("value"):
         print("    ...no provider currently configured")
+        
     else:
-        url = db.fetchone("SELECT value FROM settings WHERE name = 'llm.server'")
-        host = url.split("/")[2] if "://" in url else "localhost"
-        auth_header = db.fetchone("SELECT value FROM settings WHERE name = 'llm.auth_type'")
-        auth_key = db.fetchone("SELECT value FROM settings WHERE name = 'llm.auth_key'")
-        provider_name = db.fetchone("SELECT value FROM settings WHERE name = 'llm.host_name'")
-        provider_id = f"{provider_type}-{host}"
+        provider_type = provider_type["value"]
+        try:
+            url = db.fetchone("SELECT value FROM settings WHERE name = 'llm.server'")["value"]
+            host = url.split("/")[2] if "://" in url else "localhost"
+            auth_header = db.fetchone("SELECT value FROM settings WHERE name = 'llm.auth_type'")["value"]
+            auth_key = db.fetchone("SELECT value FROM settings WHERE name = 'llm.auth_key'")["value"]
+            provider_name = db.fetchone("SELECT value FROM settings WHERE name = 'llm.host_name'")["value"]
+            provider_id = f"{provider_type}-{host}"
 
-        # vLLM and LM Studio are both openai-like
-        provider_type = {"ollama": "ollama"}.get(provider_type, "openai-like")
-        providers[provider_id] = {
-            "name": provider_name,
-            "type": provider_type,
-            "url": url,
-            "auth_header": auth_header,
-            "auth_key": auth_key,
-            "_id": provider_id
-        }
+            # vLLM and LM Studio are both openai-like
+            provider_type = {"ollama": "ollama"}.get(provider_type, "openai-like")
+            providers[provider_id] = {
+                "name": provider_name,
+                "type": provider_type,
+                "url": url,
+                "auth_header": auth_header,
+                "auth_key": auth_key,
+                "_id": provider_id
+            }
+        except (TypeError, KeyError):
+            print("    ...provider configured but settings are incomplete, not migrating")
 
-    # add API models, always present
-    providers["thirdparty-models"] = {
+        # add API models, always present
+        providers["thirdparty-models"] = {
         "name": "Third-party models",
         "type": "api",
         "url": "",
