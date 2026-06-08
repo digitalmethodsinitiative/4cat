@@ -13,6 +13,7 @@ import os
 import errno
 from enum import Enum
 from pathlib import Path
+from natsort import natsorted
 
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
@@ -415,10 +416,30 @@ class DataSet(FourcatModule):
             raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
 
         iterations = 0
+
+        def metadata_priority_sort(file):
+            """
+            Sorting key that always prioritises dotfiles
+
+            natsort (see below) will sort very well, but puts filenames
+            starting with a number (e.g. `15file.png`) before dotfiles. This
+            key function avoids that by prepending non-dotfiles with the string
+            "file_" so they are still sorted equally, but always behind
+            dotfiles.
+
+            :param ZipInfo file:  Archive file object
+            :return str:  Filename to use for sorting
+            """
+            if not file.filename.startswith("."):
+                return "file_" + file.filename
+            return file.filename
+
         with zipfile.ZipFile(path, "r") as archive_file:
             # sorting is important because it ensures .metadata.json is read
-            # first
-            archive_contents = sorted(archive_file.infolist(), key=lambda x: x.filename)
+            # first, and returns numbered items in the correct order
+            # for the latter purpose, we use natural sorting rather than
+            # python's built-in sorting
+            archive_contents = natsorted(archive_file.infolist(), key=metadata_priority_sort)
             for archived_file in archive_contents:
 
                 if filename_filter and archived_file.filename not in filename_filter:
