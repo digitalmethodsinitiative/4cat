@@ -1,4 +1,6 @@
 import traceback
+from traceback import FrameSummary
+
 import pytest
 import time
 import json
@@ -219,7 +221,7 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
                 processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
             except Exception as e:
                 # Log the failure and add it to the failures list
-                trace = traceback.TracebackException.from_exception(e).stack[-1]
+                trace = get_trace(traceback.TracebackException.from_exception(e).stack)
                 logger.error(f"Processor {processor_name} failed in get_options: {e} (in {trace.filename.split('/')[-1]}:{trace.lineno})")
                 failures.append((processor_name, str(e)))
 
@@ -232,12 +234,12 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
             try:
                 processor_class(logger, job=mock_job, queue=mock_job_queue, manager=None, modules=fourcat_modules)
             except Exception as e:
-                trace = traceback.TracebackException.from_exception(e).stack[-1]
+                trace = get_trace(traceback.TracebackException.from_exception(e).stack)
                 logger.error(f"Processor {processor_name} failed in process(): {e} (in {trace.filename.split('/')[-1]}:{trace.lineno})")
                 failures.append((processor_name, str(e)))
 
         except Exception as e:
-            trace = traceback.TracebackException.from_exception(e).stack[-1]
+            trace = get_trace(traceback.TracebackException.from_exception(e).stack)
             logger.error(f"Processor {processor_name} failed while setting up: {e} (in {trace.filename.split('/')[-1]}:{trace.lineno})")
             failures.append((processor_name, str(e)))
 
@@ -310,3 +312,18 @@ def test_dataset_finish_raises_on_double_finish(mock_dataset):
 
     with pytest.raises(RuntimeError, match="finished"):
         mock_dataset.finish(5)
+
+def get_trace(stack) -> FrameSummary:
+    """
+    Get relevant stack trace frame
+
+    Skips over frames that are from (frozen) internal libraries
+
+    :param stack:
+    :return FrameSummary:
+    """
+    bit = stack.pop()
+    while stack and not bit.filename.startswith(str(PATH_ROOT)):
+        bit = stack.pop()
+
+    return bit
