@@ -198,8 +198,8 @@ class VideoSceneDetector(BasicProcessor):
 			}
 		}
 		# only offer ffmpeg option if we actually have ffmpeg
-		ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
-		if not ffmpeg_path or not os.path.exists(ffmpeg_path):
+		ffmpeg_path = config.get("video-downloader.ffmpeg_path")
+		if not ffmpeg_path or not os.path.exists(shutil.which(ffmpeg_path)):
 			del options["detector_type"]["options"]["ffmpeg_select"]
 			options["detector_type"]["default"] = list(options["detector_type"]["options"].values())[0]
 
