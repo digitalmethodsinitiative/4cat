@@ -239,6 +239,40 @@ def delete_job():
     else:
         return jsonify({"status": "success", "job_id": job.data["id"], "dataset_key": dataset.key if dataset else None, "message": message})
 
+@component.route("/admin/retry-job/", methods=["POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_settings")
+def retry_job():
+    """
+    Retry a crashed/parked job now
+
+    Releases the job so the delegator can claim it again immediately, instead of
+    waiting for the next backend restart (which is otherwise when parked jobs
+    are retried). Restricted to parked jobs: releasing a job that still has a
+    live worker could start a second worker for the same job.
+    """
+    job_id = request.form.get("job_id")
+    redirect_to_page = request.form.get("redirect_to_page", "false").lower() == "true"
+    if not job_id:
+        return error(400, message="Job ID is required")
+    try:
+        job = Job.get_by_ID(id=job_id, database=g.db)
+    except JobNotFoundException:
+        return error(404, message="Job not found")
+
+    if not job.is_parked:
+        return error(400, message="Only crashed (parked) jobs can be retried this way.")
+
+    # release so it becomes claimable again immediately
+    job.release()
+
+    message = f"Job {job.data['jobtype']} #{job.data['id']} released; it will be retried shortly."
+    if redirect_to_page:
+        flash(message)
+        return redirect(request.referrer or url_for("admin.list_jobs", page=1))
+    else:
+        return jsonify({"status": "success", "job_id": job.data["id"], "message": message})
+
 @component.route("/admin/add-user/")
 @login_required
 @setting_required("privileges.admin.can_manage_users")
