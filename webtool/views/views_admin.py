@@ -137,12 +137,18 @@ def get_worker_status():
     api_response = call_api("worker-status")
     if api_response["status"] != "success":
         return """<p class="content-placeholder">4CAT backend unavailable - check logs for errors</p>""", 200, {"Content-Type": "text/html"}
-    workers = [
-        {
-            **worker,
-            "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=g.db, modules=g.modules)
-        } for worker in api_response["response"]["running"]
-    ]
+    # the API reports raw job state; resolve the dataset here, treating
+    # remote_id as a dataset key only for processor jobtypes. a parked/crashed
+    # job may reference a dataset that has since been deleted, so tolerate that.
+    workers = []
+    for worker in api_response["response"]["running"]:
+        dataset = None
+        if worker.get("is_processor") and worker.get("remote_id"):
+            try:
+                dataset = DataSet(key=worker["remote_id"], db=g.db, modules=g.modules)
+            except DataSetException:
+                dataset = None
+        workers.append({**worker, "dataset": dataset})
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=g.modules.workers,
                            now=time.time())
 
