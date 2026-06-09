@@ -80,6 +80,6 @@ print("  Cleaning up old settings")
 db.execute("DELETE FROM settings WHERE name LIKE 'llm.%' AND name NOT IN ('llm.providers', 'llm.available_models', 'llm.access')")
 
 print("  Removing all known models (will be re-indexed on 4CAT restart)")
-db.upsert("settings", {"name": "llm.available_models", "value": "{}"})
+db.upsert("settings", {"name": "llm.available_models", "value": "{}", "tag": ""}, constraints=["name", "tag"])
 
 print("  - done!")
