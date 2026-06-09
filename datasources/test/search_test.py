@@ -41,12 +41,15 @@ if TEST_DATASOURCE_ENABLED:
         description = "Development-only datasource that creates dummy datasets in various states (complete, forever, crash) to exercise admin status pages."
         extension = "ndjson"  # extension of result file
 
-        # allow several to run at once so a 'forever' job does not block the
-        # 'crash' and 'complete' jobs (search workers default to max_workers = 1)
-        max_workers = 5
-
         # not offered as a processor for existing datasets
         accepts = [None]
+
+        @classmethod
+        def get_queue_id(cls, remote_id, details, dataset) -> str:
+            # one queue per job so the dummy jobs run concurrently instead of
+            # serialising behind one another (a 'forever' job would otherwise block
+            # the rest).
+            return f"{cls.type}-{remote_id}"
 
         @classmethod
         def get_options(cls, parent_dataset=None, config=None):
