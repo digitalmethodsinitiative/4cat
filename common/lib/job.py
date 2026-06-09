@@ -133,15 +133,21 @@ class Job:
 
 		self.is_finished = True
 
-	def release(self, delay=0, claim_after=0):
+	def release(self, delay=0, claim_after=0, increment_attempts=True):
 		"""
 		Release a job so it may be claimed again
 
 		:param int delay: Delay in seconds after which job may be reclaimed.
 		:param int claim_after:  Timestamp after which job may be claimed. This
 		is overridden by `delay`.
+		:param bool increment_attempts:  Whether to count this as a failed
+		attempt. True for soft failures/retries (the default, matching the
+		retry-budget logic in e.g. scraper.py); False for a deliberate re-queue
+		such as a manual retry, which is not itself a failure.
 		"""
-		update = {"timestamp_claimed": 0, "attempts": self.data["attempts"] + 1}
+		update = {"timestamp_claimed": 0}
+		if increment_attempts:
+			update["attempts"] = self.data["attempts"] + 1
 		if delay > 0:
 			update["timestamp_after"] = int(time.time()) + delay
 

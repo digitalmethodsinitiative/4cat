@@ -263,8 +263,10 @@ def retry_job():
     if not job.is_parked:
         return error(400, message="Only crashed (parked) jobs can be retried this way.")
 
-    # release so it becomes claimable again immediately
-    job.release()
+    # release so it becomes claimable again immediately. a manual retry is not
+    # itself a failed attempt - only the resulting crash (via park()) should
+    # count - so don't increment attempts here.
+    job.release(increment_attempts=False)
 
     message = f"Job {job.data['jobtype']} #{job.data['id']} released; it will be retried shortly."
     if redirect_to_page:
