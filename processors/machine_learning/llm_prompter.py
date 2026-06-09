@@ -371,7 +371,7 @@ class LLMPrompter(BasicProcessor):
             self.dataset.delete_parameter("batches")
 
         # Set all variables through which we can reach the LLM
-        api_key = ""
+        api_key = self.parameters.get("api_key", "").strip()
         client_kwargs = {}
 
         # load model and provider metadata
