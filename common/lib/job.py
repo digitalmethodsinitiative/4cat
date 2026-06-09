@@ -14,8 +14,16 @@ class Job:
 	data = {}
 	db = None
 
+	#: Sentinel value for `timestamp_claimed` marking a job that crashed and
+	#: should only be retried on restart. It is negative so it is excluded by
+	#: the `timestamp_claimed = 0` claimable check (the delegator never re-grabs
+	#: it), while `release_all()` resets it to 0 on the next restart, making it
+	#: claimable again. See `park()` and `queue.release_all()`.
+	STATUS_PARKED = -1
+
 	is_finished = False
 	is_claimed = False
+	is_parked = False
 
 	def __init__(self, data, database=None):
 		"""
@@ -32,6 +40,7 @@ class Job:
 		try:
 			self.is_finished = "is_finished" in self.data and self.data["is_finished"]
 			self.is_claimed = self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
+			self.is_parked = self.data["timestamp_claimed"] == self.STATUS_PARKED
 		except KeyError:
 			raise Exception
 
@@ -86,7 +95,7 @@ class Job:
 
 		This marks it in the database so it cannot be claimed again.
 		"""
-		if self.data["interval"] == 0:
+		if not self.is_recurring:
 			claim_time = int(time.time())
 		else:
 			# the claim time should be a multiple of the interval to prevent
@@ -116,7 +125,7 @@ class Job:
 		:param bool delete: Whether to force deleting the job even if it is a
 							job with an interval.
 		"""
-		if self.data["interval"] == 0 or delete:
+		if not self.is_recurring or delete:
 			self.db.delete("jobs", where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
 		else:
 			self.db.update("jobs", data={"timestamp_claimed": 0, "attempts": 0},
@@ -146,13 +155,48 @@ class Job:
 					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
 		self.is_claimed = False
 
+	def park(self):
+		"""
+		Park a job after a crash
+
+		Marks the job as crashed by setting its claim to `STATUS_PARKED`. Parked
+		jobs are not claimable while the backend runs (the delegator only claims
+		jobs with `timestamp_claimed = 0`), so a crashing job is not retried in a
+		tight loop. `release_all()` resets the claim to 0 on the next restart, at
+		which point the job becomes claimable again ("retry on restart").
+
+		`attempts` is incremented so the crash count survives restarts
+		(`release_all()` does not reset it).
+		"""
+		self.db.update("jobs",
+					   data={"timestamp_claimed": self.STATUS_PARKED, "attempts": self.data["attempts"] + 1},
+					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+		self.data["timestamp_claimed"] = self.STATUS_PARKED
+		self.data["attempts"] = self.data["attempts"] + 1
+		self.is_claimed = False
+		self.is_parked = True
+
+	@property
+	def is_recurring(self):
+		"""
+		Is this a recurring job?
+
+		NOTE: the claimable filter in `JobQueue.get_all_jobs()` / `get_job()`
+		(`restrict_claimable`) encodes this same interval logic directly in SQL
+		and must be kept in sync with this property.
+
+		:return bool: Whether the job repeats.
+		"""
+		# adding this property in case we update the schema for other reoccuring job types (e.g. metronome)
+		return self.data["interval"] > 0
+
 	def is_claimable(self):
 		"""
 		Can this job be claimed?
 
-		:return bool: If the job is not claimed yet and also isn't finished.
+		:return bool: If the job is not claimed, parked or finished.
 		"""
-		return not self.is_claimed and not self.is_finished
+		return not self.is_claimed and not self.is_parked and not self.is_finished
 
 	def get_place_in_queue(self):
 		"""
