@@ -162,10 +162,10 @@
             <input type="hidden" name="action" value="pull">
             <div class="form-element">
                 <label for="model-provider">LLM provider</label>
-                <select id="model-provider" name="model_provider">
-                    {% for provider in providers %}
+                <select id="model-provider" name="provider">
+                    {% for provider_id, provider in providers.items() %}
                         {% if provider.type == "ollama" %}
-                            <option value="{{ provider.url }}">{{ provider.type }} @ {{ provider.url }}</option>
+                            <option value="{{ provider_id }}">{{ provider.type }} @ {{ provider.url }}</option>
                         {% endif %}
                     {% endfor %}
                 </select>
