@@ -85,7 +85,7 @@ export const multiForm = {
             }
             for(const attribute of attributes) {
                 if(child.hasAttribute(attribute)) {
-                    child.setAttribute(attribute, child.getAttribute(attribute).replace(/-[0-9+]-/, `-${index}-`));
+                    child.setAttribute(attribute, child.getAttribute(attribute).replace(/-[0-9]+-/, `-${index}-`));
                 }
             }
             multiForm.renumber_items(child, index);
