@@ -15,11 +15,23 @@
 # splicing live in `helper-scripts/map_item_converter.py`.
 #
 # Required secrets (configured in repo Settings -> Secrets and variables -> Actions):
-#   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net
 #   ZEESCHUIMER_APP_ID           - numeric App ID of the GitHub App installed on
 #                                  digitalmethodsinitiative/zeeschuimer with permissions
 #                                  contents:write + pull-requests:write (and nothing else)
 #   ZEESCHUIMER_APP_PRIVATE_KEY  - full PEM private key for that App (including BEGIN/END lines)
+#   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net (legacy fallback)
+#
+# Optional overrides — set in repo Settings -> Secrets and variables -> Actions to change
+# the provider used by automatic (push-triggered) runs without editing this file.
+# Resolution order for each setting (first non-empty wins):
+#   API key:         workflow_dispatch input  ->  LLM_PROVIDER_API_KEY secret  ->  DMI_OLLAMA_KEY secret
+#   provider/url/model/output_mode:  workflow_dispatch input  ->  repo variable  ->  hardcoded default below
+#
+#   LLM_PROVIDER_API_KEY  (secret)   - generic key for the active provider; swap when switching providers
+#   LLM_PROVIDER          (variable) - provider type for LLMAdapter         (default: ollama)
+#   LLM_BASE_URL          (variable) - provider base URL                    (default: https://ollama.digitalmethods.net)
+#   LLM_MODEL             (variable) - model name                           (default: qwen2.5-coder:14b)
+#   LLM_OUTPUT_MODE       (variable) - structured or prompt                 (default: structured)
 
 name: Sync Zeeschuimer map_item from 4CAT
 
@@ -32,6 +44,7 @@ on:
       - 'datasources/**/search_*.py'
       - '.github/workflows/zeeschuimer_map_item_sync.yml'
   workflow_dispatch:
+    # NOTE: defaults are '' which falls through to Github settings (see Optional overrides above)
     inputs:
       bootstrap:
         description: 'Translate every Zeeschuimer datasource (initial sync, single PR). Ignored if "files" is set.'
@@ -42,25 +55,25 @@ on:
         type: string
         default: ''
       llm_provider:
-        description: 'LLM provider type used by LLMAdapter (default: ollama)'
+        description: 'LLM provider type for LLMAdapter. Leave blank to use LLM_PROVIDER variable or default (ollama).'
         type: string
-        default: 'ollama'
+        default: ''
       llm_base_url:
-        description: 'LLM provider URL (default: https://ollama.digitalmethods.net)'
+        description: 'LLM provider base URL. Leave blank to use LLM_BASE_URL variable or default (https://ollama.digitalmethods.net).'
         type: string
-        default: 'https://ollama.digitalmethods.net'
+        default: ''
       llm_api_key:
-        description: 'LLM API key (default uses GitHub secret DMI_OLLAMA_KEY)'
+        description: 'LLM API key. Leave blank to use LLM_PROVIDER_API_KEY secret or DMI_OLLAMA_KEY secret.'
         type: string
         default: ''
       model:
-        description: 'Override LLM model on LLM provider (default: qwen2.5-coder:14b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
+        description: 'LLM model name. Leave blank to use LLM_MODEL variable or default (qwen2.5-coder:14b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
         type: string
         default: ''
       output_mode:
-        description: 'Override LLM structured output (structured or prompt); some models do not support structured output (e.g. gpt-oss-120b)'
+        description: 'LLM output mode (structured or prompt). Leave blank to use LLM_OUTPUT_MODE variable or default (structured). Use prompt for models that do not support structured output (e.g. gpt-oss-120b).'
         type: string
-        default: 'structured'
+        default: ''
 
 # Least privilege: this workflow's own GITHUB_TOKEN only needs to read the 4CAT
 permissions:
@@ -167,11 +180,11 @@ jobs:
 
       - name: Run translation
         env:
-          PROVIDER_API_KEY: ${{ inputs.llm_api_key || secrets.DMI_OLLAMA_KEY }}
-          LLM_PROVIDER: ${{ inputs.llm_provider || 'ollama' }}
-          LLM_BASE_URL: ${{ inputs.llm_base_url || 'https://ollama.digitalmethods.net' }}
-          LLM_MODEL: ${{ inputs.model || 'qwen2.5-coder:14b' }}
-          LLM_OUTPUT_MODE: ${{ inputs.model || 'structured' }}
+          PROVIDER_API_KEY: ${{ inputs.llm_api_key || secrets.LLM_PROVIDER_API_KEY || secrets.DMI_OLLAMA_KEY }}
+          LLM_PROVIDER: ${{ inputs.llm_provider || vars.LLM_PROVIDER || 'ollama' }}
+          LLM_BASE_URL: ${{ inputs.llm_base_url || vars.LLM_BASE_URL || 'https://ollama.digitalmethods.net' }}
+          LLM_MODEL: ${{ inputs.model || vars.LLM_MODEL || 'qwen2.5-coder:14b' }}
+          LLM_OUTPUT_MODE: ${{ inputs.output_mode || vars.LLM_OUTPUT_MODE || 'structured' }}
           # Pass matrix values through env rather than interpolating. 
           # IS_BOOTSTRAP is always the literal true/false the detect job emitted
           # MODULE_FILES is a list of paths the detect job already validated against 
