@@ -40,9 +40,12 @@ class LLMProviderManager(BasicWorker):
 		task = self.job.details.get("task", "refresh") if self.job.details else "refresh"
 		provider = self.job.details.get("provider", "") if self.job.details else None
 		model_name = self.job.data["remote_id"]
-		available_models = None
+		providers = self.config.get("llm.providers", {})
 
-		for provider_id, provider_config in self.config.get("llm.providers", {}).items():
+		# pull/delete on the targeted connection(s). The `provider`
+		# filter scopes the *action* only - never the inventory rebuild below.
+		success = False
+		for provider_id, provider_config in providers.items():
 			if provider and provider != provider_id:
 				continue
 
@@ -57,30 +60,55 @@ class LLMProviderManager(BasicWorker):
 			# provider). may not be a problem? may be useful one day?
 			success = False
 			if task == "pull" and hasattr(client, "pull_model"):
-				success = client.pull_model(model_name)
-
+				success = client.pull_model(model_name) or success # in case a prior loop already succeeded
 			elif task == "delete" and hasattr(client, "delete_model"):
-				success = client.delete_model(model_name)
+				success = client.delete_model(model_name) or success # in case a prior loop already succeeded
+			elif task != "refresh":
+				self.log.warning(f"{self.__class__.__name__}: task '{task}' unknown or not supported by connection '{provider_id}'")
 
-			if success or task == "refresh":
-				# refresh models after pulling/deleting, or when asked to
-				if available_models is None:
-					available_models = {}
+		if task != "refresh" and not success:
+			# nothing changed and no explicit refresh requested - leave settings as-is
+			self.job.finish()
+			return
 
-				for model in client.list_models():
-					model = client.build_model_entry(model)
-					available_models[model["id"]] = model
+		# Rebuild available models inventory to reflect every
+		# connection, regardless of which one an action targeted. 
+		prev_available = self.config.get("llm.available_models", {}) or {}
+		available_models = {}
+		listed_connections = set()
+		for provider_id, provider_config in providers.items():
+			try:
+				client = LLMProviderClient.get_client(self.config, provider_config)
+			except ValueError:
+				self.log.debug(f"{self.__class__.__name__}: invalid provider type: {provider_config['type']}, skipping")
+				continue
 
-				self.log.debug(f"{self.__class__.__name__}: ran task '{task}' (model name: {model_name or 'N/A'})")
+			models = client.list_models()
+			if not models:
+				# unreachable, errored, or genuinely empty - indistinguishable, so
+				# don't touch this connection's models. A transient outage must not
+				# silently disable them; its entries are simply not refreshed now.
+				self.log.warning(f"{self.__class__.__name__}: no models returned from connection '{provider_id}', leaving its models untouched")
+				continue
 
-			elif success is None:
-				self.log.warning(f"{self.__class__.__name__}: task '{task}' unknown or not supported by client")
-			else:
-				self.log.warning(f"{self.__class__.__name__}: task '{task}' failed for model {model_name}")
+			listed_connections.add(provider_id)
+			for model in models:
+				entry = client.build_model_entry(model)
+				available_models[entry["id"]] = entry
 
-		if available_models is not None:
-			enabled_and_available = set(available_models.keys()) & set(self.config.get("llm.enabled_models", []))
-			self.config.set("llm.available_models", available_models)
-			self.config.set("llm.enabled_models", list(enabled_and_available))
+		# Prune enabled models to what is available
+		kept_enabled = []
+		for model_id in self.config.get("llm.enabled_models", []):
+			if model_id in available_models:
+				kept_enabled.append(model_id)
+				continue
+
+			# only drop a model if its connection actually reported back this round. 
+			connection = prev_available.get(model_id, {}).get("provider")
+			if connection in providers and connection not in listed_connections:
+				kept_enabled.append(model_id)
+
+		self.config.set("llm.available_models", available_models)
+		self.config.set("llm.enabled_models", kept_enabled)
 
 		self.job.finish()
