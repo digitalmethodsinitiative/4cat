@@ -126,6 +126,7 @@ class LLMProviderClient:
             "name": self.format_display_name(meta),
             "model_card": self.get_model_card_url(meta),
             "provider": self.provider_config["_id"],
+            "wrapper": self.provider_config["type"],
             "supported_media_types": self.parse_supported_media_types(meta),
             "metadata": meta,
         }

@@ -55,38 +55,50 @@ class LLMAdapter:
 
         :return BaseChatModel:  Langchain chat model for interfacing with model
         """
+        # The "wrapper" is which LangChain chat class to use for this model. For
+        # self-hosted connections it equals the connection type; for the
+        # third-party catalog (connection type "api") it is the model's vendor,
+        # stamped per-model in build_model_entry. Dispatching on the wrapper
+        # rather than the connection type is what lets third-party models
+        # resolve to the right SDK.
+        wrapper = self.model["wrapper"]
+
         chat_params = {
             "model": self.model["local_id"],
             "api_key": SecretStr(self.api_key),
-            "base_url": self.provider["url"],
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
         }
+        # Only pass a base URL when the connection actually has one. An empty
+        # string is taken literally by some SDKs (Anthropic, DeepSeek -> empty
+        # endpoint) instead of falling back to the vendor default.
+        if self.provider["url"]:
+            chat_params["base_url"] = self.provider["url"]
 
-        if self.provider["type"] == "openai":
-            if "o3" in self.model:
+        if wrapper == "openai":
+            if "o3" in self.model["local_id"]:
                 del chat_params["temperature"]
             adapter_class = ChatOpenAI
 
-        elif self.provider["type"] == "google":
+        elif wrapper == "google":
             adapter_class = ChatGoogleGenerativeAI
 
-        elif self.provider["type"] == "anthropic":
+        elif wrapper == "anthropic":
             chat_params.update({"timeout": 100, "stop": None})
             adapter_class = ChatAnthropic
 
-        elif self.provider["type"] == "mistral":
+        elif wrapper == "mistral":
             adapter_class = ChatMistralAI
 
-        elif self.provider["type"] == "deepseek":
+        elif wrapper == "deepseek":
             chat_params["max_tokens"] = min(self.max_tokens, 8192)
             adapter_class = ChatDeepSeek
 
-        elif self.provider["type"] == "ollama":
+        elif wrapper == "ollama":
             adapter_class = ChatOllama
             chat_params.update({"client_kwargs": self.client_kwargs})
 
-        elif self.provider["type"] in {"litellm", "openai-like"}:
+        elif wrapper in {"litellm", "openai-like"}:
             url = f"{self.provider['url']}/" if not self.provider["url"].endswith("/") else self.provider['url']
             url += "v1/" if not url.endswith("v1/") else ""
 
@@ -101,7 +113,7 @@ class LLMAdapter:
             adapter_class = ChatOpenAI
 
         else:
-            raise ValueError(f"{self.__class__.__name__} Unsupported LLM provider type: {self.provider['type']}")
+            raise ValueError(f"{self.__class__.__name__} Unsupported LLM wrapper: {wrapper}")
 
         return adapter_class(**chat_params)
 
@@ -142,7 +154,7 @@ class LLMAdapter:
             lc_messages = messages
 
         kwargs = {"temperature": temperature}
-        if self.provider["type"] in ("google", "ollama") or "o3" in self.model["local_id"] or "gpt-5" in self.model[
+        if self.model["wrapper"] in ("google", "ollama") or "o3" in self.model["local_id"] or "gpt-5" in self.model[
             "local_id"]:
             kwargs = {}
 
@@ -221,7 +233,7 @@ class LLMAdapter:
         :param media_category: "image", "video", or "audio"
         :returns: Provider-formatted content block
         """
-        if self.provider["type"] == "anthropic":
+        if self.model["wrapper"] == "anthropic":
             if media_category == "image":
                 if url:
                     return {"type": "image", "source": {"type": "url", "url": url}}
@@ -237,13 +249,13 @@ class LLMAdapter:
                     return {"type": "document", "source": {
                         "type": "base64", "media_type": mime_type, "data": b64_data
                     }}
-        elif self.provider["type"] == "google":
+        elif self.model["wrapper"] == "google":
             if url:
                 return {"type": "image_url", "image_url": {"url": url}}
             else:
                 data_uri = f"data:{mime_type};base64,{b64_data}"
                 return {"type": "image_url", "image_url": {"url": data_uri}}
-        elif self.provider["type"] == "ollama":
+        elif self.model["wrapper"] == "ollama":
             if media_category != "image":
                 raise ValueError(f"Ollama provider only supports image media, got category '{media_category}'")
             if url:
@@ -263,7 +275,7 @@ class LLMAdapter:
                 return {"type": "image_url", "image_url": {"url": url}}
             else:
                 data_uri = f"data:{mime_type};base64,{b64_data}"
-                if media_category == "audio" and self.provider["type"] == "openai":
+                if media_category == "audio" and self.model["wrapper"] == "openai":
                     return {"type": "input_audio", "input_audio": {
                         "data": b64_data, "format": mime_type.split("/")[-1]
                     }}
@@ -284,7 +296,7 @@ class LLMAdapter:
         json.dumps(json_schema)  # To validate / raise an error
 
         # LM Studio needs some more guidance
-        if self.provider["type"] == "lmstudio":
+        if self.model["wrapper"] == "lmstudio":
             json_schema = {"type": "json_schema", "json_schema": {"schema": json_schema}}
             self.llm = self.llm.bind(response_format=json_schema)
         else:
