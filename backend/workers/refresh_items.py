@@ -22,5 +22,6 @@ class ItemUpdater(BasicWorker):
 
     def work(self):
         # Placeholder – no tasks implemented yet.
-        self.job.finish()
+        # delete=True to remove existing interval job
+        self.job.finish(delete=True)
             
