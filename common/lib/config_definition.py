@@ -590,7 +590,8 @@ config_definition = {
                 "type": "api",
                 "url": "",
                 "auth_header": "",
-                "auth_key": ""
+                "auth_key": "",
+                "_id": "thirdparty-models"
             }
         },
         "global": True,

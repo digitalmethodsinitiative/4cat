@@ -219,34 +219,38 @@ if __name__ == "__main__":
     ollama_id = f"ollama-{ollama_url.split('/')[-1]}"
     try:
         import requests
-
-        try:
-            resp = requests.get(f"{ollama_url}/api/tags", timeout=2)
-            if resp.status_code == 200:
-                current_llm_providers = config.get("llm.providers")
-                if any([p["url"] == ollama_url for p in current_llm_providers]):
-                    print("Ollama server already configured in 4CAT settings.")
-                else:
-                    # set basic LLM settings so the initial admin user does not need to
-                    # configure them manually for local development environments that
-                    # include the Ollama sidecar.
-                    current_llm_providers[ollama_id] = {
-                        "name": "Ollama Server (4CAT, via Docker)",
-                        "url": ollama_url,
-                        "type": "ollama",
-                        "auth_header": "",
-                        "auth_key": "",
-                        "_id": ollama_id
-                    }
-                    config.set('llm.providers', current_llm_providers)
-                    config.db.commit()
-                    print('Detected Ollama on Docker network; configured LLM settings to use it.')
-        except requests.RequestException:
-            # Ollama not available; do nothing
-            pass
-    except Exception:
+        resp = requests.get(f"{ollama_url}/api/tags", timeout=2)
+    except requests.RequestException:
+        # Ollama not available; do nothing
+        resp = None
+    except Exception as e:
         # requests other error; skip automatic Ollama configuration
-        pass
+        print(f"Skipping automatic Ollama configuration due to error: {e}")
+        resp = None
+    
+    if resp is not None: 
+        if resp.status_code == 200:
+            current_llm_providers = config.get("llm.providers")
+            if any([p["url"] == ollama_url for p in current_llm_providers.values()]):
+                print("Ollama server already configured in 4CAT settings.")
+            else:
+                # set basic LLM settings so the initial admin user does not need to
+                # configure them manually for local development environments that
+                # include the Ollama sidecar.
+                current_llm_providers[ollama_id] = {
+                    "name": "Ollama Server (4CAT, via Docker)",
+                    "url": ollama_url,
+                    "type": "ollama",
+                    "auth_header": "",
+                    "auth_key": "",
+                    "_id": ollama_id
+                }
+                config.set('llm.providers', current_llm_providers)
+                config.db.commit()
+                print('Detected Ollama on Docker network; configured LLM settings to use it.')
+        else:
+            print(f"Ollama server detected at {ollama_url} but returned status code {resp.status_code}; skipping automatic configuration.")
+        
 
     print(f"\nStarting app\n"
           f"4CAT is accessible at:\n"
