@@ -429,6 +429,28 @@ def explorer_css(datasource, scope_class="explorer-content-container"):
 def _jinja2_filter_hasattr(obj, attribute):
     return hasattr(obj, attribute)
 
+@current_app.template_global("displayable_parameters")
+def _jinja2_global_displayable_parameters(item, config=None):
+    """
+    Return a dataset's parameters annotated with the producing processor's
+    options schema, suitable for rendering in the UI's parameter panel.
+
+    Sourced from the producer processor (via `get_producer_processor`) so
+    labels/tooltips survive an `adopt_type` rewrite. Sensitive options and
+    parameters absent from the schema are filtered out.
+
+    Usage: {% for entry in displayable_parameters(item, config=__config) %}
+    """
+    producer = item.get_producer_processor()
+    if not producer:
+        return []
+    options = producer.get_options(parent_dataset=item.top_parent(), config=config)
+    return [
+        {"key": k, "value": v, "schema": options[k]}
+        for k, v in item.parameters.items()
+        if k in options and v != "" and not options[k].get("sensitive")
+    ]
+
 @current_app.context_processor
 def inject_now():
     def uniqid():

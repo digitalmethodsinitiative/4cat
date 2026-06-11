@@ -45,7 +45,7 @@
                 <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished() %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>
             </li>
             {% endif %}
-        {% for entry in item.get_displayable_parameters(config=__config) %}
+        {% for entry in displayable_parameters(item, config=__config) %}
             {% set option = entry.key %}
             {% set processor_options = {entry.key: entry.schema} %}
             {% include 'components/result-parameter.html' %}

@@ -2124,28 +2124,6 @@ class DataSet(FourcatModule):
         self.db.update("datasets", where={"key": self.key}, data={"type": new_type})
         self.data["type"] = new_type
 
-    def get_displayable_parameters(self, config=None):
-        """
-        Return parameters annotated with the producing processor's options
-        schema, suitable for rendering in the UI's parameter panel.
-
-        The schema is sourced from `get_producer_processor()` so the original
-        producer's labels/tooltips survive an `adopt_type` rewrite. Sensitive
-        options and parameters not present in the schema are filtered out.
-
-        :param config:  Configuration reader, passed through to get_options.
-        :return list:  List of dicts: {"key", "value", "schema"}.
-        """
-        producer = self.get_producer_processor()
-        if not producer:
-            return []
-        options = producer.get_options(parent_dataset=self.top_parent(), config=config)
-        return [
-            {"key": k, "value": v, "schema": options[k]}
-            for k, v in self.parameters.items()
-            if k in options and v != "" and not options[k].get("sensitive")
-        ]
-
     def get_available_processors(self, config=None, exclude_hidden=False):
         """
         Get list of processors that may be run for this dataset
