@@ -750,7 +750,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         except AttributeError:
             standalone.board = self.type
 
-        standalone.type = top_parent.type
+        standalone.adopt_type(top_parent.type)
 
         standalone.detach()
         standalone.delete_parameter("key_parent")
