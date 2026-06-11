@@ -287,5 +287,12 @@ class DatasetMerger(BasicProcessor):
         else:
             standalone.update_label(f"(Merged) {self.source_dataset.get_label()}")
 
-        standalone.parameters = {**self.dataset.parameters, "board": "merged"}
-        standalone.type = self.source_dataset.type
+        # Wholesale-overwriting parameters here would clobber the producer_type
+        # stashed by create_standalone -> adopt_type; preserve it explicitly so
+        # the UI can still resolve this dataset back to merge-datasets.
+        standalone.parameters = {
+            **self.dataset.parameters,
+            "board": "merged",
+            "producer_type": standalone.parameters.get("producer_type", self.type),
+        }
+        standalone.adopt_type(self.source_dataset.type)

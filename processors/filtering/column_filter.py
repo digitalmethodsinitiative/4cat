@@ -298,7 +298,7 @@ class ColumnProcessorFilter(ColumnFilter):
         # correctly on the filtered result (especially for NDJSON). Unlike
         # BaseFilter, we deliberately keep this dataset attached to its parent
         # rather than promoting it to a standalone top-level dataset.
-        self.dataset.type = self.source_dataset.type
-        self.dataset.datasource = self.source_dataset.parameters.get(
-            "datasource", self.source_dataset.type
+        self.dataset.adopt_type(self.source_dataset.type)
+        self.dataset.change_datasource(
+            self.source_dataset.parameters.get("datasource", self.source_dataset.type)
         )
