@@ -26,6 +26,7 @@ core_packages = {
 	"langchain_mistralai",
 	"langchain_deepseek",
 	"markdown2==2.4.2",
+	"natsort",
 	"oslex",
 	"packaging",
 	"psutil~=5.0",
@@ -64,7 +65,7 @@ processor_packages = {
 	"pyahocorasick~=1.4.0",  # tokenise
 	"PyTumblr==0.1.0",  # search_tumblr
 	"razdel~=0.5",  # tokenise
-	"scenedetect[opencv]",  # video_scene_identifier
+	"scenedetect[opencv]>=0.7",  # video_scene_identifier
 	"scikit-learn",  # image_wall, histwords, tf_idf, topic_modeling, classification_evaluation, confusion_matrix
 	"Telethon~=1.36.0",  # search_telegram, download_telegram_videos, download-telegram-images
 	"unidecode~=1.3",  # accent_fold

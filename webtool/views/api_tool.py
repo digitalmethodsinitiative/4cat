@@ -20,7 +20,7 @@ from common.lib.exceptions import QueryParametersException, JobNotFoundException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.lib.dataset import DataSet
-from common.lib.helpers import UserInput, call_api
+from common.lib.helpers import UserInput, call_api, get_software_commit, get_software_version, get_git_branch
 from common.lib.user import User
 from backend.lib.worker import BasicWorker
 
@@ -57,15 +57,52 @@ def openapi_specification(api_id="all"):
 	return jsonify(current_app.openapi.generate(g.config, api_id))
 
 
+@component.route('/api/version.json')
+@api_ratelimit
+@login_required
+def api_version():
+	"""
+	Get 4CAT version information
+
+	Reports the migrated-to release version, the version of the checked-out
+	code, and (if 4CAT is running from a git checkout) the current commit
+	hash, origin repository URL, and branch. The repository URL can be used
+	to verify which fork an instance is running.
+
+	:return: Flask JSON response
+	"""
+	commit, repository = get_software_commit()
+
+	code_version_file = g.config.get("PATH_ROOT").joinpath("VERSION")
+	if code_version_file.exists():
+		with code_version_file.open() as infile:
+			code_version = infile.readline().strip()
+	else:
+		code_version = ""
+
+	response = {
+		"code": API_SUCCESS,
+		"items": {
+			"version": get_software_version(),
+			"code_version": code_version,
+			"commit": commit,
+			"repository": repository,
+			"branch": get_git_branch(),
+		}
+	}
+
+	return jsonify(response)
+
+
 @component.route('/api/status.json')
 @api_ratelimit
+@login_required
 def api_status():
 	"""
 	Get service status
 
 	:return: Flask JSON response
 	"""
-
 	# get job stats
 	queue = JobQueue(logger=g.log, database=g.db)
 	jobs = queue.get_all_jobs()
@@ -97,6 +134,7 @@ def api_status():
 	}
 
 	return jsonify(response)
+
 
 @component.route("/api/available-processors/<string:dataset_key>/")
 @login_required

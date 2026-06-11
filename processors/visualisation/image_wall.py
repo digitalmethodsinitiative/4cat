@@ -132,13 +132,16 @@ class ImageWallGenerator(VideoWallGenerator):
         if picture.height > sample_max or picture.width > sample_max:
             # if the image is large, get the dominant colour from a resized
             # version
-            sample_width = int(sample_max * picture.width / max(picture.width, picture.height))
-            sample_height = int(sample_max * picture.height / max(picture.width, picture.height))
+            sample_width = max(1, int(sample_max * picture.width / max(picture.width, picture.height)))
+            sample_height = max(1, int(sample_max * picture.height / max(picture.width, picture.height)))
             try:
                 picture = ImageOps.fit(picture, (sample_width, sample_height))
             except ValueError:
                 # Default of BICUBIC may fail
                 picture = ImageOps.fit(picture, (sample_width, sample_height), method=Image.NEAREST)
+            except ZeroDivisionError as e:
+                # Should not occur using max() above
+                raise MediaSignatureException(f"Error resizing {file_path} image for sorting (size {sample_width}x{sample_height}): {e}") from e
 
         if sort_mode not in ("", "random"):
             # ensure we get RGB values for pixels

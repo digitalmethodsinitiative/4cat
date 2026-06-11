@@ -155,16 +155,17 @@ def get_git_branch():
         branch = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} branch --show-current"), stdout=subprocess.PIPE)
         if branch.returncode != 0:
             raise ValueError()
-        branch_name = branch.stdout.decode("utf-8").strip()
-        if not branch_name:
-            # Check for detached HEAD state
-            # Most likely occuring because of checking out release tags (which are not branches) or commits
-            head_status = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} status"), stdout=subprocess.PIPE)
-            if head_status.returncode == 0:
-                for line in head_status.stdout.decode("utf-8").split("\n"):
-                    if any([detached_message in line for detached_message in ("HEAD detached from", "HEAD detached at")]):
-                        branch_name = line.split("/")[-1] if "/" in line else line.split(" ")[-1]
-                        return branch_name.strip()
+        branch_name = branch.stdout.decode("utf-8", errors="replace").strip()
+        if branch_name:
+            return branch_name
+
+        # Empty output → detached HEAD (release tag or specific commit checkout)
+        head_status = subprocess.run(oslex.split(f"git -C {oslex.quote(root_dir)} status"), stdout=subprocess.PIPE)
+        if head_status.returncode == 0:
+            for line in head_status.stdout.decode("utf-8", errors="replace").split("\n"):
+                if any(msg in line for msg in ("HEAD detached from", "HEAD detached at")):
+                    return (line.split("/")[-1] if "/" in line else line.split(" ")[-1]).strip()
+        return ""
     except (subprocess.SubprocessError, ValueError, FileNotFoundError):
         return ""
 
@@ -1474,3 +1475,20 @@ def hash_to_md5(string: str) -> str:
     Hash a string with an md5 hash.
     """
     return hashlib.md5(string.encode("utf-8")).hexdigest()
+
+
+def format_import_item(item):
+    """
+    Wrap a Zeeschuimer-format item for map_item processing.
+
+    This function extracts the raw payload from item["data"] and includes
+    all other fields as __import_meta. This ensures map_item receives the same
+    input.
+
+    :param dict item: Zeeschuimer item with "data" field
+    :return dict: Wrapped item ready for map_item
+    """
+    return {
+        **item.get("data", {}),
+        "__import_meta": {k: v for k, v in item.items() if k != "data"}
+    }
