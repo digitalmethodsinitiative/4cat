@@ -587,9 +587,8 @@ class DataSet(FourcatModule):
                     mapped_item = own_processor.get_mapped_item(item)
                 except MapItemException as e:
                     if warn_unmappable:
-                        self.warn_unmappable_item(
-                            i, processor, e, warn_admins=unmapped_items is False
-                        )
+                        # Update dataset log for unmappable items.
+                        self.warn_unmappable_item(i, processor, e)
 
                     unmapped_items += 1
                     if max_unmappable and unmapped_items > max_unmappable:
@@ -2067,13 +2066,62 @@ class DataSet(FourcatModule):
 
     def get_own_processor(self):
         """
-        Get the processor class that produced this dataset
+        Get the processor class corresponding to this dataset's data shape.
+
+        Normally this is the processor that produced the dataset, but for
+        datasets whose `type` was adopted from another datasource (e.g. by a
+        filter that copies its parent's NDJSON content verbatim), this is the
+        processor whose `map_item` / extension match the result file's
+        contents -- not necessarily the producing processor. See
+        `get_producer_processor` for the latter.
 
         :return:  Processor class, or `None` if not available.
         """
         processor_type = self.parameters.get("type", self.data.get("type"))
 
         return self.modules.processors.get(processor_type)
+
+    def get_producer_processor(self):
+        """
+        Get the processor class that actually produced this dataset.
+
+        Falls back to `get_own_processor()` for datasets whose `type` was not
+        rewritten via `adopt_type`. UI code that renders the parameter panel
+        should use this so labels/tooltips come from the producing processor's
+        options schema, not from a possibly-divergent data-shape processor.
+
+        :return:  Processor class, or `None` if not available.
+        """
+        producer_type = self.parameters.get("producer_type", self.data.get("type"))
+        return self.modules.processors.get(producer_type)
+
+    def adopt_type(self, new_type):
+        """
+        Rewrite this dataset's `type` to reflect a change in the result file's
+        data shape (e.g. after a filter has copied its parent's NDJSON content
+        verbatim into its result). The original producing processor's type is
+        preserved under `parameters["producer_type"]` on the first call, so
+        the UI can still look up the right options schema.
+
+        This is the only sanctioned path for rewriting `type` post-creation;
+        direct attribute assignment is blocked by `__setattr__`. `datasource`
+        is orthogonal -- adjust it separately via `change_datasource` if the
+        platform grouping also needs to change.
+
+        :param str new_type:  The type to adopt.
+        """
+        current_type = self.data.get("type")
+        if new_type == current_type:
+            return
+
+        if "producer_type" not in self.parameters:
+            # preserve only the original producer; chained adopt_type calls
+            # must not overwrite the first one
+            self.parameters = {**self.parameters, "producer_type": current_type}
+
+        # bypass the __setattr__ guard via the underlying DB update path
+        self.db.update("datasets", where={"key": self.key}, data={"type": new_type})
+        self.data["type"] = new_type
 
     def get_available_processors(self, config=None, exclude_hidden=False):
         """
@@ -2442,14 +2490,13 @@ class DataSet(FourcatModule):
         server = self.modules.config.get("flask.server_name")
         return f"{scheme}://{server}/download/{self.key}/"
 
-    def warn_unmappable_item(
-            self, item_count, processor=None, error_message=None, warn_admins=True
-    ):
+    def warn_unmappable_item(self, item_count, processor=None, error_message=None):
         """
-        Log an item that is unable to be mapped and warn administrators.
+        Log a per-item map_item failure to the dataset's own log.
 
         :param int item_count:			Item index
-        :param Processor processor:		Processor calling function8
+        :param Processor processor:		Processor calling function
+        :param error_message:			Optional exception or message
         """
         dataset_error_message = f"MapItemException (item {item_count}): {'is unable to be mapped! Check raw datafile.' if error_message is None else error_message}"
 
@@ -2461,22 +2508,6 @@ class DataSet(FourcatModule):
         )
         # Log error to dataset log
         closest_dataset.log(dataset_error_message)
-
-        if warn_admins:
-            if processor is not None:
-                processor.log.warning(
-                    f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}."
-                )
-            elif hasattr(self.db, "log"):
-                # borrow the database's log handler
-                self.db.log.warning(
-                    f"Unable to map item all items for dataset {closest_dataset.key}."
-                )
-            else:
-                # No other log available
-                raise DataSetException(
-                    f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn"
-                )
 
     def warn_unmappable_signatures(self, processor=None, signatures=None):
         """
@@ -2800,6 +2831,20 @@ class DataSet(FourcatModule):
         if attr in dir(self):
             super().__setattr__(attr, value)
             return
+
+        # `type` describes the data shape of the result file. It may diverge
+        # from the producing processor's type (e.g. a filter that copies its
+        # parent's NDJSON content verbatim). Direct rewrites would lose the
+        # producer identity needed by UI code; force callers through
+        # adopt_type() which preserves the original under parameters[
+        # "producer_type"].
+        if attr == "type" and self.data and self.data.get("type") and value != self.data["type"]:
+            raise AttributeError(
+                "Refusing to rewrite DataSet.type from %r to %r via direct attribute "
+                "assignment. Use DataSet.adopt_type() so the original producing "
+                "processor is preserved under parameters['producer_type']."
+                % (self.data["type"], value)
+            )
 
         if attr not in self.data:
             self.parameters[attr] = value

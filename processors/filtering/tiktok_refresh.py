@@ -74,7 +74,7 @@ class UpdateTikTok(BasicProcessor):
         # Request standalone
         standalone = self.create_standalone()
         # Update the type
-        standalone.type = "tiktok-urls-search"
+        standalone.adopt_type("tiktok-urls-search")
 
     @classmethod
     def is_filter(cls):
