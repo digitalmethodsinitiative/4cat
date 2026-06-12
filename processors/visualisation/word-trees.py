@@ -191,6 +191,9 @@ class MakeWordtree(BasicProcessor):
     x_min = 0
     x_max = 0
 
+    # for the user!
+    progress = 0
+
     # constants
     SIDE_LEFT = -1
     SIDE_RIGHT = 1
@@ -498,6 +501,8 @@ class MakeWordtree(BasicProcessor):
             processed += 1
             if processed % 500 == 0:
                 self.dataset.update_status(f"Finding query in {processed:,} of {self.source_dataset.num_rows:,} items ({len(fragments):,} matches)")
+                self.progress = (processed / self.source_dataset.num_rows) * 0.5
+                self.dataset.update_progress(self.progress)
 
             for column in columns:
                 document = post.get(column)
@@ -641,6 +646,8 @@ class MakeWordtree(BasicProcessor):
         for item in self.source_dataset.iterate_items():
             if walked % 500 == 0:
                 self.dataset.update_status(f"Counting occurrences in item {walked:,} of {self.source_dataset.num_rows:,} items")
+                self.progress = 0.5 + ((walked / self.source_dataset.num_rows) * 0.5)
+                self.dataset.update_progress(self.progress)
             for column in columns:
                 document = item.get(column)
                 walk_and_count(root, document, [], matcher)
