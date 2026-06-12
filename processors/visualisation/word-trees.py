@@ -101,6 +101,59 @@ class Fragment:
         value = reversed(self.value) if self.direction == MakeWordtree.SIDE_LEFT else self.value
         return list(value)[len(query):]
 
+class WildcardMatcher:
+    """
+    Plumbing for matching wildcard (* and ?) strings
+    """
+    # can't really think of a better way than this
+    dictionary = {
+        "*": "OOOOOXXOOOOOXXOOOOOXXOOOOOASTERISKOOOOOXXOOOOOXXOOOOOXXOOOOO",
+        "?": "OOOOOXXOOOOOXXOOOOOXXOOOOOQMARKOOOOOXXOOOOOXXOOOOOXXOOOOO",
+    }
+
+    @staticmethod
+    def obfuscate(q: str) -> str:
+        """
+        Obfuscate a wildcard string
+
+        Useful to avoid considering the wildcard syntax as a token boundary
+        while tokenising.
+
+        :param str q:
+        :return str:
+        """
+        for s, r in WildcardMatcher.dictionary.items():
+            q = q.replace(s, r)
+        return q
+
+    @staticmethod
+    def deobfuscate(q: str) -> str:
+        """
+        Deobfuscate a wildcard string
+
+        :param str q:
+        :return str:
+        """
+        for s, r in WildcardMatcher.dictionary.items():
+            q = q.replace(r, s)
+        return q
+
+    @staticmethod
+    def compile(q: str) -> re.Pattern:
+        """
+        Compile a regular expression for matching
+
+        Escapes all regex syntax currently in the match string.
+
+        :param str q:
+        :return re.Pattern:
+        """
+        q = WildcardMatcher.obfuscate(q)
+        q = re.escape(q)
+        q = WildcardMatcher.deobfuscate(q)
+        q = q.replace("*", ".*?").replace("?", ".")
+        return re.compile(q)
+
 
 class MakeWordtree(BasicProcessor):
     """
@@ -116,19 +169,19 @@ class MakeWordtree(BasicProcessor):
     extension = "svg"  # extension of result file, used internally and in UI
 
     references = [
-        "Wattenberg, M., & Viégas, F. B. (2008). The Word Tree, an Interactive Visual Concordance. IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228. <https://doi.org/10.1109/TVCG.2008.172>"
+        "Wattenberg, M., & Viégas, F. B. (2008). [The Word Tree, an Interactive Visual Concordance](https://doi.org/10.1109/TVCG.2008.172). IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228."
     ]
 
     # can be changed
-    FONT_SIZE = 16  # in px
+    FONT_SIZE = 14  # in px
     FONT_FACTOR_MAX = 3  # how big can the font get?
 
     # will be adjusted based on tokeniser used
     SPACE = ""
 
     # convert between relative and absolute units
-    REM_CONV = 15.99
-    CH_CONV = 9.63
+    REM_CONV = FONT_SIZE
+    CH_CONV = FONT_SIZE * 0.601875
 
     # gaps between nodes vertically and horizontally
     gap_x = 4
@@ -142,32 +195,9 @@ class MakeWordtree(BasicProcessor):
     SIDE_LEFT = -1
     SIDE_RIGHT = 1
 
-    # 25-colour palette via https://medialab.github.io/iwanthue/
-    palette = ["#ff6c55",
-               "#0948b9",
-               "#acad13",
-               "#7f7cf7",
-               "#72b636",
-               "#51006f",
-               "#b9e272",
-               "#a23fb0",
-               "#00bf82",
-               "#a90580",
-               "#01bd9e",
-               "#c10f78",
-               "#8fe6b3",
-               "#d2264a",
-               "#739dff",
-               "#fdaa3a",
-               "#004ca2",
-               "#f8ce80",
-               "#016bb6",
-               "#933c00",
-               "#fd97ff",
-               "#681800",
-               "#ffacef",
-               "#520042",
-               "#573b79"]
+    # colour palette via https://medialab.github.io/iwanthue/
+    palette = ["#ff6c55", "#0948b9", "#acad13", "#7f7cf7", "#72b636", "#51006f", "#b9e272", "#a23fb0", "#00bf82",
+               "#a90580", "#01bd9e", "#c10f78", "#8fe6b3", "#d2264a", "#739dff", "#fdaa3a", "#004ca2", "#f8ce80"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -184,7 +214,7 @@ class MakeWordtree(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "Word tree root query",
-                "tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation. Cannot be empty.",
+                "tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation. Cannot be empty. You can use wildcards: 'politic*' will match 'politician' and 'politics' for example.",
             },
             "limit": {
                 "type": UserInput.OPTION_TEXT,
@@ -331,10 +361,10 @@ class MakeWordtree(BasicProcessor):
         # again
         self.invert_node_labels(root)
 
-        wrapper = SVG(overflow="visible", debug=False)
-
         self.dataset.update_status(f"Rendering tree to SVG file (root side: {root_side})")
+        wrapper = SVG(overflow="visible", debug=False)
         offset_x = 0
+
         if sides != "only-right":
             self.dataset.update_status("Adding left side of tree to SVG file")
             wrapper, _ = self.render(
@@ -439,14 +469,22 @@ class MakeWordtree(BasicProcessor):
         # tokenise query
         if lowercase:
             query = query.lower()
-        tokenised_query = tokeniser(query, **tokeniser_args)
+        tokenised_query = tokeniser(WildcardMatcher.obfuscate(query), **tokeniser_args)
+        tokenised_query = [WildcardMatcher.deobfuscate(q) for q in tokenised_query]
         if type(tokenised_query) is not list:
             tokenised_query = list(tokenised_query)
         query_token_length = len(tokenised_query)
 
+        def wildcard_match(needle: list, haystack: list):
+            for k in range(len(needle)):
+                pattern = WildcardMatcher.compile(needle[k])
+                if needle[k] != haystack[k] and not pattern.match(haystack[k]):
+                    return False
+            return True
+
         def list_in_list(needle: list, haystack: list):
             for k in range(len(haystack)):
-                if haystack[k:k + len(needle)] == needle:
+                if wildcard_match(needle, haystack[k:k+len(needle)]):
                     yield k
 
         # find matching posts
@@ -459,7 +497,7 @@ class MakeWordtree(BasicProcessor):
         for post in self.source_dataset.iterate_items():
             processed += 1
             if processed % 500 == 0:
-                self.dataset.update_status(f"Finding query in {processed:,} of {self.source_dataset.num_rows:,} items")
+                self.dataset.update_status(f"Finding query in {processed:,} of {self.source_dataset.num_rows:,} items ({len(fragments):,} matches)")
 
             for column in columns:
                 document = post.get(column)
@@ -485,11 +523,11 @@ class MakeWordtree(BasicProcessor):
 
                 for position in list_in_list(tokenised_query, document):
                     if sides != "only-left":
-                        fragments.append(
-                            Fragment(document[position:position + window + query_token_length - 1], self.SIDE_RIGHT))
+                        fragment = tokenised_query + document[position + query_token_length:position + window + query_token_length - 1]
+                        fragments.append(Fragment(fragment, self.SIDE_RIGHT))
                     if sides != "only-right":
-                        fragments.append(
-                            Fragment(document[position - window + 1:position + query_token_length], self.SIDE_LEFT))
+                        fragment = document[position - window + 1:position] + tokenised_query
+                        fragments.append(Fragment(fragment, self.SIDE_LEFT))
 
         # terminate fragments at sentence stops, though only on the right side
         # of the tree
@@ -523,7 +561,8 @@ class MakeWordtree(BasicProcessor):
         # here is our tree's root node (token)
         root = TreeNode(tokenised_query[0])
         query_start = root
-        # if we have a longer query, add these already
+        # if we have a longer query, add the rest as nodes already
+        # these will be consolidated into a single node in the next steps
         for other_token in tokenised_query[1:]:
             query_start = TreeNode(other_token, parent=query_start)
 
@@ -584,7 +623,7 @@ class MakeWordtree(BasicProcessor):
         # another issue: we don't really know what the non-tokenised string
         # looked like, so we guesstimate by joining by some space character
         # this is likely to be off the mark for e.g. chinese text
-        def walk_and_count(node, doc, prefix):
+        def walk_and_count(node, document: str, prefix: list, matcher: None|re.Pattern):
             if node.weight is None:
                 node.weight = 0
 
@@ -593,17 +632,18 @@ class MakeWordtree(BasicProcessor):
             else:
                 match = f"{self.SPACE.join([node.name, *prefix])}"
 
-            node.weight += doc.count(match) if doc else 0
+            node.weight += len(matcher.findall(document)) if matcher else document.count(match)
             for child in node.children:
-                walk_and_count(child, doc, [*prefix, node.name])
+                walk_and_count(child, document, [*prefix, node.name], matcher)
 
+        matcher = WildcardMatcher.compile(query) if bool(re.findall(r"[*?]", query)) else None
         walked = 1
         for item in self.source_dataset.iterate_items():
             if walked % 500 == 0:
-                self.dataset.update_status(f"Counting occurrences in item {walked:,} of {self.source_dataset.num_rows:,}")
+                self.dataset.update_status(f"Counting occurrences in item {walked:,} of {self.source_dataset.num_rows:,} items")
             for column in columns:
                 document = item.get(column)
-                walk_and_count(root, document, [])
+                walk_and_count(root, document, [], matcher)
             walked += 1
 
         # now get the *second* largest weight as the baseline
@@ -738,9 +778,6 @@ class MakeWordtree(BasicProcessor):
                 )
             )
 
-        # filler = Rect((0, 0), (f"{own_width}ch", f"{block_height}rem"), stroke="#F09", fill="transparent", debug=False)
-        # container.add(filler)
-
         canvas.add(container)
 
         # draw the line connecting this node to the parent node
@@ -824,6 +861,9 @@ class MakeWordtree(BasicProcessor):
             # this can happen because we use the weight of the *second* most
             # prevalent node as the max weight
             return self.FONT_FACTOR_MAX
+        elif max_weight == 0:
+            # and this can happen if de-tokenisation failed in walk_and_count
+            return 1
 
         embiggen = node.weight / max_weight if max_weight else 1
         embiggen = sin(embiggen * 0.5 * pi)
