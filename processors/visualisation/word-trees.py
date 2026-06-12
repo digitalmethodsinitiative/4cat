@@ -338,7 +338,7 @@ class MakeWordtree(BasicProcessor):
         # each branch, which we will need for rendering it later
         width_left, height_left = self.get_bbox(root, max_weight, self.SIDE_LEFT)
         width_right, height_right = self.get_bbox(root, max_weight, self.SIDE_RIGHT)
-        width, height = sum([width_left, width_right]), max(height_left, height_right)
+        _, height = sum([width_left, width_right]), max(height_left, height_right)
 
         # depending on which side of the tree is higher, we need to adjust the
         # height of the other side; and we need to decide which side of the
