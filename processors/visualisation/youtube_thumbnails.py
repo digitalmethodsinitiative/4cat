@@ -7,6 +7,7 @@ import urllib.request
 from apiclient.discovery import build
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_yt_compatible_ids, UserInput
 
@@ -35,15 +36,8 @@ class YouTubeThumbnails(BasicProcessor):
 	max_retries = 3
 	sleep_time = 10
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on YouTube metadata sets
-
-		:param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "youtube-metadata"
+	# Allow processor on YouTube metadata sets
+	compatibility = Compatibility(types={"youtube-metadata"})
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

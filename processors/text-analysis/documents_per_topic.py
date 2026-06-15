@@ -3,6 +3,7 @@ Extracts topics per model and top associated words
 """
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 
 import json
@@ -26,15 +27,8 @@ class TopicModelWordExtractor(BasicProcessor):
 
     followups = []
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on topic models
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type == "topic-modeller"
+    # Allow processor on topic models
+    compatibility = Compatibility(types={"topic-modeller"})
 
     def process(self):
         """
