@@ -17,6 +17,7 @@ from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = ["Stijn Peeters", "Sal Hagen"]
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
@@ -47,16 +48,7 @@ class Tokenise(BasicProcessor):
         "[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)"
     ]
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-
-        return module.get_extension() in ("csv", "ndjson")
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
