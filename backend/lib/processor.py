@@ -1008,7 +1008,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if cls.compatibility is not None:
             return cls.compatibility.is_compatible_with(module, config=config)
 
-        return bool(module is not None and module.is_top_dataset())
+        # Legacy default: a processor that declares no `compatibility` and does
+        # not override this method is compatible only with top-level datasets
+        # (those with no parent), i.e. it runs on collected data and not on the
+        # output of other processors.
+        return Compatibility(top_dataset_only=True).is_compatible_with(module, config=config)
 
     @classmethod
     def is_filter(cls):
