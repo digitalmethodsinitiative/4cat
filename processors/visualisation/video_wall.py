@@ -12,6 +12,7 @@ from packaging import version
 
 from common.lib.helpers import UserInput, get_ffmpeg_version, convert_to_int
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility, ExecutableSibling
 from common.lib.exceptions import ProcessorInterruptedException, MediaSignatureException
 
 __author__ = "Stijn Peeters"
@@ -33,6 +34,9 @@ class VideoWallGenerator(BasicProcessor):
     title = "Video wall"  # title displayed in UI
     description = "Put all videos in a single combined video, side by side. Videos can be sorted and resized."
     extension = "mp4"  # extension of result file, used internally and in UI
+
+    # Allow on video datasets when ffmpeg and ffprobe are available
+    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
 
     # videos will be arranged and resized to fit these image wall dimensions
     # note that video aspect ratio may not allow for a precise fit
@@ -127,25 +131,6 @@ class VideoWallGenerator(BasicProcessor):
                 "min": 0
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine compatibility
-
-        :param DataSet module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        if not (module.get_media_type() == "video" or module.type.startswith("video-downloader")):
-            return False
-        else:
-            # Only check these if we have a video dataset
-            # also need ffprobe to determine video lengths
-            # is usually installed in same place as ffmpeg
-            ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
-            ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
-            return ffmpeg_path and ffprobe_path
 
     def process(self):
         """

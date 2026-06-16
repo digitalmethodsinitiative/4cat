@@ -4,8 +4,8 @@ Create an image wall of the most-used images
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sklearn.cluster import KMeans
 from common.lib.helpers import UserInput
+from common.lib.compatibility import Compatibility, ExecutableSibling
 import colorsys
-import shutil
 import copy
 
 from processors.visualisation.video_wall import VideoWallGenerator
@@ -30,27 +30,8 @@ class ImageWallGenerator(VideoWallGenerator):
     description = "Put all images in a single combined image, side by side. Images can be sorted and resized."
     extension = "png"
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Check compatibility
-
-        This processor can run 1) if ffmpeg is available and 2) if the source
-        is an image or video dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
-        ffprobe_path = (
-            shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
-            if ffmpeg_path
-            else None
-        )
-        have_ffmpeg = (ffmpeg_path and ffprobe_path)
-        return have_ffmpeg and (module.get_media_type() in ("video", "image")
-               or module.type.startswith("image-downloader")
-               or module.type == "video-frames")
+    # Allow on image/video datasets when ffmpeg and ffprobe are available
+    compatibility = Compatibility(media_types={"video", "image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

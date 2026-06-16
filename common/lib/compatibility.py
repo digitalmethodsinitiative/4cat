@@ -68,6 +68,31 @@ def is_executable(path):
     return bool(path) and shutil.which(path) is not None
 
 
+class ExecutableSibling:
+    """
+    Matcher for `required_settings`: the configured executable must resolve (via
+    `shutil.which`) AND a sibling executable must exist next to it, found by
+    swapping the name in the resolved path. For tools that ship together, e.g.
+    ffprobe alongside ffmpeg::
+
+        required_settings={("video-downloader.ffmpeg_path",
+                             ExecutableSibling("ffmpeg", "ffprobe"))}
+
+    The matcher protocol is a one-argument callable, so arguments are passed via
+    the constructor; `name`/`sibling` stay readable for a future UI. None-safe.
+    """
+
+    def __init__(self, name, sibling):
+        self.name = name
+        self.sibling = sibling
+
+    def __call__(self, path):
+        resolved = shutil.which(path) if path else None
+        if not resolved:
+            return False
+        return shutil.which(self.sibling.join(resolved.rsplit(self.name, 1))) is not None
+
+
 @dataclass
 class Compatibility:
     """
