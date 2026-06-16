@@ -6,6 +6,7 @@ import datetime
 
 from common.lib.helpers import pad_interval, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -27,15 +28,9 @@ class TwitterStatsBase(BasicProcessor):
     sorted = False
 
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return False
+    # Abstract base for the Twitter statistics processors; not runnable on its
+    # own (an empty type set never matches a dataset).
+    compatibility = Compatibility(types=set())
 
     def process(self):
         """
