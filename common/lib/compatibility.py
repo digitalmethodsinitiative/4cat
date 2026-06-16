@@ -16,7 +16,7 @@ A processor declares one as its `compatibility` class attribute, for example::
     compatibility = Compatibility(
         media_types={"video"},
         type_prefixes={"video-downloader"},
-        required_settings={("video-downloader.ffmpeg_path", shutil.which)},
+        required_settings={("video-downloader.ffmpeg_path", is_executable)},
     )
 
 BasicProcessor.is_compatible_with() evaluates it. A processor whose
@@ -55,6 +55,17 @@ def _maybe_call(module, method):
         except Exception:
             return None
     return attr
+
+
+def is_executable(path):
+    """
+    Matcher for `required_settings`: the setting's value must point to an
+    executable found on the system (resolved with `shutil.which`). An unset or
+    empty value fails safely, e.g.::
+
+        required_settings={("video-downloader.ffmpeg_path", is_executable)}
+    """
+    return bool(path) and shutil.which(path) is not None
 
 
 @dataclass

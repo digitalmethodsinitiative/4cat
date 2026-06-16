@@ -10,6 +10,7 @@ from pathlib import Path
 import oslex
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -33,18 +34,8 @@ class AudioExtractor(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "audio"
 
-    followups = ["audio-to-text"]
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on videos only
-
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-            config.get("video-downloader.ffmpeg_path") and \
-            shutil.which(config.get("video-downloader.ffmpeg_path"))
+    # Allow on video datasets when ffmpeg is available
+    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["audio-to-text"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
