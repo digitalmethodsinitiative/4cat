@@ -65,11 +65,12 @@ class ImageCategoryWallGenerator(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        return module.type.startswith("image-to-categories") or \
-            module.type.startswith("image-downloader") or \
-            module.type.startswith("video-hasher-1") or \
-            module.type.startswith("video-hash-similarity-matrix") and \
-            not module.type not in ["image-downloader-screenshots-search"]
+        return (
+            module.type.startswith("image-to-categories")
+            or module.type.startswith("image-downloader")
+            or module.type.startswith("video-hasher-1")
+            or module.type.startswith("video-hash-similarity-matrix")
+        ) and module.type not in ["image-downloader-screenshots-search"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
