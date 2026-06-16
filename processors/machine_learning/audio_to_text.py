@@ -7,6 +7,7 @@ import openai
 from requests.exceptions import ConnectionError
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -28,6 +29,9 @@ class AudioToText(BasicProcessor):
     description = ("Detect speech and other sounds in audio and convert to text with either OpenAI's Whisper or "
                    " GPT models (GPT only via API).")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+
+    # Allow on audio datasets
+    compatibility = Compatibility(media_types={"audio"}, type_prefixes={"audio-extractor"})
 
     followups = []
 
@@ -89,13 +93,6 @@ class AudioToText(BasicProcessor):
         
         # Queue per model/API type
         return f"{cls.type}-{dataset.parameters.get('model_host', 'local')}"
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on audio archives
-        """
-        return module.get_media_type() == 'audio' or module.type.startswith("audio-extractor")
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
