@@ -12,6 +12,7 @@ from sklearn.decomposition import PCA, TruncatedSVD
 from gensim.models import KeyedVectors
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas, convert_to_float
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -104,15 +105,8 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             }
         }
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on token sets
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type == "generate-embeddings"
+    # Allow processor on word embedding models
+    compatibility = Compatibility(types={"generate-embeddings"})
 
     def process(self):
         # parse parameters

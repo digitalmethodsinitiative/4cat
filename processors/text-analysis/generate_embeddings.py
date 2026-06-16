@@ -10,6 +10,7 @@ from gensim.models.phrases import Phrases, Phraser
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
@@ -114,15 +115,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 			}
 		}
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on token sets
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "tokenise-posts"
+	# Allow processor on token sets
+	compatibility = Compatibility(types={"tokenise-posts"})
 
 	def process(self):
 		"""

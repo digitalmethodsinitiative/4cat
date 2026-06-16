@@ -7,6 +7,7 @@ from gensim.models import KeyedVectors
 
 from common.lib.helpers import UserInput, convert_to_int, convert_to_float
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
@@ -67,15 +68,8 @@ class SimilarWord2VecWords(BasicProcessor):
 			}
 		}
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on word embedding models
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "generate-embeddings"
+	# Allow processor on word embedding models
+	compatibility = Compatibility(types={"generate-embeddings"})
 
 	def process(self):
 		"""

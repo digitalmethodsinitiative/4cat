@@ -6,6 +6,7 @@ import json
 
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 
 __author__ = "Dale Wahl"
@@ -21,15 +22,8 @@ class UpdateTikTok(BasicProcessor):
     description = "Re-query TikTok URLs to update the dataset, e.g. to refresh video URLs or like counts."
     extension = "ndjson"
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on NDJSON and CSV files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type in ["tiktok-search", "tiktok-urls-search"]
+    # Allow processor on TikTok datasets
+    compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"})
 
     def process(self):
         """

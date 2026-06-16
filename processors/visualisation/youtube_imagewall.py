@@ -10,6 +10,7 @@ from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput, convert_to_int
 
 __author__ = "Sal Hagen"
@@ -56,15 +57,8 @@ class YouTubeImageWall(BasicProcessor):
             }
         }
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-       Allow processor on YouTube thumbnail sets
-
-       :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-       """
-        return module.type == "youtube-thumbnails"
+    # Allow processor on YouTube thumbnail sets
+    compatibility = Compatibility(types={"youtube-thumbnails"})
 
     def process(self):
         """

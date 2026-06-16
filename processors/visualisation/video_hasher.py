@@ -16,6 +16,7 @@ from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 
 from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorAdvancedPreset
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -370,12 +371,8 @@ class VideoHashNetwork(BasicProcessor):
             "max": 100
         }}
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on video hasher
-        """
-        return module.type in ["video-hasher-1"]
+    # Allow on video hasher
+    compatibility = Compatibility(types={"video-hasher-1"})
 
     def process(self):
         """
@@ -488,12 +485,8 @@ class VideoHashSimilarities(BasicProcessor):
             "max": 100
         }}
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on video hasher
-        """
-        return module.type in ["video-hasher-1"]
+    # Allow on video hasher
+    compatibility = Compatibility(types={"video-hasher-1"})
 
     def process(self):
         """

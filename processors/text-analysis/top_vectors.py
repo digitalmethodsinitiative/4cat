@@ -7,6 +7,7 @@ import json
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -52,15 +53,8 @@ class VectorRanker(BasicProcessor):
 			},
 		}
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on token vectors
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "vectorise-tokens"
+	# Allow processor on token vectors
+	compatibility = Compatibility(types={"vectorise-tokens"})
 
 	def process(self):
 		"""

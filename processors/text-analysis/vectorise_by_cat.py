@@ -6,6 +6,7 @@ import json
 import pickle
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Dale Wahl"
@@ -25,14 +26,8 @@ class VectoriseByCategory(BasicProcessor):
 
 	followups = ["wordcloud", "render-graphs-isometric", "render-rankflow"]
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on token sets
-
-		:param module: Module to determine compatibility with
-		"""
-		return module.type == "tokenise-posts"
+	# Allow processor on token sets
+	compatibility = Compatibility(types={"tokenise-posts"})
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None):

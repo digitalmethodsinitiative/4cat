@@ -5,6 +5,7 @@ import datetime
 
 from common.lib.helpers import get_interval_descriptor
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
@@ -45,15 +46,8 @@ class TwitterUserVisibility(BasicProcessor):
             }
         }
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type in ["twitterv2-search", "dmi-tcat-search"]
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     def process(self):
         """
