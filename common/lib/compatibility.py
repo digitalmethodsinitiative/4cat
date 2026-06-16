@@ -57,6 +57,10 @@ def _maybe_call(module, method):
     return attr
 
 
+# TODO: memoize shutil.which() (used by is_executable / ExecutableSibling) -- its
+# result is constant per process, so a cached wrapper (positive results only, to
+# avoid stale negatives if an executable is installed without a restart) would
+# avoid repeated $PATH scans on video-heavy pages.
 def is_executable(path):
     """
     Matcher for `required_settings`: the setting's value must point to an
@@ -154,13 +158,19 @@ class Compatibility:
         """
         return not self.unmet_requirements(module, config=config)
 
-    def unmet_requirements(self, module, config=None) -> List[str]:
+    def unmet_requirements(self, module, config=None, first_only=True) -> List[str]:
         """
         Return the requirements `module` does not meet, as readable strings.
 
         An empty list means `module` is compatible. Each string names one thing
         that is missing -- a wrong dataset type, an absent column, a setting
         that is not configured, and so on.
+
+        By default the method returns as soon as one requirement is unmet --
+        enough for the yes/no `is_compatible_with`, and it skips the expensive
+        environment checks (config reads, shutil.which) whenever a cheap shape
+        check already fails. Pass `first_only=False` to collect every unmet
+        requirement -- used to explain why a module is not compatible.
         """
         reasons: List[str] = []
         if module is None:
@@ -170,14 +180,20 @@ class Compatibility:
         # must be one of them
         if self._identity_declared() and not self._identity_matches(module):
             reasons.append("dataset type/media is not accepted")
+            if first_only:
+                return reasons
 
         if self.top_dataset_only and not _maybe_call(module, "is_top_dataset"):
             reasons.append("requires a top-level dataset")
+            if first_only:
+                return reasons
 
         if self.extensions is not None:
             extension = _maybe_call(module, "get_extension")
             if extension not in set(self.extensions):
                 reasons.append("requires extension: %s" % ", ".join(self.extensions))
+                if first_only:
+                    return reasons
 
         if self.rankable is not None:
             if bool(_maybe_call(module, "is_rankable")) != self.rankable:
@@ -185,6 +201,8 @@ class Compatibility:
                     "requires a rankable dataset" if self.rankable
                     else "requires a non-rankable dataset"
                 )
+                if first_only:
+                    return reasons
 
         # the only check that really needs a DataSet object
         if self.requires_columns:
@@ -192,7 +210,11 @@ class Compatibility:
             missing = [column for column in self.requires_columns if column not in columns]
             if missing:
                 reasons.append("requires column(s): %s" % ", ".join(missing))
+                if first_only:
+                    return reasons
 
+        # Note: this may have executable check that are expensive so we do it after cheaper checks
+        # TODO: could separate quicker setting checks for slower ones
         for requirement in self.required_settings:
             key, expected = (requirement, None) if isinstance(requirement, str) else requirement
             value = config.get(key) if config is not None else None
@@ -210,10 +232,14 @@ class Compatibility:
                 met = value == expected
             if not met:
                 reasons.append("requires setting: %s" % key)
+                if first_only:
+                    return reasons
 
         for package in self.required_packages:
             if not shutil.which(package):
                 reasons.append("requires package: %s" % package)
+                if first_only:
+                    return reasons
 
         return reasons
 
