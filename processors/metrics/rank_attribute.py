@@ -8,6 +8,7 @@ from collections import OrderedDict
 from itertools import islice, chain
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -30,23 +31,13 @@ class AttributeRanker(BasicProcessor):
     description = "Count values in a dataset column, like URLs or hashtags (overall or per timeframe)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    followups = []
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     references = ["[regex010](https://regex101.com/)"]
 
     include_missing_data = True
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-
-        return module.get_extension() in ("csv", "ndjson")
-    
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
 

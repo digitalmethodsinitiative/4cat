@@ -3,6 +3,7 @@ Change a dataset item to an annotation
 """
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -23,6 +24,9 @@ class ItemToAnnotation(BasicProcessor):
                    "Explorer. Item values must be numbers or strings.")  # description displayed in UI
     extension = "csv"
 
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
 
@@ -42,16 +46,6 @@ class ItemToAnnotation(BasicProcessor):
             options["columns"]["options"] = {v: v for v in columns}
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on NDJSON and CSV files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
