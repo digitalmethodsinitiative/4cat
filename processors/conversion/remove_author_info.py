@@ -10,6 +10,7 @@ import json
 import csv
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import dict_search_and_update, UserInput, HashCache
 
 __author__ = "Stijn Peeters"
@@ -30,21 +31,14 @@ class AuthorInfoRemover(BasicProcessor):
     title = "Pseudonymise or anonymise"  # title displayed in UI
     description = "Removes or replaces data from the dataset in fields identified as containing personal information"
 
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
+
     references = [
         "[What is a hash?](https://techterms.com/definition/hash)",
         "[What is a salt?](https://en.wikipedia.org/wiki/Salt_(cryptography))",
         "[What is Blake2?](https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE2)"
     ]
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on CSV files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.is_top_dataset() and module.get_extension() in ["csv", 'ndjson']
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

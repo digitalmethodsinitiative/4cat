@@ -9,6 +9,7 @@ from io import StringIO
 import networkx as nx
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
@@ -27,15 +28,8 @@ class WikiURLCoLinker(BasicProcessor):
 	description = "Create a GEXF network file comprised network comprised of linked-to Wikipedia pages, linked to the categories they are part of. English Wikipedia only. Will only fetch the first 10,000 links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-        Allow processor on top datasets.
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+	# Allow on top-level CSV/NDJSON datasets
+	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
 	def process(self):
 		"""
@@ -66,7 +60,7 @@ class WikiURLCoLinker(BasicProcessor):
 
 			if not post["body"]:
 				continue
-				
+
 			wiki_links = link_regex.findall(post["body"])
 
 			# if the result has an explicit url per post, take that into
@@ -147,7 +141,7 @@ class WikiURLCoLinker(BasicProcessor):
 					# Add " (cat)" to the category strings.
 					# This is needed because pages can sometimes have the same name as the category.
 					# This will result in a faulty graph, since there's duplicate nodes.
-					
+
 					category += " (cat)"
 
 					if category not in all_categories:

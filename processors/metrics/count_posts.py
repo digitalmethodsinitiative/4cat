@@ -4,6 +4,7 @@ Collapse post bodies into one long string
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -21,18 +22,8 @@ class CountPosts(BasicProcessor):
     description = "Counts how many items are in the dataset per date (or overall)."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    followups = ["histogram"]
-
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"}, preferred_followups=["histogram"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
