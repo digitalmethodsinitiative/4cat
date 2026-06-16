@@ -32,7 +32,15 @@ class TfIdf(BasicProcessor):
 	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. time-separated)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["wordcloud"]
+	# Allow processor on token sets
+	compatibility = Compatibility(
+		types={"tokenise-posts"},
+		preferred_followups=["wordcloud"],
+		excluded_followups=[
+			"consolidate-urls", "preset-neologisms", "sentence-split", "tokenise-posts",
+			"image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter",
+		],
+	)
 
 	references = [
 		"[Spärck Jones, Karen. 1972. \"A statistical interpretation of term specificity and its application in retrieval.\" *Journal of Documentation* (28), 1: 11–21.](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.115.8343&rep=rep1&type=pdf)",
@@ -106,9 +114,6 @@ class TfIdf(BasicProcessor):
 			}
 		}
 
-	# Allow processor on token sets
-	compatibility = Compatibility(types={"tokenise-posts"})
-
 	def process(self):
 		"""
 		Unzips and appends tokens to fetch and write a tf-idf matrix
@@ -167,7 +172,7 @@ class TfIdf(BasicProcessor):
 		if max_occurrences <= 0 or max_occurrences > len(tokens):
 			max_occurrences = len(tokens)
 		self.dataset.log(f"Running tf-idf with library {library}, n_size {n_size}, min_occurrences {min_occurrences}, max_occurrences {max_occurrences}, max_output {max_output}, smartirs {smartirs}")
-		
+
 		# Get the tf-idf matrix.
 		self.dataset.update_status("Generating tf-idf for token set")
 		try:
@@ -300,12 +305,3 @@ class TfIdf(BasicProcessor):
 				results.append(result)
 
 		return results
-
-	@classmethod
-	def exclude_followup_processors(cls, processor_type):
-		"""
-		Exclude followups if they are not compatible with the module
-		"""
-		if processor_type in ["consolidate-urls", "preset-neologisms", "sentence-split", "tokenise-posts", "image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter"]:
-			return True
-		return False

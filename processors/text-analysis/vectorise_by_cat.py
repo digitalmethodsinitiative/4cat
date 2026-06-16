@@ -24,10 +24,15 @@ class VectoriseByCategory(BasicProcessor):
 	description = "Counts all tokens per category."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["wordcloud", "render-graphs-isometric", "render-rankflow"]
-
 	# Allow processor on token sets
-	compatibility = Compatibility(types={"tokenise-posts"})
+	compatibility = Compatibility(
+		types={"tokenise-posts"},
+		preferred_followups=["wordcloud", "render-graphs-isometric", "render-rankflow"],
+		excluded_followups=[
+			"consolidate-urls", "preset-neologisms", "sentence-split", "tokenise-posts",
+			"image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter",
+		],
+	)
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None):
@@ -289,12 +294,3 @@ class VectoriseByCategory(BasicProcessor):
 		# Finish
 		self.dataset.update_status("Finished")
 		self.dataset.finish(done)
-
-	@classmethod
-	def exclude_followup_processors(cls, processor_type):
-		"""
-		Exclude followups if they are not compatible with the module
-		"""
-		if processor_type in ["consolidate-urls", "preset-neologisms", "sentence-split", "tokenise-posts", "image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter"]:
-			return True
-		return False

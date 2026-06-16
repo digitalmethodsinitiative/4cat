@@ -1116,19 +1116,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     @classmethod
     def exclude_followup_processors(cls, processor_type=None):
         """
-        Used for processor compatibility
+        Determine whether a follow-up processor should be excluded.
 
-        To be defined by the child processor if it should exclude certain follow-up processors.
-        e.g.:
+        Follow-up processors that should never be offered after this one are
+        listed in the `excluded_followups` field of the `compatibility`
+        specification. Processors with dynamic exclusion logic may override this
+        method instead.
 
-        def exclude_followup_processors(cls, processor_type):
-            if processor_type in ["undesirable-followup-processor"]:
-                return True
-            return False
-
-        :param str processor_type:  Processor type to exclude
-        :return bool:  True if processor should be excluded, False otherwise
+        :param str processor_type:  Processor type to check
+        :return bool:  True if the follow-up should be excluded, False otherwise
         """
+        if cls.compatibility is not None and processor_type in cls.compatibility.excluded_followups:
+            return True
         return False
 
     @abc.abstractmethod
