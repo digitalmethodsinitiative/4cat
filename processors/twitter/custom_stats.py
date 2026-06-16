@@ -22,6 +22,9 @@ class TwitterCustomStats(TwitterStatsBase):
     description = "Group tweets by category and count tweets per timeframe to collect aggregate group statistics.\nFor retweets and quotes, hashtags, mentions, URLs, and images from the original tweet are included in the retweet/quote. Data on public metrics (e.g., number of retweets or likes of tweets) are as of the time the data was collected."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
+
     sorted = 'Number of Tweets'
 
     @classmethod
@@ -56,9 +59,6 @@ class TwitterCustomStats(TwitterStatsBase):
                 "help": "Produce counts per"
             },
         }
-
-    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
-    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     def map_data(self, post):
         """

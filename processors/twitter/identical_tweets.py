@@ -21,6 +21,9 @@ class TwitterIdenticalTweets(TwitterStatsBase):
     description = "Groups tweets by text and counts the number of times they have been (re)tweeted indentically."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
+
     sorted = 'Number of Identical Tweets'
 
     @classmethod
@@ -43,9 +46,6 @@ class TwitterIdenticalTweets(TwitterStatsBase):
                 "help": "Produce counts per"
             },
         }
-
-    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
-    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     def map_data(self, post):
         """

@@ -30,7 +30,8 @@ class TopicModelWordExtractor(BasicProcessor):
                    "by multiple rows (for each sentence and/or column used).")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    followups = []
+    # Allow processor on topic models
+    compatibility = Compatibility(types={"topic-modeller"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -75,9 +76,6 @@ class TopicModelWordExtractor(BasicProcessor):
                 options["columns"]["default"] = ["body"]
 
         return options
-
-    # Allow processor on topic models
-    compatibility = Compatibility(types={"topic-modeller"})
 
     def process(self):
         """

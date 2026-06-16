@@ -23,10 +23,8 @@ class Vectorise(BasicProcessor):
 	description = "Counts how often a token appears in the dataset. This creates a bag of words."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	followups = ["vector-ranker"]
-
 	# Allow processor on token sets
-	compatibility = Compatibility(types={"tokenise-posts"})
+	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["vector-ranker"])
 
 	def process(self):
 		"""

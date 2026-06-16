@@ -25,6 +25,9 @@ class TwitterUserVisibility(BasicProcessor):
     description = "Collects usernames and totals how many tweets are authored by the user and how many tweets mention the user"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -45,9 +48,6 @@ class TwitterUserVisibility(BasicProcessor):
                 "help": "Produce counts per"
             }
         }
-
-    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
-    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     def process(self):
         """

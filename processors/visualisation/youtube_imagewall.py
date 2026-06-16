@@ -33,6 +33,9 @@ class YouTubeImageWall(BasicProcessor):
     description = "Make an image wall from YouTube video thumbnails."  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI
 
+    # Allow processor on YouTube thumbnail sets
+    compatibility = Compatibility(types={"youtube-thumbnails"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -56,9 +59,6 @@ class YouTubeImageWall(BasicProcessor):
                 "help": "Overlay video categories"
             }
         }
-
-    # Allow processor on YouTube thumbnail sets
-    compatibility = Compatibility(types={"youtube-thumbnails"})
 
     def process(self):
         """

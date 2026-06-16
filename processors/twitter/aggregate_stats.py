@@ -26,6 +26,9 @@ class TwitterAggregatedStats(BasicProcessor):
     description = "Group tweets by category and count tweets per timeframe and then calculate aggregate group statistics (i.e. min, max, average, Q1, median, Q3, and trimmed mean): number of tweets, urls, hashtags, mentions, etc. \nUse for example to find the distribution of the number of tweets per author and compare across time."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
+
     num_of_different_categories = None
 
     @classmethod
@@ -66,9 +69,6 @@ class TwitterAggregatedStats(BasicProcessor):
                 "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
             }
         }
-
-    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
-    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     def trim_mean(self, values, cut_pct):
         """

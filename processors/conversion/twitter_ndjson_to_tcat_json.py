@@ -21,10 +21,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
     description = "Convert a Twitter dataset to a TCAT-compatible format. This file can then be uploaded to TCAT."  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
 
-    followups = ["tcat-auto-upload"]
-
     # Allow processor on Twitter/X (API v2) datasets
-    compatibility = Compatibility(types={"twitterv2-search"})
+    compatibility = Compatibility(types={"twitterv2-search"}, preferred_followups=["tcat-auto-upload"])
 
     def process(self):
         """
@@ -133,7 +131,6 @@ class ConvertNDJSONToJSON(BasicProcessor):
                     # Storing full place object
                     'geo_full' : tweet.get('geo'),
                     }
-
 
         # Retweet - TCAT checks existance of 'retweeted_status' as key to determine if tweet is a retweet
         # We instead search for a referenced_tweets with type 'retweeted'

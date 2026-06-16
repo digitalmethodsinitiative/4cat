@@ -19,7 +19,7 @@ __email__ = "4cat@oilab.eu"
 
 class YouTubeThumbnails(BasicProcessor):
 	"""
-	
+
 	Downloads YouTube thumbnails.
 
 	"""
@@ -31,13 +31,11 @@ class YouTubeThumbnails(BasicProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 	media_type = "image"  # media type of the result
 
-	followups = ["youtube-imagewall"]
+	# Allow processor on YouTube metadata sets
+	compatibility = Compatibility(types={"youtube-metadata"}, preferred_followups=["youtube-imagewall"])
 
 	max_retries = 3
 	sleep_time = 10
-
-	# Allow processor on YouTube metadata sets
-	compatibility = Compatibility(types={"youtube-metadata"})
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -80,7 +78,7 @@ class YouTubeThumbnails(BasicProcessor):
 
 		# prepare staging area
 		results_path = self.dataset.get_staging_area()
-		
+
 		api_key = self.parameters.get("key")
 		if not api_key:
 			api_key = self.config.get("api.youtube.key")
@@ -88,7 +86,7 @@ class YouTubeThumbnails(BasicProcessor):
 			self.dataset.finish_with_error("You need to provide a valid API key")
 			return
 		self.api_key = api_key
-				
+
 		# Use YouTubeDL and the YouTube API to request video data
 		youtube = build("youtube", "v3",
 						developerKey=api_key)

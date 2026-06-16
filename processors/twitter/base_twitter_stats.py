@@ -25,12 +25,11 @@ class TwitterStatsBase(BasicProcessor):
     description = "This is a class to help other twitter classes"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    sorted = False
-
-
     # Abstract base for the Twitter statistics processors; not runnable on its
     # own (an empty type set never matches a dataset).
     compatibility = Compatibility(types=set())
+
+    sorted = False
 
     def process(self):
         """

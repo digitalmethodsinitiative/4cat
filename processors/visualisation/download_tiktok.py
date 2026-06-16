@@ -32,7 +32,8 @@ class TikTokImageDownloader(BasicProcessor):
     extension = "zip"
     media_type = "image"
 
-    followups = ImageDownloader.followups
+    # Allow processor on TikTok datasets
+    compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"}, preferred_followups=ImageDownloader.followups)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -82,9 +83,6 @@ class TikTokImageDownloader(BasicProcessor):
             options["amount"]["min"] = 1
 
         return options
-
-    # Allow processor on TikTok datasets
-    compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"})
 
     def process(self):
         """

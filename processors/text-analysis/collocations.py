@@ -23,10 +23,8 @@ class GetCollocations(BasicProcessor):
 	description = "Extracts words appearing close to each other from a set of tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["preset-coword-network", "wordcloud"]
-
 	# Allow processor on token sets
-	compatibility = Compatibility(types={"tokenise-posts"})
+	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["preset-coword-network", "wordcloud"])
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

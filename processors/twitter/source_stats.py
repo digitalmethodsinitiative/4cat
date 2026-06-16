@@ -21,6 +21,9 @@ class TwitterHashtagStats(TwitterStatsBase):
     description = "Lists by source of tweet how many tweets contain hashtags, how many times those tweets have been retweeted/replied to/liked/quoted, and information about unique users and hashtags used alongside each hashtag.\nFor retweets and quotes, hashtags from the original tweet are included in the retweet/quote."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
+
     sorted = 'Number of Tweets from Source'
 
     @classmethod
@@ -52,9 +55,6 @@ class TwitterHashtagStats(TwitterStatsBase):
             #     "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
             # }
         }
-
-    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
-    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     def map_data(self, post):
         """

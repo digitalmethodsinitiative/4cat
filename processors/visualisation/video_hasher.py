@@ -357,6 +357,9 @@ class VideoHashNetwork(BasicProcessor):
     description = "Creates hashes network to identify duplicate or similar videos."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
 
+    # Allow on video hasher
+    compatibility = Compatibility(types={"video-hasher-1"})
+
     references = [
         "[Video Hash](https://github.com/akamhy/videohash#readme)",
     ]
@@ -370,9 +373,6 @@ class VideoHashNetwork(BasicProcessor):
             "min": 0,
             "max": 100
         }}
-
-    # Allow on video hasher
-    compatibility = Compatibility(types={"video-hasher-1"})
 
     def process(self):
         """
@@ -471,6 +471,9 @@ class VideoHashSimilarities(BasicProcessor):
     description = "Creates CSV with hashes and groups videos above similarity value."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow on video hasher
+    compatibility = Compatibility(types={"video-hasher-1"})
+
     references = [
         "[Video Hash](https://github.com/akamhy/videohash#readme)",
     ]
@@ -484,9 +487,6 @@ class VideoHashSimilarities(BasicProcessor):
             "min": 0,
             "max": 100
         }}
-
-    # Allow on video hasher
-    compatibility = Compatibility(types={"video-hasher-1"})
 
     def process(self):
         """

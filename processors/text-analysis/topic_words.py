@@ -25,7 +25,8 @@ class TopicModelWordExtractor(BasicProcessor):
     description = "Creates a CSV file with the top tokens (words) per topic in the generated topic model, and their associated weights."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    followups = ["wordcloud"]
+    # Allow processor on topic models
+    compatibility = Compatibility(types={"topic-modeller"}, preferred_followups=["wordcloud"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -48,9 +49,6 @@ class TopicModelWordExtractor(BasicProcessor):
                 "tooltip": "This many of the most relevant tokens will be retained per topic"
             }
         }
-
-    # Allow processor on topic models
-    compatibility = Compatibility(types={"topic-modeller"})
 
     def process(self):
         """

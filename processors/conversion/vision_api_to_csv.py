@@ -30,6 +30,9 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                    "to the original dataset.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow processor on Google Vision API output
+    compatibility = Compatibility(types={"google-vision-api"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -49,9 +52,6 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                 "tooltip": "Every feature will receive its own annotation"
             }
         }
-
-    # Allow processor on Google Vision API output
-    compatibility = Compatibility(types={"google-vision-api"})
 
     def process(self):
         """

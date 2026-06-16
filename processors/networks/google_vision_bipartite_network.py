@@ -26,6 +26,9 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
                   "labels if the label occurs for the image with that file name."
     extension = "gexf"  # extension of result file, used internally and in UI
 
+    # Allow processor to run on Google Vision API data
+    compatibility = Compatibility(types={"google-vision-api"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -61,9 +64,6 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
                 "tooltip": "Note that only those features that were in the original API response can be mapped"
             }
         }
-
-    # Allow processor to run on Google Vision API data
-    compatibility = Compatibility(types={"google-vision-api"})
 
     def process(self):
         """

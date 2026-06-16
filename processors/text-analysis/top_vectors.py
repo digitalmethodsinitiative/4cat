@@ -25,7 +25,8 @@ class VectorRanker(BasicProcessor):
 				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["wordcloud"]
+	# Allow processor on token vectors
+	compatibility = Compatibility(types={"vectorise-tokens"}, preferred_followups=["wordcloud"])
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -52,9 +53,6 @@ class VectorRanker(BasicProcessor):
 				"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
 			},
 		}
-
-	# Allow processor on token vectors
-	compatibility = Compatibility(types={"vectorise-tokens"})
 
 	def process(self):
 		"""
@@ -102,7 +100,7 @@ class VectorRanker(BasicProcessor):
 				vectors = vector_unpacker.load(binary_tokens)
 
 			vectors = sorted(vectors, key=lambda x: x[1], reverse=True)
-				
+
 			# for overall ranking we need the full vector space per interval
 			# because maybe an overall top-ranking vector is at the bottom
 			# in this particular interval - we'll truncate the top list at

@@ -37,7 +37,7 @@ class Tokenise(BasicProcessor):
                   "tokens per sentence."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    followups = ["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller", ]
+    compatibility = Compatibility(extensions={"csv", "ndjson"}, preferred_followups=["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller", ])
 
     references = [
         "[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
@@ -47,8 +47,6 @@ class Tokenise(BasicProcessor):
         "[Words in cracklib word list](https://github.com/cracklib/cracklib/tree/master/words)",
         "[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)"
     ]
-
-    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

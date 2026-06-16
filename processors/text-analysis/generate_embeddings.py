@@ -33,7 +33,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 				  "Note that good models require a lot of data."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	followups = ["similar-word2vec", "histwords-vectspace"]
+	# Allow processor on token sets
+	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["similar-word2vec", "histwords-vectspace"])
 
 	references = [
 		"word2vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
@@ -114,9 +115,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 				"tooltip": "If checked, commonly occurring word combinations ('New York') will be replaced with a single-word combination ('New_York')"
 			}
 		}
-
-	# Allow processor on token sets
-	compatibility = Compatibility(types={"tokenise-posts"})
 
 	def process(self):
 		"""

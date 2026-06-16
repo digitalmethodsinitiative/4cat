@@ -28,6 +28,9 @@ class HashSimilarityNetworker(BasicProcessor):
     description = "Calculate similarity of hashes and create a GEXF network file. Can identify near duplicate hashes."
     extension = "gexf"
 
+    # Currently only allowed on video-hashes, though any row of bit hashes would work.
+    compatibility = Compatibility(types={"video-hashes"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """
@@ -67,9 +70,6 @@ class HashSimilarityNetworker(BasicProcessor):
             options["descriptor_column"]["default"] = "id" if "id" in columns else sorted(columns, key=lambda k: "id" in k).pop()
 
         return options
-
-    # Currently only allowed on video-hashes, though any row of bit hashes would work.
-    compatibility = Compatibility(types={"video-hashes"})
 
     def process(self):
         """

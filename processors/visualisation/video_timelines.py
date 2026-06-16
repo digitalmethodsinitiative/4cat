@@ -39,6 +39,10 @@ class VideoTimelines(BasicProcessor):
                   "collage of sequential frames). Timelines are then vertically stacked."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
+    # Compatible with extracted video frames (or anything that stores related
+    # images in separate folders within a zip archive).
+    compatibility = Compatibility(types={"video-frames", "video-scene-frames"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -62,10 +66,6 @@ class VideoTimelines(BasicProcessor):
                 "max": 200
             }
         }
-
-    # Compatible with extracted video frames (or anything that stores related
-    # images in separate folders within a zip archive).
-    compatibility = Compatibility(types={"video-frames", "video-scene-frames"})
 
     def process(self):
         metadata = {}

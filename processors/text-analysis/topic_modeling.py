@@ -32,12 +32,14 @@ class TopicModeler(BasicProcessor):
                   "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    followups = ["document_count", "document_topic_matrix", "topic-model-words"]
+    # Allow processor on token sets
+    compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["document_count", "document_topic_matrix", "topic-model-words"])
+
     references = [
         'Blei, David M., Andrew Y. Ng, and Michael I. Jordan (2003). "Latent dirichlet allocation." the *Journal of machine Learning research* 3: 993-1022.',
         'Blei, David M. (2003). "Topic Modeling and Digital Humanities." *Journal of Digital Humanities* 2(1).'
     ]
-    
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -85,9 +87,6 @@ class TopicModeler(BasicProcessor):
                 "tooltip": "Tokens are ignored if they  occur in more than this fraction (between 0 and 1) of all tokenised items."
             }
         }
-
-    # Allow processor on token sets
-    compatibility = Compatibility(types={"tokenise-posts"})
 
     def process(self):
         """
