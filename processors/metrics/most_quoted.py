@@ -5,6 +5,7 @@ import csv
 import re
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -23,18 +24,8 @@ class QuoteRanker(BasicProcessor):
 	description = "Sort posts by how often they were replied to by other posts in the dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = []
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on chan datasets
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun")
-
+	# chan datasets (posts reply to / quote each other)
+	compatibility = Compatibility(datasources={"fourchan", "eightchan", "eightkun"})
 
 	def process(self):
 		"""
