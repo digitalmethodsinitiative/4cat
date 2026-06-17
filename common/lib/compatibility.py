@@ -37,21 +37,22 @@ from dataclasses import dataclass
 from typing import Iterable, List, Optional
 
 
-def _maybe_call(module, method):
+def _maybe_call(module, method, **kwargs):
     """
     Read `module.method` without assuming it exists.
 
     Calls it and returns the result when it is a method, returns the value when
     it is a plain attribute, and returns None when it is missing or raises. A
     DataSet exposes these as methods; a processor class exposes some of them as
-    well, and this keeps the same check working for both.
+    well, and this keeps the same check working for both. Any keyword arguments
+    are forwarded to the call (e.g. is_rankable(multiple_items=False)).
     """
     attr = getattr(module, method, None)
     if attr is None:
         return None
     if callable(attr):
         try:
-            return attr()
+            return attr(**kwargs)
         except Exception:
             return None
     return attr
@@ -128,6 +129,9 @@ class Compatibility:
     top_dataset_only: bool = False
     # When set, the dataset's is_rankable() must equal this. None means it does not matter.
     rankable: Optional[bool] = None
+    # Forwarded to is_rankable(multiple_items=...) when `rankable` is set. False
+    # restricts to single-value rankings (rejecting multi-column word_1/word_2/... rankings).
+    rankable_multiple_items: bool = True
     # Columns that must all be present in the dataset. This can only be checked
     # against a real dataset, as it reads the dataset's columns.
     requires_columns: Iterable[str] = ()
@@ -196,7 +200,7 @@ class Compatibility:
                     return reasons
 
         if self.rankable is not None:
-            if bool(_maybe_call(module, "is_rankable")) != self.rankable:
+            if bool(_maybe_call(module, "is_rankable", multiple_items=self.rankable_multiple_items)) != self.rankable:
                 reasons.append(
                     "requires a rankable dataset" if self.rankable
                     else "requires a non-rankable dataset"
