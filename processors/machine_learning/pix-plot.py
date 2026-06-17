@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
 from common.lib.helpers import UserInput, ellipsiate
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -33,7 +34,8 @@ class PixPlotGenerator(BasicProcessor):
                   "algorithmically grouped by similarity."
     extension = "html"  # extension of result file, used internally and in UI
 
-    followups = []
+    # image datasets (image archives or image-downloader output), when PixPlot is enabled
+    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.db_pixplot_enabled", "dmi-service-manager.ab_server_address"})
 
     references = [
         "[PixPlot](https://pixplot.io/)",
@@ -144,18 +146,6 @@ class PixPlotGenerator(BasicProcessor):
             options["amount"]["max"] = max_number_images
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on token sets;
-        Checks if pix-plot.server_url set
-
-        :param module: Dataset or processor to determine compatibility with
-        """
-        return config.get("dmi-service-manager.db_pixplot_enabled", False) and \
-               config.get("dmi-service-manager.ab_server_address", False) and \
-               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):
         """

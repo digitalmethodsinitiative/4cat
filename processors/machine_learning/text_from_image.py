@@ -13,6 +13,7 @@ from common.lib.helpers import UserInput, hash_to_md5
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -37,8 +38,8 @@ class ImageTextDetector(BasicProcessor):
     """
     extension = "ndjson"  # extension of result file, used internally and in UI
 
-    # Processors designed to handle input from this Dataset
-    followups = ["image-text-wall"]
+    # image datasets (image archives or image-downloader output), when the OCR server is enabled
+    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.eb_ocr_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
 
     references = [
         "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
@@ -101,17 +102,6 @@ class ImageTextDetector(BasicProcessor):
             #     "help": "See references for additional information about models and their utility"
             # },
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on image sets
-
-        :param module: Module to determine compatibility with
-        """
-        return config.get('dmi-service-manager.eb_ocr_enabled', False) and \
-               config.get("dmi-service-manager.ab_server_address", False) and \
-               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     def process(self):
         """

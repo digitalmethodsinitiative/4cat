@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_last_line
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -26,6 +27,9 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     title = "Upload to DMI-TCAT"  # title displayed in UI
     description = "Send a TCAT-ready JSON file to a particular DMI-TCAT server."  # description displayed in UI
     extension = "html"  # extension of result file, used internally and in UI
+
+    # the TCAT converter's output, when a TCAT server is configured
+    compatibility = Compatibility(types={"convert-ndjson-for-tcat"}, required_settings={"tcat-auto-upload.server_url", "tcat-auto-upload.token", "tcat-auto-upload.username", "tcat-auto-upload.password"})
 
     config = {
         # TCAT Server Connection Info
@@ -58,23 +62,6 @@ class FourcatToDmiTcatUploader(BasicProcessor):
             "global": True
         },
     }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        It is if TCAT credentials have been configured and the input is a
-        TCAT-compatible file.
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type == "convert-ndjson-for-tcat" and \
-            config.get('tcat-auto-upload.server_url') and \
-            config.get('tcat-auto-upload.token') and \
-            config.get('tcat-auto-upload.username') and \
-            config.get('tcat-auto-upload.password')
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
