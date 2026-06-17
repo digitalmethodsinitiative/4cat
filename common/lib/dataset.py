@@ -2027,11 +2027,9 @@ class DataSet(FourcatModule):
             ):
                 continue
 
-            # consider a processor compatible if its is_compatible_with
-            # method returns True *or* if it has no explicit compatibility
-            # check and this dataset is top-level (i.e. has no parent)
-            if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
-                    or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, config=config)):
+            # evaluates processcor's declarative `compatibility`
+            # undeclared processors default to top-level-only
+            if processor.is_compatible_with(self, config=config):
                 available[processor_type] = processor
 
         return available
