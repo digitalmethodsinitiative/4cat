@@ -14,6 +14,7 @@ from telethon import utils as telethon_utils
 
 from common.lib.helpers import UserInput
 from processors.visualisation.download_telegram_videos import TelegramVideoDownloader
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -42,9 +43,10 @@ class TelegramFileDownloader(TelegramVideoDownloader):
     extension = "zip"
     media_type = "file"
 
-    # no followups -- file outputs are heterogeneous and don't map cleanly to
-    # existing video/image follow-on processors
-    followups = []
+    # coarse map spec; is_compatible_with (below) is the runtime truth (Telegram API creds).
+    # No preferred_followups -- file outputs are heterogeneous and don't map cleanly to
+    # existing video/image follow-on processors.
+    compatibility = Compatibility(types={"telegram-search"}, required_settings={"file-downloader-telegram.allow_files"})
 
     config = {
         "file-downloader-telegram.allow_files": {

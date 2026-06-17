@@ -22,6 +22,7 @@ from datasources.telegram.search_telegram import SearchTelegram
 from processors.visualisation.download_videos import VideoDownloaderPlus
 from common.lib.helpers import UserInput, timify
 from common.lib.dataset import DataSet
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -46,7 +47,9 @@ class TelegramVideoDownloader(BasicProcessor):
     media_type = "video"  # media type of the result
     flawless = True
 
-    followups = VideoDownloaderPlus.followups
+    # coarse map spec; is_compatible_with (below) is the runtime truth -- it also checks the
+    # source dataset carries Telegram API credentials, which are read from the dataset
+    compatibility = Compatibility(types={"telegram-search"}, required_settings={"video-downloader-telegram.allow_videos"}, preferred_followups=VideoDownloaderPlus.followups)
 
     config = {
         "video-downloader-telegram.max_videos": {
