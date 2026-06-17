@@ -4,6 +4,7 @@ Use a prompt from a preset list
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 from common.lib.llm import LLMAdapter
+from common.lib.compatibility import Compatibility
 
 from common.lib.exceptions import (
     QueryParametersException,
@@ -24,6 +25,10 @@ class PromptCompassRunner(ProcessorPreset):
     description = ("Choose prompts used in other LLM-based research to test on this dataset. Outcomes are added to the "
                    "original dataset as a new column.")
     extension = "ndjson"
+
+    # coarse map spec; is_compatible_with (below) is the runtime truth -- it also checks
+    # that LLM models are configured (get_available_models)
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
     references = [
 	    "This processor is an implementation of the stand-alone tool [PromptCompass](https://github.com/ErikBorra/PromptCompass) by Erik Borra.",
@@ -82,8 +87,8 @@ class PromptCompassRunner(ProcessorPreset):
 
         return models
 
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
+    @classmethod
+    def is_compatible_with(cls, module=None, config=None):
         """
         Determine compatibility
 
