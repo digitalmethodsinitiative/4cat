@@ -17,6 +17,7 @@ from PIL import Image
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -35,6 +36,9 @@ class ImageCategoryWallGenerator(BasicProcessor):
     title = "Visualise images by category"  # title displayed in UI
     description = "Combine images into a single image arranged by category"  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+
+    # image-category, image-downloader, or video-hash datasets (except screenshot downloads)
+    compatibility = Compatibility(type_prefixes={"image-to-categories", "image-downloader", "video-hasher-1", "video-hash-similarity-matrix"}, excluded_types={"image-downloader-screenshots-search"})
 
     number_of_ranges = 10  # number of ranges to use for numeric categories
 
@@ -56,21 +60,6 @@ class ImageCategoryWallGenerator(BasicProcessor):
             "help": "Max pixels for each images when visualising",
         }
     }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on CLIP dataset only
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return (
-            module.type.startswith("image-to-categories")
-            or module.type.startswith("image-downloader")
-            or module.type.startswith("video-hasher-1")
-            or module.type.startswith("video-hash-similarity-matrix")
-        ) and module.type not in ["image-downloader-screenshots-search"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
