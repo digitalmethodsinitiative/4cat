@@ -152,8 +152,10 @@ class Compatibility:
     # Forwarded to is_rankable(multiple_items=...) when `rankable` is set. False
     # restricts to single-value rankings (rejecting multi-column word_1/word_2/... rankings).
     rankable_multiple_items: bool = True
-    # Columns that must all be present in the dataset, read from its columns.
-    requires_columns: Iterable[str] = ()
+    # Columns that must ALL be present in the dataset, read from its columns.
+    requires_all_columns: Iterable[str] = ()
+    # Columns of which AT LEAST ONE must be present, read from its columns.
+    requires_any_columns: Iterable[str] = ()
 
     # --- Environment requirements ---
     # Executables that must be found on the system path (checked with shutil.which).
@@ -180,16 +182,18 @@ class Compatibility:
         """
         Whether fully evaluating this spec needs the dataset's produced data.
 
-        True when the `rankable` or `requires_columns` axis is set: both are read
-        from the produced result file, so they cannot be resolved from a
-        processor class alone. (Shape axes such as top_dataset/extension also read
-        instance state, but they are recoverable from a dataset's shape; only
-        these two need the produced data, so only they are counted here.) A
-        consumer that reasons about processors without real datasets (e.g. a
-        processor map) can use this to mark those axes as undecided rather than
-        treating them as failed.
+        True when `rankable`, `requires_all_columns`, or `requires_any_columns` is
+        set: all are read from the produced result file, so they cannot be
+        resolved from a processor class alone. (Shape axes such as
+        top_dataset/extension also read instance state, but they are recoverable
+        from a dataset's shape; only these need the produced data, so only they
+        are counted here.) A consumer that reasons about processors without real
+        datasets (e.g. a processor map) can use this to mark those axes as
+        undecided rather than treating them as failed.
         """
-        return self.rankable is not None or bool(self.requires_columns)
+        return (self.rankable is not None
+                or bool(self.requires_all_columns)
+                or bool(self.requires_any_columns))
 
     def is_compatible_with(self, module, config=None) -> bool:
         """
@@ -215,9 +219,9 @@ class Compatibility:
            datasource); cheap, no result-file read. (Several still read instance
            state -- is_top_dataset() -> key_parent, get_extension(), parameters --
            so on a bare processor class they return a stub, not a real answer.)
-        2. dataset-required -- `rankable` and `requires_columns`, read from the
-           produced result file, so they need a materialized DataSet (see
-           `requires_dataset`);
+        2. dataset-required -- `rankable`, `requires_all_columns`, and
+           `requires_any_columns`, read from the produced result file, so they
+           need a materialized DataSet (see `requires_dataset_result_file`);
         3. environment -- configuration settings and system executables.
 
         By default the method returns as soon as one requirement is unmet --
@@ -261,7 +265,7 @@ class Compatibility:
                     return reasons
 
         # --- tier 2: dataset-required (read from the result file; cannot be
-        # resolved from a processor class -- see requires_dataset) ---
+        # resolved from a processor class -- see requires_dataset_result_file) ---
 
         if self.rankable is not None:
             if bool(_maybe_call(module, "is_rankable", multiple_items=self.rankable_multiple_items)) != self.rankable:
@@ -272,11 +276,15 @@ class Compatibility:
                 if first_only:
                     return reasons
 
-        if self.requires_columns:
+        if self.requires_all_columns or self.requires_any_columns:
             columns = _maybe_call(module, "get_columns") or []
-            missing = [column for column in self.requires_columns if column not in columns]
+            missing = [column for column in self.requires_all_columns if column not in columns]
             if missing:
-                reasons.append("requires column(s): %s" % ", ".join(missing))
+                reasons.append("requires all column(s): %s" % ", ".join(missing))
+                if first_only:
+                    return reasons
+            if self.requires_any_columns and not any(column in columns for column in self.requires_any_columns):
+                reasons.append("requires any of column(s): %s" % ", ".join(self.requires_any_columns))
                 if first_only:
                     return reasons
 
