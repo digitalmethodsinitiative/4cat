@@ -8,6 +8,7 @@ import re
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from common.lib.exceptions import QueryParametersException
+from common.lib.compatibility import Compatibility
 
 from nltk.tokenize import word_tokenize
 
@@ -168,6 +169,9 @@ class MakeWordtree(BasicProcessor):
     description = "Generates a word tree for a given query, a \"graphical version of the traditional 'keyword-in-context' method\" (Wattenberg & Viégas, 2008)."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
+    # any csv or ndjson dataset
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
+
     references = [
         "Wattenberg, M., & Viégas, F. B. (2008). [The Word Tree, an Interactive Visual Concordance](https://doi.org/10.1109/TVCG.2008.172). IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228."
     ]
@@ -306,16 +310,6 @@ class MakeWordtree(BasicProcessor):
                 options["columns"]["default"] = default_options.pop(0)
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
