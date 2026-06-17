@@ -33,8 +33,6 @@ class AudioToText(BasicProcessor):
     # Allow on audio datasets
     compatibility = Compatibility(media_types={"audio"}, type_prefixes={"audio-extractor"})
 
-    followups = []
-
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",
         "[OpenAI speech to text](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper"
