@@ -122,18 +122,20 @@ class Compatibility:
     # Datasources the processor accepts, e.g. {"4chan", "reddit"}.
     datasources: Optional[Iterable[str]] = None
 
-    # --- structural gates (each must hold when set) ---
+    # --- shape gates (no dataset needed; answerable from a processor class too) ---
     # Result-file extensions the processor accepts, e.g. {"csv", "ndjson"}.
     extensions: Optional[Iterable[str]] = None
     # When True, the processor only accepts a top-level dataset (one with no parent).
     top_dataset_only: bool = False
-    # When set, the dataset's is_rankable() must equal this. None means it does not matter.
+
+    # --- dataset-required gates (read from the result file, so they need a real
+    # dataset and cannot be resolved from a processor class -- see requires_dataset) ---
+    # When set, is_rankable() must equal this (read from the result file). None = not checked.
     rankable: Optional[bool] = None
     # Forwarded to is_rankable(multiple_items=...) when `rankable` is set. False
     # restricts to single-value rankings (rejecting multi-column word_1/word_2/... rankings).
     rankable_multiple_items: bool = True
-    # Columns that must all be present in the dataset. This can only be checked
-    # against a real dataset, as it reads the dataset's columns.
+    # Columns that must all be present in the dataset, read from its columns.
     requires_columns: Iterable[str] = ()
 
     # --- environment requirements ---
@@ -153,6 +155,19 @@ class Compatibility:
     # when they are otherwise compatible.
     excluded_followups: Iterable[str] = ()
 
+    @property
+    def requires_dataset(self) -> bool:
+        """
+        Whether fully evaluating this spec needs a materialized DataSet.
+
+        True when the `rankable` or `requires_columns` axis is set: both are read
+        from the produced result file, so they cannot be resolved from a
+        processor class alone. A consumer that reasons about processors without
+        real datasets (e.g. a processor map) can use this to mark those axes as
+        undecided rather than treating them as failed.
+        """
+        return self.rankable is not None or bool(self.requires_columns)
+
     def is_compatible_with(self, module, config=None) -> bool:
         """
         Return whether `module` meets every requirement in this specification.
@@ -170,15 +185,26 @@ class Compatibility:
         that is missing -- a wrong dataset type, an absent column, a setting
         that is not configured, and so on.
 
+        The checks run in three tiers, cheapest first so the short-circuit can
+        skip later work once something fails:
+
+        1. shape -- type/extension/etc.; answerable from a processor class as
+           well as a real dataset (no file or system access);
+        2. dataset-required -- `rankable` and `requires_columns`, read from the
+           produced result file, so they need a materialized DataSet (see
+           `requires_dataset`);
+        3. environment -- configuration settings and system executables.
+
         By default the method returns as soon as one requirement is unmet --
-        enough for the yes/no `is_compatible_with`, and it skips the expensive
-        environment checks (config reads, shutil.which) whenever a cheap shape
-        check already fails. Pass `first_only=False` to collect every unmet
-        requirement -- used to explain why a module is not compatible.
+        enough for the yes/no `is_compatible_with`. Pass `first_only=False` to
+        collect every unmet requirement -- used to explain why a module is not
+        compatible.
         """
         reasons: List[str] = []
         if module is None:
             return ["no dataset provided"]
+
+        # --- tier 1: shape (no DataSet needed; also answerable from a processor class) ---
 
         # if the processor names the kinds of dataset it accepts, the module
         # must be one of them
@@ -199,6 +225,9 @@ class Compatibility:
                 if first_only:
                     return reasons
 
+        # --- tier 2: dataset-required (read from the result file; cannot be
+        # resolved from a processor class -- see requires_dataset) ---
+
         if self.rankable is not None:
             if bool(_maybe_call(module, "is_rankable", multiple_items=self.rankable_multiple_items)) != self.rankable:
                 reasons.append(
@@ -208,7 +237,6 @@ class Compatibility:
                 if first_only:
                     return reasons
 
-        # the only check that really needs a DataSet object
         if self.requires_columns:
             columns = _maybe_call(module, "get_columns") or []
             missing = [column for column in self.requires_columns if column not in columns]
@@ -217,15 +245,16 @@ class Compatibility:
                 if first_only:
                     return reasons
 
-        # Note: this may have executable check that are expensive so we do it after cheaper checks
-        # TODO: could separate quicker setting checks for slower ones
+        # --- tier 3: environment (needs config/system, not a DataSet; the
+        # executable matchers here can be expensive, so this tier runs last.
+        # TODO: cheap setting reads could be split out ahead of those matchers) ---
         for requirement in self.required_settings:
             key, expected = (requirement, None) if isinstance(requirement, str) else requirement
             value = config.get(key) if config is not None else None
             # no expected value; just check that the setting is truthy
             if expected is None:
                 met = bool(value)
-            # some function to check (special check for things like {"video-downloader.ffmpeg_path": lambda p: shutil.which(p) is not None})
+            # a function that validates the value (e.g. is_executable / ExecutableSibling)
             elif callable(expected):
                 met = bool(expected(value))
             # a collection of acceptable values
