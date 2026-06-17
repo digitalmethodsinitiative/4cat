@@ -112,7 +112,7 @@ class Compatibility:
     AND-ed).
     """
 
-    # --- consumed data shape: identity (the module must match one of these) ---
+    # --- Identity axes: consumed data shape (the module must match one of these) ---
     # Dataset types the processor accepts, matched exactly.
     types: Optional[Iterable[str]] = None
     # Dataset type prefixes the processor accepts, matched with str.startswith.
@@ -121,14 +121,31 @@ class Compatibility:
     media_types: Optional[Iterable[str]] = None
     # Datasources the processor accepts, e.g. {"4chan", "reddit"}.
     datasources: Optional[Iterable[str]] = None
+    # Collectors types (a dataset whose type ends in -search or -import) 
+    # Compare with top_dataset_only, which reads key_parent; the two cover nearly 
+    # the same datasets but differ in role (identity/OR vs gate/AND)
+    is_collector: bool = False
 
-    # --- shape gates (no dataset needed; answerable from a processor class too) ---
-    # Result-file extensions the processor accepts, e.g. {"csv", "ndjson"}.
-    extensions: Optional[Iterable[str]] = None
+    # --- Shape gates (structural checks) ---
+     # Parent dataset types this processor CANNOT run on -- a hard gate
+    # (is_compatible_with returns False). Use when the processor would fail or
+    # produce garbage on that type (e.g. download_videos on telegram-search).
+    # For a soft filter use excluded_followups on the producer instead.
+    excluded_types: Iterable[str] = ()
+
+    # --- DataSet required gates ---
+    # The ground truth requires an existing DataSet to read its produced data
+    # TODO: processors could declare these attributes more explicitly
     # When True, the processor only accepts a top-level dataset (one with no parent).
     top_dataset_only: bool = False
+    # When True, the processor only accepts a non-top-level (child) dataset -- the
+    # inverse of top_dataset_only.
+    child_only: bool = False
+    # Result-file extensions the processor accepts, e.g. {"csv", "ndjson"}.
+    extensions: Optional[Iterable[str]] = None
 
-    # --- dataset-required gates (read from the result file, so they need a real
+    # --- Result file gates (reading the actual file is required)
+    # TODO: processors again could point to these attributes more explicitly if known
     # dataset and cannot be resolved from a processor class -- see requires_dataset) ---
     # When set, is_rankable() must equal this (read from the result file). None = not checked.
     rankable: Optional[bool] = None
@@ -138,7 +155,7 @@ class Compatibility:
     # Columns that must all be present in the dataset, read from its columns.
     requires_columns: Iterable[str] = ()
 
-    # --- environment requirements ---
+    # --- Environment requirements ---
     # Executables that must be found on the system path (checked with shutil.which).
     required_packages: Iterable[str] = ()
     # Configuration the processor needs. Each entry is either a setting key,
@@ -148,23 +165,29 @@ class Compatibility:
     # returns whether it is acceptable.
     required_settings: Iterable = ()
 
-    # --- follow-up processors ---
+    # --- Follow-up processors ---
     # Processor types to recommend first as next steps for this processor's output.
     preferred_followups: Iterable[str] = ()
-    # Processor types that should never be offered as follow-ups here, even
-    # when they are otherwise compatible.
+    # Processor types never SUGGESTED as follow-ups after this one -- a soft
+    # filter (affects the suggestion list only; is_compatible_with is unchanged,
+    # so they can still be run directly). Use for "a more specific processor is
+    # preferred here" (e.g. tiktok-search excludes the generic video-downloader).
+    # For "that processor would fail on this output", use its excluded_types (hard).
     excluded_followups: Iterable[str] = ()
 
     @property
-    def requires_dataset(self) -> bool:
+    def requires_dataset_result_file(self) -> bool:
         """
-        Whether fully evaluating this spec needs a materialized DataSet.
+        Whether fully evaluating this spec needs the dataset's produced data.
 
         True when the `rankable` or `requires_columns` axis is set: both are read
         from the produced result file, so they cannot be resolved from a
-        processor class alone. A consumer that reasons about processors without
-        real datasets (e.g. a processor map) can use this to mark those axes as
-        undecided rather than treating them as failed.
+        processor class alone. (Shape axes such as top_dataset/extension also read
+        instance state, but they are recoverable from a dataset's shape; only
+        these two need the produced data, so only they are counted here.) A
+        consumer that reasons about processors without real datasets (e.g. a
+        processor map) can use this to mark those axes as undecided rather than
+        treating them as failed.
         """
         return self.rankable is not None or bool(self.requires_columns)
 
@@ -188,8 +211,10 @@ class Compatibility:
         The checks run in three tiers, cheapest first so the short-circuit can
         skip later work once something fails:
 
-        1. shape -- type/extension/etc.; answerable from a processor class as
-           well as a real dataset (no file or system access);
+        1. structural -- the dataset's shape (type, extension, parent,
+           datasource); cheap, no result-file read. (Several still read instance
+           state -- is_top_dataset() -> key_parent, get_extension(), parameters --
+           so on a bare processor class they return a stub, not a real answer.)
         2. dataset-required -- `rankable` and `requires_columns`, read from the
            produced result file, so they need a materialized DataSet (see
            `requires_dataset`);
@@ -204,7 +229,7 @@ class Compatibility:
         if module is None:
             return ["no dataset provided"]
 
-        # --- tier 1: shape (no DataSet needed; also answerable from a processor class) ---
+        # --- tier 1: structural shape (cheap; no result-file read) ---
 
         # if the processor names the kinds of dataset it accepts, the module
         # must be one of them
@@ -213,8 +238,18 @@ class Compatibility:
             if first_only:
                 return reasons
 
+        if self.excluded_types and getattr(module, "type", None) in set(self.excluded_types):
+            reasons.append("does not run on dataset type: %s" % getattr(module, "type", None))
+            if first_only:
+                return reasons
+
         if self.top_dataset_only and not _maybe_call(module, "is_top_dataset"):
             reasons.append("requires a top-level dataset")
+            if first_only:
+                return reasons
+
+        if self.child_only and _maybe_call(module, "is_top_dataset"):
+            reasons.append("requires a child (non-top-level) dataset")
             if first_only:
                 return reasons
 
@@ -278,7 +313,7 @@ class Compatibility:
 
     def _identity_declared(self) -> bool:
         """Whether the processor names any kind of dataset it accepts."""
-        return any(
+        return self.is_collector or any(
             axis is not None
             for axis in (self.types, self.type_prefixes, self.media_types, self.datasources)
         )
@@ -303,5 +338,8 @@ class Compatibility:
             parameters = getattr(module, "parameters", None) or {}
             if isinstance(parameters, dict) and parameters.get("datasource") in set(self.datasources):
                 return True
+
+        if self.is_collector and _maybe_call(module, "is_from_collector"):
+            return True
 
         return False

@@ -12,6 +12,7 @@ from ural import urls_from_text
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Stijn Peeters", "Dale Wahl", "Sal Hagen"]
@@ -30,6 +31,9 @@ class ExtractURLs(BasicProcessor):
     title = "Extract and expand URLs"  # title displayed in UI
     description = "Extract any URLs from selected column(s) with the option to expand shortened URLs."
     extension = "csv"
+
+    # any csv/ndjson dataset, except this processor's own filter output
+    compatibility = Compatibility(extensions={"csv", "ndjson"}, excluded_types={"extract-urls-filter"})
 
     # taken from https://github.com/timleland/url-shorteners
     # current as of 9 April 2021
@@ -152,15 +156,6 @@ class ExtractURLs(BasicProcessor):
         # additions by 4CAT
         "api.parler.com", "trib.al", "fb.watch",
     )
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        All processor on CSV and NDJSON datasets
-
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.get_extension() in ["csv", "ndjson"] and module.type != "extract-urls-filter"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
