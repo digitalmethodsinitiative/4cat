@@ -563,7 +563,6 @@ class MakeWordtree(BasicProcessor):
                 if type(document) is not list:
                     # Convert generator to list
                     document = list(document)
-                document = 
 
                 for position in list_in_list(tokenised_query, document):
                     if sides != "only-left":
