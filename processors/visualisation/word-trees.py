@@ -10,7 +10,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from common.lib.exceptions import QueryParametersException
 
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, TweetTokenizer
 
 from svgwrite.container import SVG, Script, Style
 from svgwrite.shapes import Rect
@@ -290,9 +290,10 @@ class MakeWordtree(BasicProcessor):
             },
             "tokeniser_type": {
                 "type": UserInput.OPTION_CHOICE,
-                "default": "regular",
+                "default": "nltk-tweet",
                 "options": {
-                    "regular": "nltk word_tokenize",
+                    "nltk-tweet": "nltk TweetTokenizer (optimized for social media)",
+                    "nltk-word": "nltk word_tokenize",
                     "jieba-cut": "jieba (for Chinese text; accurate mode, recommended)",
                     "jieba-cut-all": "jieba (for Chinese text; full mode)",
                     "jieba-search": "jieba (for Chinese text; search engine suggestion style)",
@@ -490,10 +491,12 @@ class MakeWordtree(BasicProcessor):
             tokeniser_args = {"cut_all": True}
         elif self.parameters.get("tokeniser_type") == "jieba-search":
             tokeniser = jieba.cut_for_search
-            tokeniser_args = {}
-        else:
+        elif self.parameters.get("tokeniser_type") == "nltk-word":
             self.SPACE = " "
             tokeniser = word_tokenize
+        else:
+            self.SPACE = " "
+            tokeniser = TweetTokenizer(preserve_case=False).tokenize
 
         # tokenise query
         matcher = WildcardMatcher()
