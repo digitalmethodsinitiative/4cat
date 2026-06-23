@@ -210,8 +210,9 @@ class MakeWordtree(BasicProcessor):
     align = "top"
 
     # convert between relative and absolute units
+    REM_TO_CH = 0.601875
     REM_CONV = FONT_SIZE
-    CH_CONV = FONT_SIZE * 0.601875
+    CH_CONV = FONT_SIZE * REM_TO_CH
 
     # gaps between nodes vertically and horizontally
     gap_x = 4
@@ -562,6 +563,7 @@ class MakeWordtree(BasicProcessor):
                 if type(document) is not list:
                     # Convert generator to list
                     document = list(document)
+                document = 
 
                 for position in list_in_list(tokenised_query, document):
                     if sides != "only-left":
@@ -868,7 +870,12 @@ class MakeWordtree(BasicProcessor):
         if bbox_q not in node.bbox:
             font_size = self.get_font_size(node)
 
-            own_width = len(node.name) * font_size
+            own_width = len(node.name)
+            for character in node.name:
+                if emoji.is_emoji(character):
+                    own_width += self.REM_TO_CH  # square instead of rectangular
+
+            own_width *= font_size
             own_height = font_size + self.gap_y
             node.own_bbox = (own_width, own_height)
 
