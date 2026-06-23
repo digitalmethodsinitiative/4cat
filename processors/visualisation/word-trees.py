@@ -525,7 +525,8 @@ class MakeWordtree(BasicProcessor):
         link_regex = re.compile(r"https?://\S+")
         strip_urls = self.parameters.get("strip-urls")
         strip_symbols = self.parameters.get("strip-symbols")
-        punkt_replace = re.compile(r"[" + re.escape(string.punctuation) + "]")
+        punctuation = string.punctuation + "‘’“”‚„′″…–—«»"  # string.punctuation isn't quite complete
+        punkt_replace = re.compile(r"[" + re.escape(punctuation) + "]")
 
         for post in self.source_dataset.iterate_items():
             processed += 1
