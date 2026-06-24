@@ -1,7 +1,7 @@
 """
-Centralized HTTP client for communicating with an LLM provider.
+Centralized HTTP client for communicating with an LLM server.
 
-This class owns all direct HTTP calls to the provider's REST API and provides
+This class owns all direct HTTP calls to the server's REST API and provides
 shared static helpers for capability parsing, display-name formatting, and
 building canonical llm.available_models entries. It is a plain helper with no
 4CAT base-class dependency.
@@ -12,21 +12,21 @@ from abc import abstractmethod
 import requests
 
 
-class LLMProviderClient:
+class LLMServerClient:
     _headers = {}
-    provider_config = {}
+    server_config = {}
 
     @staticmethod
-    def get_client(config, provider_config: dict) -> "LLMProviderClient":
+    def get_client(config, server_config: dict) -> "LLMServerClient":
         """
-        Get a client for an LLM provider
+        Get a client for an LLM server
 
-        Returns the appropriate sub-class depending on the provider type.
+        Returns the appropriate sub-class depending on the server type.
 
         :param config:  4CAT config reader
-        :param dict provider_config:  Provider parameters, as configured in
+        :param dict server_config:  Server parameters, as configured in
           4CAT
-        :return LLMProviderClient:  A client object appropriate for the provider.
+        :return LLMServerClient:  A client object appropriate for the server.
         """
         # in-line import because we otherwise get circular import shenanigans
         from common.lib.llm.clients.ollama_client import OllamaClient
@@ -35,29 +35,29 @@ class LLMProviderClient:
         from common.lib.llm.clients.thirdparty_client import ThirdPartyClient
 
         for client_type in (OllamaClient, LiteLLMClient, OpenAICompatibleClient, ThirdPartyClient):
-            if client_type.type == provider_config["type"]:
-                return client_type(config, provider_config)
+            if client_type.type == server_config["type"]:
+                return client_type(config, server_config)
 
-        raise ValueError(f"LLMProviderClient: Unknown provider type {provider_config['type']}")
+        raise ValueError(f"LLMServerClient: Unknown server type {server_config['type']}")
 
-    def __init__(self, config, provider_config: dict, timeout: int = 10, log=None) -> None:
+    def __init__(self, config, server_config: dict, timeout: int = 10, log=None) -> None:
         """
-        HTTP client for an LLM Provider
+        HTTP client for an LLM Server
 
         :param config:  4CAT config reader
-        :param dict provider_config:  Provider parameters, as configured in 4CAT
+        :param dict server_config:  Server parameters, as configured in 4CAT
         :param int timeout: Default request timeout in seconds.
         :param Logger log:  4CAT log handler
         """
         self.config = config
-        self.provider_config = provider_config
+        self.server_config = server_config
 
         self.timeout = timeout
-        self.auth_type = provider_config.get("auth_header")
-        self.auth_key = provider_config.get("auth_key")
+        self.auth_type = server_config.get("auth_header")
+        self.auth_key = server_config.get("auth_key")
         self.timeout = timeout
 
-        self.base_url = provider_config["url"].rstrip("/")
+        self.base_url = server_config["url"].rstrip("/")
         if self.base_url.endswith("v1"):
             # get rid of the 'v1' - we'll add this in the path
             self.base_url = f"{self.base_url[:-2]}"
@@ -125,8 +125,8 @@ class LLMProviderClient:
             "local_id": self.get_model_id(meta),
             "name": self.format_display_name(meta),
             "model_card": self.get_model_card_url(meta),
-            "provider": self.provider_config["_id"],
-            "wrapper": self.provider_config["type"],
+            "server": self.server_config["_id"],
+            "wrapper": self.server_config["type"],
             "supported_media_types": self.parse_supported_media_types(meta),
             "metadata": meta,
         }
@@ -175,7 +175,7 @@ class LLMProviderClient:
         """
         Choose a model identifier based on model metadata.
 
-        This is the ID within the provider context, i.e. it is not guaranteed
+        This is the ID within the server context, i.e. it is not guaranteed
         to be globally unique (use `get_global_model_id()` instead).
 
         :param dict meta:  Model metadata
@@ -187,10 +187,10 @@ class LLMProviderClient:
         """
         Choose a model identifier based on model metadata.
 
-        This needs to be a *globally* unique ID, i.e. if multiple providers
-        provide the same model, the ID should still be unique per provider.
+        This needs to be a *globally* unique ID, i.e. if multiple servers
+        provide the same model, the ID should still be unique per server.
 
         :param dict meta:  Model metadata
         :return str:  Model ID
         """
-        return "-".join((self.provider_config["type"], self.provider_config["url"], self.get_model_id(meta)))
+        return "-".join((self.server_config["type"], self.server_config["url"], self.get_model_id(meta)))

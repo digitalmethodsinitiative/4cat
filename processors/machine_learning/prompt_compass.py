@@ -107,7 +107,7 @@ class PromptCompassRunner(ProcessorPreset):
 
         for model, metadata in enabled_models.items():
             if metadata.get("model_card"):
-                model_key = metadata["provider"] + "/" + model
+                model_key = metadata["server"] + "/" + model
                 options[f"{model_key}-info"] = {
                     "type": UserInput.OPTION_INFO,
                     "help": f"Read the [model card]({metadata['model_card']}) for {model}.",

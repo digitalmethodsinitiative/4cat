@@ -36,10 +36,10 @@ class LLMAdapter:
         :param int max_tokens:  Max tokens to generate
         :param dict client_kwargs:  Optional parameters for the LLM adapter class
         """
-        known_providers = config.get("llm.providers", {})
+        known_servers = config.get("llm.servers", {})
 
         self.model = model
-        self.provider = known_providers.get(model['provider'])
+        self.server = known_servers.get(model["server"])
         self.api_key = api_key
         self.temperature = temperature
         self.structured_output = False
@@ -72,8 +72,8 @@ class LLMAdapter:
         # Only pass a base URL when the connection actually has one. An empty
         # string is taken literally by some SDKs (Anthropic, DeepSeek -> empty
         # endpoint) instead of falling back to the vendor default.
-        if self.provider["url"]:
-            chat_params["base_url"] = self.provider["url"]
+        if self.server["url"]:
+            chat_params["base_url"] = self.server["url"]
 
         if wrapper == "openai":
             if "o3" in self.model["local_id"]:
@@ -99,14 +99,14 @@ class LLMAdapter:
             chat_params.update({"client_kwargs": self.client_kwargs})
 
         elif wrapper in {"litellm", "openai-like"}:
-            url = f"{self.provider['url']}/" if not self.provider["url"].endswith("/") else self.provider['url']
+            url = f"{self.server['url']}/" if not self.server["url"].endswith("/") else self.server['url']
             url += "v1/" if not url.endswith("v1/") else ""
 
             chat_params.update({"base_url": url})
-            if self.provider["auth_header"]:
+            if self.server["auth_header"]:
                 chat_params.update({
                     "default_headers": {
-                        self.provider["auth_header"]: self.provider["auth_key"]
+                        self.server["auth_header"]: self.server["auth_key"]
                     }
                 })
 
@@ -175,7 +175,7 @@ class LLMAdapter:
         Create multimodal content structure for LangChain messages with media URLs
         and/or local media files (base64-encoded).
 
-        Supports images, video, and audio depending on the provider and model.
+        Supports images, video, and audio depending on the server and model.
 
         :param text: Text content
         :param media_urls: List of media URLs (http/https)
@@ -225,13 +225,13 @@ class LLMAdapter:
             media_category: str = "image",
     ) -> dict:
         """
-        Format a single media block for the appropriate provider.
+        Format a single media block for the appropriate server.
 
         :param url: Media URL (if URL-based)
         :param b64_data: Base64-encoded data (if file-based)
         :param mime_type: MIME type of the media
         :param media_category: "image", "video", or "audio"
-        :returns: Provider-formatted content block
+        :returns: Server-formatted content block
         """
         if self.model["wrapper"] == "anthropic":
             if media_category == "image":
@@ -257,7 +257,7 @@ class LLMAdapter:
                 return {"type": "image_url", "image_url": {"url": data_uri}}
         elif self.model["wrapper"] == "ollama":
             if media_category != "image":
-                raise ValueError(f"Ollama provider only supports image media, got category '{media_category}'")
+                raise ValueError(f"Ollama only supports image media, got category '{media_category}'")
             if url:
                 return {
                     "type": "image_url",

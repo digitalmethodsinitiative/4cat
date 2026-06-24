@@ -5,10 +5,10 @@ This includes vLLM and LM Studio. And LiteLLM, technically, but LiteLLM has
 some useful API endpoints exclusive to it that we can benefit from, so use
 the dedicated class for tht instead.
 """
-from common.lib.llm.llm_client import LLMProviderClient
+from common.lib.llm.llm_client import LLMServerClient
 
 
-class OpenAICompatibleClient(LLMProviderClient):
+class OpenAICompatibleClient(LLMServerClient):
     type = "openai-like"
 
     _models_info_path = "/api/v1/models"

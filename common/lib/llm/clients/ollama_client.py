@@ -3,10 +3,10 @@ Centralized HTTP client for communicating with an Ollama server.
 """
 import requests
 
-from common.lib.llm.llm_client import LLMProviderClient
+from common.lib.llm.llm_client import LLMServerClient
 
 
-class OllamaClient(LLMProviderClient):
+class OllamaClient(LLMServerClient):
     type = "ollama"
 
     _models_info_path = "/api/tags"

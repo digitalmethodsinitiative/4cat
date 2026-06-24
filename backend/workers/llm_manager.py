@@ -2,7 +2,7 @@
 Manage LLM models
 """
 from backend.lib.worker import BasicWorker
-from common.lib.llm.llm_client import LLMProviderClient
+from common.lib.llm.llm_client import LLMServerClient
 
 class LLMProviderManager(BasicWorker):
 	"""
@@ -50,7 +50,7 @@ class LLMProviderManager(BasicWorker):
 				continue
 
 			try:
-				client = LLMProviderClient.get_client(self.config, provider_config)
+				client = LLMServerClient.get_client(self.config, provider_config)
 			except ValueError:
 				self.log.debug(f"{self.__class__.__name__}: invalid provider type: {provider_config['type']}, skipping")
 				continue
@@ -78,7 +78,7 @@ class LLMProviderManager(BasicWorker):
 		listed_connections = set()
 		for provider_id, provider_config in providers.items():
 			try:
-				client = LLMProviderClient.get_client(self.config, provider_config)
+				client = LLMServerClient.get_client(self.config, provider_config)
 			except ValueError:
 				self.log.debug(f"{self.__class__.__name__}: invalid provider type: {provider_config['type']}, skipping")
 				continue

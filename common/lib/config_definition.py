@@ -582,12 +582,12 @@ config_definition = {
                 "your users. After configuring providers you can enable and disable available models via the 'LLMs & "
                 "Providers' page in the Control Panel."
     },
-    "llm.providers": {
+    "llm.servers": {
         "type": UserInput.OPTION_MULTI_OPTION,
         "default": {
             "thirdparty-models": {
                 "name": "Third-party APIs (OpenAI, Google, Claude, Mistral, etc)",
-                "type": "api",
+                "type": "thirdparty",
                 "url": "",
                 "auth_header": "",
                 "auth_key": "",
@@ -595,7 +595,7 @@ config_definition = {
             }
         },
         "global": True,
-        "help": "LLM providers",
+        "help": "LLM servers",
         "dict_key": lambda v: re.sub(r"[^0-9a-zA-Z ]", "", v["name"]).lower().replace(" ", "-") + (("-" + v["url"].split("/")[2].lower()) if "://" in v["url"] else ""),
         "options": {
             "name": {
@@ -606,13 +606,13 @@ config_definition = {
             },
             "type": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": "LLM Provider Type",
+                "help": "LLM Server Type",
                 "default": "none",
                 "options": {
                     "ollama": "Ollama",
                     "litellm": "LiteLLM",
                     "openai-like": "OpenAI compatible API (LM Studio, vLLM, etc)",
-                    "api": "Third-party models from OpenAI, Anthropic, Mistral, etc",
+                    "thirdparty": "Third-party models from OpenAI, Anthropic, Mistral, etc",
                     "none": "None",
                 },
             },

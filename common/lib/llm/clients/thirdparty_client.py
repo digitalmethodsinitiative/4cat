@@ -4,11 +4,11 @@ can be used with 4CAT
 """
 import json
 
-from common.lib.llm.llm_client import LLMProviderClient
+from common.lib.llm.llm_client import LLMServerClient
 
 
-class ThirdPartyClient(LLMProviderClient):
-    type = "api"
+class ThirdPartyClient(LLMServerClient):
+    type = "thirdparty"
 
     _models_info_key = "models"
     _model_id_key = "model"
@@ -52,7 +52,7 @@ class ThirdPartyClient(LLMProviderClient):
         # Third-party catalog models span multiple vendors, so the wrapper
         # (which LangChain chat class to use) is per-model, not the connection
         # type ("api"). Override the connection-derived wrapper with the vendor.
-        entry["wrapper"] = meta["provider"]
+        entry["wrapper"] = meta["server"]
 
         return entry
 

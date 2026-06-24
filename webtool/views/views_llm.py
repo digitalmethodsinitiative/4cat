@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, flash, get_flashed_messages, redir
 from flask_login import login_required
 
 from webtool.lib.helpers import setting_required, error
-from common.lib.llm.llm_client import LLMProviderClient
+from common.lib.llm.llm_client import LLMServerClient
 
 component = Blueprint("llm", __name__)
 
@@ -77,7 +77,7 @@ def llm_panel():
     # --- GET: render panel ---
 
     for provider_id, provider in providers.items():
-        client = LLMProviderClient.get_client(g.config, provider)
+        client = LLMServerClient.get_client(g.config, provider)
 
         if provider_status := client.get_status():
             server_status = "online" if provider_status == 200 else f"error (HTTP {provider_status})"

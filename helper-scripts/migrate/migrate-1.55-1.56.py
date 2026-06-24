@@ -25,59 +25,59 @@ db = Database(
     appname="4cat-migrate",
 )
 
-# the separate LLM server settings were consolidated into one overarching 'llm.providers' setting
-print("  Checking if llm.providers setting exists...")
+# the separate LLM server settings were consolidated into one overarching 'llm.servers' setting
+print("  Checking if llm.servers setting exists...")
 has_setting = db.fetchone(
-    "SELECT COUNT(*) AS num FROM settings WHERE name = 'llm.providers'"
+    "SELECT COUNT(*) AS num FROM settings WHERE name = 'llm.servers'"
 )
 
 if has_setting["num"] > 0:
     print("    ...exists, deleting old settings without overwriting")
 else:
     print("    ...does not exist, filling with currently configured proviers")
-    provider_type = db.fetchone("SELECT value FROM settings WHERE name = 'llm.provider_type'")
-    providers = {}
-    if not provider_type or not provider_type.get("value"):
-        print("    ...no provider currently configured")
+    server_type = db.fetchone("SELECT value FROM settings WHERE name = 'llm.provider_type'")
+    servers = {}
+    if not server_type or not server_type.get("value"):
+        print("    ...no server currently configured")
         
     else:
-        provider_type = provider_type["value"]
+        server_type = server_type["value"]
         try:
             url = db.fetchone("SELECT value FROM settings WHERE name = 'llm.server'")["value"]
             host = url.split("/")[2] if "://" in url else "localhost"
             auth_header = db.fetchone("SELECT value FROM settings WHERE name = 'llm.auth_type'")["value"]
             auth_key = db.fetchone("SELECT value FROM settings WHERE name = 'llm.auth_key'")["value"]
-            provider_name = db.fetchone("SELECT value FROM settings WHERE name = 'llm.host_name'")["value"]
-            provider_id = f"{provider_type}-{host}"
+            server_name = db.fetchone("SELECT value FROM settings WHERE name = 'llm.host_name'")["value"]
+            server_id = f"{server_type}-{host}"
 
             # vLLM and LM Studio are both openai-like
-            provider_type = {"ollama": "ollama"}.get(provider_type, "openai-like")
-            providers[provider_id] = {
-                "name": provider_name,
-                "type": provider_type,
+            server_type = {"ollama": "ollama"}.get(server_type, "openai-like")
+            servers[server_id] = {
+                "name": server_name,
+                "type": server_type,
                 "url": url,
                 "auth_header": auth_header,
                 "auth_key": auth_key,
-                "_id": provider_id
+                "_id": server_id
             }
         except (TypeError, KeyError):
-            print("    ...provider configured but settings are incomplete, not migrating")
+            print("    ...server configured but settings are incomplete, not migrating")
 
         # add API models, always present
-        providers["thirdparty-models"] = {
+        servers["thirdparty-models"] = {
         "name": "Third-party models",
-        "type": "api",
+        "type": "thirdparty",
         "url": "",
         "auth_header": "",
         "auth_key": "",
         "_id": "thirdparty-models"
     }
 
-    db.insert("settings", {"name": "llm.providers", "value": json.dumps(providers)})
-    print(f"    ...added {len(providers)} providers")
+    db.insert("settings", {"name": "llm.servers", "value": json.dumps(servers)})
+    print(f"    ...added {len(servers)} servers")
 
 print("  Cleaning up old settings")
-db.execute("DELETE FROM settings WHERE name LIKE 'llm.%' AND name NOT IN ('llm.providers', 'llm.available_models', 'llm.access')")
+db.execute("DELETE FROM settings WHERE name LIKE 'llm.%' AND name NOT IN ('llm.servers', 'llm.available_models', 'llm.access')")
 
 print("  Removing all known models (will be re-indexed on 4CAT restart)")
 db.upsert("settings", {"name": "llm.available_models", "value": "{}", "tag": ""}, constraints=["name", "tag"])

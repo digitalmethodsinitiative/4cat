@@ -59,10 +59,10 @@ class LLMPrompter(BasicProcessor):
             return local_queue
 
         model = dataset.parameters.get("model")
-        if model.startswith("api"):
+        if model.startswith("thirdparty"):
             # API-based models have their own queue - no local resources being
             # used so can be concurrent
-            return f"llm-api-{dataset.key}"
+            return f"llm-thirdparty-{dataset.key}"
         else:
             # use the model URL as the queue ID (extracted from the model
             # global ID)
@@ -75,17 +75,17 @@ class LLMPrompter(BasicProcessor):
     def get_model_library(cls, config):
         available_models = config.get("llm.available_models", {})
         enabled_model_ids = config.get("llm.enabled_models", [])
-        providers = config.get("llm.providers", {})
+        servers = config.get("llm.servers", {})
         if not config.get("llm.access"):
-            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("api-")]
+            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty-")]
 
         models_option = {}
         for key, value in {k: v for k, v in available_models.items() if k in enabled_model_ids}.items():
-            provider = providers[value["provider"]]
-            if provider["name"] not in models_option:
-                models_option[provider["name"]] = {}
+            server = servers[value["server"]]
+            if server["name"] not in models_option:
+                models_option[server["name"]] = {}
 
-            models_option[provider["name"]][key] = value["name"]
+            models_option[server["name"]][key] = value["name"]
 
         return models_option
 
@@ -112,7 +112,7 @@ class LLMPrompter(BasicProcessor):
             },
             "model": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": "API model",
+                "help": "Model",
                 "options": models,
                 "default": "none",
                 "tooltip": "Select from the predefined model list or insert manually",
@@ -123,7 +123,7 @@ class LLMPrompter(BasicProcessor):
                 "help": "API key",
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
                 "/api-keys). Note that this often involves billing.",
-                "requires": "model^=api",
+                "requires": "model^=thirdparty",
                 "sensitive": True,
             }
         }
@@ -280,7 +280,7 @@ class LLMPrompter(BasicProcessor):
         options.update({
             "ethics_warning3": {
                 "type": UserInput.OPTION_INFO,
-                "requires": "model^=api-",
+                "requires": "model^=thirdparty",
                 "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
                         "whether local open-source LLMs are also an option.</strong>",
             },
@@ -374,19 +374,19 @@ class LLMPrompter(BasicProcessor):
         api_key = self.parameters.get("api_key", "").strip()
         client_kwargs = {}
 
-        # load model and provider metadata
+        # load model and server metadata
         chosen_model_id = self.parameters.get("model")
         available_models = {k: v for k, v in self.config.get("llm.available_models").items() if k in self.config.get("llm.enabled_models")}
         if chosen_model_id not in available_models:
             return self.dataset.finish_with_error(f"Model {chosen_model_id} not supported")
 
         model = available_models[chosen_model_id]
-        provider = self.config.get("llm.providers").get(model["provider"])
+        server = self.config.get("llm.servers").get(model["server"])
 
-        if not provider:
-            return self.dataset.finish_with_error(f"Model provider for {chosen_model_id} not currently available.")
+        if not server:
+            return self.dataset.finish_with_error(f"Model server for {chosen_model_id} not currently available.")
 
-        if provider["type"] == "api" and not api_key:
+        if server["type"] == "thirdparty" and not api_key:
             return self.dataset.finish_with_error(f"No API key provided for model {chosen_model_id}")
 
         # Prompt validation
@@ -432,9 +432,9 @@ class LLMPrompter(BasicProcessor):
         json_schema_original = json_schema or None  # We may manipulate the schema later, save a copy
         
         # Start LLM
-        self.dataset.update_status("Connecting to LLM provider")
-        base_url_str = "" if not provider["url"] else f" at base URL '{provider['url']}'"
-        self.dataset.log(f"Using LLM provider '{provider['_id']}' with model '{model['local_id']}'{base_url_str}")
+        self.dataset.update_status("Connecting to LLM server")
+        base_url_str = "" if not server["url"] else f" at base URL '{server['url']}'"
+        self.dataset.log(f"Using LLM server '{server['_id']}' with model '{model['local_id']}'{base_url_str}")
         try:
             llm = LLMAdapter(
                 config=self.config,
@@ -567,7 +567,7 @@ class LLMPrompter(BasicProcessor):
                         )
                     except Exception as e:
                         # Best-effort heuristic to detect model incompatibility with media type.
-                        # Error messages vary by provider; this catches common patterns.
+                        # Error messages vary by server; this catches common patterns.
                         error_str = str(e).lower()
                         if "vision" in error_str or "image" in error_str or "multimodal" in error_str or "media" in error_str:
                             self.dataset.finish_with_error(
@@ -665,7 +665,7 @@ class LLMPrompter(BasicProcessor):
                             for output_key, output_value in annotation_output.items():
 
                                 # Skip 'signature' and 'type' annotations for Google
-                                if model["provider"] == "google" and (
+                                if model["server"] == "google" and (
                                     output_key.endswith(".signature")
                                     or output_key.endswith(".type")
                                 ):
@@ -699,8 +699,8 @@ class LLMPrompter(BasicProcessor):
 
                     self.dataset.update_progress(row / max_processed)
 
-                    # Rate limits for different providers
-                    if model["provider"] == "mistral":
+                    # Rate limits for different servers
+                    if model["server"] == "mistral":
                         time.sleep(1)
 
                     if limit_reached:
@@ -851,7 +851,7 @@ class LLMPrompter(BasicProcessor):
                             else:
                                 self.dataset.finish_with_warning(outputs, f"{e}")
                                 return
-                        # Broad exception, but necessary with all the different LLM providers and options...
+                        # Broad exception, but necessary with all the different LLM servers and options...
                         except Exception as e:
                             self.dataset.finish_with_warning(outputs, f"Not all items processed: {e}")
                             return
@@ -964,7 +964,7 @@ class LLMPrompter(BasicProcessor):
                                 for output_key, output_value in annotation_output.items():
 
                                     # Skip 'signature' and 'type' annotations for Google
-                                    if model["provider"] == "google" and output_key in ("extras.signature", ".type"):
+                                    if model["server"] == "google" and output_key in ("extras.signature", ".type"):
                                         continue
 
                                     annotation = {
@@ -981,8 +981,8 @@ class LLMPrompter(BasicProcessor):
                         batched_data = {}
                         n_batched = 0
 
-                        # Rate limits for different providers
-                        if model["provider"] == "mistral":
+                        # Rate limits for different servers
+                        if model["server"] == "mistral":
                             time.sleep(1)
 
                     # Write annotations in batches
@@ -1103,7 +1103,7 @@ class LLMPrompter(BasicProcessor):
         :param config:
         :return:
         """
-        is_external_api = query["model"].startswith("api-")
+        is_external_api = query["model"].startswith("thirdparty")
         if is_external_api and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
 

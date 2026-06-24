@@ -1,9 +1,9 @@
 """
 Centralized HTTP client for communicating with a LiteLLM server.
 """
-from common.lib.llm.llm_client import LLMProviderClient
+from common.lib.llm.llm_client import LLMServerClient
 
-class LiteLLMClient(LLMProviderClient):
+class LiteLLMClient(LLMServerClient):
     type = "litellm"
 
     _models_info_path = "/model/info"
