@@ -14,6 +14,17 @@ export function getRelativeURL(endpoint) {
     return root + endpoint;
 }
 
+/**
+ * Format an epoch timestamp as a localised date/time string
+ *
+ * @param epoch_timestamp  Unix timestamp in seconds
+ * @returns {String}  Localised date/time string (en-GB, medium date and time)
+ */
+export function getLocalTimeStr(epoch_timestamp) {
+    let local_date = new Date(parseInt(epoch_timestamp) * 1000);
+    return Intl.DateTimeFormat("en-GB", {dateStyle: "medium", timeStyle: "medium"}).format(local_date);
+}
+
 export function applyProgress(element, progress) {
     if (element.parent().hasClass('button-like')) {
         element = element.parent();
