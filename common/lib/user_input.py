@@ -438,7 +438,7 @@ class UserInput:
             # if we have a categorised set of options, look deeper to get
             # valid option values
             is_categorised = all([type(o) is dict for o in options.values()])
-            match_options = chain(*[list(o.keys()) for o in options.values()]) if is_categorised else options
+            match_options = list(chain(*[list(o.keys()) for o in options.values()])) if is_categorised else options
 
             if choice not in match_options:
                 if not silently_correct:
