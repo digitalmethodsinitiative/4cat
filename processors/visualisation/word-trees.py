@@ -394,7 +394,7 @@ class MakeWordtree(BasicProcessor):
         self.invert_node_labels(root)
 
         self.dataset.update_status(f"Rendering tree to SVG file (root side: {root_side})")
-        wrapper = SVG(overflow="visible", debug=False)
+        wrapper = SVG(overflow="visible", debug=False, id="tree")
         offset_x = 0
 
         if sides != "only-right":
@@ -921,7 +921,7 @@ class MakeWordtree(BasicProcessor):
         return """
 window.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#toggle-colour').addEventListener('click', function (e) {
-        document.querySelectorAll('text').forEach((component) => {
+        document.querySelectorAll('#tree text').forEach((component) => {
             if (!component.hasAttribute('fill') || component.getAttribute('fill') == '#000') {
                 component.setAttribute('fill', component.getAttribute('latent-colour'));
             } else {
@@ -929,7 +929,7 @@ window.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
-    document.querySelectorAll('text').forEach((element) => {
+    document.querySelectorAll('#tree text').forEach((element) => {
       element.addEventListener('click', function(e) {
         let highlight_element = e.target.parentNode;
         if(highlight_element.classList.contains('highlighted')) {
