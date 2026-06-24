@@ -239,20 +239,35 @@ class ColumnFilter(BaseFilter):
         :param bool bottom:  If true, return bottom results instead
         :return:
         """
-        possible_values = set()
+        value_counts = {}
         top_n = convert_to_int(top_n, 10)
-        for item in self.source_dataset.iterate_items():
-            possible_values.add(item.get(column))
+        if top_n <= 0:
+            return
 
-        ranked_items = 0
-        top_values = sorted(list(possible_values), reverse=(not bottom))[:top_n]
         for item in self.source_dataset.iterate_items(processor=self):
-            if item.get(column) in top_values:
-                ranked_items = 0
-                yield item
+            value = item.get(column)
+            value_counts[value] = value_counts.get(value, 0) + 1
 
-            if ranked_items >= top_n:
-                return
+        value_quotas = {}
+        remaining = top_n
+        for value in sorted(value_counts, reverse=(not bottom)):
+            value_quotas[value] = min(value_counts[value], remaining)
+            remaining -= value_quotas[value]
+            if remaining <= 0:
+                break
+
+        yielded_values = {}
+        for item in self.source_dataset.iterate_items(processor=self):
+            value = item.get(column)
+            if value not in value_quotas:
+                continue
+
+            yielded_for_value = yielded_values.get(value, 0)
+            if yielded_for_value >= value_quotas[value]:
+                continue
+
+            yield item
+            yielded_values[value] = yielded_for_value + 1
 
 
 class ColumnProcessorFilter(ColumnFilter):
