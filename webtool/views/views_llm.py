@@ -77,7 +77,7 @@ def llm_panel():
     # --- GET: render panel ---
 
     for server_id, server in servers.items():
-        client = LLMServerClient.get_client(g.config, server)
+        client = LLMServerClient.get_client(g.config, server, g.log)
 
         if server_status := client.get_status():
             server_status = "online" if server_status == 200 else f"error (HTTP {server_status})"

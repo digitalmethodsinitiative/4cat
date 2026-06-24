@@ -17,7 +17,7 @@ class LLMServerClient:
     server_config = {}
 
     @staticmethod
-    def get_client(config, server_config: dict) -> "LLMServerClient":
+    def get_client(config, server_config: dict, log) -> "LLMServerClient":
         """
         Get a client for an LLM server
 
@@ -36,7 +36,7 @@ class LLMServerClient:
 
         for client_type in (OllamaClient, LiteLLMClient, OpenAICompatibleClient, ThirdPartyClient):
             if client_type.type == server_config["type"]:
-                return client_type(config, server_config)
+                return client_type(config, server_config, log=log)
 
         raise ValueError(f"LLMServerClient: Unknown server type {server_config['type']}")
 
