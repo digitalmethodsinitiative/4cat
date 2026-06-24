@@ -112,7 +112,8 @@ class OllamaClient(LLMServerClient):
         elif meta.get("details") and meta["details"].get("parameter_size"):
             extra_bits.append(f"{meta['details']['parameter_size']} parameters")
 
-        model_name += f" ({', '.join(extra_bits)})"
+        if extra_bits:
+            model_name += f" ({', '.join(extra_bits)})"
 
         return model_name
 
