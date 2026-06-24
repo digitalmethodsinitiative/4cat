@@ -90,7 +90,7 @@ def llm_panel():
     enabled_models = list(g.config.get("llm.enabled_models", []) or [])
 
     update_running = bool([
-        job for job in g.queue.get_all_jobs("manage-llm") if not job.data["interval"]
+        job for job in g.queue.get_all_jobs("manage-llm", restrict_claimable=False) if not job.data["interval"]
     ])
 
     return render_template(
