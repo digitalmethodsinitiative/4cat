@@ -433,7 +433,7 @@ class UserInput:
             # select box
             # one out of multiple options
             # return option if valid, or default
-            options = settings.get("options", [])
+            options = settings.get("options", {})
 
             # if we have a categorised set of options, look deeper to get
             # valid option values
