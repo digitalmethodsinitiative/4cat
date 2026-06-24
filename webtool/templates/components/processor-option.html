@@ -22,7 +22,16 @@
     {% elif option_settings.type == "choice" %}
         <select name="option-{{ option }}">
         {% for choice in option_settings.options %}
-            <option value="{{ choice }}"{% if choice == option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
+            {% if option_settings.options[choice] is mapping %}
+                <optgroup label="{{ choice }}">
+                {% set choice = option_settings.options[choice] %}
+                {% for optgroup_choice in choice %}
+                    <option value="{{ optgroup_choice }}"{% if optgroup_choice == option_settings.default %} selected="selected"{% endif %}>{{ choice[optgroup_choice] }}</option>
+                {% endfor %}
+                </optgroup>
+            {% else %}
+                <option value="{{ choice }}"{% if choice == option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
+            {% endif %}
         {% endfor %}
         </select>
     {% elif option_settings.type in ("multi", "annotations") %}

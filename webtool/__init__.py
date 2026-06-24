@@ -171,6 +171,7 @@ with app.app_context():
     import webtool.views.views_restart  # noqa: E402
     import webtool.views.views_admin  # noqa: E402
     import webtool.views.views_extensions  # noqa: E402
+    import webtool.views.views_llm  # noqa: E402
     import webtool.views.views_user  # noqa: E402
     import webtool.views.views_dataset  # noqa: E402
     import webtool.views.views_misc  # noqa: E402
@@ -182,6 +183,7 @@ with app.app_context():
     app.register_blueprint(webtool.views.views_restart.component)
     app.register_blueprint(webtool.views.views_admin.component)
     app.register_blueprint(webtool.views.views_extensions.component)
+    app.register_blueprint(webtool.views.views_llm.component)
     app.register_blueprint(webtool.views.views_user.component)
     app.register_blueprint(webtool.views.views_dataset.component)
     app.register_blueprint(webtool.views.views_misc.component)
@@ -240,6 +242,10 @@ with app.app_context():
     app.jinja_loader = ChoiceLoader(
         [FileSystemLoader(template_paths), FunctionLoader(get_datasource_explorer_templates)]
     )
+
+    # enable to {% do %} tag in jinja
+    app.jinja_env.add_extension("jinja2.ext.do")
+    app.jinja_env.add_extension("jinja2.ext.debug")
 
     # import custom jinja2 template filters
     # these also benefit from current_app
