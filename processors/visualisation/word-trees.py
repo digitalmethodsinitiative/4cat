@@ -31,7 +31,6 @@ class TreeNode(Node):
     """
     An anytree Node, but with some extra plumbing to give nodes directionality
     """
-    weight = 0
 
     def __init__(self, *args, **kwargs):
         """
@@ -44,6 +43,7 @@ class TreeNode(Node):
         """
         super().__init__(*args, **kwargs)
         self.bbox = {}
+        self.weight = 0
 
     def get_child(self, name: str, direction: int) -> bool | Node:
         """
@@ -115,8 +115,11 @@ class WildcardMatcher:
         "?": "OOOOOXXOOOOOXXOOOOOXXOOOOOQMARKOOOOOXXOOOOOXXOOOOOXXOOOOO",
     }
 
-    _cache = {}
-    _remap = {}
+    def __init__(self):
+        """
+        Initialise cache
+        """
+        self._cache = {}
 
     def obfuscate(self, q: str) -> str:
         """
@@ -703,7 +706,6 @@ class MakeWordtree(BasicProcessor):
 
         # determine how high this block will be based on the available
         # height and the nodes we'll need to fit in it
-        parent_node = node.parent if not node.is_root else node
         block_width, block_height = self.get_bbox(node, side)
         own_width, own_height = self.get_bbox(node, side, False)
 
