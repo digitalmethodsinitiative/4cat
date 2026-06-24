@@ -2,6 +2,7 @@
 Generate word tree from dataset
 """
 import string
+import emoji
 import jieba
 import re
 
@@ -9,7 +10,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from common.lib.exceptions import QueryParametersException
 
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, TweetTokenizer
 
 from svgwrite.container import SVG, Script, Style
 from svgwrite.shapes import Rect
@@ -25,11 +26,24 @@ __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
 
+
 class TreeNode(Node):
     """
     An anytree Node, but with some extra plumbing to give nodes directionality
     """
-    weight = None
+
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor
+
+        Initialises the `bbox` property.
+
+        :param args:
+        :param kwargs:
+        """
+        super().__init__(*args, **kwargs)
+        self.bbox = {}
+        self.weight = 0
 
     def get_child(self, name: str, direction: int) -> bool | Node:
         """
@@ -58,6 +72,9 @@ class TreeNode(Node):
             return inclusive
         else:
             return self.direction == direction
+
+    def get_parents(self):
+        return self.path if hasattr(self, "parents") else []
 
     @property
     def id(self) -> str:
@@ -88,19 +105,6 @@ class Fragment:
         self.value = value
         self.direction = direction
 
-    def without_query(self, query: list) -> list:
-        """
-        Get the fragment value without the query
-
-        Depending on the direction, removes the first or last tokens of the
-        fragment that contain the original query.
-
-        :param list query:  Query, as a list of tokens
-        :return list:  Remaining tokens
-        """
-        value = reversed(self.value) if self.direction == MakeWordtree.SIDE_LEFT else self.value
-        return list(value)[len(query):]
-
 class WildcardMatcher:
     """
     Plumbing for matching wildcard (* and ?) strings
@@ -111,8 +115,13 @@ class WildcardMatcher:
         "?": "OOOOOXXOOOOOXXOOOOOXXOOOOOQMARKOOOOOXXOOOOOXXOOOOOXXOOOOO",
     }
 
-    @staticmethod
-    def obfuscate(q: str) -> str:
+    def __init__(self):
+        """
+        Initialise cache
+        """
+        self._cache = {}
+
+    def obfuscate(self, q: str) -> str:
         """
         Obfuscate a wildcard string
 
@@ -126,8 +135,7 @@ class WildcardMatcher:
             q = q.replace(s, r)
         return q
 
-    @staticmethod
-    def deobfuscate(q: str) -> str:
+    def deobfuscate(self, q: str) -> str:
         """
         Deobfuscate a wildcard string
 
@@ -138,21 +146,43 @@ class WildcardMatcher:
             q = q.replace(r, s)
         return q
 
-    @staticmethod
-    def compile(q: str) -> re.Pattern:
+    def compile(self, q: str) -> re.Pattern|None:
         """
         Compile a regular expression for matching
 
-        Escapes all regex syntax currently in the match string.
+        Escapes all regex syntax currently in the match string. Regular
+        expressions are cached. If the query does not contain wildcard
+        characters, return `None` (signalling that plain string matching can be
+        used)
 
-        :param str q:
-        :return re.Pattern:
+        :param str q:  Query string (may contain `*` and `?` wildcards)
+        :return re.Pattern|None:  Regular expression object, or `None`
         """
-        q = WildcardMatcher.obfuscate(q)
-        q = re.escape(q)
-        q = WildcardMatcher.deobfuscate(q)
-        q = q.replace("*", ".*?").replace("?", ".")
-        return re.compile(q)
+        if q not in self._cache:
+            worked_q = self.obfuscate(q)
+            worked_q = re.escape(worked_q)
+            worked_q = self.deobfuscate(worked_q)
+            if re.findall(r"[*?]", worked_q):
+                worked_q = worked_q.replace("*", ".*?").replace("?", ".")
+                self._cache[q] = re.compile(worked_q)
+            else:
+                self._cache[q] = None
+
+        return self._cache[q]
+
+    def fullmatch(self, needle: str, haystack:str) -> bool:
+        """
+        Match a needle against a haystack
+
+        :param str needle:  Query string (may contain `*` and `?` wildcards)
+        :param str haystack:  Haystack to search
+        :return bool:  Do the strings match?
+        """
+        pattern = self.compile(needle)
+        if pattern is None:
+            return needle == haystack
+        else:
+            return bool(pattern.fullmatch(haystack))
 
 
 class MakeWordtree(BasicProcessor):
@@ -179,9 +209,13 @@ class MakeWordtree(BasicProcessor):
     # will be adjusted based on tokeniser used
     SPACE = ""
 
+    # tbd on load
+    align = "top"
+
     # convert between relative and absolute units
+    REM_TO_CH = 0.601875
     REM_CONV = FONT_SIZE
-    CH_CONV = FONT_SIZE * 0.601875
+    CH_CONV = FONT_SIZE * REM_TO_CH
 
     # gaps between nodes vertically and horizontally
     gap_x = 4
@@ -217,7 +251,10 @@ class MakeWordtree(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "Word tree root query",
-                "tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation. Cannot be empty. You can use wildcards: 'politic*' will match 'politician' and 'politics' for example.",
+                "tooltip": "Enter a text here to serve as the root of the word tree. The context of this query will be "
+                           "visualised as a tree graph. You can use wildcards: 'politic*' will match 'politician' and "
+                           "'politics' for example, though this is more computationally intensive and will make the "
+                           "processor much slower.",
             },
             "limit": {
                 "type": UserInput.OPTION_TEXT,
@@ -231,7 +268,7 @@ class MakeWordtree(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "min": 1,
                 "max": 25,
-                "default": 15,
+                "default": 10,
                 "help": "Window size",
                 "tooltip": "Up to this many words before and/or after the queried phrase will be visualised",
             },
@@ -257,9 +294,10 @@ class MakeWordtree(BasicProcessor):
             },
             "tokeniser_type": {
                 "type": UserInput.OPTION_CHOICE,
-                "default": "regular",
+                "default": "nltk-tweet",
                 "options": {
-                    "regular": "nltk word_tokenize",
+                    "nltk-tweet": "nltk TweetTokenizer (optimized for social media)",
+                    "nltk-word": "nltk word_tokenize",
                     "jieba-cut": "jieba (for Chinese text; accurate mode, recommended)",
                     "jieba-cut-all": "jieba (for Chinese text; full mode)",
                     "jieba-search": "jieba (for Chinese text; search engine suggestion style)",
@@ -276,21 +314,15 @@ class MakeWordtree(BasicProcessor):
                 "type": UserInput.OPTION_TOGGLE,
                 "default": True,
                 "help": "Remove punctuation",
+                "tooltip": "Remove punctuation. Adjust your query accordingly (e.g. after removing punctuation, the "
+                           "query 'a.i.' will match nothing).",
             },
             "lower-case": {
                 "type": UserInput.OPTION_TOGGLE,
                 "default": True,
                 "help": "Make all text lower case",
                 "tooltip": "If not checked, e.g. 'The' and 'the' will be considered separate branches of the word tree"
-            },
-            "stop-sentences": {
-                "type": UserInput.OPTION_TOGGLE,
-                "default": False,
-                "help": "Stop at period",
-                "tooltip": "If selected, tree branches will stop at a period (i.e. the end of a sentence), even if the "
-                           "branch is shorter than the Window size. This only affects the right side of the tree "
-                           "(after the query)"
-            },
+            }
         }
 
         # Get the columns for the select columns option
@@ -322,23 +354,23 @@ class MakeWordtree(BasicProcessor):
         This takes a 4CAT results file as input, and outputs a plain text file
         containing all post bodies as one continuous string, sanitized.
         """
-        align = self.parameters.get("align")
+        self.align = self.parameters.get("align")
         sides = self.parameters.get("sides")
 
         # nice label
         self.dataset.update_label(f"Word tree: '{self.parameters.get('query')}'")
 
         # build our tree of text fragments
-        root, max_weight = self.build_tree(self.parameters.get("query"))
+        root, self.max_weight = self.build_tree(self.parameters.get("query"))
 
         if not root or not root.children:
-            return self.dataset.finish_with_error(f"Query '{self.parameters.get('query')} not found in dataset")
+            return self.dataset.finish_with_error(f"Query '{self.parameters.get('query')}' not found in dataset")
 
         # while we're at it, we also calculate the (approximate) dimensions of
         # each branch, which we will need for rendering it later
-        width_left, height_left = self.get_bbox(root, max_weight, self.SIDE_LEFT)
-        width_right, height_right = self.get_bbox(root, max_weight, self.SIDE_RIGHT)
-        _, height = sum([width_left, width_right]), max(height_left, height_right)
+        width_left, height_left = self.get_bbox(root, self.SIDE_LEFT)
+        width_right, height_right = self.get_bbox(root, self.SIDE_RIGHT)
+        height = max(height_left, height_right)
 
         # depending on which side of the tree is higher, we need to adjust the
         # height of the other side; and we need to decide which side of the
@@ -349,12 +381,12 @@ class MakeWordtree(BasicProcessor):
         if sides == "both":
             root_side = "right" if height_right > height_left else "left"
 
-        if align == "middle":
+        if self.align == "middle":
             if height_left > height_right:
                 origin_right_y = int((height / 2) - (height_right / 2))
             else:
                 origin_left_y = int((height / 2) - (height_left / 2))
-        elif align == "bottom":
+        elif self.align == "bottom":
             origin_right_y = height - height_right
             origin_left_y = height - height_left
 
@@ -365,7 +397,7 @@ class MakeWordtree(BasicProcessor):
         self.invert_node_labels(root)
 
         self.dataset.update_status(f"Rendering tree to SVG file (root side: {root_side})")
-        wrapper = SVG(overflow="visible", debug=False)
+        wrapper = SVG(overflow="visible", debug=False, id="tree")
         offset_x = 0
 
         if sides != "only-right":
@@ -376,12 +408,11 @@ class MakeWordtree(BasicProcessor):
                 y=origin_left_y,
                 height=height,
                 side=self.SIDE_LEFT,
-                max_weight=max_weight,
                 draw_root=root_side == "left"
             )
 
             # shift the rest of the tree to the right of this half
-            offset_x += width_left - self.get_bbox(root, max_weight, self.SIDE_LEFT, False)[0]
+            offset_x += width_left - self.get_bbox(root, self.SIDE_LEFT, False)[0]
 
         if sides != "only-left":
             self.dataset.update_status("Adding right side of tree to SVG file")
@@ -392,7 +423,6 @@ class MakeWordtree(BasicProcessor):
                 y=origin_right_y,
                 height=height,
                 side=self.SIDE_RIGHT,
-                max_weight=max_weight,
                 draw_root=root_side == "right"
             )
 
@@ -419,7 +449,8 @@ class MakeWordtree(BasicProcessor):
         canvas.add(Script(content=self.get_svg_script()))
         canvas.defs.add(Style(self.get_css()))
         canvas.add(wrapper)
-        canvas.add(Rect((25, canvas["height"] - 25 - 25), (25, 25), fill=self.palette[0], style="cursor:pointer", id="toggle-colour", stroke="#000"))
+        canvas.add(Rect((25, canvas["height"] - 25 - 25), (25, 25), fill=self.palette[0], style="cursor:pointer",
+                        id="toggle-colour", stroke="#000"))
         canvas.save(pretty=True)
 
         return self.dataset.finish(len(list(PreOrderIter(root))))
@@ -464,31 +495,32 @@ class MakeWordtree(BasicProcessor):
             tokeniser_args = {"cut_all": True}
         elif self.parameters.get("tokeniser_type") == "jieba-search":
             tokeniser = jieba.cut_for_search
-            tokeniser_args = {}
-        else:
+        elif self.parameters.get("tokeniser_type") == "nltk-word":
             self.SPACE = " "
             tokeniser = word_tokenize
+        else:
+            self.SPACE = " "
+            tokeniser = TweetTokenizer(preserve_case=False).tokenize
 
         # tokenise query
+        matcher = WildcardMatcher()
         if lowercase:
             query = query.lower()
-        tokenised_query = tokeniser(WildcardMatcher.obfuscate(query), **tokeniser_args)
-        tokenised_query = [WildcardMatcher.deobfuscate(q) for q in tokenised_query]
+
+        tokenised_query = tokeniser(matcher.obfuscate(query), **tokeniser_args)
+        tokenised_query = [matcher.deobfuscate(q) for q in tokenised_query]
         if type(tokenised_query) is not list:
             tokenised_query = list(tokenised_query)
+
         query_token_length = len(tokenised_query)
 
-        def wildcard_match(needle: list, haystack: list):
-            for k in range(len(needle)):
-                pattern = WildcardMatcher.compile(needle[k])
-                if needle[k] != haystack[k] and not pattern.match(haystack[k]):
-                    return False
-            return True
-
         def list_in_list(needle: list, haystack: list):
-            for k in range(len(haystack)):
-                if wildcard_match(needle, haystack[k:k+len(needle)]):
-                    yield k
+            if len(needle) > len(haystack):
+                return
+
+            for i in range(len(haystack) - len(needle) + 1):
+                if all(matcher.fullmatch(needle[j], haystack[i + j]) for j in range(len(needle))):
+                    yield i
 
         # find matching posts
         processed = 0
@@ -496,13 +528,19 @@ class MakeWordtree(BasicProcessor):
         columns = self.parameters.get("columns", [])
         if type(columns) is not list:
             columns = [columns]
+
         link_regex = re.compile(r"https?://\S+")
+        strip_urls = self.parameters.get("strip-urls")
+        strip_symbols = self.parameters.get("strip-symbols")
+        punctuation = string.punctuation + "‘’“”‚„′″…–—«»"  # string.punctuation isn't quite complete
+        punkt_replace = re.compile(r"[" + re.escape(punctuation) + "]")
+
         for post in self.source_dataset.iterate_items():
             processed += 1
             if processed % 500 == 0:
-                self.dataset.update_status(f"Finding query in {processed:,} of {self.source_dataset.num_rows:,} items ({len(fragments):,} matches)")
-                self.progress = (processed / self.source_dataset.num_rows) * 0.5
-                self.dataset.update_progress(self.progress)
+                self.dataset.update_status(
+                    f"Finding query in {processed:,} of {self.source_dataset.num_rows:,} items ({len(fragments):,} matches)")
+                self.dataset.update_progress((processed / self.source_dataset.num_rows) * 0.95)
 
             for column in columns:
                 document = post.get(column)
@@ -512,8 +550,11 @@ class MakeWordtree(BasicProcessor):
                 except TypeError:
                     continue
 
-                if self.parameters.get("strip-urls"):
+                if strip_urls:
                     document = link_regex.sub("", document)
+
+                if strip_symbols:
+                    document = punkt_replace.sub("", document)
 
                 if not document:
                     continue
@@ -528,44 +569,17 @@ class MakeWordtree(BasicProcessor):
 
                 for position in list_in_list(tokenised_query, document):
                     if sides != "only-left":
-                        fragment = tokenised_query + document[position + query_token_length:position + window + query_token_length - 1]
+                        fragment = document[position + query_token_length:position + window + query_token_length - 1]
                         fragments.append(Fragment(fragment, self.SIDE_RIGHT))
                     if sides != "only-right":
-                        fragment = document[position - window + 1:position] + tokenised_query
+                        # reverse order - we un-reverse with invert_node_labels() later
+                        fragment = document[max(0, position - window + 1):position][::-1]
                         fragments.append(Fragment(fragment, self.SIDE_LEFT))
-
-        # terminate fragments at sentence stops, though only on the right side
-        # of the tree
-        if self.parameters.get("stop-sentences"):
-            filtered_fragments = []
-            for fragment in fragments:
-                if fragment.direction == self.SIDE_LEFT:
-                    filtered_fragments.append(fragment)
-                    continue
-
-                filtered_fragment = Fragment([], fragment.direction)
-                for token in fragment.value:
-                    filtered_fragment.value.append(token)
-                    if token.endswith("."):
-                        break
-                filtered_fragments.append(filtered_fragment)
-
-            fragments = filtered_fragments
-
-        # now we no longer need punctuation, we can strip it from the fragments
-        # this may leave us with empty fragments, so these are also removed
-        punkt_replace = re.compile(r"[" + re.escape(string.punctuation) + "]")
-        if self.parameters.get("strip-symbols"):
-            for i, fragment in enumerate(fragments):
-                for j, token in enumerate(fragment.value):
-                    fragment.value[j] = punkt_replace.sub("", token)
-
-                fragment.value = [_ for _ in fragment.value if _.strip()]
-                fragments[i] = fragment
 
         # here is our tree's root node (token)
         root = TreeNode(tokenised_query[0])
         query_start = root
+        root.weight = len(fragments)  # occurs in every fragment, after all
         # if we have a longer query, add the rest as nodes already
         # these will be consolidated into a single node in the next steps
         for other_token in tokenised_query[1:]:
@@ -585,11 +599,12 @@ class MakeWordtree(BasicProcessor):
         for fragment in fragments:
             current_node = root if fragment.direction == self.SIDE_LEFT else query_start
 
-            for token in fragment.without_query(tokenised_query):
+            for token in fragment.value:
                 child_node = current_node.get_child(token, fragment.direction)
                 if not child_node:
                     child_node = TreeNode(token, parent=current_node, direction=fragment.direction)
 
+                child_node.weight += 1
                 current_node = child_node
 
         # consolidate strings of single-child nodes
@@ -604,12 +619,13 @@ class MakeWordtree(BasicProcessor):
                 consolidated_node = directional_children[0]
                 joiner = self.SPACE if consolidated_node.name not in string.punctuation else ""
                 node.name = joiner.join([node.name, consolidated_node.name])
+                node.weight = consolidated_node.weight
                 for grandchild in consolidated_node.children:
                     grandchild.parent = node
 
                 node.children = [child for child in node.children if child != consolidated_node]
                 directional_children = [n for n in node.children if
-                                        not side or node.has_direction(side, inclusive=True)]
+                                        not side or n.has_direction(side, inclusive=True)]
 
             for child in node.children:
                 consolidate(child, side=side)
@@ -620,38 +636,6 @@ class MakeWordtree(BasicProcessor):
         # tree goes in two directions (since all nodes will have branches in
         # two directions), so do so as a special case
         consolidate(root, self.SIDE_RIGHT)
-
-        # now we count how often each node occurs
-        # this is quite expensive, iterating through the whole dataset again
-        # but when we iterated the first time, we didn't know what the nodes
-        # would look like in the end...
-        # another issue: we don't really know what the non-tokenised string
-        # looked like, so we guesstimate by joining by some space character
-        # this is likely to be off the mark for e.g. chinese text
-        def walk_and_count(node, document: str, prefix: list, matcher: None|re.Pattern):
-            if node.weight is None:
-                node.weight = 0
-
-            if node.has_direction(self.SIDE_RIGHT):
-                match = f"{self.SPACE.join([*prefix, node.name])}"
-            else:
-                match = f"{self.SPACE.join([node.name, *prefix])}"
-
-            node.weight += len(matcher.findall(document)) if matcher else document.count(match)
-            for child in node.children:
-                walk_and_count(child, document, [*prefix, node.name], matcher)
-
-        matcher = WildcardMatcher.compile(query) if bool(re.findall(r"[*?]", query)) else None
-        walked = 1
-        for item in self.source_dataset.iterate_items():
-            if walked % 500 == 0:
-                self.dataset.update_status(f"Counting occurrences in item {walked:,} of {self.source_dataset.num_rows:,} items")
-                self.progress = 0.5 + ((walked / self.source_dataset.num_rows) * 0.5)
-                self.dataset.update_progress(self.progress)
-            for column in columns:
-                document = item.get(column)
-                walk_and_count(root, document, [], matcher)
-            walked += 1
 
         # now get the *second* largest weight as the baseline
         # since the root node will always have more, and usually *far* more
@@ -689,7 +673,6 @@ class MakeWordtree(BasicProcessor):
             origin: tuple | bool = None,
             side: int = 1,
             draw_root: bool = True,
-            max_weight: int = 0,
             depth: int = 0
     ) -> tuple[SVG, float]:
         """
@@ -708,7 +691,6 @@ class MakeWordtree(BasicProcessor):
         :param tuple origin: Coordinates to connect bezier spline to
         :param int side:  Is this node on the left or right side of the graph?
         :param bool draw_root:  Draw root node?
-        :param int max_weight:  Global max weight of node
         :param int depth:  How many levels we're into the tree
         :return tuple:  Tuple, updated canvas and height of drawn content
         """
@@ -720,17 +702,16 @@ class MakeWordtree(BasicProcessor):
             return canvas, 0
 
         # determine how much we want to enlarge the text
-        font_size = self.get_font_size(node, max_weight)
+        font_size = self.get_font_size(node)
 
         # determine how high this block will be based on the available
         # height and the nodes we'll need to fit in it
-        parent_node = node.parent if not node.is_root else node
-        own_width, own_height = self.get_bbox(node, max_weight, side, with_children=False)
-        block_width, block_height = self.get_bbox(node, max_weight, side)
+        block_width, block_height = self.get_bbox(node, side)
+        own_width, own_height = self.get_bbox(node, side, False)
 
         if side == self.SIDE_LEFT and node.is_root:
             # first element on the left - start drawing from the right
-            x += self.get_bbox(parent_node, max_weight, side, with_children=True)[0] - own_width
+            x += self.get_bbox(node, side)[0] - own_width
 
         # keep track of what part of the canvas has been used so far
         self.x_min = min(self.x_min, x)
@@ -742,13 +723,12 @@ class MakeWordtree(BasicProcessor):
         # bottom of the text is at y=0
         x_height = (font_size * 0.55)
         text_offset_y = x_height
-
         # adjust positioning depending on alignment setting
-        if self.parameters.get("align") == "middle":
+        if self.align == "middle":
             # center text vertically in block
             text_offset_y += (block_height * 0.5) - (x_height * 0.5)
 
-        elif self.parameters.get("align") == "bottom":
+        elif self.align == "bottom":
             text_offset_y += block_height - x_height
 
         # difference between text baseline and bezier connection point
@@ -831,7 +811,7 @@ class MakeWordtree(BasicProcessor):
         for child in node.children:
             if side == self.SIDE_LEFT:
                 # left side: align to the right of the box
-                offset_x, _ = self.get_bbox(child, max_weight, side, False)
+                offset_x, _ = child.own_bbox
                 offset_x *= side
             else:
                 offset_x = own_width
@@ -845,7 +825,6 @@ class MakeWordtree(BasicProcessor):
                 origin=new_origin,
                 side=side,
                 draw_root=False,
-                max_weight=max_weight,
                 depth=depth + 1
             )
 
@@ -853,7 +832,7 @@ class MakeWordtree(BasicProcessor):
 
         return canvas, block_height
 
-    def get_font_size(self, node: TreeNode, max_weight: int) -> float:
+    def get_font_size(self, node: TreeNode) -> float:
         """
         Get font size for a node
 
@@ -861,22 +840,22 @@ class MakeWordtree(BasicProcessor):
         too much
 
         :param TreeNode node:  Node to determine font size for
-        :param int max_weight:  Global max weight to normalise against
         :return float:  Font size, based on configured global font size
         """
-        if node.weight > max_weight:
+        if node.weight > self.max_weight:
             # this can happen because we use the weight of the *second* most
             # prevalent node as the max weight
             return self.FONT_FACTOR_MAX
-        elif max_weight == 0:
-            # and this can happen if de-tokenisation failed in walk_and_count
+        elif self.max_weight == 0:
+            # and this can happen if de-tokenisation failed earlier
             return 1
 
-        embiggen = node.weight / max_weight if max_weight else 1
+        embiggen = node.weight / self.max_weight if self.max_weight else 1
         embiggen = sin(embiggen * 0.5 * pi)
         return max(1, embiggen * self.FONT_FACTOR_MAX)
 
-    def get_bbox(self, node: TreeNode, max_weight: int, direction: int, with_children: bool = True) -> tuple[float, float]:
+    def get_bbox(self, node: TreeNode, direction: int, with_children: bool = True) \
+            -> tuple[float, float]:
         """
         Get bounding box of a node
 
@@ -884,32 +863,41 @@ class MakeWordtree(BasicProcessor):
         space for the node's children to be rendered.
 
         :param TreeNode node:  Node to determine bounding box of
-        :param int max_weight:  Global max weight to normalise against
         :param int direction:  Which direction of the tree to consider
         :param bool with_children:  Include room for children in box?
         :return tuple:  (width, height) dimensions tuple
         """
-        font_size = self.get_font_size(node, max_weight)
+        bbox_q = (direction, with_children)
+        if bbox_q not in node.bbox:
+            font_size = self.get_font_size(node)
 
-        own_width = len(node.name) * font_size
-        own_height = font_size + self.gap_y
+            own_width = len(node.name)
+            for character in node.name:
+                if emoji.is_emoji(character):
+                    own_width += self.REM_TO_CH  # square instead of rectangular
 
-        branch_height = 0
-        branch_width = 0
+            own_width *= font_size
+            own_height = font_size + self.gap_y
+            node.own_bbox = (own_width, own_height)
 
-        if with_children:
-            for child in node.children:
-                if not child.has_direction(direction, inclusive=True):
-                    continue
+            branch_height = 0
+            branch_width = 0
 
-                (child_width, child_height) = self.get_bbox(child, max_weight, direction)
-                branch_height += child_height
-                branch_width = max(branch_width, child_width)
+            if with_children:
+                for child in node.children:
+                    if not child.has_direction(direction, inclusive=True):
+                        continue
 
-        own_height = max(branch_height, own_height)
-        own_width += branch_width
+                    (child_width, child_height) = self.get_bbox(child, direction)
+                    branch_height += child_height
+                    branch_width = max(branch_width, child_width)
 
-        return own_width, own_height
+                own_height = max(branch_height, own_height)
+                own_width += branch_width
+
+            node.bbox[bbox_q] = (own_width, own_height)
+
+        return node.bbox[bbox_q]
 
     def invert_node_labels(self, node: TreeNode):
         """
@@ -935,7 +923,7 @@ class MakeWordtree(BasicProcessor):
         return """
 window.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#toggle-colour').addEventListener('click', function (e) {
-        document.querySelectorAll('text').forEach((component) => {
+        document.querySelectorAll('#tree text').forEach((component) => {
             if (!component.hasAttribute('fill') || component.getAttribute('fill') == '#000') {
                 component.setAttribute('fill', component.getAttribute('latent-colour'));
             } else {
@@ -943,7 +931,7 @@ window.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
-    document.querySelectorAll('text').forEach((element) => {
+    document.querySelectorAll('#tree text').forEach((element) => {
       element.addEventListener('click', function(e) {
         let highlight_element = e.target.parentNode;
         if(highlight_element.classList.contains('highlighted')) {

@@ -666,9 +666,10 @@ def manipulate_settings():
         global_value = global_settings.get(option, definition.get(option, {}).get("default"))
         is_changed = tag and global_value != tag_value
 
-        default = all_settings.get(option, definition.get(option, {}).get("default"))
+        default = definition.get(option, {}).get("default")
+        current_value = all_settings.get(option, definition.get(option, {}).get("default"))
         if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
-            default = json.dumps(default)
+            current_value = json.dumps(current_value)
 
         # this is used for organising things in the UI
         option_owner = option.split(".")[0]
@@ -694,7 +695,8 @@ def manipulate_settings():
                 "default": all_settings.get(option)
             }),
             "submenu": submenu,
-            "default": default,
+            "default": current_value,  # override default so this is the value displayed in the web UI
+            "original_default": default,  # but also save the actual default
             "tabname": tabname,
             "is_changed": is_changed
         }

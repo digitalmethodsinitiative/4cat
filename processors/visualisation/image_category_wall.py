@@ -153,9 +153,10 @@ class ImageCategoryWallGenerator(BasicProcessor):
             image_dataset = source_dataset
             category_dataset = source_dataset.top_parent()
         # Or is the parent dataset an image dataset?
-        elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in
-                  ImageCategoryWallGenerator.image_datasets] + [
-                     source_dataset.get_parent().get_media_type() == "image"]):
+        elif source_dataset.get_parent() and any(
+                [source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in
+                 ImageCategoryWallGenerator.image_datasets] + [
+                    source_dataset.get_parent().get_media_type() == "image"]):
             image_dataset = source_dataset.get_parent()
             category_dataset = source_dataset
         else:
