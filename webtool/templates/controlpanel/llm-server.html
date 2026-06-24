@@ -123,6 +123,7 @@
                             {% if servers[model.server].type == "ollama" %}
                             <form action="{{ url_for("llm.llm_panel") }}" method="POST" style="display:inline;">
                                 <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="server" value="{{ model.server }}">
                                 <input type="hidden" name="model_name" value="{{ model_id }}">
                                 <button type="submit" class="small confirm-first" data-confirm-action="delete this model from the Ollama server">
                                     <i class="fa fa-trash" aria-hidden="true"></i> Delete

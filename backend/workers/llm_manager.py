@@ -41,16 +41,17 @@ class LLMServerManager(BasicWorker):
 		server = self.job.details.get("server", "") if self.job.details else None
 		model_name = self.job.data["remote_id"]
 		servers = self.config.get("llm.servers", {})
+		current_models = self.config.get("llm.available_models", {})
 
 		# pull/delete on the targeted connection(s). The `provider`
 		# filter scopes the *action* only - never the inventory rebuild below.
-		success = False
+		changes_made = False
 		for server_id, server_config in servers.items():
 			if server and server != server_id:
 				continue
 
 			try:
-				client = LLMServerClient.get_client(self.config, server_config)
+				client = LLMServerClient.get_client(self.config, server_config, self.log)
 			except ValueError:
 				self.log.debug(f"{self.__class__.__name__}: invalid server type: {server_config['type']}, skipping")
 				continue
@@ -58,15 +59,16 @@ class LLMServerManager(BasicWorker):
 			# note that technically it is possible to pull/delete a model on
 			# multiple servers at once (if a model_name is defined but no
 			# server). may not be a problem? may be useful one day?
-			success = False
 			if task == "pull" and hasattr(client, "pull_model"):
-				success = client.pull_model(model_name) or success # in case a prior loop already succeeded
-			elif task == "delete" and hasattr(client, "delete_model"):
-				success = client.delete_model(model_name) or success # in case a prior loop already succeeded
+				changes_made = client.pull_model(model_name) or changes_made # in case a prior loop already succeeded
+			elif task == "delete":
+				if hasattr(client, "delete_model") and model_name in current_models:
+					model_info = current_models.get(model_name, {})
+					changes_made = client.delete_model(model_info["local_id"]) or changes_made # in case a prior loop already succeeded
 			elif task != "refresh":
 				self.log.warning(f"{self.__class__.__name__}: task '{task}' unknown or not supported by connection '{server_id}'")
 
-		if task != "refresh" and not success:
+		if task != "refresh" and not changes_made:
 			# nothing changed and no explicit refresh requested - leave settings as-is
 			self.job.finish()
 			return
@@ -78,7 +80,7 @@ class LLMServerManager(BasicWorker):
 		listed_connections = set()
 		for server_id, server_config in servers.items():
 			try:
-				client = LLMServerClient.get_client(self.config, server_config)
+				client = LLMServerClient.get_client(self.config, server_config, self.log)
 			except ValueError:
 				self.log.debug(f"{self.__class__.__name__}: invalid server type: {server_config['type']}, skipping")
 				continue
