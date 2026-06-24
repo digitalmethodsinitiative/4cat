@@ -706,7 +706,6 @@ class MakeWordtree(BasicProcessor):
 
         # determine how high this block will be based on the available
         # height and the nodes we'll need to fit in it
-        parent_node = node.parent if not node.is_root else node
         block_width, block_height = self.get_bbox(node, side)
         own_width, own_height = self.get_bbox(node, side, False)
 
