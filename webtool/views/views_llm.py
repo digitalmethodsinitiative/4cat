@@ -20,18 +20,18 @@ def llm_panel():
     LLM Server management panel
 
     Shows server status, available models, and controls to pull/delete/refresh
-    models. Pull, delete, and refresh operations are queued as LLMProviderManager
+    models. Pull, delete, and refresh operations are queued as LLMServerManager
     jobs rather than run synchronously.
     """
     if not g.config.get("llm.access"):
         return error(403, message="LLM access is not enabled on this server.")
 
-    providers = g.config.get("llm.providers", [])
+    servers = g.config.get("llm.servers", {})
 
     if request.method == "POST":
         action = request.form.get("action", "").strip()
-        provider = request.form.get("provider", "").strip()
-        details = {"provider": provider} if provider else {}
+        server = request.form.get("server", "").strip()
+        details = {"server": server} if server else {}
 
         if action == "refresh":
             # Queue a one-time manual refresh job; use a timestamp-based remote_id
@@ -76,15 +76,15 @@ def llm_panel():
 
     # --- GET: render panel ---
 
-    for provider_id, provider in providers.items():
-        client = LLMServerClient.get_client(g.config, provider)
+    for server_id, server in servers.items():
+        client = LLMServerClient.get_client(g.config, server)
 
-        if provider_status := client.get_status():
-            server_status = "online" if provider_status == 200 else f"error (HTTP {provider_status})"
+        if server_status := client.get_status():
+            server_status = "online" if server_status == 200 else f"error (HTTP {server_status})"
         else:
             server_status = "unreachable"
 
-        providers[provider_id]["status"] = server_status
+        servers[server_id]["status"] = server_status
 
     available_models = g.config.get("llm.available_models", {}) or {}
     enabled_models = list(g.config.get("llm.enabled_models", []) or [])
@@ -96,7 +96,7 @@ def llm_panel():
     return render_template(
         "controlpanel/llm-server.html",
         flashes=get_flashed_messages(),
-        providers=providers,
+        servers=servers,
         available_models=available_models,
         enabled_models=enabled_models,
         update_running=update_running,

@@ -64,12 +64,11 @@ class LLMPrompter(BasicProcessor):
             # used so can be concurrent
             return f"llm-thirdparty-{dataset.key}"
         else:
-            # use the model URL as the queue ID (extracted from the model
-            # global ID)
+            # use the model's server URL as the queue ID
             # this is not fool-proof, but does mean not more than one dataset
             # runs per API server - in the scenario of these running locally,
             # it means things do not run concurrently (which is good)
-            return f"llm-local-{dataset.parameters.get('model').split('-')[1]}"
+            return f"llm-local[{dataset.parameters.get('model').split('://')[1].split('/')[0]}]"
 
     @classmethod
     def get_model_library(cls, config):
@@ -77,7 +76,7 @@ class LLMPrompter(BasicProcessor):
         enabled_model_ids = config.get("llm.enabled_models", [])
         servers = config.get("llm.servers", {})
         if not config.get("llm.access"):
-            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty-")]
+            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
 
         models_option = {}
         for key, value in {k: v for k, v in available_models.items() if k in enabled_model_ids}.items():
@@ -327,6 +326,10 @@ class LLMPrompter(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
+        # need at least one models
+        if config and not config.get("llm.enabled_models", False):
+            return False
+        
         # Text-based datasets
         if module.get_extension() in ["csv", "ndjson"]:
             return True

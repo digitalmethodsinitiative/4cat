@@ -52,7 +52,7 @@ class ThirdPartyClient(LLMServerClient):
         # Third-party catalog models span multiple vendors, so the wrapper
         # (which LangChain chat class to use) is per-model, not the connection
         # type ("api"). Override the connection-derived wrapper with the vendor.
-        entry["wrapper"] = meta["server"]
+        entry["wrapper"] = meta["provider"]
 
         return entry
 

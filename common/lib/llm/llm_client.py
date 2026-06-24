@@ -10,7 +10,7 @@ building canonical llm.available_models entries. It is a plain helper with no
 from abc import abstractmethod
 
 import requests
-
+import re
 
 class LLMServerClient:
     _headers = {}
@@ -193,4 +193,6 @@ class LLMServerClient:
         :param dict meta:  Model metadata
         :return str:  Model ID
         """
-        return "-".join((self.server_config["type"], self.server_config["url"], self.get_model_id(meta)))
+        domain = re.sub(r"^https?://", "", self.server_config["url"])
+        domain = domain.rstrip("/")
+        return f"{self.server_config['type']}://{domain}/{self.get_model_id(meta)}"

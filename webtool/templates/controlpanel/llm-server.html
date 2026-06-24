@@ -7,7 +7,7 @@
 {% block body %}
 <article class="small">
     <section class="result-list">
-        <h2><span>LLM Providers</span></h2>
+        <h2><span>LLM Servers</span></h2>
 
         {% if flashes %}
         <div class="form-notices-wrapper">
@@ -18,7 +18,7 @@
         {% endif %}
 
         <p>
-            You can add and configure LLM providers via the 'LLM providers' tab on the <a href="{{ url_for("admin.manipulate_settings") }}">Settings</a> page.
+            You can add and configure LLM servers via the 'LLM servers' tab on the <a href="{{ url_for("admin.manipulate_settings") }}">Settings</a> page.
         </p>
 
         {# Server status #}
@@ -28,21 +28,21 @@
                     <th>Server</th>
                     <th>Status</th>
                 </tr>
-            {% if not providers %}
+            {% if not servers %}
                 <tr>
                     <td colspan="2">
-                        No LLM providers configured.
+                        No LLM servers configured.
                     </td>
                 </tr>
             {% else %}
-                {% for provider_id, provider in providers.items() %}
+                {% for server_id, server in servers.items() %}
                 <tr>
-                    <td><span class="property-badge">{{ provider.type }}</span> <a href="{{ provider.url }}">{{ provider.name }}</a></td>
+                    <td><span class="property-badge">{{ server.type }}</span> <a href="{{ server.url }}">{{ server.name }}</a></td>
                     <td>
-                        {% if provider.status == "online" %}
+                        {% if server.status == "online" %}
                             <span style="color: green;"><i class="fa fa-check-circle" aria-hidden="true"></i> Online</span>
                         {% else %}
-                            <span style="color: red;"><i class="fa fa-times-circle" aria-hidden="true"></i> {{ provider.status }}</span>
+                            <span style="color: red;"><i class="fa fa-times-circle" aria-hidden="true"></i> {{ server.status }}</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -77,7 +77,7 @@
                 </colgroup>
                 <tr>
                     <th>Name</th>
-                    <th>Provider/model</th>
+                    <th>Server/model</th>
                     <th>Capabilities</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -93,7 +93,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <span class="property-badge">{{ providers[model.provider]['type'] }}/{{ providers[model.provider].url|hostname }}</span><br>
+                            <span class="property-badge">{{ servers[model.server]['type'] }}/{{ servers[model.server].url|hostname }}</span><br>
                             {{ model.local_id }}
                         </td>
                         <td>
@@ -120,7 +120,7 @@
                                 <button type="submit" class="small"><i class="fa fa-toggle-on" aria-hidden="true"></i> Enable</button>
                             </form>
                             {% endif %}
-                            {% if providers[model.provider].type == "ollama" %}
+                            {% if servers[model.server].type == "ollama" %}
                             <form action="{{ url_for("llm.llm_panel") }}" method="POST" style="display:inline;">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="model_name" value="{{ model_id }}">
@@ -135,11 +135,11 @@
                 {% else %}
                     <tr>
                         <td colspan="5">
-                            {% if providers %}
+                            {% if servers %}
                                 No models found. Use the <strong>Refresh</strong> button to fetch available models, or
-                                install a new model below with compatible providers.
+                                install a new model below with compatible servers.
                             {% else %}
-                                No LLM providers configured.
+                                No LLM servers configured.
                             {% endif %}
                         </td>
                     </tr>
@@ -149,23 +149,23 @@
     </section>
 
     {# Pull a new model, if an ollama server is configured #}
-    {% if providers.values()|selectattr("type", "equalto", "ollama")|list %}
+    {% if servers.values()|selectattr("type", "equalto", "ollama")|list %}
     <section>
         <h2><span>Install new LLMs</span></h2>
-        <p>Enter a model name (e.g. <code>llama3:8b</code>) to make it available via the configured provider. For
+        <p>Enter a model name (e.g. <code>llama3:8b</code>) to make it available via the configured server. For
             Ollama, model names can be found in the
             <a href="https://ollama.com/library" target="_blank" rel="noopener">model library</a>.</p>
         <p>Pulling large models may take several minutes; the job runs in the background. Note that 4CAT cannot install
-            models for all LLM providers; if your provider is not listed below, it may not be able to add additional
+            models for all LLM servers; if your server is not listed below, it may not be able to add additional
             models to it, or you may need to use an external tool to add new models.</p>
         <form action="{{ url_for("llm.llm_panel") }}" method="POST" class="wide">
             <input type="hidden" name="action" value="pull">
             <div class="form-element">
-                <label for="model-provider">LLM provider</label>
-                <select id="model-provider" name="provider">
-                    {% for provider_id, provider in providers.items() %}
-                        {% if provider.type == "ollama" %}
-                            <option value="{{ provider_id }}">{{ provider.type }} @ {{ provider.url }}</option>
+                <label for="model-server">LLM server</label>
+                <select id="model-server" name="server">
+                    {% for server_id, server in servers.items() %}
+                        {% if server.type == "ollama" %}
+                            <option value="{{ server_id }}">{{ server.type }} @ {{ server.url }}</option>
                         {% endif %}
                     {% endfor %}
                 </select>
