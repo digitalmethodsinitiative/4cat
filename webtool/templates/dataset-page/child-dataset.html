@@ -22,25 +22,6 @@
             {% endif %}
             </button>
             {% include "dataset-page/dataset-header.html" %}
-            <section class="status">
-                <dl class="badge-list dataset-status">
-                    <div class="status-badge-annotated status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
-                        <dt>{% if not dataset.is_finished %}Processing{% elif dataset.num_rows %}Completed{% else %}No results{% endif %}</dt>
-                        <dd>{{ dataset.get_status() or "Processor finished." }}</dd>
-                    </div>
-                {% if dataset.num_rows %}
-                    <div>
-                        <dt>Items</dt>
-                        <dd>{{ dataset.num_rows|commafy }}</dd>
-                    </div>
-                {% endif %}
-                </dl>
-            {% if dataset.parameters|visible_parameters %}
-                <dl class="badge-list parameters with-overflow">
-                {% include "dataset-page/dataset-parameters.html" %}
-                </dl>
-            {% endif %}
-            </section>
         </div>
     </article>
     <div class="run-hint">

@@ -5,7 +5,7 @@
 {% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
 
 {% block body %}
-<section class="dataset-metadata" data-dataset-key="{{ dataset.key }}">
+<section class="dark dataset-metadata" data-dataset-key="{{ dataset.key }}">
         <nav>
             <ul>
             {% if current_user.is_authenticated and current_user.can_access_dataset(dataset) %}
@@ -33,79 +33,38 @@
             {% include "dataset-page/dataset-header.html" %}
         {% endwith %}
 
-        <dl class="badge-list">
-            <div class="status-badge status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows == 0 %}bad{% else %}good{% endif %}">
-                <dt class="sr-only">Status</dt>
-                <dd>{% if not dataset.is_finished %}In progress{% elif dataset.num_rows == 0 %}No results{% else %}Completed{% endif %}</dd>
-            </div>
-            <div>
-                <dt>Created</dt>
-                <dd>
-                    {% if dataset.parameters.original_timestamp %}
-                        <i class="fa fa-file-import tooltip-trigger" aria-hidden="true"
-                           aria-controls="tooltip-{{ dataset.key }}-imported"></i>
-                        <span class="sr-only">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
-                        <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-imported">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
-                    {% endif %}
-                    {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
-                </dd>
-            </div>
-        {% if __user_config("ui.show_datasource") %}
-            <div>
-                <dt>Created from</dt>
-                <dd>
-                    {% if dataset.parameters.datasource in datasources %}
-                        <a href="{{ url_for("misc.data_overview", datasource=dataset.parameters.datasource) }}">
-                    {% endif %}
-                        {{ dataset.parameters.datasource }}
-                    {% if dataset.parameters.datasource in datasources %}
-                        </a>
-                    {% endif %}
-                </dd>
-            </div>
-        {% endif %}
-        {% if dataset.num_rows > 0 %}
-            <div>
-                <dt>Items</dt>
-                <dd>{{ dataset.num_rows|commafy }}</dd>
-            </div>
-        {% endif %}
-        </dl>
-
-        {% if dataset.parameters|visible_parameters %}
-        <dl class="badge-list">
-            {% include "dataset-page/dataset-parameters.html" %}
-        </dl>
+        {% if dataset.is_expiring(config=__config) %}
+            <p class="notice">
+                <i class="fa fa-warning" aria-hidden="true"></i> <strong>Note:</strong> this dataset will no longer be
+                available
+                after {{ dataset.is_expiring(config=__config)|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You
+                can
+                <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+            </p>
         {% endif %}
 
-    {% if dataset.is_expiring(config=__config) %}
-    <p class="notice">
-        <i class="fa fa-warning" aria-hidden="true"></i> <strong>Note:</strong> this dataset will no longer be available
-        after {{ dataset.is_expiring(config=__config)|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You can
-        <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
-    </p>
-    {% endif %}
-
-    {% if merge_sources %}
-    <p class="notice">
-        <i class="fa fa-arrows-to-dot" aria-hidden="true"></i> This dataset is a merger of {% for source in merge_sources %}
-        {% if source is string %}
-        {{ source }}{% else %}
-        <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% endif %}{% if
-        loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
-        {% endfor %}.
-    </p>
-    {% elif "copied_from" in dataset.parameters %}
-    <p class="notice">
-        This dataset was generated from
-        {% if copy_source is string %}
-        <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
-        {% else %}
-        the dataset '<a href="{{ url_for('dataset.show_result', key=copy_source.key) }}">{{
-        copy_source.get_label()}}</a>'.
+        {% if merge_sources %}
+            <p class="notice">
+                <i class="fa fa-arrows-to-dot" aria-hidden="true"></i> This dataset is a merger of
+                {% for source in merge_sources %}
+                    {% if source is string %}
+                        {{ source }}{% else %}
+                        <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% endif %}
+                {% if
+            loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
+                {% endfor %}.
+            </p>
+        {% elif "copied_from" in dataset.parameters %}
+            <p class="notice">
+                This dataset was generated from
+                {% if copy_source is string %}
+                    <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                {% else %}
+                    the dataset '
+                    <a href="{{ url_for('dataset.show_result', key=copy_source.key) }}">{{ copy_source.get_label() }}</a>'.
+                {% endif %}
+            </p>
         {% endif %}
-    </p>
-    {% endif %}
     </section>
 
     <section class="analysis-results center-stage">

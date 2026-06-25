@@ -126,7 +126,8 @@ app.config.from_mapping({
     "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
     "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
     "HOSTNAME_WHITELIST_API": config.get("flask.autologin.api"),
-    "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http"
+    "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http",
+    "TEMPLATES_AUTO_RELOAD": True
 })
 
 # Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)

@@ -241,13 +241,6 @@
     box-sizing: content-box;
 }
 
-.processor-card .with-overflow {
-    background: linear-gradient(90deg, transparent 0%, transparent 90%, var(--panel-bg-1) 100%);
-    overflow-y: auto;
-    white-space: nowrap;
-    border-bottom-right-radius: var(--radius);
-}
-
 .processor-card .quick-links {
     flex-grow: 1;
 }

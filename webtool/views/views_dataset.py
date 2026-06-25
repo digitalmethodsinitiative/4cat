@@ -146,8 +146,12 @@ def show_results(page):
     datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
                    metadata["has_worker"]}
 
+    breadcrumbs = [{
+        "url": url_for("dataset.show_results"),
+        "label": "Datasets"
+    }]
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites)
+                           datasets=filtered, pagination=pagination, favourites=favourites, breadcrumbs=breadcrumbs)
 
 
 """
@@ -589,10 +593,20 @@ def show_result(key):
     standalone = "processors" not in request.url
     template = "dataset-page/view-dataset.html" if standalone else "components/result-details.html"
 
+
+    breadcrumbs = [{
+            "url": url_for("dataset.show_results"),
+            "label": "Datasets"
+        },
+        {
+            "url": url_for("dataset.show_result", key=dataset.key),
+            "label": dataset.get_label()
+        }]
+
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=g.modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
-                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire,
+                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, breadcrumbs=breadcrumbs,
                            datasources=datasources, merge_sources=merge_sources, copy_source=copy_source)
 
 

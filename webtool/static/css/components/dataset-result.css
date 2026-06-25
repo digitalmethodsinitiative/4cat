@@ -36,6 +36,7 @@
     box-sizing: border-box;
     border-top: var(--stroke-light) dashed var(--dark);
     color: var(--bright);
+    margin: 0;
 }
 
 .dataset-metadata .badge-list dt {
@@ -80,6 +81,7 @@
 .dataset-metadata p.notice {
     font-variant: small-caps;
     text-transform: lowercase;
+    margin: 0 auto;
 }
 
 .dataset-metadata p.notice a {

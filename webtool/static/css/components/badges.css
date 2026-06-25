@@ -4,6 +4,17 @@
     font-size: var(--font-base);
 }
 
+.badge-list.with-overflow {
+    background: linear-gradient(90deg, transparent 0%, transparent 90%, var(--panel-bg-1) 100%);
+    overflow-y: auto;
+    white-space: nowrap;
+    border-bottom-right-radius: var(--radius);
+}
+
+.dark .badge-list.with-overflow {
+    background: linear-gradient(90deg, var(--brighten-12) 0%, var(--brighten-12) 90%, var(--panel-bg-3) 100%);
+}
+
 .badge-list div {
     display: grid;
     grid-template-columns: auto auto;
@@ -31,6 +42,10 @@
 
 .status-badge dd {
     text-transform: uppercase;
+}
+
+.dark .badge-list .status-badge-annotated dd {
+    background: transparent;
 }
 
 .status-badge.status-good dd {
@@ -64,6 +79,11 @@
     color: var(--green);
 }
 
+.dark .badge-list .status-badge-annotated.status-good dd {
+    color: var(--green-light);
+    border: var(--stroke) solid var(--green-light);
+}
+
 .badge-list .status-badge-annotated.status-bad dt, .status-indicator.status-bad {
     border: var(--stroke) solid var(--red-light);
     background: var(--red-light);
@@ -73,6 +93,11 @@
 .badge-list .status-badge-annotated.status-bad dd {
     border-color: var(--red-light);
     color: var(--red);
+}
+
+.dark .badge-list .status-badge-annotated.status-bad dd {
+    color: var(--red-light);
+    border: var(--stroke) solid var(--red-light);
 }
 
 .badge-list .status-badge-annotated.status-neutral dt, .status-indicator.status-neutral {
@@ -86,6 +111,11 @@
     color: var(--blue);
 }
 
+.dark .badge-list .status-badge-annotated.status-neutral dd {
+    color: var(--blue-light);
+    border: var(--stroke) solid var(--blue-light);
+}
+
 .badge-list .status-badge-annotated.status-warning dt, .status-indicator.status-warning {
     border: var(--stroke) solid var(--yellow-light);
     background: var(--yellow-light);
@@ -95,4 +125,9 @@
 .badge-list .status-badge-annotated.status-warning dd {
     border-color: var(--yellow-light);
     color: var(--yellow);
+}
+
+.dark .badge-list .status-badge-annotated.status-warning dd {
+    color: var(--yellow-light);
+    border: var(--stroke) solid var(--yellow-light);
 }

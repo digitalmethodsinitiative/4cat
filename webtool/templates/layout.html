@@ -37,7 +37,7 @@
                 {% if __user_config("privileges.can_create_dataset") %}
                     <li class="emphasis button-like"><a href="#">Create Dataset</a></li>
                 {% endif %}
-                <li><a href="#">My Datasets</a></li>
+                <li><a href="{{ url_for("dataset.show_results") }}">My Datasets</a></li>
                 <li><a href="#">About</a></li>
                 {% if __user_cp_access %}
                     <li><a href="#">Control panel</a></li>
