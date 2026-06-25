@@ -27,6 +27,7 @@ class SearchCustom(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    icon = "file-import"
 
     max_workers = 1
     

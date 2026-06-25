@@ -26,6 +26,7 @@ class SearchImportFromFourcat(BasicProcessor):
     description = "Import a dataset from another 4CAT server or from a zip file (exported from a 4CAT server)"  # description displayed in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    icon = "file-import"
 
     max_workers = 1  # this cannot be more than 1, else things get VERY messy
 

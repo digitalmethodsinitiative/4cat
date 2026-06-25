@@ -18,6 +18,7 @@ class SearchMedia(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    icon = "images"
 
     max_workers = 1
 

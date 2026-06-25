@@ -29,6 +29,7 @@ class SearchBluesky(Search):
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    icon = "brand-bluesky"
 
     config = {
         "bsky-search.max_results": {

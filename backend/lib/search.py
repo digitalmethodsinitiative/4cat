@@ -32,6 +32,9 @@ class Search(BasicProcessor, ABC):
 	#: backwards-compatibility reasons. For example, `instagram-search`.
 	type = "abstract-search"
 
+	# generic icon
+	icon = "comments"
+
 	#: Amount of workers of this type that can run in parallel. Be careful with
 	#: this, because values higher than 1 will mean that e.g. API rate limits
 	#: are easily violated.

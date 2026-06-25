@@ -15,6 +15,7 @@ class AudioUploadToText(SearchMedia):
     category = "Search"  # category
     title = "Convert speech to text"  # title displayed in UI
     description = "Upload your own audio and use OpenAI's Whisper or GPT models to create transcripts"  # description displayed in UI
+    icon = "closed-captioning"
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

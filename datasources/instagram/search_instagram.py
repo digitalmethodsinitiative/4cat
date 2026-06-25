@@ -23,6 +23,7 @@ class SearchInstagram(Search):
     description = "Import Instagram data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_from_zeeschuimer = True
+    icon = "brand-instagram"
 
     # not available as a processor for existing datasets
     accepts = [None]
