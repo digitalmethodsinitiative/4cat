@@ -190,9 +190,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             return
 
         if self.job.is_recurring:
-            self.job.release(delay=10)
-        else:
-            self.job.park()
+            self.log.fatal("Worker %s crashed while processing recurring job %s - manaully release job for retry." % (self.type, self.job.data["remote_id"]))
+        
+        self.job.park()
 
     def clean_up(self):
         """
