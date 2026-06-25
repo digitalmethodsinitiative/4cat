@@ -756,7 +756,11 @@ def manipulate_settings():
         options[k]["config_order"] = config_order
         config_order += 1
 
-    options = {k: options[k] for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o].get("config_order", 0)))}
+    options = {
+        k: options[k]
+        for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o].get("config_order", 0)))
+        if not options[k].get("indirect")
+    }
 
     # 'data sources' is one setting but we want to be able to indicate
     # overrides per sub-item
