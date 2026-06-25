@@ -84,6 +84,9 @@ def llm_panel():
     available_models = g.config.get("llm.available_models", {}) or {}
     enabled_models = list(g.config.get("llm.enabled_models", []) or [])
 
+    # order is important for grouping per server
+    available_models = {k: available_models[k] for k in sorted(available_models, key=lambda k: available_models[k]["server"])}
+
     llm_jobs = [
         job for job in g.queue.get_all_jobs("manage-llm", restrict_claimable=False) if not job.data["interval"]
     ]
