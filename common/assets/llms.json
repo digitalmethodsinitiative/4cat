@@ -1,20 +1,32 @@
 [
   {
+    "model": "gpt-5.5",
+    "name": "[OpenAI] GPT-5.5",
+    "model_card": "https://platform.openai.com/docs/models/gpt-5.5",
+    "provider": "openai"
+  },
+  {
     "model": "gpt-5.4",
     "name": "[OpenAI] GPT-5.4",
     "model_card": "https://platform.openai.com/docs/models/gpt-5.4",
     "provider": "openai"
   },
   {
-    "model": "gpt-5-mini",
-    "name": "[OpenAI] GPT-5 mini",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5-mini",
+    "model": "gpt-5.4-mini",
+    "name": "[OpenAI] GPT-5.4 mini",
+    "model_card": "https://platform.openai.com/docs/models/gpt-5.4-mini",
     "provider": "openai"
   },
   {
-    "model": "gpt-5-nano",
-    "name": "[OpenAI] GPT-5 nano",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5-nano",
+    "model": "gpt-5.4-nano",
+    "name": "[OpenAI] GPT-5.4 nano",
+    "model_card": "https://platform.openai.com/docs/models/gpt-5.4-nano",
+    "provider": "openai"
+  },
+  {
+    "model": "gpt-5.5-pro",
+    "name": "[OpenAI] GPT-5.5 Pro",
+    "model_card": "https://platform.openai.com/docs/models/gpt-5.5-pro",
     "provider": "openai"
   },
   {
@@ -30,33 +42,15 @@
     "provider": "openai"
   },
   {
-    "model": "gpt-4.1-nano",
-    "name": "[OpenAI] GPT-4.1 nano",
-    "model_card": "https://platform.openai.com/docs/models/gpt-4.1-nano",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-4.1",
-    "name": "[OpenAI] GPT-4.1",
-    "model_card": "https://platform.openai.com/docs/models/gpt-4.1",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-4o-mini",
-    "name": "[OpenAI] GPT-4o mini",
-    "model_card": "https://platform.openai.com/docs/models/gpt-4o-mini",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-4o",
-    "name": "[OpenAI] GPT-4o",
-    "model_card": "https://platform.openai.com/docs/models/gpt-4o",
-    "provider": "openai"
-  },
-  {
     "model": "gemini-3.1-pro-preview",
     "name": "[Google] Gemini 3.1 Pro",
     "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-pro",
+    "provider": "google"
+  },
+  {
+    "model": "gemini-3.5-flash",
+    "name": "[Google] Gemini 3.5 Flash",
+    "model_card": "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash",
     "provider": "google"
   },
   {
@@ -72,8 +66,20 @@
     "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-flash-lite"
   },
   {
+    "model": "claude-fable-5",
+    "name": "[Anthropic] Claude Fable 5",
+    "model_card": "https://www.anthropic.com/claude/fable",
+    "provider": "anthropic"
+  },
+  {
+    "model": "claude-opus-4-8",
+    "name": "[Anthropic] Claude Opus 4.8",
+    "model_card": "https://www.anthropic.com/claude/opus",
+    "provider": "anthropic"
+  },
+  {
     "model": "claude-opus-4-6",
-    "name": "[Anthropic] Claude Opus 4.6 (latest)",
+    "name": "[Anthropic] Claude Opus 4.6",
     "model_card": "https://www.anthropic.com/claude/opus",
     "provider": "anthropic"
   },
@@ -102,15 +108,15 @@
     "provider": "mistral"
   },
   {
-    "model": "mistral-small-2506",
-    "name": "[Mistral] Mistral Small 3.2 (25.06)",
-    "model_card": "https://docs.mistral.ai/models/mistral-small-3-2-25-06",
+    "model": "mistral-small-2603",
+    "name": "[Mistral] Mistral Small 4",
+    "model_card": "https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03",
     "provider": "mistral"
   },
   {
-    "model": "mistral-medium-2508",
-    "name": "[Mistral] Mistral Medium 3.1 (25.08)",
-    "model_card": "mistral-medium-2508",
+    "model": "mistral-medium-3-5",
+    "name": "[Mistral] Mistral Medium 3.5",
+    "model_card": "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04",
     "provider": "mistral"
   },
   {
@@ -124,6 +130,18 @@
     "name": "[Mistral] Mistral Nemo 12B",
     "model_card": "https://docs.mistral.ai/models/mistral-nemo-12b-24-07",
     "provider": "mistral"
+  },
+  {
+    "model": "deepseek-v4-pro",
+    "name": "[DeepSeek] DeepSeek V4 Pro",
+    "model_card": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro",
+    "provider": "deepseek"
+  },
+  {
+    "model": "deepseek-v4-flash",
+    "name": "[DeepSeek] DeepSeek V4 Flash",
+    "model_card": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash",
+    "provider": "deepseek"
   },
   {
     "model": "deepseek-chat",
