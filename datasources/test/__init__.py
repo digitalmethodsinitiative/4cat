@@ -25,3 +25,7 @@ if os.environ.get("FOURCAT_ENABLE_TEST_DATASOURCE", "").lower() in ("1", "true",
     # Internal identifier for this data source
     DATASOURCE = "test"
     NAME = "Test datasource (dev only)"
+else:
+    # deliberately inert on a normal/production instance; tell the loader
+    # this is intentional so it doesn't warn about missing attributes
+    DATASOURCE_DISABLED = True
