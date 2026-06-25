@@ -363,6 +363,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist, may have "
                                  "been deleted in the meantime)" % (self.dataset.key, self.parameters["attach_to"]))
 
+        # Validate map_item against the freshly finished dataset and emit a
+        # single rolled-up admin alert if anything is unmappable. Fires once
+        # per dataset creation; later processors that iterate this dataset
+        # don't re-alert.
+        self._validate_map_item_post_run()
+
         self.job.finish()
 
         if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
@@ -744,7 +750,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         except AttributeError:
             standalone.board = self.type
 
-        standalone.type = top_parent.type
+        standalone.adopt_type(top_parent.type)
 
         standalone.detach()
         standalone.delete_parameter("key_parent")
@@ -912,6 +918,60 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             raise MapItemException("Unable to map item!")
 
         return mapped_item
+
+    def _validate_map_item_post_run(self):
+        """
+        Walk the just-finished dataset and run `map_item` over each item,
+        rolling up any failures into a single admin alert via
+        `DataSet.warn_unmappable_signatures`. Fires at at creation time, 
+        immediately after the dataset is marked finished and before this 
+        worker frees its queue slot.
+
+        Wrapped so a validation failure can never fail the dataset itself.
+
+        This holds the current worker's queue slot for the duration of the
+        iteration. Subsequent processors are unaffected — they pick up the
+        now-finished dataset on other workers. If this becomes a measurable
+        bottleneck for very large datasets, revisit moving to a daemon
+        thread or a dedicated validator worker.
+        """
+        try:
+            # Only run validation if the dataset is finished, has rows, and the processor
+            # has a compatible map_item method.
+            if not self.dataset.is_finished():
+                return
+            if self.dataset.data.get("num_rows", 0) <= 0:
+                return
+            if not self.map_item_method_available(dataset=self.dataset):
+                return
+
+            signatures = {}
+            for i, item in enumerate(self.dataset._iterate_items(processor=self)):
+                try:
+                    self.get_mapped_item(item)
+                except MapItemException as e:
+                    frame = getattr(e, "frame", None)
+                    fname = Path(frame.filename).name if frame and getattr(frame, "filename", None) else "?"
+                    lineno = getattr(frame, "lineno", 0) if frame else 0
+                    sig = signatures.setdefault(
+                        (fname, lineno),
+                        {"count": 0, "error": str(e), "samples": []}
+                    )
+                    sig["count"] += 1
+                    if len(sig["samples"]) < 3:
+                        sig["samples"].append(i)
+                except Exception:
+                    # Unexpected exception type — don't let it kill validation
+                    continue
+
+            if signatures:
+                self.dataset.warn_unmappable_signatures(processor=self, signatures=signatures)
+        except Exception as e:
+            # Validation must never fail the dataset
+            try:
+                self.log.warning(f"map_item validation hook failed for dataset {self.dataset.key}: {e}")
+            except Exception:
+                pass
 
     @classmethod
     def is_filter(cls):

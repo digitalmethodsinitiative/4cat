@@ -65,11 +65,12 @@ class ImageCategoryWallGenerator(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-        return module.type.startswith("image-to-categories") or \
-            module.type.startswith("image-downloader") or \
-            module.type.startswith("video-hasher-1") or \
-            module.type.startswith("video-hash-similarity-matrix") and \
-            not module.type not in ["image-downloader-screenshots-search"]
+        return (
+            module.type.startswith("image-to-categories")
+            or module.type.startswith("image-downloader")
+            or module.type.startswith("video-hasher-1")
+            or module.type.startswith("video-hash-similarity-matrix")
+        ) and module.type not in ["image-downloader-screenshots-search"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -152,9 +153,10 @@ class ImageCategoryWallGenerator(BasicProcessor):
             image_dataset = source_dataset
             category_dataset = source_dataset.top_parent()
         # Or is the parent dataset an image dataset?
-        elif any([source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in
-                  ImageCategoryWallGenerator.image_datasets] + [
-                     source_dataset.get_parent().get_media_type() == "image"]):
+        elif source_dataset.get_parent() and any(
+                [source_dataset.get_parent().type.startswith(dataset_prefix) for dataset_prefix in
+                 ImageCategoryWallGenerator.image_datasets] + [
+                    source_dataset.get_parent().get_media_type() == "image"]):
             image_dataset = source_dataset.get_parent()
             category_dataset = source_dataset
         else:

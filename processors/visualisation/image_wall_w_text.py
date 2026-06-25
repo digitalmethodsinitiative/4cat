@@ -99,11 +99,17 @@ class ImageTextWallGenerator(BasicProcessor):
         """
         Identify dataset types that are compatible with this processor
         """
-        # TODO: use `media_type` method to identify image datasets after merge
-        # TODO: do we have additional text datasets we would like to support?
+        # Datasets that have both images and captions
+        # TODO: after metadata merge: text from metadata
         if source_dataset.type in ImageTextWallGenerator.combined_dataset:
             # This dataset has both images and captions
             return source_dataset, source_dataset
+
+        # Datasets that have separate images and captions
+        if source_dataset is None or source_dataset.get_parent() is None:
+            return None, None
+        
+        # TODO: add additional caption datasets, allow column selection for text dataset (need filename column + text column)
         elif any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in
                   ImageTextWallGenerator.caption_datasets]):
             text_dataset = source_dataset

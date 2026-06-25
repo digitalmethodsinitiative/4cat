@@ -107,7 +107,7 @@ class SearchDouyin(Search):
             # live_watch_count = stats.get("liveWatchCount", MissingMappedField("Unknown"))
 
             # This is a guess, I have not encountered it
-            video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if "tagName" in tag])
+            video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if tag.get("tagName")])
 
             mix_current_episode = item.get(mix_info_key, {}).get("currentEpisode", "N/A")
 
@@ -126,7 +126,7 @@ class SearchDouyin(Search):
 
                 # Author is stream owner
                 author = stream_data.get("owner")
-                video_tags = stream_data.get("video_feed_tag")
+                video_tags = ",".join([tag for tag in stream_data.get("video_feed_tag").strip(",", ) if tag])
                 stats = stream_data.get("stats")
 
             else:

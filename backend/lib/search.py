@@ -158,7 +158,6 @@ class Search(BasicProcessor, ABC):
 			return []
 
 		import_warnings = {}
-		import_error_signatures = {}  # (filename, lineno) -> {count, error, samples}
 
 		# Check if processor and dataset can use map_item
 		check_map_item = self.map_item_method_available(dataset=self.dataset)
@@ -212,22 +211,8 @@ class Search(BasicProcessor, ABC):
 					except MapItemException as e:
 						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
 						self.import_error_count += 1
-						# Per-item user-facing log entry. The admin alert is
-						# emitted once at end of import as a single roll-up
-						# (see warn_unmappable_signatures below), so we
-						# suppress the per-item admin call here.
-						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e, warn_admins=False)
-						# Accumulate file:line signatures for the rolled-up alert
-						frame = getattr(e, "frame", None)
-						fname = Path(frame.filename).name if frame and getattr(frame, "filename", None) else "?"
-						lineno = getattr(frame, "lineno", 0) if frame else 0
-						sig = import_error_signatures.setdefault(
-							(fname, lineno),
-							{"count": 0, "error": str(e), "samples": []}
-						)
-						sig["count"] += 1
-						if len(sig["samples"]) < 3:
-							sig["samples"].append(i)
+						# Per-item user-facing log entry.
+						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e)
 
 				yield new_item
 
@@ -237,11 +222,6 @@ class Search(BasicProcessor, ABC):
 			self.dataset.log("While importing, the following issues were raised:")
 			for warning, num_items in import_warnings.items():
 				self.dataset.log(f"  {warning} (for {num_items:,} item(s))")
-
-		# Rolled-up dev alert for unmappable-item signatures (one Slack message
-		# per dataset with file:line, counts and sample indices).
-		if import_error_signatures:
-			self.dataset.warn_unmappable_signatures(processor=self, signatures=import_error_signatures)
 
 		path.unlink()
 		self.dataset.delete_parameter("file")
