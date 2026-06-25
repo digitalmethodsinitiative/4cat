@@ -22,7 +22,7 @@ import time
 from backend.lib.search import Search
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 
 # only make this worker available when explicitly enabled, so it never loads on
 # a normal/production instance (the datasource folder is always discovered, but
@@ -100,6 +100,14 @@ if TEST_DATASOURCE_ENABLED:
                     # oscillate progress 0..1 so the bar is visibly active
                     self.dataset.update_progress((tick % 20) / 20)
                     time.sleep(2)
+
+            if self.job.is_recurring:
+                # recurring jobs are not expected to produce any items, so don't
+                # return any; just update the status and progress so the job
+                # shows up as active on the status page.
+                self.dataset.update_status("Test datasource: recurring job (mode=%s)" % mode)
+                self.dataset.update_progress(0.5)
+                raise ProcessorException("Recurring jobs are not expected to produce DataSets; this is a test datasource.")
 
             # mode == "complete": write some dummy rows and finish
             amount = query.get("amount", 5)

@@ -37,6 +37,7 @@ from common.config_manager import ConfigManager
 cli = argparse.ArgumentParser()
 cli.add_argument("-m", "--modes", nargs="+", default=["complete", "forever", "crash"],
                  choices=["complete", "forever", "crash"], help="Which dummy job state(s) to enqueue")
+cli.add_argument("-i", "--interval", default=0, type=int, help="Interval between jobs (seconds)")
 cli.add_argument("-u", "--user", default="anonymous", help="Username to assign the datasets to")
 cli.add_argument("-a", "--amount", type=int, default=5, help="Dummy rows for 'complete' mode")
 args = cli.parse_args()
@@ -68,7 +69,7 @@ for mode in args.modes:
         modules=modules
     )
     dataset.update_label("Test job (%s)" % mode)
-    queue.add_job(worker_or_type=worker, dataset=dataset, interval=0)
+    queue.add_job(worker_or_type=worker, dataset=dataset, interval=args.interval)
     job = Job.get_by_remote_ID(dataset.key, db)
     dataset.link_job(job)
     print("Queued '%s' test job: dataset %s" % (mode, dataset.key))
