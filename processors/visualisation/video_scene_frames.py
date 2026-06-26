@@ -29,8 +29,8 @@ class VideoSceneFrames(BasicProcessor):
     """
     type = "video-scene-frames"  # job type ID
     category = "Visual"  # category
-    title = "Extract first frames from each scene"  # title displayed in UI
-    description = "For each scene identified, extracts the first frame."  # description displayed in UI
+    title = "Extract key frames from each scene"  # title displayed in UI
+    description = "For each scene identified, extracts a key frame (e.g. the first frame)."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
     followups = ["video-timelines"]
@@ -58,6 +58,18 @@ class VideoSceneFrames(BasicProcessor):
                 },
                 "help": "Size of extracted frames"
             },
+            "key_frame": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "first",
+                "help": "Key frame",
+                "options": {
+                    "first": "First frame",
+                    "middle": "Middle frame",
+                    "last": "Last frame"
+                },
+                "tooltip": "Which scene to select from each frame. Note that scene boundaries are determined by the "
+                        "difference between the last frame of the previous scene, and the first frame of the next."
+            }
         }
 
     @classmethod
@@ -86,6 +98,7 @@ class VideoSceneFrames(BasicProcessor):
 
         # Collect parameters
         frame_size = self.parameters.get("frame_size", "no_modify")
+        key_frame = self.parameters.get("key_frame", "first")
 
         # unpack source videos to get frames from
         video_dataset = None
@@ -123,6 +136,8 @@ class VideoSceneFrames(BasicProcessor):
             if video.file.name not in scenes:
                 continue
 
+            self.dataset.log(f"Video {video.file.name} has {len(scenes[video.file.name]):,} scenes")
+
             video_folder = staging_area.joinpath(video.file.stem)
             video_folder.mkdir(exist_ok=True)
 
@@ -131,8 +146,20 @@ class VideoSceneFrames(BasicProcessor):
 
             # we use a single command per video and get all frames in one go
             # previously we had a separate command per frame, which is slower
-            frames = [s["start_frame"] for s in scenes[video.file.name]]
-            vf_param = "+".join([f"eq(n\\,{frame})" for frame in frames])
+            # which frame? depends on the key frame setting - for 'middle' we
+            # need to do some calculations
+            keyframe_field = {"first": "start_frame", "last": "end_frame", "middle": None}.get(key_frame)
+            frame_scenes = []
+            for scene in scenes[video.file.name]:
+                bounds = {k: int(v) for k, v in scene.items() if k.endswith("_frame")}
+                frame_scenes.append({
+                    "scene": scene["id"].split("_").pop(),
+                    "frame": scene.get(keyframe_field) if keyframe_field else int(
+                        bounds["start_frame"] + ((bounds["end_frame"] - bounds["start_frame"]) / 2)
+                    )
+                })
+
+            vf_param = "+".join([f"eq(n\\,{frame['frame']})" for frame in frame_scenes])
 
             command = [
                 ffmpeg_path,
@@ -157,8 +184,7 @@ class VideoSceneFrames(BasicProcessor):
             # the default filenames can be improved - use scene ID instead of frame #
             for i in range(0, len(scenes[video.file.name])):
                 frame_file = video_folder.joinpath(f"{video.file.stem}_frame_{i+1}.jpeg")
-                scene_id = scenes[video.file.name][i]["id"].split("_").pop()
-                frame_file.rename(frame_file.with_stem(f"{video.file.stem}_scene_{scene_id}"))
+                frame_file.rename(frame_file.with_stem(f"{video.file.stem}_scene_{frame_scenes[i]['scene']}"))
 
             processed_frames += len(scenes[video.file.name])
 

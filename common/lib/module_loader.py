@@ -217,6 +217,11 @@ class ModuleCollector:
                 self.log_buffer += "Could not import %s: %s\n" % (module_name, e)
                 return
 
+            if getattr(datasource, "DATASOURCE_DISABLED", False):
+                # module deliberately declined to register (e.g. dev-only datasource
+                # gated behind an env var); not an error, so don't warn.
+                return
+
             if not hasattr(datasource, "init_datasource") or not hasattr(datasource, "DATASOURCE"):
                 self.log_buffer += "Could not load datasource %s: missing init_datasource or DATASOURCE\n" % subdirectory
                 return

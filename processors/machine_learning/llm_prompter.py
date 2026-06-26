@@ -5,6 +5,8 @@ Prompt LLMs.
 import re
 import time
 import json
+from itertools import chain
+
 import jsonschema
 import requests
 
@@ -16,7 +18,7 @@ from datetime import datetime, timedelta
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
-from common.lib.llm import LLMAdapter
+from common.lib.llm.adapter import LLMAdapter
 from backend.lib.processor import BasicProcessor
 
 class LLMPrompter(BasicProcessor):
@@ -55,46 +57,51 @@ class LLMPrompter(BasicProcessor):
         local_queue = "local_models" 
         if not dataset:
             return local_queue
+
+        model = dataset.parameters.get("model")
+        if model.startswith("thirdparty"):
+            # API-based models have their own queue - no local resources being
+            # used so can be concurrent
+            return f"llm-thirdparty-{dataset.key}"
         else:
-            if dataset.parameters.get('api_or_local', 'api') in ["local", "hosted"]:
-                # Hosted models also go in the local queue since they use the same shared LLM server
-                return local_queue
-        
-        # Queue per model/API type
-        return f"{cls.type}-{dataset.parameters.get('api_or_local', 'api')}-{dataset.parameters.get('api_model', 'none')}"
+            # use the model's server URL as the queue ID
+            # this is not fool-proof, but does mean not more than one dataset
+            # runs per API server - in the scenario of these running locally,
+            # it means things do not run concurrently (which is good)
+            return f"llm-local[{dataset.parameters.get('model').split('://')[1].split('/')[0]}]"
+
+    @classmethod
+    def get_model_library(cls, config):
+        available_models = config.get("llm.available_models", {})
+        enabled_model_ids = config.get("llm.enabled_models", [])
+        servers = config.get("llm.servers", {})
+        if not config.get("llm.access"):
+            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
+
+        models_option = {}
+        for key, value in {k: v for k, v in available_models.items() if k in enabled_model_ids}.items():
+            server = servers[value["server"]]
+            if server["name"] not in models_option:
+                models_option[server["name"]] = {}
+
+            models_option[server["name"]][key] = value["name"]
+
+        return models_option
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         # Check if 4CAT wide LLM server is available
-        if config.get("llm.access", False) and config.get("llm.server", ""):
-            shared_llm_name = config.get("llm.host_name", "4CAT LLM Server")
-            shared_llm_models = {model: model_metadata.get("name") for model, model_metadata in config.get("llm.available_models", {}).items()}
-            shared_llm_default = list(shared_llm_models.keys())[0] if shared_llm_models else ""
-        else:
-            shared_llm_name = False
-            shared_llm_default = ""
-            shared_llm_models = {}
+        models = cls.get_model_library(config)
 
         # Determine if the parent dataset is a media archive (zip with images/video/audio)
         is_media_parent = False
         media_type = "media"
-        hosted_and_local_available = True
         if parent_dataset:
             parent_extension = parent_dataset.get_extension()
             parent_media_type = parent_dataset.get_media_type()
             if parent_extension == "zip" and parent_media_type in ("image", "video", "audio"):
                 is_media_parent = True
                 media_type = parent_media_type
-            if parent_media_type in ("video", "audio"):
-                # Ollama and LM Studio currently only support text and image
-                hosted_and_local_available = False
-        
-        # Add additional sources for LLM Models
-        api_or_local_options = {"api": "API"}
-        if hosted_and_local_available:
-            api_or_local_options["local"] = "Local"
-            if shared_llm_name:
-                api_or_local_options["hosted"] = shared_llm_name
 
         options = {
             "ethics_warning1": {
@@ -102,21 +109,12 @@ class LLMPrompter(BasicProcessor):
                 "help": "Always <strong>test your prompt</strong> on a sample of rows, for instance by first using the "
                 "<strong>Random filter</strong> processor.",
             },
-            "api_or_local": {
+            "model": {
                 "type": UserInput.OPTION_CHOICE,
-                "help": "Local or API",
-                "options": api_or_local_options,
-                "default": "api" if not shared_llm_name else "hosted",
-                "tooltip": "You can use 'local' models through Ollama and LM Studio as long as you have a valid "
-                "and accessible URL through which the model can be reached.",
-            },
-            "api_model": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "API model",
-                "options": LLMAdapter.get_model_options(config),
+                "help": "Model",
+                "options": models,
                 "default": "none",
                 "tooltip": "Select from the predefined model list or insert manually",
-                "requires": "api_or_local==api",
             },
             "api_key": {
                 "type": UserInput.OPTION_TEXT,
@@ -124,282 +122,194 @@ class LLMPrompter(BasicProcessor):
                 "help": "API key",
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
                 "/api-keys). Note that this often involves billing.",
-                "requires": "api_or_local==api",
+                "requires": "model^=thirdparty",
                 "sensitive": True,
-            },
-            "api_custom_model_provider": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "Model provider",
-                "requires": "api_model==custom",
-                "options": LLMAdapter.get_model_providers(config),
-                "tooltip": "API provider. Currently limited to this list.",
-            },
-            "api_custom_model_id": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Model ID",
-                "requires": "api_model==custom",
-                "tooltip": "E.g. 'mistral-small-2503'. Check the API provider's documentation on what model ID to use. "
-                "Fine-tuned models often require more info; OpenAI for instance requires the following "
-                "format: ft:[modelname]:[org_id]:[custom_suffix]:",
-                "default": "",
-            },
-            "local_info": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "api_or_local==local",
-                "help": "You can use local LLMs with LM Studio, Ollama, and vLLM. These applications need to be reachable by "
-                "this 4CAT server, e.g. by running them on the same machine. For LM Studio and vLLM, "
-                "use the Base URL to interface with any OpenAI-like API endpoint.",
-            },
-            "local_provider": {
-                "type": UserInput.OPTION_CHOICE,
-                "requires": "api_or_local==local",
-                "options": {
-                    "none": "",
-                    "lmstudio": "LM Studio",
-                    "ollama": "Ollama",
-                    "vllm": "vLLM",
-                },
-                "default": "none",
-                "help": "Local LLM provider",
-            },
-            "lmstudio-info": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "local_provider==lmstudio",
-                "help": "LM Studio is a desktop application to chat with LLMs, but that you can also run as a local "
-                "server. See [this link for intructions on how to run LM Studio as a server](https://lmstudio.ai/docs/"
-                "app/api). When the server is running, the endpoint is shown in the 'Developer' tab on the top "
-                "right (default: `http://localhost:1234/v1` or `http://host.docker.internal:1234/v1` in Docker). "
-                "4CAT will use the top-most model you have loaded. ",
-            },
-            "ollama-info": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "local_provider==ollama",
-                "help": "Ollama is a simple command-line application that lets you interface with a range of open-"
-                "source LLMs and that you can run as a local server. See [this link]"
-                "(https://github.com/ollama/ollama/blob/main/README.md#quickstart) for instructions.",
-            },
-            "vllm-info": {
-                "type": UserInput.OPTION_INFO,
-                "requires": "local_provider==ollama",
-                "help": "[vLLM](https://docs.vllm.ai/en/latest/getting_started/quickstart/) is a framework for Linux "
-                "systems capable of fast inference with a single LLM. Communication is done through an "
-                "OpenAI-like API endpoint. Just change the base URL below and insert an optional API key.",
-            },
-            "local_base_url": {
-                "type": UserInput.OPTION_TEXT,
-                "requires": "api_or_local==local",
-                "default": "",
-                "help": "Base URL",
-                "tooltip": "[optional] Leaving this empty will use default values (`http://localhost:1234/v1` or `http://host.docker.internal:1234/v1` for LM "
-                "Studio, `http://localhost:11434` or `http://host.docker.internal:11434` for Ollama, `http://localhost:8000` or `http://host.docker.internal:8000` for vLLM ).",
-            },
-            "lmstudio_api_key": {
-                "type": UserInput.OPTION_TEXT,
-                "default": "",
-                "help": "LM Studio API key",
-                "tooltip": "[optional] Uses `lm-studio` by default.",
-                "requires": "local_provider==lmstudio",
-                "sensitive": True,
-            },
-            "vllm_api_key": {
-                "type": UserInput.OPTION_TEXT,
-                "default": "",
-                "help": "vLLM API key",
-                "tooltip": "[optional] Empty by default.",
-                "requires": "local_provider==vllm",
-                "sensitive": True,
-            },
-            "ollama_model": {
-                "type": UserInput.OPTION_TEXT,
-                "requires": "local_provider==ollama",
-                "default": "",
-                "help": "Ollama model name",
-                "tooltip": "[required] for example 'llama3.2'",
-            },
-            "hosted_llm_model": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "LLM model",
-                "options": shared_llm_models,
-                "default": shared_llm_default,
-                "requires": "api_or_local==hosted",
-            },
+            }
         }
 
         if is_media_parent:
             # Media-specific options: show info about media files being attached
-            options["media_info"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": f"The parent dataset contains <strong>{media_type}</strong> files that will be sent "
-                f"to the LLM with each prompt. Make sure to use a model that supports "
-                f"<strong>{media_type}</strong> input (e.g. vision models for images).<br>"
-                f"Not all models support all media types. If the model cannot process "
-                f"{media_type} files, an error will be returned during processing.",
-            }
-            options["system_prompt"] = {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "System prompt",
-                "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
-                "on the tone of the text. This processor may edit the system prompt to "
-                "ensure correct output. System prompts are included in the results file.",
-                "default": "",
-            }
-            options["prompt"] = {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "User prompt",
-                "tooltip": f"Describe what the model should do with each {media_type} file. "
-                f"No column brackets needed — {media_type} files are attached automatically.",
-                "default": "",
-            }
+            options.update({
+                "media_info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": f"The parent dataset contains <strong>{media_type}</strong> files that will be sent "
+                            f"to the LLM with each prompt. Make sure to use a model that supports "
+                            f"<strong>{media_type}</strong> input (e.g. vision models for images).<br>"
+                            f"Not all models support all media types. If the model cannot process "
+                            f"{media_type} files, an error will be returned during processing.",
+                },
+                "system_prompt": {
+                    "type": UserInput.OPTION_TEXT_LARGE,
+                    "help": "System prompt",
+                    "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
+                               "on the tone of the text. This processor may edit the system prompt to "
+                               "ensure correct output. System prompts are included in the results file.",
+                    "default": "",
+                },
+                "prompt": {
+                    "type": UserInput.OPTION_TEXT_LARGE,
+                    "help": "User prompt",
+                    "tooltip": f"Describe what the model should do with each {media_type} file. "
+                               f"No column brackets needed — {media_type} files are attached automatically.",
+                    "default": "",
+                }
+            })
+
         else:
-            # Text-based dataset options: column brackets, media URL toggle, batching
-            options["prompt_info"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": "<strong>How to prompt</strong><br>"
-                "Use `[brackets]` with column names to insert dataset items in the prompt. You "
-                "can place column brackets in different parts of the prompt or use multiple column names within"
-                ' a single column bracket to merge items.<br>Example 1: "Describe the topic '
-                'of this social media post in max. 3 words: `[body, tags]`"<br>Example 2: '
-                "\"Given the following hashtags: `[tags]`, answer whether they are 'related' or 'unrelated' "
-                'to the following text: `[body]`"<br><strong>Prompting is a delicate art</strong>. See '
-                "processor references on best prompting practices.<br>For predefined research prompts, see "
-                "e.g. [Prompt Compass](https://github.com/ErikBorra/PromptCompass/blob/main/prompts.json#L136) "
-                "or the [Anthropic Prompt Library](https://docs.anthropic.com/en/resources/prompt-library/"
-                "library).",
-            }
-            options["system_prompt"] = {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "System prompt",
-                "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
-                "on the tone of the text. This processor may edit the system prompt to "
-                "ensure correct output. System prompts are included in the results file.",
-                "default": "",
-            }
-            options["prompt"] = {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "User prompt",
-                "tooltip": "Use [brackets] with columns names.",
-                "default": "",
-            }
-            options["use_media"] = {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Add images",
-                "tooltip": "Add media URLs for multi-modal processing. Requires a model that supports vision.",
-                "default": False,
-            }
-            options["media_columns"] = {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Columns with image URL(s)",
-                "default": "",
-                "inline": True,
-                "tooltip": "Multiple columns can be selected.",
-                "requires": "use_media==true",
-            }
+            options.update({
+                # Text-based dataset options: column brackets, media URL toggle, batching
+                "prompt_info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": "<strong>How to prompt</strong><br>"
+                            "Use `[brackets]` with column names to insert dataset items in the prompt. You "
+                            "can place column brackets in different parts of the prompt or use multiple column names within"
+                            ' a single column bracket to merge items.<br>Example 1: "Describe the topic '
+                            'of this social media post in max. 3 words: `[body, tags]`"<br>Example 2: '
+                            "\"Given the following hashtags: `[tags]`, answer whether they are 'related' or 'unrelated' "
+                            'to the following text: `[body]`"<br><strong>Prompting is a delicate art</strong>. See '
+                            "processor references on best prompting practices.<br>For predefined research prompts, see "
+                            "e.g. [Prompt Compass](https://github.com/ErikBorra/PromptCompass/blob/main/prompts.json#L136) "
+                            "or the [Anthropic Prompt Library](https://docs.anthropic.com/en/resources/prompt-library/"
+                            "library).",
+                },
+                "system_prompt": {
+                    "type": UserInput.OPTION_TEXT_LARGE,
+                    "help": "System prompt",
+                    "tooltip": "[optional] A system prompt can be used to give the LLM general instructions, for instance "
+                               "on the tone of the text. This processor may edit the system prompt to "
+                               "ensure correct output. System prompts are included in the results file.",
+                    "default": "",
+                },
+                "prompt": {
+                    "type": UserInput.OPTION_TEXT_LARGE,
+                    "help": "User prompt",
+                    "tooltip": "Use [brackets] with columns names.",
+                    "default": "",
+                },
+                "use_media": {
+                    "type": UserInput.OPTION_TOGGLE,
+                    "help": "Add images",
+                    "tooltip": "Add media URLs for multi-modal processing. Requires a model that supports vision.",
+                    "default": False,
+                },
+                "media_columns": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Columns with image URL(s)",
+                    "default": "",
+                    "inline": True,
+                    "tooltip": "Multiple columns can be selected.",
+                    "requires": "use_media==true",
+                }
+            })
 
         # Common options for both text and media datasets
-        options["structured_output"] = {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Output structured JSON",
-            "tooltip": "Output in a JSON format instead of text. Note that your chosen model may not support "
-            "structured output.",
-            "default": False,
-        }
-        options["json_schema_info"] = {
-            "type": UserInput.OPTION_INFO,
-            "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
-            "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
-            "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
-            "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
-            "requires": "structured_output==true",
-        }
-        options["json_schema"] = {
-            "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "JSON schema",
-            "tooltip": "[required] A JSON schema that the structured output will adhere to",
-            "requires": "structured_output==true",
-            "default": "",
-        }
-        options["temperature"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Temperature",
-            "default": 0.1,
-            "coerce_type": float,
-            "max": 2.0,
-            "tooltip": "Temperature indicates how strict the model will gravitate towards the most "
-            "probable next token. A score close to 0 returns more predictable "
-            "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
-        }
+        options.update({
+            "structured_output": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Output structured JSON",
+                "tooltip": "Output in a JSON format instead of text. Note that your chosen model may not support "
+                           "structured output.",
+                "default": False,
+            },
+            "json_schema_info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "<strong>Insert a JSON Schema</strong> for structured outputs. These define the output that "
+                        "the LLM will adhere to. [See instructions and examples on how to write a JSON Schema]"
+                        "(https://json-schema.org/learn/miscellaneous-examples) and [OpenAI's documentation]"
+                        "(https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#supported-schemas).",
+                "requires": "structured_output==true",
+            },
+            "json_schema": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "JSON schema",
+                "tooltip": "[required] A JSON schema that the structured output will adhere to",
+                "requires": "structured_output==true",
+                "default": "",
+            },
+            "temperature": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Temperature",
+                "default": 0.1,
+                "coerce_type": float,
+                "max": 2.0,
+                "tooltip": "Temperature indicates how strict the model will gravitate towards the most "
+                           "probable next token. A score close to 0 returns more predictable "
+                           "outputs while a score close to 1 leads to more creative outputs. Not supported by all models.",
+            }
+        })
 
         if not is_media_parent:
-            options["truncate_input"] = {
+            options.update({
+                "truncate_input": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Max chars in input value",
+                    "default": 0,
+                    "coerce_type": int,
+                    "tooltip": "This value determines how many characters an inserted dataset value may have. 0 = unlimited.",
+                    "requires": "use_media==false",
+                },
+                "max_tokens": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Max output tokens",
+                    "default": 10000,
+                    "coerce_type": int,
+                    "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
+                               "text for common English text. This includes tokens spent for reasoning.",
+                },
+                "batches": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Items per prompt",
+                    "coerce_type": int,
+                    "default": 1,
+                    "tooltip": "How many dataset items to insert into the prompt. These will be inserted as a list "
+                               "wherever the column brackets are used (e.g. '[body]').",
+                    "requires": "use_media==false",
+                },
+                "batch_info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": "<strong>Note on batching:</strong> Batching may increase speed but reduce accuracy. Models "
+                            "need to support structured output for batching. This processor uses JSON schemas to ensure "
+                            "symmetry between input and output lengths, but models may struggle to match input and output "
+                            "values. Describe the dataset values in plurals in your prompt when batching. If you use "
+                            "multiple column brackets in your prompt, rows with any empty values are skipped.",
+                    "requires": "use_media==false",
+                }
+            })
+
+        options.update({
+            "ethics_warning3": {
+                "type": UserInput.OPTION_INFO,
+                "requires": "model^=thirdparty",
+                "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
+                        "whether local open-source LLMs are also an option.</strong>",
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                "label": "prompt outputs",
+                "default": False,
+            },
+            "hide_think": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Hide reasoning",
+                "default": False,
+                "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
+                           "removes this tag and its contents from the output.",
+            },
+            "limit": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Max chars in input value",
+                "help": "Only annotate this many items, then stop",
                 "default": 0,
                 "coerce_type": int,
-                "tooltip": "This value determines how many characters an inserted dataset value may have. 0 = unlimited.",
-                "requires": "use_media==false",
-            }
-
-        options["max_tokens"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Max output tokens",
-            "default": 10000,
-            "coerce_type": int,
-            "tooltip": "As a rule of thumb, one token generally corresponds to ~4 characters of "
-            "text for common English text. This includes tokens spent for reasoning.",
-        }
-
-        if not is_media_parent:
-            options["batches"] = {
+                "min": 0,
+                "delegated": True,
+            },
+            "annotation_label": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Items per prompt",
-                "coerce_type": int,
-                "default": 1,
-                "tooltip": "How many dataset items to insert into the prompt. These will be inserted as a list "
-                "wherever the column brackets are used (e.g. '[body]').",
-                "requires": "use_media==false",
+                "help": "Label for the annotations to add to the dataset",
+                "default": "",
+                "delegated": True,
             }
-            options["batch_info"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": "<strong>Note on batching:</strong> Batching may increase speed but reduce accuracy. Models "
-                "need to support structured output for batching. This processor uses JSON schemas to ensure "
-                "symmetry between input and output lengths, but models may struggle to match input and output "
-                "values. Describe the dataset values in plurals in your prompt when batching. If you use "
-                "multiple column brackets in your prompt, rows with any empty values are skipped.",
-                "requires": "use_media==false",
-            }
-
-        options["ethics_warning3"] = {
-            "type": UserInput.OPTION_INFO,
-            "requires": "api_or_local==api",
-            "help": "<strong>When using LLMs through commercial parties, always consider anonymising your data and "
-            "whether local open-source LLMs are also an option.</strong>",
-        }
-        options["save_annotations"] = {
-            "type": UserInput.OPTION_ANNOTATION,
-            "label": "prompt outputs",
-            "default": False,
-        }
-        options["hide_think"] = {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Hide reasoning",
-            "default": False,
-            "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
-            "removes this tag and its contents from the output.",
-        }
-        options["limit"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Only annotate this many items, then stop",
-            "default": 0,
-            "coerce_type": int,
-            "min": 0,
-            "delegated": True,
-        }
-        options["annotation_label"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Label for the annotations to add to the dataset",
-            "default": "",
-            "delegated": True,
-        }
+        })
 
         # Get the media columns for the select media columns option
         if not is_media_parent and parent_dataset and parent_dataset.get_columns():
@@ -416,23 +326,22 @@ class LLMPrompter(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
+        # need at least one models
+        if config and not config.get("llm.enabled_models", False):
+            return False
+        
         # Text-based datasets
         if module.get_extension() in ["csv", "ndjson"]:
             return True
+
         # Media datasets (zip archives with images, video, or audio)
         if module.get_extension() == "zip" and module.get_media_type() in ("image", "video", "audio"):
             return True
         return False
 
     def process(self):
-        
         self.dataset.update_status("Validating settings")
 
-        api_model = self.parameters.get("api_model")
-        if api_model == "none":
-            api_model = ""
-
-        modal_location = self.parameters.get("api_or_local", "api") 
         hide_think = self.parameters.get("hide_think", False)
 
         # Check if the source dataset is a media archive (zip with images/video/audio)
@@ -459,85 +368,29 @@ class LLMPrompter(BasicProcessor):
 
         # Set value for batch length in prompts
         batches = max(1, min(self.parameters.get("batches", 1), self.source_dataset.num_rows))
-        use_batches = batches > 1
-        if media_columns or is_media_archive:  # no batching for media files
-            use_batches = False
+        use_batches = batches > 1 and not (media_columns or is_media_archive)  # no batching for media files
+
         if not use_batches:
             self.dataset.delete_parameter("batches")
 
         # Set all variables through which we can reach the LLM
-        api_key = ""
-        base_url = None
+        api_key = self.parameters.get("api_key", "").strip()
         client_kwargs = {}
 
-        if modal_location == "local":
-            provider = self.parameters.get("local_provider", "")
-            base_url = self.parameters.get("local_base_url", "")
+        # load model and server metadata
+        chosen_model_id = self.parameters.get("model")
+        available_models = {k: v for k, v in self.config.get("llm.available_models").items() if k in self.config.get("llm.enabled_models")}
+        if chosen_model_id not in available_models:
+            return self.dataset.finish_with_error(f"Model {chosen_model_id} not supported")
 
-            if not provider:
-                self.dataset.finish_with_error("Choose a local model provider")
-                return
+        model = available_models[chosen_model_id]
+        server = self.config.get("llm.servers").get(model["server"])
 
-            if provider == "lmstudio":
-                model = "lmstudio_model"
-                if not base_url:
-                    base_url = "http://127.0.0.1:1234/v1" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:1234/v1"
-                if not self.parameters.get("lmstudio_api_key"):
-                    api_key = "lm-studio"
-            elif provider == "ollama":
-                model = self.parameters.get("ollama_model", "")
-                if not model:
-                    self.dataset.finish_with_error("You need to provide a model name for Ollama (e.g. 'llama3.2')")
-                    return
-                if not base_url:
-                    base_url = "http://localhost:11434" if not self.config.get("USING_DOCKER", False) else "http://host.docker.internal:11434"
-            elif provider == "vllm":
-                model = "vllm_model"
-                api_key = self.parameters.get("vllm_api_key", "")
-                if not base_url:
-                    base_url = "http://localhost:8000/v1"
-            else:
-                self.dataset.finish_with_error("Local provider not supported, choose either lmstudio or ollama")
-                return
+        if not server:
+            return self.dataset.finish_with_error(f"Model server for {chosen_model_id} not currently available.")
 
-        elif modal_location == "hosted":
-            base_url = self.config.get("llm.server", "")
-            provider = self.config.get("llm.provider_type", "none").lower()
-            api_key = self.config.get("llm.api_key", "")
-            llm_auth_type = self.config.get("llm.auth_type", "")
-            model = self.parameters.get("hosted_llm_model", "")
-            if api_key and llm_auth_type:
-                client_kwargs = {
-                    "headers": {
-                        llm_auth_type: api_key
-                    }
-                }
-            if provider == "none" or not base_url:
-                self.dataset.finish_with_error("4CAT LLM server not properly configured; contact the administrator")
-                return
-        else:
-            if not api_model:
-               self.dataset.finish_with_error("Select an API model or insert one manually")
-               return
-            # Models can be set manually
-            if api_model == "custom":
-                model = self.parameters.get("api_custom_model_id", "")
-                provider = self.parameters.get("api_custom_model_provider", "")
-                if not model:
-                    self.dataset.finish_with_error("You must provide a valid API model name/ID")
-                    return
-                if not provider:
-                    self.dataset.finish_with_error("You must provide a valid API model provider")
-                    return
-            else:
-                model_info = LLMAdapter.get_models(self.config).get(api_model, {})
-                provider = model_info.get("provider")
-                model = api_model
-
-            api_key = self.parameters.get("api_key") or self.config.get(f"api.{provider}.api_key", "")
-            if not api_key:
-                self.dataset.finish_with_error("You need to provide a valid API key")
-                return
+        if server["type"] == "thirdparty" and not api_key:
+            return self.dataset.finish_with_error(f"No API key provided for model {chosen_model_id}")
 
         # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
@@ -582,15 +435,14 @@ class LLMPrompter(BasicProcessor):
         json_schema_original = json_schema or None  # We may manipulate the schema later, save a copy
         
         # Start LLM
-        self.dataset.update_status("Connecting to LLM provider")
-        base_url_str = "" if not base_url else f" at base URL '{base_url}'"
-        self.dataset.log(f"Using LLM provider '{provider}' with model '{model}'{base_url_str}")
+        self.dataset.update_status("Connecting to LLM server")
+        base_url_str = "" if not server["url"] else f" at base URL '{server['url']}'"
+        self.dataset.log(f"Using LLM server '{server['_id']}' with model '{model['local_id']}'{base_url_str}")
         try:
             llm = LLMAdapter(
-                provider=provider,
+                config=self.config,
                 model=model,
                 api_key=api_key,
-                base_url=base_url,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 client_kwargs=client_kwargs
@@ -718,7 +570,7 @@ class LLMPrompter(BasicProcessor):
                         )
                     except Exception as e:
                         # Best-effort heuristic to detect model incompatibility with media type.
-                        # Error messages vary by provider; this catches common patterns.
+                        # Error messages vary by server; this catches common patterns.
                         error_str = str(e).lower()
                         if "vision" in error_str or "image" in error_str or "multimodal" in error_str or "media" in error_str:
                             self.dataset.finish_with_error(
@@ -788,7 +640,7 @@ class LLMPrompter(BasicProcessor):
                             "prompt": prompt,
                             "temperature": temperature,
                             "max_tokens": max_tokens,
-                            "model": model,
+                            "model": model["local_id"],
                             "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                             "time_created_utc": time_created,
                             "batch_number": "",
@@ -816,7 +668,7 @@ class LLMPrompter(BasicProcessor):
                             for output_key, output_value in annotation_output.items():
 
                                 # Skip 'signature' and 'type' annotations for Google
-                                if provider == "google" and (
+                                if model["server"] == "google" and (
                                     output_key.endswith(".signature")
                                     or output_key.endswith(".type")
                                 ):
@@ -850,8 +702,8 @@ class LLMPrompter(BasicProcessor):
 
                     self.dataset.update_progress(row / max_processed)
 
-                    # Rate limits for different providers
-                    if provider == "mistral":
+                    # Rate limits for different servers
+                    if model["server"] == "mistral":
                         time.sleep(1)
 
                     if limit_reached:
@@ -966,10 +818,9 @@ class LLMPrompter(BasicProcessor):
                                 json_schema = self.get_json_schema_for_batch(n_batched, custom_schema=json_schema_original)
                                 # `llm` becomes a RunnableSequence when used, so we'll need to reset it here
                                 llm = LLMAdapter(
-                                    provider=provider,
+                                    config=self.config,
                                     model=model,
                                     api_key=api_key,
-                                    base_url=base_url,
                                     temperature=temperature,
                                     max_tokens=max_tokens,
                                     client_kwargs=client_kwargs
@@ -984,7 +835,7 @@ class LLMPrompter(BasicProcessor):
 
                         batch_str = f" and {n_batched} items batched into the prompt" if use_batches else ""
                         self.dataset.update_status(f"Generating text at row {row:,}/"
-                                                   f"{max_processed:,} with {model}{batch_str}")
+                                                   f"{max_processed:,} with {model['name']}{batch_str}")
                         # Now finally generate some text!
                         try:
                             response = llm.generate_text(
@@ -1003,20 +854,14 @@ class LLMPrompter(BasicProcessor):
                             else:
                                 self.dataset.finish_with_warning(outputs, f"{e}")
                                 return
-                        # Broad exception, but necessary with all the different LLM providers and options...
+                        # Broad exception, but necessary with all the different LLM servers and options...
                         except Exception as e:
                             self.dataset.finish_with_warning(outputs, f"Not all items processed: {e}")
                             return
 
-                        # Set model name from the response for more details
-                        if hasattr(response, "response_metadata"):
-                            model = response.response_metadata.get("model_name", model)
-                            if "models/" in model:
-                                model = model.replace("models/", "")
-
                         if not response:
                             structured_warning = " with your specified JSON schema" if structured_output else ""
-                            warning = f"{model} could not return text{structured_warning}. Consider editing your prompt or changing settings."
+                            warning = f"{model['name']} could not return text{structured_warning}. Consider editing your prompt or changing settings."
                             self.dataset.finish_with_warning(outputs, warning)
                             return
 
@@ -1100,7 +945,7 @@ class LLMPrompter(BasicProcessor):
                                 "prompt": prompt if not use_batches else base_prompt,  # Insert dataset values if not batching
                                 "temperature": temperature,
                                 "max_tokens": max_tokens,
-                                "model": model,
+                                "model": model["local_id"],
                                 "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                                 "time_created_utc": time_created,
                                 "batch_number": n + 1 if use_batches else "",
@@ -1122,7 +967,7 @@ class LLMPrompter(BasicProcessor):
                                 for output_key, output_value in annotation_output.items():
 
                                     # Skip 'signature' and 'type' annotations for Google
-                                    if provider == "google" and output_key in ("extras.signature", ".type"):
+                                    if model["server"] == "google" and output_key in ("extras.signature", ".type"):
                                         continue
 
                                     annotation = {
@@ -1139,8 +984,8 @@ class LLMPrompter(BasicProcessor):
                         batched_data = {}
                         n_batched = 0
 
-                        # Rate limits for different providers
-                        if provider == "mistral":
+                        # Rate limits for different servers
+                        if model["server"] == "mistral":
                             time.sleep(1)
 
                     # Write annotations in batches
@@ -1175,7 +1020,7 @@ class LLMPrompter(BasicProcessor):
         # Final outputs
         time_end = time.time()
         time_progressed = str(timedelta(seconds=int(time_end - time_start)))
-        final_status = f"Finished, {model} generated text in {time_progressed}."
+        final_status = f"Finished, {model['local_id']} generated text in {time_progressed}."
         skipped_str = None if not skipped else f" Skipped {skipped} rows because of empty values."
         if skipped_str:
             self.dataset.finish_with_warning(i, final_status + skipped_str)
@@ -1261,8 +1106,13 @@ class LLMPrompter(BasicProcessor):
         :param config:
         :return:
         """
-        if query["api_or_local"] == "api" and not query.get("api_key"):
+        is_external_api = query["model"].startswith("thirdparty")
+        if is_external_api and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
+
+        allowed_models = LLMPrompter.get_model_library(config)
+        if query["model"] not in chain(*[v.keys() for v in allowed_models.values()]):
+            raise QueryParametersException(f"The '{query['model']}' model is not currently available.")
 
         # For media archive datasets, use_media won't be present in the query
         is_media_archive = "use_media" not in query
@@ -1277,7 +1127,7 @@ class LLMPrompter(BasicProcessor):
             raise QueryParametersException("You need to insert column name(s) in the user prompt within brackets "
                                            "(e.g. '[body]' or '[timestamp, author]')")
 
-        if query["api_or_local"] == "api" and not query.get("frontend-confirm"):
+        if is_external_api and not query.get("frontend-confirm"):
             raise QueryNeedsExplicitConfirmationException("Your data will be sent to a third-party service for "
                                                           "processing, which will share your data with them and is "
                                                           "likely to incur costs. Do you want to continue?")

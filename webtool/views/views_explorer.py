@@ -174,7 +174,7 @@ def explorer_dataset(dataset_key: str, page=1):
     )
 
 
-@component.route("/explorer/save_annotation_fields/<string:dataset_key>/", methods=["POST"])
+@component.route("/explorer/save_annotation_fields/<string:dataset_key>", methods=["POST"])
 @api_ratelimit
 @login_required
 @setting_required("privileges.can_run_processors")
@@ -201,9 +201,12 @@ def explorer_save_annotation_fields(dataset_key: str):
     # Save it!
     annotation_fields = request.get_json()
 
-    # Potentially re-add annotation fields that were hidden in the Explorer
+    # Re-add annotation fields that were hidden in the Explorer.
+    # These (e.g. processor-generated fields) are filtered out before being sent
+    # to the editor, so the client never posts them back. If we don't restore them
+    # here they'd be treated as deleted and their annotations would be wiped.
     if dataset.annotation_fields:
-        for annotation_field_id, annotation_field in annotation_fields.items():
+        for annotation_field_id, annotation_field in dataset.annotation_fields.items():
             if annotation_field.get("hide_in_explorer"):
                 annotation_fields[annotation_field_id] = annotation_field
 

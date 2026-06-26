@@ -123,13 +123,14 @@ class VideoFrames(BasicProcessor):
 			]
 
 			if frame_interval != 0:
-				command += ["-r", str(frame_interval)]
+				command.extend(["-r", str(frame_interval)])
 			else:
-				command += ["-vframes", "1"]
+				command.extend(["-vframes", "1"])
 
 			if frame_size != 'no_modify':
-				command += ['-s', oslex.quote(frame_size)]
-			command += [str(video_dir.joinpath("/video_frame_%07d.jpeg"))]
+				command.extend(['-s', oslex.quote(frame_size)])
+
+			command.extend([str(video_dir.joinpath("video_frame_%07d.jpeg"))])
 
 			self.dataset.log(" ".join(command))
 

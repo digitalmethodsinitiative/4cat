@@ -2,25 +2,188 @@
 Generate word tree from dataset
 """
 import string
+import emoji
 import jieba
 import re
 
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
+from common.lib.exceptions import QueryParametersException
 
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, TweetTokenizer
 
-from svgwrite import Drawing
-from svgwrite.container import SVG
+from svgwrite.container import SVG, Script, Style
+from svgwrite.shapes import Rect
 from svgwrite.path import Path
 from svgwrite.text import Text
 
-from anytree import Node
+from math import ceil, sin, pi
+from anytree import Node, PreOrderIter
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
+
+
+class TreeNode(Node):
+    """
+    An anytree Node, but with some extra plumbing to give nodes directionality
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor
+
+        Initialises the `bbox` property.
+
+        :param args:
+        :param kwargs:
+        """
+        super().__init__(*args, **kwargs)
+        self.bbox = {}
+        self.weight = 0
+
+    def get_child(self, name: str, direction: int) -> bool | Node:
+        """
+        Get children with a specific direction
+
+        :param str name:  Node name
+        :param int direction:  Direction, one of the `SIDE_*` constants
+        :return:  The first matching node, or `False`
+        """
+        for node in self.children:
+            if node.name == name and node.has_direction(direction, inclusive=True):
+                return node
+
+        return False
+
+    def has_direction(self, direction: int, inclusive: bool = False) -> bool:
+        """
+        Test if node has the required direction
+
+        :param direction:  Direction, one of the `SIDE_*` constants
+        :param bool inclusive:  If `True`, also return `True` if the node has
+          no direction (i.e. if it is the root node)
+        :return:  Whether the node has the required direction
+        """
+        if not hasattr(self, "direction"):
+            return inclusive
+        else:
+            return self.direction == direction
+
+    def get_parents(self):
+        return self.path if hasattr(self, "parents") else []
+
+    @property
+    def id(self) -> str:
+        """
+        Get node ID
+
+        This is equivalent to the node path
+
+        :return str:  Node ID
+        """
+        return "/".join([re.sub(r"[^a-zA-Z0-9-]*", "", n.name) for n in self.iter_path_reverse()])
+
+
+class Fragment:
+    """
+    Simple class for text fragments
+
+    Fragments have two components, a value and a direction (does that make them vectors?)
+    """
+
+    def __init__(self, value: list, direction: int):
+        """
+        Constructor
+
+        :param list value:  The value, as a list of tokens
+        :param int direction:  Direction, one of the `SIDE_*` constants
+        """
+        self.value = value
+        self.direction = direction
+
+class WildcardMatcher:
+    """
+    Plumbing for matching wildcard (* and ?) strings
+    """
+    # can't really think of a better way than this
+    dictionary = {
+        "*": "OOOOOXXOOOOOXXOOOOOXXOOOOOASTERISKOOOOOXXOOOOOXXOOOOOXXOOOOO",
+        "?": "OOOOOXXOOOOOXXOOOOOXXOOOOOQMARKOOOOOXXOOOOOXXOOOOOXXOOOOO",
+    }
+
+    def __init__(self):
+        """
+        Initialise cache
+        """
+        self._cache = {}
+
+    def obfuscate(self, q: str) -> str:
+        """
+        Obfuscate a wildcard string
+
+        Useful to avoid considering the wildcard syntax as a token boundary
+        while tokenising.
+
+        :param str q:
+        :return str:
+        """
+        for s, r in WildcardMatcher.dictionary.items():
+            q = q.replace(s, r)
+        return q
+
+    def deobfuscate(self, q: str) -> str:
+        """
+        Deobfuscate a wildcard string
+
+        :param str q:
+        :return str:
+        """
+        for s, r in WildcardMatcher.dictionary.items():
+            q = q.replace(r, s)
+        return q
+
+    def compile(self, q: str) -> re.Pattern|None:
+        """
+        Compile a regular expression for matching
+
+        Escapes all regex syntax currently in the match string. Regular
+        expressions are cached. If the query does not contain wildcard
+        characters, return `None` (signalling that plain string matching can be
+        used)
+
+        :param str q:  Query string (may contain `*` and `?` wildcards)
+        :return re.Pattern|None:  Regular expression object, or `None`
+        """
+        if q not in self._cache:
+            worked_q = self.obfuscate(q)
+            worked_q = re.escape(worked_q)
+            worked_q = self.deobfuscate(worked_q)
+            if re.findall(r"[*?]", worked_q):
+                worked_q = worked_q.replace("*", ".*?").replace("?", ".")
+                self._cache[q] = re.compile(worked_q)
+            else:
+                self._cache[q] = None
+
+        return self._cache[q]
+
+    def fullmatch(self, needle: str, haystack:str) -> bool:
+        """
+        Match a needle against a haystack
+
+        :param str needle:  Query string (may contain `*` and `?` wildcards)
+        :param str haystack:  Haystack to search
+        :return bool:  Do the strings match?
+        """
+        pattern = self.compile(needle)
+        if pattern is None:
+            return needle == haystack
+        else:
+            return bool(pattern.fullmatch(haystack))
+
 
 class MakeWordtree(BasicProcessor):
     """
@@ -36,8 +199,42 @@ class MakeWordtree(BasicProcessor):
     extension = "svg"  # extension of result file, used internally and in UI
 
     references = [
-        "Wattenberg, M., & Viégas, F. B. (2008). The Word Tree, an Interactive Visual Concordance. IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228. <https://doi.org/10.1109/TVCG.2008.172>"
+        "Wattenberg, M., & Viégas, F. B. (2008). [The Word Tree, an Interactive Visual Concordance](https://doi.org/10.1109/TVCG.2008.172). IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228."
     ]
+
+    # can be changed
+    FONT_SIZE = 14  # in px
+    FONT_FACTOR_MAX = 3  # how big can the font get?
+
+    # will be adjusted based on tokeniser used
+    SPACE = ""
+
+    # tbd on load
+    align = "top"
+
+    # convert between relative and absolute units
+    REM_TO_CH = 0.601875
+    REM_CONV = FONT_SIZE
+    CH_CONV = FONT_SIZE * REM_TO_CH
+
+    # gaps between nodes vertically and horizontally
+    gap_x = 4
+    gap_y = 1
+
+    # to be used later to determine dimensions of graph
+    x_min = 0
+    x_max = 0
+
+    # for the user!
+    progress = 0
+
+    # constants
+    SIDE_LEFT = -1
+    SIDE_RIGHT = 1
+
+    # colour palette via https://medialab.github.io/iwanthue/
+    palette = ["#ff6c55", "#0948b9", "#acad13", "#7f7cf7", "#72b636", "#51006f", "#b9e272", "#a23fb0", "#00bf82",
+               "#a90580", "#01bd9e", "#c10f78", "#8fe6b3", "#d2264a", "#739dff", "#fdaa3a", "#004ca2", "#f8ce80"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -54,7 +251,10 @@ class MakeWordtree(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "Word tree root query",
-                "tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation. Cannot be empty or contain whitespace.",
+                "tooltip": "Enter a text here to serve as the root of the word tree. The context of this query will be "
+                           "visualised as a tree graph. You can use wildcards: 'politic*' will match 'politician' and "
+                           "'politics' for example, though this is more computationally intensive and will make the "
+                           "processor much slower.",
             },
             "limit": {
                 "type": UserInput.OPTION_TEXT,
@@ -62,22 +262,22 @@ class MakeWordtree(BasicProcessor):
                 "min": 1,
                 "max": 25,
                 "help": "Max branches/level",
-                "tooltip": "Limit the amount of branches per level, sorted by most-occuring phrases. Range 1-25.",
+                "tooltip": "Limit the amount of branches per level, sorted by most-occuring fragments. Range 1-25.",
             },
             "window": {
                 "type": UserInput.OPTION_TEXT,
                 "min": 1,
-                "max": 10,
-                "default": 5,
+                "max": 25,
+                "default": 10,
                 "help": "Window size",
                 "tooltip": "Up to this many words before and/or after the queried phrase will be visualised",
             },
             "sides": {
                 "type": UserInput.OPTION_CHOICE,
-                "default": "right",
+                "default": "both",
                 "options": {
-                    "left": "Before query",
-                    "right": "After query",
+                    "only-left": "Before query",
+                    "only-right": "After query",
                     "both": "Before and after query",
                 },
                 "help": "Query context to visualise",
@@ -88,14 +288,16 @@ class MakeWordtree(BasicProcessor):
                 "options": {
                     "middle": "Vertically centered",
                     "top": "Top",
+                    "bottom": "Bottom",
                 },
                 "help": "Visual alignment",
             },
             "tokeniser_type": {
                 "type": UserInput.OPTION_CHOICE,
-                "default": "regular",
+                "default": "nltk-tweet",
                 "options": {
-                    "regular": "nltk word_tokenize",
+                    "nltk-tweet": "nltk TweetTokenizer (optimized for social media)",
+                    "nltk-word": "nltk word_tokenize",
                     "jieba-cut": "jieba (for Chinese text; accurate mode, recommended)",
                     "jieba-cut-all": "jieba (for Chinese text; full mode)",
                     "jieba-search": "jieba (for Chinese text; search engine suggestion style)",
@@ -112,7 +314,15 @@ class MakeWordtree(BasicProcessor):
                 "type": UserInput.OPTION_TOGGLE,
                 "default": True,
                 "help": "Remove punctuation",
+                "tooltip": "Remove punctuation. Adjust your query accordingly (e.g. after removing punctuation, the "
+                           "query 'a.i.' will match nothing).",
             },
+            "lower-case": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Make all text lower case",
+                "tooltip": "If not checked, e.g. 'The' and 'the' will be considered separate branches of the word tree"
+            }
         }
 
         # Get the columns for the select columns option
@@ -132,67 +342,148 @@ class MakeWordtree(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
-                Allow processor to run on all csv and NDJSON datasets
+        Allow processor to run on all csv and NDJSON datasets
 
-                :param module: Dataset or processor to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         :param ConfigManager|None config:  Configuration reader (context-aware)
         """
-
         return module.get_extension() in ("csv", "ndjson")
-
-    # determines how close the nodes are displayed to each other (min. 1)
-    whitespace = 2
-
-    # 'fontsize' can be changed, the others are derived
-    fontsize = 16
-    step = 0
-    gap = 0
-
-    # to be used later to determine dimensions of graph
-    x_min = 0
-    x_max = 0
-    max_occurrences = {}
-
-    # constants
-    SIDE_LEFT = -1
-    SIDE_RIGHT = 1
-
-    # amount of nodes to include per branch
-    # set as a parameter, but stored as a property to be accessed by child
-    # methods
-    limit = 1
 
     def process(self):
         """
         This takes a 4CAT results file as input, and outputs a plain text file
         containing all post bodies as one continuous string, sanitized.
         """
-
-        link_regex = re.compile(r"https?://[^\s]+")
-
-        # settings
-        columns = self.parameters.get("columns", [])
-        if not columns:
-            return self.dataset.finish_with_error("Please select at least one columns for the word tree")
-
-        strip_urls = self.parameters.get("strip-urls")
-        strip_symbols = self.parameters.get("strip-symbols")
-        sides = self.parameters.get("sides")
         self.align = self.parameters.get("align")
-        window = convert_to_int(self.parameters.get("window"), 5) + 1
-        query = self.parameters.get("query")
-        self.limit = convert_to_int(self.parameters.get("limit"), 100)
+        sides = self.parameters.get("sides")
 
-        left_branches = []
-        right_branches = []
+        # nice label
+        self.dataset.update_label(f"Word tree: '{self.parameters.get('query')}'")
 
-        # do some validation
-        if not query.strip() or re.sub(r"\s", "", query) != query:
-            return self.dataset.finish_with_error(
-                "Invalid query for word tree generation. Query cannot be empty or contain whitespace."
+        # build our tree of text fragments
+        root, self.max_weight = self.build_tree(self.parameters.get("query"))
+
+        if not root or not root.children:
+            return self.dataset.finish_with_error(f"Query '{self.parameters.get('query')}' not found in dataset")
+
+        # while we're at it, we also calculate the (approximate) dimensions of
+        # each branch, which we will need for rendering it later
+        width_left, height_left = self.get_bbox(root, self.SIDE_LEFT)
+        width_right, height_right = self.get_bbox(root, self.SIDE_RIGHT)
+        height = max(height_left, height_right)
+
+        # depending on which side of the tree is higher, we need to adjust the
+        # height of the other side; and we need to decide which side of the
+        # tree gets to draw the root node, since we can't have both sides draw
+        # it
+        origin_left_y, origin_right_y = 0, 0
+        root_side = "right" if sides == "only-right" else "left"
+        if sides == "both":
+            root_side = "right" if height_right > height_left else "left"
+
+        if self.align == "middle":
+            if height_left > height_right:
+                origin_right_y = int((height / 2) - (height_right / 2))
+            else:
+                origin_left_y = int((height / 2) - (height_left / 2))
+        elif self.align == "bottom":
+            origin_right_y = height - height_right
+            origin_left_y = height - height_left
+
+        # the nodes on the left side of the graph now have the wrong word order,
+        # because we reversed them earlier to generate the correct tree
+        # hierarchy - now reverse the node labels so they are proper language
+        # again
+        self.invert_node_labels(root)
+
+        self.dataset.update_status(f"Rendering tree to SVG file (root side: {root_side})")
+        wrapper = SVG(overflow="visible", debug=False, id="tree")
+        offset_x = 0
+
+        if sides != "only-right":
+            self.dataset.update_status("Adding left side of tree to SVG file")
+            wrapper, _ = self.render(
+                wrapper,
+                root,
+                y=origin_left_y,
+                height=height,
+                side=self.SIDE_LEFT,
+                draw_root=root_side == "left"
             )
 
-        window = max(1, window)
+            # shift the rest of the tree to the right of this half
+            offset_x += width_left - self.get_bbox(root, self.SIDE_LEFT, False)[0]
+
+        if sides != "only-left":
+            self.dataset.update_status("Adding right side of tree to SVG file")
+            wrapper, _ = self.render(
+                wrapper,
+                root,
+                x=offset_x,
+                y=origin_right_y,
+                height=height,
+                side=self.SIDE_RIGHT,
+                draw_root=root_side == "right"
+            )
+
+        # things may have been rendered outside the canvas, so we readjust the
+        # canvas size to include everything that's been drawn
+        # also add a margin to give the graph some room to breathe
+        margin = 2
+        x_shift = 0 if self.x_min >= 0 else self.x_min * -1
+        y_shift = 0
+        x_shift += margin
+        y_shift += margin
+
+        wrapper.update({"x": f"{x_shift}ch", "y": f"{y_shift}rem"})
+        canvas = get_4cat_canvas(
+            self.dataset.get_results_path(),
+            (ceil(self.x_max - self.x_min) + (2 * margin)) * self.CH_CONV,
+            (height + (2 * margin)) * self.REM_CONV,
+            None,
+            fontsize_normal=self.FONT_SIZE,
+            fontsize_large=self.FONT_SIZE * 1.5,
+            fontsize_small=self.FONT_SIZE * 0.8
+        )
+
+        canvas.add(Script(content=self.get_svg_script()))
+        canvas.defs.add(Style(self.get_css()))
+        canvas.add(wrapper)
+        canvas.add(Rect((25, canvas["height"] - 25 - 25), (25, 25), fill=self.palette[0], style="cursor:pointer",
+                        id="toggle-colour", stroke="#000"))
+        canvas.save(pretty=True)
+
+        return self.dataset.finish(len(list(PreOrderIter(root))))
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Validate input
+
+        Checks if everything needed is filled in.
+
+        :param query:
+        :param request:
+        :param config:
+        :return:
+        """
+        if not query.get("query", "").strip():
+            raise QueryParametersException("Query cannot be empty.")
+
+        return query
+
+    def build_tree(self, query: str) -> tuple[TreeNode, int]:
+        """
+        Build a tree of text fragments to then visualise
+
+        :param str query:  Query to build tree around
+        :return tuple:  A tuple with a reference to the root of the tree and
+          the max node weight encountered
+        """
+
+        sides = self.parameters.get("sides")
+        window = max(1, convert_to_int(self.parameters.get("window"), 5) + 1)
+        lowercase = self.parameters.get("lower-case")
 
         # determine what tokenisation strategy to use
         tokeniser_args = {}
@@ -204,504 +495,478 @@ class MakeWordtree(BasicProcessor):
             tokeniser_args = {"cut_all": True}
         elif self.parameters.get("tokeniser_type") == "jieba-search":
             tokeniser = jieba.cut_for_search
-            tokeniser_args = {}
-        else:
+        elif self.parameters.get("tokeniser_type") == "nltk-word":
+            self.SPACE = " "
             tokeniser = word_tokenize
+        else:
+            self.SPACE = " "
+            tokeniser = TweetTokenizer(preserve_case=False).tokenize
+
+        # tokenise query
+        matcher = WildcardMatcher()
+        if lowercase:
+            query = query.lower()
+
+        tokenised_query = tokeniser(matcher.obfuscate(query), **tokeniser_args)
+        tokenised_query = [matcher.deobfuscate(q) for q in tokenised_query]
+        if type(tokenised_query) is not list:
+            tokenised_query = list(tokenised_query)
+
+        query_token_length = len(tokenised_query)
+
+        def list_in_list(needle: list, haystack: list):
+            if len(needle) > len(haystack):
+                return
+
+            for i in range(len(haystack) - len(needle) + 1):
+                if all(matcher.fullmatch(needle[j], haystack[i + j]) for j in range(len(needle))):
+                    yield i
 
         # find matching posts
         processed = 0
-        punkt_replace = re.compile(r"[" + re.escape(string.punctuation) + "]")
-        for post in self.source_dataset.iterate_items(self):
+        fragments = []
+        columns = self.parameters.get("columns", [])
+        if type(columns) is not list:
+            columns = [columns]
+
+        link_regex = re.compile(r"https?://\S+")
+        strip_urls = self.parameters.get("strip-urls")
+        strip_symbols = self.parameters.get("strip-symbols")
+        punctuation = string.punctuation + "‘’“”‚„′″…–—«»"  # string.punctuation isn't quite complete
+        punkt_replace = re.compile(r"[" + re.escape(punctuation) + "]")
+
+        for post in self.source_dataset.iterate_items():
             processed += 1
             if processed % 500 == 0:
                 self.dataset.update_status(
-                    "Processing and tokenising post %i" % processed
-                )
+                    f"Finding query in {processed:,} of {self.source_dataset.num_rows:,} items ({len(fragments):,} matches)")
+                self.dataset.update_progress((processed / self.source_dataset.num_rows) * 0.95)
 
             for column in columns:
-                body = post.get(column)
+                document = post.get(column)
 
                 try:
-                    body = str(body)
+                    document = str(document)
                 except TypeError:
                     continue
 
-                if not body:
-                    continue
-
                 if strip_urls:
-                    body = link_regex.sub("", body)
+                    document = link_regex.sub("", document)
 
                 if strip_symbols:
-                    body = punkt_replace.sub("", body)
+                    document = punkt_replace.sub("", document)
 
-                body = tokeniser(body, **tokeniser_args)
-                if type(body) is not list:
+                if not document:
+                    continue
+
+                if lowercase:
+                    document = document.lower()
+
+                document = tokeniser(document, **tokeniser_args)
+                if type(document) is not list:
                     # Convert generator to list
-                    body = list(body)
+                    document = list(document)
 
-                positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]
+                for position in list_in_list(tokenised_query, document):
+                    if sides != "only-left":
+                        fragment = document[position + query_token_length:position + window + query_token_length - 1]
+                        fragments.append(Fragment(fragment, self.SIDE_RIGHT))
+                    if sides != "only-right":
+                        # reverse order - we un-reverse with invert_node_labels() later
+                        fragment = document[max(0, position - window + 1):position][::-1]
+                        fragments.append(Fragment(fragment, self.SIDE_LEFT))
 
-                # get lists of tokens for both the left and right side of the tree
-                # on the left side, all lists end with the query, on the right side,
-                # they start with the query
-                for position in positions:
-                    right_branches.append(body[position : position + window])
-                    left_branches.append(body[max(0, position - window) : position + 1])
+        # here is our tree's root node (token)
+        root = TreeNode(tokenised_query[0])
+        query_start = root
+        root.weight = len(fragments)  # occurs in every fragment, after all
+        # if we have a longer query, add the rest as nodes already
+        # these will be consolidated into a single node in the next steps
+        for other_token in tokenised_query[1:]:
+            query_start = TreeNode(other_token, parent=query_start)
 
-        # Some settings for rendering the tree later
-        self.step = self.fontsize * 0.6  # approximately the width of a monospace char
-        self.gap = 7 * self.step  # space for lines between nodes
-        width = 1  # will be updated later
+        self.dataset.update_status("Cleaning up and sorting text fragments")
+        # build the tree: each node a token, with all single tokens following it as a
+        # child node, recursively. this gets us, for example:
+        #   never
+        #   `- gonna
+        #      `- give
+        #         `- you
+        #            `- up
+        #      `- let
+        #         `- you
+        #            `- down
+        for fragment in fragments:
+            current_node = root if fragment.direction == self.SIDE_LEFT else query_start
 
-        # invert the left side of the tree (because that's the way we want the
-        # branching to work for that side)
-        # we'll visually invert the nodes in the tree again later
-        left_branches = [list(reversed(branch)) for branch in left_branches]
+            for token in fragment.value:
+                child_node = current_node.get_child(token, fragment.direction)
+                if not child_node:
+                    child_node = TreeNode(token, parent=current_node, direction=fragment.direction)
 
-        # first create vertical slices of tokens per level
-        self.dataset.update_status("Generating token tree from posts")
-        levels_right = [{} for i in range(0, window)]
-        levels_left = [{} for i in range(0, window)]
-        tokens_left = []
-        tokens_right = []
+                child_node.weight += 1
+                current_node = child_node
 
-        # for each "level" (each branching point representing a level), turn
-        # tokens into nodes, record the max amount of occurrences for any
-        # token in that level, and keep track of what nodes are in which level.
-        # The latter is needed because a token may occur multiple times, at
-        # different points in the graph. Do this for both the left and right
-        # side of the tree.
-        for i in range(0, window):
-            for branch in right_branches:
-                if i >= len(branch):
-                    continue
+        # consolidate strings of single-child nodes
+        # this merges non-branching lists of tokens, so we get:
+        #   never gonna
+        #   `- give you up
+        #   `- let you down
+        def consolidate(node, side=None):
+            directional_children = [n for n in node.children if not side or n.has_direction(side, inclusive=True)]
 
-                token = branch[i].lower()
-                if token not in levels_right[i]:
-                    parent = (
-                        levels_right[i - 1][branch[i - 1].lower()] if i > 0 else None
-                    )
-                    levels_right[i][token] = Node(
-                        token,
-                        parent=parent,
-                        occurrences=1,
-                        is_top_root=(parent is None),
-                    )
-                    tokens_right.append(levels_right[i][token])
-                else:
-                    levels_right[i][token].occurrences += 1
+            while len(directional_children) == 1:
+                consolidated_node = directional_children[0]
+                joiner = self.SPACE if consolidated_node.name not in string.punctuation else ""
+                node.name = joiner.join([node.name, consolidated_node.name])
+                node.weight = consolidated_node.weight
+                for grandchild in consolidated_node.children:
+                    grandchild.parent = node
 
-                occurrences = levels_right[i][token].occurrences
-                self.max_occurrences[i] = (
-                    max(occurrences, self.max_occurrences[i])
-                    if i in self.max_occurrences
-                    else occurrences
-                )
+                node.children = [child for child in node.children if child != consolidated_node]
+                directional_children = [n for n in node.children if
+                                        not side or n.has_direction(side, inclusive=True)]
 
-            for branch in left_branches:
-                if i >= len(branch):
-                    continue
+            for child in node.children:
+                consolidate(child, side=side)
 
-                token = branch[i].lower()
-                if token not in levels_left[i]:
-                    parent = (
-                        levels_left[i - 1][branch[i - 1].lower()] if i > 0 else None
-                    )
-                    levels_left[i][token] = Node(
-                        token,
-                        parent=parent,
-                        occurrences=1,
-                        is_top_root=(parent is None),
-                    )
-                    tokens_left.append(levels_left[i][token])
-                else:
-                    levels_left[i][token].occurrences += 1
+        consolidate(root)
 
-                occurrences = levels_left[i][token].occurrences
-                self.max_occurrences[i] = (
-                    max(occurrences, self.max_occurrences[i])
-                    if i in self.max_occurrences
-                    else occurrences
-                )
+        # if the query is multi-token, it has not been consolidated if the
+        # tree goes in two directions (since all nodes will have branches in
+        # two directions), so do so as a special case
+        consolidate(root, self.SIDE_RIGHT)
 
-        # nodes that have no siblings can be merged with their parents, else
-        # the graph becomes unnecessarily large with lots of single-word nodes
-        # connected to single-word nodes. additionally, we want the nodes with
-        # the most branches to be sorted to the top, and then only retain the
-        # most interesting (i.e. most-occurring) branches
-        self.dataset.update_status("Merging and sorting tree nodes")
-        for token in tokens_left:
-            self.merge_upwards(token)
-            self.sort_node(token)
-            self.limit_subtree(token)
+        # now get the *second* largest weight as the baseline
+        # since the root node will always have more, and usually *far* more
+        # occurrences than anything else
+        weights = sorted([node.weight for node in PreOrderIter(root)])
+        max_weight = weights[-2] if len(weights) > 1 else weights[-1]
 
-        for token in tokens_right:
-            self.merge_upwards(token)
-            self.sort_node(token)
-            self.limit_subtree(token)
+        # prune branches, sorting by weight and keeping only the top weightiest
+        # we limit this per side - i.e. for both sides, keep track of top x
+        # nodes separately. the root node is considered part of the right side
+        # for this purpose
+        self.dataset.update_status("Sorting and pruning tree branches")
+        def arrange(node, limit):
+            children_left = sorted(
+                [c for c in node.children if c.has_direction(self.SIDE_LEFT)],
+                key=lambda c: c.weight, reverse=True)[:limit]
+            children_right = sorted(
+                [c for c in node.children if c.has_direction(self.SIDE_RIGHT, inclusive=True)],
+                key=lambda c: c.weight, reverse=True)[:limit]
+            node.children = [*children_right, *children_left]
+            for child in node.children:
+                arrange(child, limit)
 
-        # somewhat annoyingly, anytree does not simply delete nodes detached
-        # from the tree in the previous steps, but makes them root nodes. We
-        # don't need these root nodes (we only need the original root), so the
-        # next step is to remove all root nodes that are not the main root.
-        # We cannot modify a list in-place, so make a new list with the
-        # relevant nodes
-        filtered_tokens_right = []
-        for token in tokens_right:
-            if token.is_root and not token.is_top_root:
-                continue
+        arrange(root, convert_to_int(self.parameters.get("limit"), 100))
 
-            filtered_tokens_right.append(token)
-
-        filtered_tokens_left = []
-        for token in tokens_left:
-            if token.is_root and not token.is_top_root:
-                continue
-
-            filtered_tokens_left.append(token)
-
-        self.dataset.log(
-            f"Collected {len(filtered_tokens_left)} left tokens and {len(filtered_tokens_right)} right tokens"
-        )
-
-        # now we know which nodes are left, and can therefore determine how
-        # large the canvas needs to be - this is based on the max number of
-        # branches found on any level of the tree, in other words, the number
-        # of "terminal nodes"
-        breadths_left = [
-            self.max_breadth(node) for node in filtered_tokens_left if node.is_top_root
-        ]
-        breadths_right = [
-            self.max_breadth(node) for node in filtered_tokens_right if node.is_top_root
-        ]
-
-        if not breadths_left:
-            if sides == "left":
-                return self.dataset.finish_with_error("No data available to the left of the query")
-            elif sides == "both":
-                self.dataset.log("No data available to the left of the query")
-                sides = "right"
-                breadths_left = [0]
-
-        if not breadths_right:
-            if sides == "right":
-
-                return self.dataset.finish_with_error("No data available to the right of the query")
-            elif sides == "both":
-                self.dataset.log("No data available to the right of the query")
-                sides = "left"
-                breadths_right = [0]
-
-        height_left = self.whitespace * self.fontsize * max(breadths_left)
-        height_right = self.whitespace * self.fontsize * max(breadths_right)
-        height = max(height_left, height_right)
-
-        canvas = Drawing(
-            str(self.dataset.get_results_path()),
-            size=(width, height),
-            style="font-family:monospace;font-size:%ipx" % self.fontsize,
-        )
-
-        # the nodes on the left side of the graph now have the wrong word order,
-        # because we reversed them earlier to generate the correct tree
-        # hierarchy - now reverse the node labels so they are proper language
-        # again
-        for token in tokens_left:
-            self.invert_node_labels(token)
-
-        wrapper = SVG(overflow="visible")
-
-        self.dataset.update_status("Rendering tree to SVG file")
-        if sides != "right":
-            self.dataset.update_status("Adding left side of tree to SVG file")
-            wrapper = self.render(
-                wrapper,
-                [
-                    token
-                    for token in filtered_tokens_left
-                    if token.is_root and token.children
-                ],
-                height=height,
-                side=self.SIDE_LEFT,
-            )
-
-        if sides != "left":
-            self.dataset.update_status("Adding right side of tree to SVG file")
-            wrapper = self.render(
-                wrapper,
-                [
-                    token
-                    for token in filtered_tokens_right
-                    if token.is_root and token.children
-                ],
-                height=height,
-                side=self.SIDE_RIGHT,
-            )
-
-        # things may have been rendered outside the canvas, in which case we
-        # need to readjust the SVG properties
-        wrapper.update({"x": 0 if self.x_min >= 0 else self.x_min * -1})
-        canvas.update({"width": (self.x_max - self.x_min)})
-
-        canvas.add(wrapper)
-        canvas.save(pretty=True)
-
-        self.dataset.update_status("Finished")
-        self.dataset.finish(len(tokens_left) + len(tokens_right))
+        return root, max_weight
 
     def render(
-        self,
-        canvas,
-        level,
-        x=0,
-        y=0,
-        origin=None,
-        height=None,
-        side=1,
-        init=True,
-        level_index=0,
-    ):
+            self,
+            canvas: SVG,
+            node: TreeNode,
+            x: float = 0,
+            y: float = 0,
+            height: float = 0,
+            origin: tuple | bool = None,
+            side: int = 1,
+            draw_root: bool = True,
+            depth: int = 0
+    ) -> tuple[SVG, float]:
         """
-        Render node set to canvas
+        Render node to canvas
 
-        :param canvas:  SVG object
-        :param list level:  List of nodes to render
-        :param int x:  X coordinate of top left of level block
-        :param int y:  Y coordinate of top left of level block
-        :param tuple origin:  Coordinates to draw 'connecting' line to
-        :param float height:  Block height budget
-        :param int side:  What direction to move into: 1 for rightwards, -1 for leftwards
-        :param bool init:  Whether the draw the top level of nodes. Only has an effect if
-                                           side == self.SIDE_LEFT
-        :return:  Updated canvas
+        Because we're using a monospace font to determine position and size,
+        we can use rem (i.e. font size) for height and ch (i.e. width of the
+        '0' charachter, but actually all characters because minispace) for
+        vertical positioning.
+
+        :param SVG canvas:  Canvas, as an SVG document
+        :param TreeNode node:  Node to render
+        :param float x:  Top left coordinate of node container
+        :param float y:  Top left coordinate of node container
+        :param float height: Full container height
+        :param tuple origin: Coordinates to connect bezier spline to
+        :param int side:  Is this node on the left or right side of the graph?
+        :param bool draw_root:  Draw root node?
+        :param int depth:  How many levels we're into the tree
+        :return tuple:  Tuple, updated canvas and height of drawn content
         """
-        if not level:
-            return canvas
+        if not node:
+            return canvas, 0
 
-        # this eliminates a small misalignment where the left side of the
-        # graph starts slightly too far to the left
-        if init and side == self.SIDE_LEFT:
-            x += self.step
+        # ignore nodes with a direction we're not rendering right now
+        if not node.has_direction(side, inclusive=True):
+            return canvas, 0
 
-        # determine how many nodes we'll need to fit on top of each other
-        # within this block
-        required_space_level = sum([self.max_breadth(node) for node in level])
+        # determine how much we want to enlarge the text
+        font_size = self.get_font_size(node)
 
-        # draw each node and the tree below it
-        for node in level:
-            # determine how high this block will be based on the available
-            # height and the nodes we'll need to fit in it
-            required_space_node = self.max_breadth(node)
+        # determine how high this block will be based on the available
+        # height and the nodes we'll need to fit in it
+        block_width, block_height = self.get_bbox(node, side)
+        own_width, own_height = self.get_bbox(node, side, False)
 
-            block_height = (required_space_node / required_space_level) * height
+        if side == self.SIDE_LEFT and node.is_root:
+            # first element on the left - start drawing from the right
+            x += self.get_bbox(node, side)[0] - own_width
 
-            # determine how much we want to enlarge the text
-            occurrence_ratio = node.occurrences / self.max_occurrences[level_index]
-            if occurrence_ratio >= 0.75:
-                embiggen = 3
-            elif occurrence_ratio > 0.5:
-                embiggen = 2
-            elif occurrence_ratio > 0.25:
-                embiggen = 1.75
-            elif occurrence_ratio > 0.15:
-                embiggen = 1.5
+        # keep track of what part of the canvas has been used so far
+        self.x_min = min(self.x_min, x)
+        self.x_max = max(self.x_max, x + block_width)
+
+        # the 0.55 offset makes it so that the top of lower case letters
+        # equals the top of the container i.e. it is a more convenient
+        # baseline (roughly equal to the x-height) - by default in svg the
+        # bottom of the text is at y=0
+        x_height = (font_size * 0.55)
+        text_offset_y = x_height
+        # adjust positioning depending on alignment setting
+        if self.align == "middle":
+            # center text vertically in block
+            text_offset_y += (block_height * 0.5) - (x_height * 0.5)
+
+        elif self.align == "bottom":
+            text_offset_y += block_height - x_height
+
+        # difference between text baseline and bezier connection point
+        # gonna be honest here, no idea why this works (why 3.8?)
+        origin_offset_y = font_size / 3.8
+        node.coordinates = (x, y)
+        node.dimensions = (own_width, block_height)
+        container = SVG(
+            x=f"{x}ch",
+            y=f"{y}rem",
+            width=f"{own_width}ch",
+            height=f"{block_height}rem",
+            overflow="visible",
+            debug=False,
+            id=node.id if (not node.is_root or draw_root) else "",
+            parent=node.parent.id if not node.is_root else ""
+        )
+
+        if draw_root or not node.is_root:
+            # ensure we only draw the root node once
+            # we still do everything else for the root node even if it is not
+            # drawn, to ensure correct positioning and connecting of the rest
+            # of the graph
+            colour = self.palette[depth % len(self.palette) + 1]
+            container.add(
+                Text(
+                    text=node.name,
+                    insert=(0, f"{text_offset_y}rem"),  # baseline
+                    style=f"font-size:{font_size}rem",
+                    fill="#000",
+                    latent_colour=colour,
+                    # filter="url(#debug)",
+                    debug=False
+                )
+            )
+
+        canvas.add(container)
+
+        # draw the line connecting this node to the parent node
+        # so far we've worked with relative units which is nice for text
+        # but we need absolute coordinates for the bezier curves...
+        # we have a reasonably well-working conversion factor though
+        gap_guide = 0.1  # space between text and start/end of line
+        if origin:
+            destination = (
+                (x + own_width if side == self.SIDE_LEFT else x) - (self.gap_x * (gap_guide * side)),
+                y + text_offset_y - origin_offset_y
+            )
+
+            # bezier curve control points
+            control_x_offset = (destination[0] - origin[0]) / 5
+            control_left_x = destination[0] - control_x_offset
+            control_right_x = origin[0] + control_x_offset
+            control_left = (control_left_x, origin[1])
+            control_right = (control_right_x, destination[1])
+
+            # draw curve
+            stroke_width = max(1, font_size * 0.75) * 1.5
+            flow = Path(stroke="#000", fill_opacity=0, stroke_linecap="round",
+                        stroke_width=stroke_width)
+            flow.push(f"M {origin[0] * self.CH_CONV} {origin[1] * self.REM_CONV}")
+            flow.push(
+                f"C {control_left[0] * self.CH_CONV} {control_left[1] * self.REM_CONV} "
+                f"{control_right[0] * self.CH_CONV} {control_right[1] * self.REM_CONV} "
+                f"{destination[0] * self.CH_CONV} {destination[1] * self.REM_CONV}"
+            )
+            canvas.add(flow)
+
+        # bezier curves for the next set of nodes will start at these
+        # coordinates (i.e. the left or right side of the text)
+        new_origin = (
+            ((x + own_width) if side == self.SIDE_RIGHT else x) + (self.gap_x * (gap_guide * side)),
+            y + text_offset_y - origin_offset_y,
+        )
+
+        # add gap to the next node
+        x += self.gap_x * side
+
+        # draw this node's children
+        for child in node.children:
+            if side == self.SIDE_LEFT:
+                # left side: align to the right of the box
+                offset_x, _ = child.own_bbox
+                offset_x *= side
             else:
-                embiggen = 1
+                offset_x = own_width
 
-            # determine how large the text block will be (this is why we use a
-            # monospace font)
-            characters = len(node.name)
-            text_width = characters * self.step
-            text_width *= embiggen * 1
-
-            text_offset_y = (
-                self.fontsize if self.align == "top" else ((block_height) / 2)
-            )
-
-            # determine where in the block to draw the text and where on the
-            # canvas the block appears
-            block_position = (x, y)
-            block_offset_x = -(text_width + self.step) if side == self.SIDE_LEFT else 0
-
-            self.x_min = min(self.x_min, block_position[0] + block_offset_x)
-            self.x_max = max(
-                self.x_max, block_position[0] + block_offset_x + text_width
-            )
-
-            # the first node on the left side of the graph does not need to be
-            # drawn if the right side is also being drawn because in that case
-            # it's already going to be included through that part of the graph
-            if not (init and side == self.SIDE_LEFT):
-                container = SVG(
-                    x=block_position[0] + block_offset_x,
-                    y=block_position[1],
-                    width=text_width,
-                    height=block_height,
-                    overflow="visible",
-                )
-                container.add(
-                    Text(
-                        text=node.name,
-                        insert=(0, text_offset_y),
-                        alignment_baseline="middle",
-                        style="font-size:" + str(embiggen) + "em",
-                    )
-                )
-                canvas.add(container)
-            else:
-                # adjust position to make left side connect to right side
-                x += text_width
-                block_position = (block_position[0] + text_width, block_position[1])
-
-            # draw the line connecting this node to the parent node
-            if origin:
-                destination = (x - self.step, y + text_offset_y)
-
-                # for the left side of the graph, draw a curve leftwards
-                # instead of rightwards
-                if side == self.SIDE_RIGHT:
-                    bezier_origin = origin
-                    bezier_destination = destination
-                else:
-                    bezier_origin = (destination[0] + self.step, destination[1])
-                    bezier_destination = (origin[0] - self.step, origin[1])
-
-                # bezier curve control points
-                control_x = bezier_destination[0] - (
-                    (bezier_destination[0] - bezier_origin[0]) / 2
-                )
-                control_left = (control_x, bezier_origin[1])
-                control_right = (control_x, bezier_destination[1])
-
-                # draw curve
-                flow = Path(stroke="#000", fill_opacity=0, stroke_width=1.5)
-                flow.push("M %f %f" % bezier_origin)
-                flow.push(
-                    "C %f %f %f %f %f %f"
-                    % tuple([*control_left, *control_right, *bezier_destination])
-                )
-                canvas.add(flow)
-
-            # bezier curves for the next set of nodes will start at these
-            # coordinates
-            new_origin = (
-                block_position[0] + ((text_width + self.step) * side),
-                block_position[1] + text_offset_y,
-            )
-
-            # draw this node's children
-            canvas = self.render(
+            canvas, child_height = self.render(
                 canvas,
-                node.children,
-                x=x + ((text_width + self.gap) * side),
+                child,
+                x=x + offset_x,
                 y=y,
+                height=height,
                 origin=new_origin,
-                height=int(block_height),
                 side=side,
-                init=False,
-                level_index=level_index + 1,
+                draw_root=False,
+                depth=depth + 1
             )
-            y += block_height
 
-        return canvas
+            y += child_height
 
-    def merge_upwards(self, node):
+        return canvas, block_height
+
+    def get_font_size(self, node: TreeNode) -> float:
         """
-        Merge a node with the parent node if it has no siblings
+        Get font size for a node
 
-        Used to string together tokens into one longer text string
+        Use a sine-based easing function to not emphasise the top branches
+        too much
 
-        :param Node node:
+        :param TreeNode node:  Node to determine font size for
+        :return float:  Font size, based on configured global font size
         """
-        if not node or not node.parent:
-            return
+        if node.weight > self.max_weight:
+            # this can happen because we use the weight of the *second* most
+            # prevalent node as the max weight
+            return self.FONT_FACTOR_MAX
+        elif self.max_weight == 0:
+            # and this can happen if de-tokenisation failed earlier
+            return 1
 
-        parent = node.parent
-        if len(node.siblings) == 0:
-            node.parent.name += " " + node.name
-            # we need a reference because after the next line the node will
-            # have no parent
-            node.parent.children = node.children
+        embiggen = node.weight / self.max_weight if self.max_weight else 1
+        embiggen = sin(embiggen * 0.5 * pi)
+        return max(1, embiggen * self.FONT_FACTOR_MAX)
 
-        self.merge_upwards(parent)
+    def get_bbox(self, node: TreeNode, direction: int, with_children: bool = True) \
+            -> tuple[float, float]:
+        """
+        Get bounding box of a node
 
-    def invert_node_labels(self, node):
+        This is based on the configured font size and by default includes
+        space for the node's children to be rendered.
+
+        :param TreeNode node:  Node to determine bounding box of
+        :param int direction:  Which direction of the tree to consider
+        :param bool with_children:  Include room for children in box?
+        :return tuple:  (width, height) dimensions tuple
+        """
+        bbox_q = (direction, with_children)
+        if bbox_q not in node.bbox:
+            font_size = self.get_font_size(node)
+
+            own_width = len(node.name)
+            for character in node.name:
+                if emoji.is_emoji(character):
+                    own_width += self.REM_TO_CH  # square instead of rectangular
+
+            own_width *= font_size
+            own_height = font_size + self.gap_y
+            node.own_bbox = (own_width, own_height)
+
+            branch_height = 0
+            branch_width = 0
+
+            if with_children:
+                for child in node.children:
+                    if not child.has_direction(direction, inclusive=True):
+                        continue
+
+                    (child_width, child_height) = self.get_bbox(child, direction)
+                    branch_height += child_height
+                    branch_width = max(branch_width, child_width)
+
+                own_height = max(branch_height, own_height)
+                own_width += branch_width
+
+            node.bbox[bbox_q] = (own_width, own_height)
+
+        return node.bbox[bbox_q]
+
+    def invert_node_labels(self, node: TreeNode):
         """
         Invert the word order in node labels
 
         Used for nodes on the left side of the tree view, which would be the
         wrong way around otherwise.
 
-        :param node:
+        :param TreeNode node:  Node to reverse text for
         """
-        if hasattr(node, "is_inverted"):
-            return
+        if node.has_direction(self.SIDE_LEFT):
+            node.name = self.SPACE.join(reversed(node.name.split(self.SPACE)))
 
-        node.is_inverted = True
-        node.name = " ".join(reversed(node.name.split(" ")))
         for child in node.children:
             self.invert_node_labels(child)
 
-    def max_children(self, node, current_max=1):
+    def get_svg_script(self) -> str:
         """
-        Get max amount of children of any node under the given node
+        Simple embeddable JavaScript to toggle colouring
 
-        :param Node node:  Node to check
-        :param int current_max:  Max amount found so far
-        :return int:
+        :return str:  Script code
         """
-        for child in node.children:
-            current_max = max(current_max, self.max_children(child, current_max))
+        return """
+window.addEventListener('DOMContentLoaded', function () {
+    document.querySelector('#toggle-colour').addEventListener('click', function (e) {
+        document.querySelectorAll('#tree text').forEach((component) => {
+            if (!component.hasAttribute('fill') || component.getAttribute('fill') == '#000') {
+                component.setAttribute('fill', component.getAttribute('latent-colour'));
+            } else {
+                component.setAttribute('fill', '#000');
+            }
+        });
+    });
+    document.querySelectorAll('#tree text').forEach((element) => {
+      element.addEventListener('click', function(e) {
+        let highlight_element = e.target.parentNode;
+        if(highlight_element.classList.contains('highlighted')) {
+          document.querySelectorAll('.highlighted').forEach((e) => e.classList.remove('highlighted'));
+          return;
+        }
+        if(!highlight_element.hasAttribute('parent')) {
+          return;
+        }
+        while(true) {
+          highlight_element.classList.add('highlighted');
 
-        return max(len(node.children), current_max)
+          if(!highlight_element.hasAttribute('parent')) {
+            break;
+          }
+          highlight_element = document.getElementById(highlight_element.getAttribute('parent'));
+        }
+      });
+    });
+});
+"""
 
-    def max_breadth(self, node):
+    def get_css(self):
         """
-        Get max sibling nodes at any underlying level of children for a node
+        Simple embeddable stylesheet to highlight hovered flows
 
-        :param Node node:  Node to check
-        :return int:
+        :return str:  CSS code
         """
-        return (
-            len(
-                [
-                    descendant
-                    for descendant in node.descendants
-                    if not descendant.children
-                ]
-            )
-            + 1
-        )
+        return """
+svg[parent] text {
+    cursor: pointer;
+}
+.highlighted text {
+	fill: #F09;
+	text-decoration: underline;
+}
+"""
 
-    def sort_node(self, node):
-        """
-        Sort node recursively by most children
-
-        :param Node node:
-        :return Node:
-        """
-        if node.children:
-            node.children = [self.sort_node(child) for child in node.children]
-
-        node.children = sorted(
-            node.children, reverse=True, key=lambda x: len(x.children)
-        )
-        return node
-
-    def limit_subtree(self, node):
-        """
-        Limit the amount of branches in a (sub)tree
-
-        Branches are sorted by most occurences and then the top n are kept.
-
-        :param node: Node of which to filter children
-        :return:  Node, with pruned branches
-        """
-        if node.children:
-            node.children = [self.limit_subtree(child) for child in node.children]
-
-        node.children = sorted(
-            node.children, reverse=True, key=lambda x: x.occurrences
-        )[0 : self.limit]
-        return node
