@@ -1034,7 +1034,7 @@ def main():
     if not provider_api_key:
         sys.exit("Error: PROVIDER_API_KEY environment variable not set.")
 
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = Path(__file__).resolve().parent.parent.parent
 
     if args.bootstrap:
         files = discover_bootstrap_files(repo_root, args.zeeschuimer_checkout.resolve())
@@ -1052,7 +1052,7 @@ def main():
     llm = LLMAdapter(
         model={
             "local_id": args.model,
-            "wrapper": "ollama"
+            "wrapper": args.llm_provider,
         },
         server={
             "url": base_url
