@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     # Resolved only by type checkers / linters (never at runtime), so the
     # `llm: LLMAdapter` annotations below have a defined name without forcing
     # the langchain import.
-    from common.lib.llm import LLMAdapter
+    from common.lib.llm.adapter import LLMAdapter
 
 # Sibling module — lives next to this script in helper-scripts/. Python adds the
 # script's directory to sys.path automatically when the file is run directly.
@@ -1046,14 +1046,17 @@ def main():
     # Imported here (not at module top) so the pure helpers above stay
     # importable for tests without the langchain stack. See note near the
     # imports at the top of this file.
-    from common.lib.llm import LLMAdapter
-    provider = args.llm_provider.lower()
+    from common.lib.llm.adapter import LLMAdapter
     base_url = args.base_url
 
     llm = LLMAdapter(
-        provider=provider,
-        model=args.model,
-        base_url=base_url,
+        model={
+            "local_id": args.model,
+            "wrapper": "ollama"
+        },
+        server={
+            "url": base_url
+        },
         api_key=provider_api_key,
         temperature=0.2,
         max_tokens=args.max_tokens,
@@ -1080,7 +1083,7 @@ def main():
     fail_fast = not args.no_fail_fast
     print(
         f"Using model: {args.model} "
-        f"(provider: {args.llm_provider}, output_mode: {args.output_mode}, "
+        f"(output_mode: {args.output_mode}, "
         f"fail_fast: {fail_fast}, strict_lint: {args.strict_lint})"
     )
 
