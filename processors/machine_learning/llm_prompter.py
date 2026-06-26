@@ -438,9 +438,10 @@ class LLMPrompter(BasicProcessor):
         self.dataset.update_status("Connecting to LLM server")
         base_url_str = "" if not server["url"] else f" at base URL '{server['url']}'"
         self.dataset.log(f"Using LLM server '{server['_id']}' with model '{model['local_id']}'{base_url_str}")
+
         try:
             llm = LLMAdapter(
-                config=self.config,
+                server=server,
                 model=model,
                 api_key=api_key,
                 temperature=temperature,
@@ -818,8 +819,8 @@ class LLMPrompter(BasicProcessor):
                                 json_schema = self.get_json_schema_for_batch(n_batched, custom_schema=json_schema_original)
                                 # `llm` becomes a RunnableSequence when used, so we'll need to reset it here
                                 llm = LLMAdapter(
-                                    config=self.config,
                                     model=model,
+                                    server=server,
                                     api_key=api_key,
                                     temperature=temperature,
                                     max_tokens=max_tokens,
