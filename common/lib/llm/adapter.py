@@ -19,8 +19,8 @@ from langchain_deepseek import ChatDeepSeek
 class LLMAdapter:
     def __init__(
             self,
-            config,
             model: dict,
+            server: dict = None,
             api_key: Optional[str] = None,
             temperature: float = 0.1,
             max_tokens: int = 1000,
@@ -29,17 +29,16 @@ class LLMAdapter:
         """
         Instantiate an adapter to interface with an LLM model
 
-        :param config:  4CAT config reader
-        :param dict model:  Model metadata (as in `llm.available_models` 4CAT setting)
+        :param dict model:  Model metadata (as in `llm.available_models` 4CAT
+          setting)
+        :param dict server:  Server metadata (as in `llm.servers` 4CAT setting)
         :param str api_key:  API key, if needed
         :param float temperature:  Temperature hyperparameter
         :param int max_tokens:  Max tokens to generate
         :param dict client_kwargs:  Optional parameters for the LLM adapter class
         """
-        known_servers = config.get("llm.servers", {})
-
         self.model = model
-        self.server = known_servers.get(model["server"])
+        self.server = server
         self.api_key = api_key
         self.temperature = temperature
         self.structured_output = False
