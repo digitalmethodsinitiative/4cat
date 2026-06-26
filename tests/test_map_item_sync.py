@@ -1,9 +1,9 @@
 """
 Tests for the Zeeschuimer map_item sync helper scripts:
 
-- `helper-scripts/map_item_converter.py` — path derivation, JS-marker splicing,
+- `helper-scripts/map_item/converter.py` — path derivation, JS-marker splicing,
   the static lint, and the comment stripper.
-- `helper-scripts/map_item_ci.py` — translation-matrix planning and PR-body
+- `helper-scripts/map_item/ci.py` — translation-matrix planning and PR-body
   construction (the CI glue).
 
 These import the helper scripts directly (they have no heavy dependencies once
@@ -16,14 +16,14 @@ from pathlib import Path
 import pytest
 
 # helper-scripts is not a package; put it on sys.path so the modules (and their
-# sibling `from map_item_rules import ...`) import cleanly.
-HELPER_DIR = Path(__file__).resolve().parent.parent / "helper-scripts"
+# sibling `from rules import ...`) import cleanly.
+HELPER_DIR = Path(__file__).resolve().parent.parent / "helper-scripts/map_item"
 if str(HELPER_DIR) not in sys.path:
     sys.path.insert(0, str(HELPER_DIR))
 
-import map_item_ci  # noqa: E402
-import map_item_converter as mic  # noqa: E402
-import map_item_rules  # noqa: E402
+import ci  # noqa: E402
+import converter as mic  # noqa: E402
+import rules  # noqa: E402
 
 
 # --------------------------------------------------------------------------- #
@@ -208,18 +208,18 @@ def test_lint_clean_translation_has_no_issues():
 
 
 # --------------------------------------------------------------------------- #
-# map_item_rules registry wiring
+# rules registry wiring
 # --------------------------------------------------------------------------- #
 
 def test_regex_lint_rules_use_lint_message_when_set():
     # dict_get carries a separate lint_message (mentions Map), distinct from its
     # prompt_rule, and that is what the lint pass surfaces.
     get_msg = next(
-        msg for pat, msg in map_item_rules.get_regex_lint_rules()
+        msg for pat, msg in rules.get_regex_lint_rules()
         if pat.pattern == r"\.get\("
     )
     assert "Map" in get_msg
-    dict_get_rule = next(r for r in map_item_rules.RULES if r.id == "dict_get")
+    dict_get_rule = next(r for r in rules.RULES if r.id == "dict_get")
     assert get_msg == dict_get_rule.lint_message
     assert get_msg != dict_get_rule.prompt_rule
 
@@ -229,14 +229,14 @@ def test_regex_lint_rules_use_lint_message_when_set():
 # --------------------------------------------------------------------------- #
 
 def test_plan_matrix_bootstrap():
-    mode, matrix, rejected = map_item_ci.plan_matrix("workflow_dispatch", "", True, "", "")
+    mode, matrix, rejected = ci.plan_matrix("workflow_dispatch", "", True, "", "")
     assert mode == "bootstrap"
     assert matrix == [{"module": "bootstrap", "files": "", "bootstrap": True}]
     assert rejected == []
 
 
 def test_plan_matrix_explicit_files_override_bootstrap():
-    mode, matrix, _ = map_item_ci.plan_matrix(
+    mode, matrix, _ = ci.plan_matrix(
         "workflow_dispatch", "datasources/tiktok/search_tiktok.py", True, "", ""
     )
     assert mode == "files"  # files win over bootstrap
@@ -244,7 +244,7 @@ def test_plan_matrix_explicit_files_override_bootstrap():
 
 
 def test_plan_matrix_groups_by_module_sorted():
-    mode, matrix, rejected = map_item_ci.plan_matrix(
+    mode, matrix, rejected = ci.plan_matrix(
         "workflow_dispatch",
         "datasources/tiktok/search_tiktok.py datasources/gab/search_gab.py",
         False, "", "",
@@ -256,7 +256,7 @@ def test_plan_matrix_groups_by_module_sorted():
 
 def test_plan_matrix_push_uses_injected_git_diff():
     changed = ["datasources/tiktok/search_tiktok.py", "datasources/tiktok/search_other.py"]
-    mode, matrix, _ = map_item_ci.plan_matrix(
+    mode, matrix, _ = ci.plan_matrix(
         "push", "", False, "aaaaaaa", "bbbbbbb", git_diff=lambda b, a: changed
     )
     assert mode == "files"
@@ -266,7 +266,7 @@ def test_plan_matrix_push_uses_injected_git_diff():
 
 
 def test_plan_matrix_none_when_no_changes():
-    mode, matrix, rejected = map_item_ci.plan_matrix(
+    mode, matrix, rejected = ci.plan_matrix(
         "push", "", False, "a", "b", git_diff=lambda b, a: []
     )
     assert mode == "none" and matrix == [] and rejected == []
@@ -282,7 +282,7 @@ def test_plan_matrix_rejects_shell_injection_paths():
         "../../etc/passwd "                       # traversal
         "datasources/ok/search_ok.py"            # the only valid one
     )
-    mode, matrix, rejected = map_item_ci.plan_matrix(
+    mode, matrix, rejected = ci.plan_matrix(
         "workflow_dispatch", candidates, False, "", ""
     )
     all_files = " ".join(m["files"] for m in matrix)
@@ -308,7 +308,7 @@ def test_build_pr_body_single_module_title_and_warnings():
             "commentary": "a note", "lint_warnings": ["[map_item_function] .get( found"],
         }],
     }
-    title, body = map_item_ci.build_pr_body(
+    title, body = ci.build_pr_body(
         manifest, module="tiktok", is_bootstrap=False, before="a" * 7, after="b" * 7,
         run_id="42", event_name="workflow_dispatch", repo="org/4cat",
     )
@@ -323,7 +323,7 @@ def test_build_pr_body_bootstrap_title_counts_modules():
         {"python_file": "datasources/a/search_a.py", "js_file": "modules/a.js", "status": "ok"},
         {"python_file": "datasources/b/search_b.py", "js_file": "modules/b.js", "status": "ok"},
     ]}
-    title, _ = map_item_ci.build_pr_body(
+    title, _ = ci.build_pr_body(
         manifest, module="bootstrap", is_bootstrap=True, before="", after="",
         run_id="1", event_name="workflow_dispatch", repo="org/4cat",
     )
@@ -340,7 +340,7 @@ def test_build_pr_body_push_invokes_injected_diff():
         calls.append((before, after, path))
         return "diff --git a/x b/x\n+added"
 
-    _, body = map_item_ci.build_pr_body(
+    _, body = ci.build_pr_body(
         manifest, module="a", is_bootstrap=False, before="X", after="Y",
         run_id="1", event_name="push", repo="org/4cat", python_diff=fake_diff,
     )
@@ -360,7 +360,7 @@ def test_set_output_uses_delimiter_form(tmp_path, monkeypatch):
 
     # a value containing a newline + an "=" line that would forge an extra
     # output in the naive `name=value` form
-    map_item_ci.set_output("title", "Real Title\nmalicious=pwned")
+    ci.set_output("title", "Real Title\nmalicious=pwned")
 
     content = out_file.read_text(encoding="utf-8")
     assert content.startswith("title<<")          # delimiter form, not `title=`
@@ -372,7 +372,7 @@ def test_set_output_uses_delimiter_form(tmp_path, monkeypatch):
 def test_set_output_noop_without_env(monkeypatch):
     monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
     # must not raise when not running under Actions
-    map_item_ci.set_output("title", "anything")
+    ci.set_output("title", "anything")
 
 
 # --------------------------------------------------------------------------- #
@@ -418,12 +418,12 @@ def test_splice_allows_commented_map_item_without_markers():
 # --------------------------------------------------------------------------- #
 
 def test_code_fence_default_three_backticks():
-    assert map_item_ci._code_fence("no backticks here", "diff") == ("```diff", "```")
+    assert ci._code_fence("no backticks here", "diff") == ("```diff", "```")
 
 
 def test_code_fence_grows_past_inner_backticks():
     # longest run inside is 4 backticks -> fence must be 5
-    open_f, close_f = map_item_ci._code_fence("a ``` b ```` c", "diff")
+    open_f, close_f = ci._code_fence("a ``` b ```` c", "diff")
     assert open_f == "`````diff"
     assert close_f == "`````"
 
@@ -437,7 +437,7 @@ def test_build_pr_body_diff_fence_survives_backticks():
         # a Python diff whose body itself contains a ``` fence
         return "diff --git a/x b/x\n+doc = '''\n+```\n+'''"
 
-    _, body = map_item_ci.build_pr_body(
+    _, body = ci.build_pr_body(
         manifest, module="a", is_bootstrap=False, before="X", after="Y",
         run_id="1", event_name="push", repo="org/4cat", python_diff=fake_diff,
     )
@@ -465,7 +465,7 @@ processor_packages = {
     "beautifulsoup4",
 }
 '''
-    reqs = map_item_ci.extract_llm_requirements(setup_py)
+    reqs = ci.extract_llm_requirements(setup_py)
     assert "langchain_core" in reqs
     assert "langchain_ollama" in reqs
     assert "pydantic" in reqs
