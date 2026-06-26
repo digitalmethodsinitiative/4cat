@@ -247,6 +247,68 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
         logger.info("All processors passed successfully.")
 
 @pytest.mark.dependency(depends=["test_module_collector"])
+def test_compatibility_coverage(logger, fourcat_modules):
+    """
+    Every concrete, non-collector processor should express its input contract.
+    Three states, differentiated:
+
+    * declares a `compatibility` (a Compatibility instance) -- fully covered;
+    * keeps an `is_compatible_with` override but NO coarse Compatibility --
+      "covered" for runtime, but *opaque to the processor map*: it can't place the
+      processor without at least a coarse spec. Surfaced as a warning, not a
+      failure;
+    * neither -- a hard failure: it silently rides the BasicProcessor default,
+      which is almost never intended.
+
+    Collectors (datasources) consume uploads/queries, not an existing dataset, so
+    they have no consumer-side compatibility and are exempt. Abstract bases that
+    genuinely run on nothing use the `Compatibility(types=set())` convention,
+    which counts as declared.
+    """
+    from backend.lib.processor import BasicProcessor
+    from backend.lib.search import Search
+    from common.lib.compatibility import Compatibility
+
+    base_method = BasicProcessor.is_compatible_with.__func__
+    stragglers = []       # neither a Compatibility nor an override -- hard failure
+    override_only = []    # an override but no coarse Compatibility -- opaque to the map
+
+    for name, processor_class in fourcat_modules.processors.items():
+        # collectors run on no dataset (a Search subclass, or a -search/-import type)
+        if issubclass(processor_class, Search) or name.endswith(("-search", "-import")):
+            continue
+
+        if isinstance(getattr(processor_class, "compatibility", None), Compatibility):
+            continue  # fully covered
+
+        own_method = getattr(processor_class.is_compatible_with, "__func__", None)
+        if own_method is not None and own_method is not base_method:
+            override_only.append(name)
+        else:
+            stragglers.append(name)
+
+    # surfaced, not failed: an override with no coarse Compatibility is opaque to
+    # the map -- it has no spec to read, so it can't place the processor at all
+    if override_only:
+        logger.warning(
+            f"{len(override_only)} processor(s) keep an is_compatible_with override but declare no "
+            f"coarse Compatibility (opaque to the map; a coarse spec would help): {sorted(override_only)}"
+        )
+
+    if stragglers:
+        logger.error(f"{len(stragglers)} processor(s) have neither a Compatibility nor an override: {sorted(stragglers)}")
+        pytest.fail(
+            "These processors declare no Compatibility and keep no is_compatible_with override "
+            f"(they silently ride the BasicProcessor default): {sorted(stragglers)}"
+        )
+
+    logger.info(
+        f"Compatibility coverage OK ({len(fourcat_modules.processors)} processors; "
+        f"{len(override_only)} override-only, 0 stragglers)."
+    )
+
+
+@pytest.mark.dependency(depends=["test_module_collector"])
 def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database):
     from backend.lib.search import Search
 
