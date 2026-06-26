@@ -415,6 +415,7 @@ class Tokenise(BasicProcessor):
 
             if processed % 500 == 0:
                 self.dataset.update_progress(processed / self.source_dataset.num_rows)
+                self.dataset.update_status(f"Processing items ({processed:,} of {self.source_dataset.num_rows:,}; in set '{document_descriptor}')")
             processed += 1
 
             # tokenise...
@@ -460,7 +461,6 @@ class Tokenise(BasicProcessor):
                     output_path = str(output_file)
 
                     if current_output_path != output_path:
-                        self.dataset.update_status("Processing items (%s)" % document_descriptor)
                         if output_file_handle:
                             output_file_handle.close()
                         output_file_handle = output_file.open("a")

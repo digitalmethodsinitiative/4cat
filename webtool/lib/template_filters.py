@@ -195,6 +195,25 @@ def _jinja2_filter_markdown(text, trim_container=False):
 def _jinja2_filter_isbool(value):
     return isinstance(value, bool)
 
+@current_app.template_filter('propmap')
+def _jinja2_filter_propmap(data, property, default=None):
+    """
+    Select a property from a sequence of dicts
+
+    To map `{a: b: {prop: value}}` to `{a: value}` for a given `prop`. If
+    `data` is a dict, preserve key:value pairs. If the property does not exist
+    in a sequence item, use the `default` value.
+
+    :param data:  Sequence or dict to map
+    :param property:  Property to use for mapping
+    :param default:  Value to use if property does not exist in item
+    :return:  Mapped sequence or dict
+    """
+    if type(data) is dict:
+        return {k: v.get(property, default) for k, v in data.items()}
+    else:
+        return [v.get(property, default) for v in data.values()]
+
 @current_app.template_filter('json')
 def _jinja2_filter_json(data):
     return json.dumps(data)
@@ -396,6 +415,18 @@ def _jinja2_filter_parameter_str(url):
 
     return params
 
+@current_app.template_filter("hostname")
+def _jinja2_filter_hostname(url: str) -> str:
+    """
+    For a URL, return the hostname
+
+    If no hostname is found, return the original value
+
+    :param str url:
+    :return str:
+    """
+    return ural.get_hostname(url) or url
+
 
 @current_app.template_filter("explorer_css")
 def explorer_css(datasource, scope_class="explorer-content-container"):
@@ -429,6 +460,10 @@ def explorer_css(datasource, scope_class="explorer-content-container"):
 def _jinja2_filter_hasattr(obj, attribute):
     return hasattr(obj, attribute)
 
+@current_app.template_filter('debug')
+def _jinja2_filter_debug(value):
+    print(value)
+    
 @current_app.template_global("displayable_parameters")
 def _jinja2_global_displayable_parameters(item, config=None):
     """

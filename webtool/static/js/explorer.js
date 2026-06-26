@@ -393,9 +393,6 @@ function init() {
 
 			let dataset_key = $("#dataset-key").text();
 
-			// Note: new_fields may legitimately be empty ({}) — e.g. when deleting the
-			// last remaining field — in which case we still POST so the field is cleared.
-
 			// AJAX the annotation forms
 			$.ajax({
 				url: getRelativeURL("explorer/save_annotation_fields/" + dataset_key),
@@ -409,14 +406,8 @@ function init() {
 				},
 				error: function (error) {
 					console.log(error);
-
-					if (error.status === 400) {
-						annotations.warnEditor(error.responseJSON.error);
-					}
-					else {
-						annotations.warnEditor("Server error, couldn't save annotation fields.")
-					}
-					$("#apply-annotation-fields").html("<i class='fa-solid fa-check'></i> Apply");
+					annotations.warnEditor("Server error (" + error.status + "), couldn't save annotation fields.")
+					$("#apply-annotation-fields").html("<i class='fa-solid fa-check'></i> Update fields");
 				}
 			});
 		},

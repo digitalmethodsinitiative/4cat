@@ -83,7 +83,8 @@ class DataSet(FourcatModule):
             type=None,
             is_private=True,
             owner="anonymous",
-            modules=None
+            modules=None,
+            check_owners=True
     ):
         """
         Create new dataset object
@@ -111,6 +112,9 @@ class DataSet(FourcatModule):
         :param modules: Module cache. If not given, will be loaded when needed
         (expensive). Used to figure out what processors are compatible with
         this dataset.
+        :param bool check_owners:  Update owner cache on instantiation. This
+        requires database querying, so may be useful to disable when
+        instantiating datasets in bulk. Ignored if `key` is set.
         """
         self.db = db
 
@@ -220,7 +224,8 @@ class DataSet(FourcatModule):
             # Reserve filename and update data['result_file']
             self.reserve_result_file(parameters, extension)
 
-        self.refresh_owners()
+        if check_owners:
+            self.refresh_owners()
 
     def check_dataset_finished(self):
         """

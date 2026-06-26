@@ -73,6 +73,9 @@ class ThingExpirer(BasicWorker):
                                     AND key_parent = ''
                                     """)
 
+        # instantiating config wrappers can get expensive, so cache per user
+        wrappers = {}
+
         for dataset in datasets:
             # we only check datasets with no parent, because child datasets
             # inherit the ownership of the parent, and child datasets are
@@ -80,12 +83,27 @@ class ThingExpirer(BasicWorker):
             if self.interrupted:
                 raise WorkerInterruptedException("Interrupted while expiring datasets")
 
+            # this is a relatively expensive loop that should not block other
+            # things, so add a small time.sleep() to give python's interpreter
+            # some breathing room
+            time.sleep(0.01)
+
             # the dataset creator's configuration context determines expiration
             try:
-                dataset = DataSet(data=dataset, db=self.db, modules=self.modules)
-                wrapper = ConfigWrapper(
-                    self.config, user=User.get_by_name(self.db, dataset.creator)
-                )
+                if dataset["creator"] not in wrappers:
+                    wrapper = ConfigWrapper(
+                        self.config, user=User.get_by_name(self.db, dataset["creator"])
+                    )
+                    # pre-read expiration
+                    wrappers[dataset["creator"]] = (wrapper, wrapper.get("datasources.expiration"))
+
+                wrapper, expiration = wrappers[dataset["creator"]]
+                dataset = DataSet(data=dataset, db=self.db, modules=self.modules, check_owners=False)
+
+                if not dataset.parameters.get("expires-after") and not expiration.get(dataset.parameters.get("datasource")):
+                    # is_expired() is expensive, so do some pre-checking
+                    continue
+
                 if dataset.is_expired(config=wrapper):
                     self.log.info(f"Deleting dataset {dataset.key} (expired)")
                     dataset.delete(commit=False)
