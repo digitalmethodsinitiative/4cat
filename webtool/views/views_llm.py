@@ -65,7 +65,7 @@ def llm_panel():
                         enabled_models.append(model)
 
             g.config.set("llm.enabled_models", enabled_models)
-            flash(f"Enabled models updated")
+            flash("Enabled models updated")
 
         return redirect(url_for("llm.llm_panel"))
 
