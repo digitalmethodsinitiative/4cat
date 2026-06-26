@@ -3,7 +3,7 @@ Registry of known Python → JavaScript translation pitfalls for the
 Zeeschuimer auto-generator.
 
 Each `TranslationError` record drives three things in
-`map_item_converter.py`:
+`map_item/converter.py`:
 
 - The "things to get right" section of the LLM prompt.
 - The "before submitting" verification checklist.
@@ -19,7 +19,7 @@ Cross-repo workflow:
   needs a record — this is a curated subset.
 
 Three lint checks are too complex for a single regex and live as bespoke
-code in `map_item_converter.lint_translation`:
+code in `converter.lint_translation`:
 
 - `class_needs_new` — variable-width lookbehind for `new `.
 - `literal_newline_in_string` — JS string lexer.
@@ -330,7 +330,7 @@ def get_regex_lint_rules() -> list[tuple[re.Pattern, str]]:
     message is the rule's `lint_message` when set, else its `prompt_rule`.
 
     Bespoke lint checks (class instantiation, literal newlines, regex use)
-    are NOT included here — they live in `map_item_converter.lint_translation`
+    are NOT included here — they live in `converter.lint_translation`
     and are tied to records by `id` in comments.
     """
     return [

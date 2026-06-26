@@ -12,9 +12,9 @@ IMPORTANT: this module is intentionally pure-stdlib and MUST NOT import
 heavy import here would break it.
 
 Usage (from the 4CAT repo root):
-    python helper-scripts/map_item_ci.py plan-matrix
-    python helper-scripts/map_item_ci.py build-pr-body --manifest manifest.json --out pr_body.md
-    python helper-scripts/map_item_ci.py llm-requirements
+    python helper-scripts/map_item/ci.py plan-matrix
+    python helper-scripts/map_item/ci.py build-pr-body --manifest manifest.json --out pr_body.md
+    python helper-scripts/map_item/ci.py llm-requirements
 
 `llm-requirements` prints the langchain/pydantic/requests pip specs read from
 setup.py, so the workflow installs the same LLM stack 4CAT declares instead of
