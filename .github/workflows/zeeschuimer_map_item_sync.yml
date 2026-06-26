@@ -10,9 +10,9 @@
 # Architecture: a `detect` job groups changed files by module and emits a
 # matrix; a `sync` job fans out one parallel run per module, each opening
 # (or updating) its own PR on a stable per-module branch. The planning
-# and PR-body logic are in `helper-scripts/map_item_ci.py` (# unit-tested 
+# and PR-body logic are in `helper-scripts/map_item/ci.py` (# unit-tested
 # in tests/test_map_item_sync.py); the LLM translation and JS
-# splicing live in `helper-scripts/map_item_converter.py`.
+# splicing live in `helper-scripts/map_item/converter.py`.
 #
 # Required secrets (configured in repo Settings -> Secrets and variables -> Actions):
 #   ZEESCHUIMER_APP_ID           - numeric App ID of the GitHub App installed on
@@ -97,7 +97,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        # `detect` runs map_item_ci.py (stdlib only — no LLM deps installed
+        # `detect` runs map_item/ci.py (stdlib only — no LLM deps installed
         # here), but still needs a `python` on PATH; don't rely on the runner
         # image happening to provide one.
         uses: actions/setup-python@v5
@@ -114,8 +114,8 @@ jobs:
           AFTER_SHA: ${{ github.sha }}
         # Validates paths against a strict datasource shape (dropping anything
         # else) and writes `mode` + `matrix` to $GITHUB_OUTPUT. See
-        # helper-scripts/map_item_ci.py.
-        run: python helper-scripts/map_item_ci.py plan-matrix
+        # helper-scripts/map_item/ci.py.
+        run: python helper-scripts/map_item/ci.py plan-matrix
 
   sync:
     name: Sync ${{ matrix.target.module }}
@@ -137,7 +137,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           # Full history so the PR-body builder can `git diff before..after`
-          # for the changed Python file (see map_item_ci.py build-pr-body).
+          # for the changed Python file (see map_item/ci.py build-pr-body).
           fetch-depth: 0
 
       - name: Set up Python
@@ -157,7 +157,7 @@ jobs:
           # that way a version specifier that contains a shell metacharacter
           # (e.g. a future `langchain_core>=0.3` pin — `>` is redirection) can't
           # be misparsed by the shell.
-          python helper-scripts/map_item_ci.py llm-requirements > llm-requirements.txt
+          python helper-scripts/map_item/ci.py llm-requirements > llm-requirements.txt
           echo "Installing from setup.py:"
           cat llm-requirements.txt
           pip install -r llm-requirements.txt
@@ -197,13 +197,13 @@ jobs:
           if [ "$IS_BOOTSTRAP" = "true" ]; then
             # Bootstrap translates every datasource in one run; --no-fail-fast
             # so one datasource failing doesn't abort the whole initial sync.
-            python helper-scripts/map_item_converter.py \
+            python helper-scripts/map_item/converter.py \
               --bootstrap \
               --no-fail-fast \
               --zeeschuimer-checkout ./zeeschuimer-checkout \
               --output-manifest ./manifest.json
           else
-            python helper-scripts/map_item_converter.py \
+            python helper-scripts/map_item/converter.py \
               --files $MODULE_FILES \
               --zeeschuimer-checkout ./zeeschuimer-checkout \
               --output-manifest ./manifest.json
@@ -220,8 +220,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           REPO: ${{ github.repository }}
         # Reads manifest.json, writes pr_body.md, and writes `title` to
-        # $GITHUB_OUTPUT (delimiter form, injection-safe). See map_item_ci.py.
-        run: python helper-scripts/map_item_ci.py build-pr-body --manifest manifest.json --out pr_body.md
+        # $GITHUB_OUTPUT (delimiter form, injection-safe). See ci.py.
+        run: python helper-scripts/map_item/ci.py build-pr-body --manifest manifest.json --out pr_body.md
 
       - name: Check there are JS changes to PR
         id: have_changes

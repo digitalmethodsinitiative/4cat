@@ -439,7 +439,7 @@ def _cmd_build_pr_body(manifest_path: str, out_path: str) -> int:
 
 
 def _cmd_llm_requirements() -> int:
-    setup_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "setup.py")
+    setup_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..", "setup.py")
     with open(setup_py, encoding="utf-8") as f:
         specs = extract_llm_requirements(f.read())
     if not specs:

@@ -31,7 +31,7 @@ import traceback
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
-sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."))
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
 
 # NOTE: `common.lib.llm.LLMAdapter` (and the langchain stack it pulls in) is
 # imported lazily inside main(), not at module load. That keeps the pure
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
 # Sibling module — lives next to this script in helper-scripts/. Python adds the
 # script's directory to sys.path automatically when the file is run directly.
-from map_item_rules import RULES, get_regex_lint_rules
+from rules import RULES, get_regex_lint_rules
 
 
 # 4CAT datasource path -> Zeeschuimer module path is derived by convention:
