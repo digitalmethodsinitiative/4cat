@@ -361,7 +361,7 @@ class LLMPrompter(BasicProcessor):
         temperature = float(self.parameters.get("temperature", 0.1))
         temperature = min(max(temperature, 0), 2)
         max_input_len = int(self.parameters.get("truncate_input", 0))
-        max_tokens = int(self.parameters.get("max_tokens"))
+        max_tokens = int(self.parameters.get("max_tokens", 10000))
         system_prompt_base = self.parameters.get("system_prompt", "")
         limit = self.parameters.get("limit", 0)
         limit_reached = False
