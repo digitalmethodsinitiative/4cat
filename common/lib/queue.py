@@ -97,6 +97,11 @@ class JobQueue:
 		query = "SELECT * FROM jobs %s" % filter
 
 		if restrict_claimable:
+			# `timestamp_claimed = 0` excludes both running jobs (> 0) and
+			# crashed/parked jobs (Job.STATUS_PARKED, i.e. -1), which only become
+			# claimable again after release_all() on restart.
+			# NOTE: the `interval` recurrence logic here mirrors Job.is_recurring;
+			# keep the two in sync (e.g. if a "metronome" recurrence type is added).
 			query += ("        AND timestamp_claimed = 0"
 					  "              AND timestamp_after < %s"
 					  "              AND (interval = 0 OR timestamp_lastclaimed + interval < %s)")

@@ -2,6 +2,7 @@
 4CAT views for LLM server management
 """
 import time
+import re
 
 from flask import Blueprint, render_template, flash, get_flashed_messages, redirect, url_for, request, g
 from flask_login import login_required
@@ -27,6 +28,7 @@ def llm_panel():
         return error(403, message="LLM access is not enabled on this server.")
 
     servers = g.config.get("llm.servers", {})
+    models = g.config.get("llm.available_models", {})
 
     if request.method == "POST":
         action = request.form.get("action", "").strip()
@@ -36,41 +38,34 @@ def llm_panel():
         if action == "refresh":
             # Queue a one-time manual refresh job; use a timestamp-based remote_id
             # so it is always accepted even if a periodic job already exists.
-            g.queue.add_job("manage-llm", details={**details, "task": "refresh"},
+            g.queue.add_job("manage-llm", details={"task": "refresh"},
                             remote_id=f"manage-llm-manual-{int(time.time())}")
-            flash("Model refresh job queued.")
+            flash("Requesting model list from LLM servers.")
 
         elif action == "pull":
             model_name = request.form.get("model_name", "").strip()
             if model_name:
                 g.queue.add_job("manage-llm", details={**details, "task": "pull"}, remote_id=model_name)
-                flash(f"Pull job queued for model '{model_name}'.")
+                flash(f"Model '{model_name}' was queued for installation.")
             else:
-                flash("Please provide a model name to pull.")
+                flash("Please provide a model name to install.")
 
         elif action == "delete":
-            model_name = request.form.get("model_name", "").strip()
-            if model_name:
-                g.queue.add_job("manage-llm", details={**details, "task": "delete"}, remote_id=model_name)
-                flash(f"Delete job queued for model '{model_name}'.")
+            model = request.form.get("model", "").strip()
+            if model and model in models:
+                g.queue.add_job("manage-llm", details={**details, "task": "delete"}, remote_id=model)
+                flash(f"Model '{model}' was queued for deletion.")
 
-        elif action == "enable":
-            model_name = request.form.get("model_name", "").strip()
-            if model_name:
-                enabled_models = list(g.config.get("llm.enabled_models", []) or [])
-                if model_name not in enabled_models:
-                    enabled_models.append(model_name)
-                    g.config.set("llm.enabled_models", enabled_models)
-                flash(f"Model '{model_name}' enabled.")
+        elif action == "save-enabled":
+            enabled_models = []
+            for field, value in request.form.items():
+                if field.startswith("enable:") and value == "on":
+                    model = re.sub(r"^enable:", "", field)
+                    if model in models:
+                        enabled_models.append(model)
 
-        elif action == "disable":
-            model_name = request.form.get("model_name", "").strip()
-            if model_name:
-                enabled_models = list(g.config.get("llm.enabled_models", []) or [])
-                if model_name in enabled_models:
-                    enabled_models.remove(model_name)
-                    g.config.set("llm.enabled_models", enabled_models)
-                flash(f"Model '{model_name}' disabled.")
+            g.config.set("llm.enabled_models", enabled_models)
+            flash("Enabled models updated")
 
         return redirect(url_for("llm.llm_panel"))
 
@@ -89,9 +84,12 @@ def llm_panel():
     available_models = g.config.get("llm.available_models", {}) or {}
     enabled_models = list(g.config.get("llm.enabled_models", []) or [])
 
-    update_running = bool([
+    # order is important for grouping per server
+    available_models = {k: available_models[k] for k in sorted(available_models, key=lambda k: available_models[k]["server"])}
+
+    llm_jobs = [
         job for job in g.queue.get_all_jobs("manage-llm", restrict_claimable=False) if not job.data["interval"]
-    ])
+    ]
 
     return render_template(
         "controlpanel/llm-server.html",
@@ -99,5 +97,5 @@ def llm_panel():
         servers=servers,
         available_models=available_models,
         enabled_models=enabled_models,
-        update_running=update_running,
+        tasks_running=llm_jobs,
     )

@@ -769,5 +769,5 @@ categories = {
     "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
     "extensions": "Extensions",
-    "llm": "LLM Providers"
+    "llm": "LLM servers"
 }

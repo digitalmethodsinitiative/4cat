@@ -140,11 +140,13 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             self.abort()
         except ProcessorException as e:
             self.log.error(str(e), frame=e.frame)
+            self.mark_job_after_crash()
         except Exception as e:
             stack = traceback.extract_tb(e.__traceback__)
             frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack]
             location = "->".join(frames)
             self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location), frame=stack)
+            self.mark_job_after_crash()
         finally:
             # Clean up after work successfully completed or terminates
             try:
@@ -168,6 +170,29 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
                     cfg.close_memcache()
             except Exception:
                 pass
+
+    def mark_job_after_crash(self):
+        """
+        Decide what happens to the job after an unhandled crash
+
+        On a crash the job is neither finished nor released by default, which
+        would leave it claimed (and so invisible to the delegator) until the
+        next restart. Instead:
+
+        - recurring jobs are released so they retry on their next interval;
+        - one-shot jobs are parked, i.e. retried only on restart, to avoid a
+          tight crash loop.
+
+        See `Job.park()` and `Job.release()`.
+        """
+        if self.job.is_finished:
+            # the worker already finalised the job before crashing
+            return
+
+        if self.job.is_recurring:
+            self.log.fatal("Worker %s crashed while processing recurring job %s - manaully release job for retry." % (self.type, self.job.data["remote_id"]))
+        
+        self.job.park()
 
     def clean_up(self):
         """

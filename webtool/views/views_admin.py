@@ -137,12 +137,18 @@ def get_worker_status():
     api_response = call_api("worker-status")
     if api_response["status"] != "success":
         return """<p class="content-placeholder">4CAT backend unavailable - check logs for errors</p>""", 200, {"Content-Type": "text/html"}
-    workers = [
-        {
-            **worker,
-            "dataset": None if not worker["dataset_key"] else DataSet(key=worker["dataset_key"], db=g.db, modules=g.modules)
-        } for worker in api_response["response"]["running"]
-    ]
+    # the API reports raw job state; resolve the dataset here, treating
+    # remote_id as a dataset key only for processor jobtypes. a parked/crashed
+    # job may reference a dataset that has since been deleted, so tolerate that.
+    workers = []
+    for worker in api_response["response"]["running"]:
+        dataset = None
+        if worker.get("is_processor") and worker.get("remote_id"):
+            try:
+                dataset = DataSet(key=worker["remote_id"], db=g.db, modules=g.modules)
+            except DataSetException:
+                dataset = None
+        workers.append({**worker, "dataset": dataset})
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=g.modules.workers,
                            now=time.time())
 
@@ -232,6 +238,42 @@ def delete_job():
         return redirect(request.referrer or url_for("admin.list_jobs", page=1))
     else:
         return jsonify({"status": "success", "job_id": job.data["id"], "dataset_key": dataset.key if dataset else None, "message": message})
+
+@component.route("/admin/retry-job/", methods=["POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_settings")
+def retry_job():
+    """
+    Retry a crashed/parked job now
+
+    Releases the job so the delegator can claim it again immediately, instead of
+    waiting for the next backend restart (which is otherwise when parked jobs
+    are retried). Restricted to parked jobs: releasing a job that still has a
+    live worker could start a second worker for the same job.
+    """
+    job_id = request.form.get("job_id")
+    redirect_to_page = request.form.get("redirect_to_page", "false").lower() == "true"
+    if not job_id:
+        return error(400, message="Job ID is required")
+    try:
+        job = Job.get_by_ID(id=job_id, database=g.db)
+    except JobNotFoundException:
+        return error(404, message="Job not found")
+
+    if not job.is_parked:
+        return error(400, message="Only crashed (parked) jobs can be retried this way.")
+
+    # release so it becomes claimable again immediately. a manual retry is not
+    # itself a failed attempt - only the resulting crash (via park()) should
+    # count - so don't increment attempts here.
+    job.release(increment_attempts=False)
+
+    message = f"Job {job.data['jobtype']} #{job.data['id']} released; it will be retried shortly."
+    if redirect_to_page:
+        flash(message)
+        return redirect(request.referrer or url_for("admin.list_jobs", page=1))
+    else:
+        return jsonify({"status": "success", "job_id": job.data["id"], "message": message})
 
 @component.route("/admin/add-user/")
 @login_required
@@ -714,7 +756,11 @@ def manipulate_settings():
         options[k]["config_order"] = config_order
         config_order += 1
 
-    options = {k: options[k] for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o].get("config_order", 0)))}
+    options = {
+        k: options[k]
+        for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o].get("config_order", 0)))
+        if not options[k].get("indirect")
+    }
 
     # 'data sources' is one setting but we want to be able to indicate
     # overrides per sub-item
