@@ -92,7 +92,7 @@
                     </tr>
                     {% set table = namespace(current=0) %}
                     {% if available_models %}
-                        {% for model_id, model in available_models.items() %}
+                        {% for model_id, model in available_models.items() if model.server in servers %}
                             {% if table.current != model.server %}
                                 {% set table.current = model.server %}
                                 <tr>
