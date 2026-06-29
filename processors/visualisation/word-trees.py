@@ -199,7 +199,9 @@ class MakeWordtree(BasicProcessor):
     extension = "svg"  # extension of result file, used internally and in UI
 
     references = [
-        "Wattenberg, M., & Viégas, F. B. (2008). [The Word Tree, an Interactive Visual Concordance](https://doi.org/10.1109/TVCG.2008.172). IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228."
+        "Wattenberg, M., & Viégas, F. B. (2008). [The Word Tree, an Interactive Visual Concordance](https://doi.org/10.1109/TVCG.2008.172). IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228.",
+        "[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
+        "[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
     ]
 
     # can be changed
