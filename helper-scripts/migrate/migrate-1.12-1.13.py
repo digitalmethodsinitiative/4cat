@@ -1,4 +1,5 @@
 # this should have been done in the 1.9 -> 1.10 migration script, but alas...
+import re
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), "../.."))
@@ -17,6 +18,10 @@ except (SyntaxError, ImportError, AttributeError):
 
 for datasource in ("8kun", "8chan"):
 	print("  Checking for %s database tables... " % datasource, end="")
+
+	if not re.match(r'^[a-zA-Z0-9_]+$', datasource):
+		print("invalid datasource name, skipping!")
+		continue
 
 	chan_table = db.fetchone("SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )", ("public", "posts_%s" % datasource))
 	if not chan_table["exists"]:
