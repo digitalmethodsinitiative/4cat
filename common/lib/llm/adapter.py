@@ -39,7 +39,7 @@ class LLMAdapter:
         """
         self.model = model
         self.server = server
-        self.api_key = api_key
+        self.api_key = api_key or "dummy-key"  # need a key, even if not required
         self.temperature = temperature
         self.structured_output = False
         self.parser = None
@@ -61,6 +61,7 @@ class LLMAdapter:
         # rather than the connection type is what lets third-party models
         # resolve to the right SDK.
         wrapper = self.model["wrapper"]
+        print(wrapper)
 
         chat_params = {
             "model": self.model["local_id"],
