@@ -2040,7 +2040,7 @@ class DataSet(FourcatModule):
             ):
                 continue
 
-            # evaluates processcor's declarative `compatibility`
+            # evaluates processor's declarative `compatibility`
             # undeclared processors default to top-level-only
             if processor.is_compatible_with(self, config=config):
                 available[processor_type] = processor

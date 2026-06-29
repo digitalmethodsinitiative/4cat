@@ -54,6 +54,9 @@ def _maybe_call(module, method, **kwargs):
         try:
             return attr(**kwargs)
         except Exception:
+            # deliberately swallowed: a failing get_columns()/is_rankable() reads
+            # as "cannot determine"; could pass logger here to debug in case there is
+            # a real bug, but this caller is expected to handle None as "not met"
             return None
     return attr
 
@@ -94,6 +97,11 @@ class ExecutableSibling:
     def __call__(self, path):
         resolved = shutil.which(path) if path else None
         if not resolved:
+            return False
+        # if `name` is not in the resolved path, the rsplit/join below leaves it
+        # unchanged and we would re-check the same executable -- a false positive
+        # that never actually locates the sibling. Fail instead.
+        if self.name not in resolved:
             return False
         return shutil.which(self.sibling.join(resolved.rsplit(self.name, 1))) is not None
 

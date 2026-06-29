@@ -27,6 +27,9 @@ from common.lib.user import User
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
+# Shared instance for the legacy default `compatibility`
+_DEFAULT_COMPATIBILITY = Compatibility(top_dataset_only=True)
+
 
 class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     """
@@ -1012,7 +1015,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         # not override this method is compatible only with top-level datasets
         # (those with no parent), i.e. it runs on collected data and not on the
         # output of other processors.
-        return Compatibility(top_dataset_only=True).is_compatible_with(module, config=config)
+        return _DEFAULT_COMPATIBILITY.is_compatible_with(module, config=config)
 
     @classmethod
     def is_filter(cls):
