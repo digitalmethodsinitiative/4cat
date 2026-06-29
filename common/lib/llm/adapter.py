@@ -102,7 +102,7 @@ class LLMAdapter:
             url += "v1/" if not url.endswith("v1/") else ""
 
             chat_params.update({"base_url": url})
-            if self.server["auth_header"]:
+            if self.server.get("auth_header"):
                 chat_params.update({
                     "default_headers": {
                         self.server["auth_header"]: self.server["auth_key"]
