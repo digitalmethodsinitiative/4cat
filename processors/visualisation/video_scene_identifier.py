@@ -10,6 +10,7 @@ import re
 from scenedetect import open_video, SceneManager, VideoOpenFailure, FrameTimecode
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -39,7 +40,8 @@ class VideoSceneDetector(BasicProcessor):
 				  "intensity or cuts and fades to black) and extract the scene metadata."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["video-scene-frames", "video-timelines"]
+	# Allow on video datasets
+	compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-scene-frames", "video-timelines"])
 
 	references = [
 		"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",
@@ -204,13 +206,6 @@ class VideoSceneDetector(BasicProcessor):
 			options["detector_type"]["default"] = list(options["detector_type"]["options"].values())[0]
 
 		return options
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow on videos
-		"""
-		return module.get_media_type() == "video" or module.type.startswith("video-downloader")
 
 	def process(self):
 		"""

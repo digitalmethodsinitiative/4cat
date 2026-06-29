@@ -8,6 +8,7 @@ for video documents and webpage previews.
 from common.lib.helpers import UserInput
 from processors.visualisation.download_images import ImageDownloader
 from processors.visualisation.download_telegram_videos import TelegramVideoDownloader
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -32,7 +33,8 @@ class TelegramImageDownloader(TelegramVideoDownloader):
     extension = "zip"
     media_type = "image"
 
-    followups = ImageDownloader.followups
+    # coarse map spec; is_compatible_with (below) is the runtime truth (Telegram API creds)
+    compatibility = Compatibility(types={"telegram-search"}, preferred_followups=ImageDownloader.followups)
 
     config = {
         "image-downloader-telegram.max": {

@@ -9,6 +9,7 @@ from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, DataSetException
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
+from common.lib.compatibility import Compatibility
 import ural
 
 __author__ = "Stijn Peeters"
@@ -29,15 +30,8 @@ class DatasetMerger(BasicProcessor):
     description = "Merge this dataset with other datasets of the same format. A new dataset is " \
                   "created containing a combination of items from the original datasets."  # description displayed in UI
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on any top-level CSV or NDJSON file
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
+    # a collector's csv or ndjson output
+    compatibility = Compatibility(is_collector=True, extensions={"csv", "ndjson"})
 
     @staticmethod
     def get_dataset_from_url(url, db, modules=None):

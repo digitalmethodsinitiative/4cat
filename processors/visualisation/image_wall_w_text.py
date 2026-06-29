@@ -18,6 +18,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -38,6 +39,10 @@ class ImageTextWallGenerator(BasicProcessor):
     image_datasets = ["image-downloader", "video-hasher-1"]
     caption_datasets = ["image-captions", "text-from-images"]
     combined_dataset = ["image-downloader-stable-diffusion"]
+
+    # coarse map spec; is_compatible_with (below) is the runtime truth -- it walks the
+    # genealogy (identity_dataset_types) to confirm both an image and a text/caption dataset
+    compatibility = Compatibility(types=set(combined_dataset), type_prefixes=set(caption_datasets))
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):

@@ -225,7 +225,7 @@ def get_processor_options(processor_type, dataset_id=None):
 			return error(404, message="Dataset '%s' does not exist" % dataset_id)
 		
 		# Check compatibility of processor with dataset
-		if hasattr(processor, "is_compatible_with") and not processor.is_compatible_with(dataset, g.config):
+		if not processor.is_compatible_with(dataset, g.config):
 			return error(422, message="Processor '%s' is not compatible with dataset '%s'" % (processor_type, dataset_id))
 
 		worker_options = processor.get_options(dataset, g.config)

@@ -15,6 +15,7 @@ __email__ = "4cat@oilab.eu"
 
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
+from common.lib.compatibility import Compatibility
 
 
 class ImageGrapher(BasicProcessor):
@@ -33,6 +34,9 @@ class ImageGrapher(BasicProcessor):
                    "'Image Preview' plugin.")
     extension = "gexf"  # extension of result file, used internally and in UI
 
+    # coarse map spec; is_compatible_with (below) is the runtime truth -- it also walks the
+    # genealogy to find an image-downloader root (get_root_dataset)
+    compatibility = Compatibility(type_prefixes={"image-downloader"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

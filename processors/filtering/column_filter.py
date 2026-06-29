@@ -7,6 +7,7 @@ import datetime
 from backend.lib.processor import BasicProcessor
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput, convert_to_int
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -24,16 +25,8 @@ class ColumnFilter(BaseFilter):
     description = ("A flexible and customizable filter that lets you retain items in selected column that match a "
                    "custom requirement. This creates a new dataset.")
 
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on top datasets that are CSV or NDJSON.
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+    # top-level csv/ndjson datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -264,15 +257,8 @@ class ColumnProcessorFilter(ColumnFilter):
     title = "Filter by value"  # title displayed in UI
     description = "A generic filter that checks whether a value in a selected column matches a custom requirement. "
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on child datasets and do not create a standalone dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager config:  Configuration reader (context-aware)
-        """
-        return not module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+    # child (non-top-level) csv/ndjson datasets
+    compatibility = Compatibility(child_only=True, extensions={"csv", "ndjson"})
 
     @classmethod
     def is_filter(cls):

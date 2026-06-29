@@ -7,6 +7,7 @@ import csv
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_4cat_canvas
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.compatibility import Compatibility
 
 from svgwrite.shapes import Rect
 from svgwrite.path import Path
@@ -40,6 +41,9 @@ class RankFlowRenderer(BasicProcessor):
         "Bernhard Rieder's RankFlow."
     )  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+
+    # rankable datasets, including multi-column rankings (e.g. top vectors per interval)
+    compatibility = Compatibility(rankable=True)
 
     references = [
         "[Rieder, B. RankFlow. *The Politics of Systems*](https://labs.polsys.net/tools/rankflow/)"
@@ -132,16 +136,6 @@ class RankFlowRenderer(BasicProcessor):
                 "help": "Remove items that do not occur in all mapped periods.",
             },
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-                Allow processor on rankable items
-
-                :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.is_rankable()
 
     def process(self):
         """

@@ -2,6 +2,7 @@
 Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
+from common.lib.compatibility import Compatibility
 
 from common.lib.helpers import UserInput
 
@@ -16,6 +17,9 @@ class NeologismExtractor(ProcessorPreset):
     description = ("Retrieve uncommon terms by deleting all words that appears in dictionary lists. Assumes English-"
                    "language data. Uses stopwords-iso as a stopword filter.")
     extension = "csv"
+
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     references = [
         "Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
@@ -49,17 +53,6 @@ class NeologismExtractor(ProcessorPreset):
                 options["columns"]["default"] = default_options.pop(0)
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-
-        return module.get_extension() in ("csv", "ndjson")
 
     def get_processor_pipeline(self):
         """

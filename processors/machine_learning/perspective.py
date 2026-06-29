@@ -9,6 +9,7 @@ from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from googleapiclient import discovery
 from common.lib.item_mapping import MappedItem
+from common.lib.compatibility import Compatibility
 
 class Perspective(BasicProcessor):
 	"""
@@ -20,6 +21,9 @@ class Perspective(BasicProcessor):
 	description = ("Use the Perspective API to score text with attributes on toxicity, "
 					"including 'toxicity', 'insult', and 'profanity'.")		# description displayed in UI
 	extension = "ndjson"  # extension of result file, used internally and in UI
+
+	# top-level text datasets (scores text columns via the Perspective API)
+	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
 	references = [
 		"[Perspective API documentation](https://developers.perspectiveapi.com/s/about-the-api)",

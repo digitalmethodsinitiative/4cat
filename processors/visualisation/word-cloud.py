@@ -6,6 +6,7 @@ Make word clouds of columns with text and values
 from wordcloud import WordCloud
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -24,15 +25,11 @@ class MakeWordCloud(BasicProcessor):
 	description = "Generates a word cloud with words sized on occurrence."  # description displayed in UI
 	extension = "svg"
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on rankable items
-
-		:param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type in ("tfidf", "collocations", "vector-ranker", "vectorise-tokens-by-category", "similar-word2vec", "extract-nouns", "get-entities")
+	# Allow processor on rankable items
+	compatibility = Compatibility(types={
+		"tfidf", "collocations", "vector-ranker", "vectorise-tokens-by-category",
+		"similar-word2vec", "extract-nouns", "get-entities"
+	})
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None):

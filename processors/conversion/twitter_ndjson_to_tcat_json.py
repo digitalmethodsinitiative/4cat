@@ -4,6 +4,7 @@ Convert a Twitter NDJSON file to be importable by TCAT's import-jsondump.php
 import json
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -20,16 +21,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
     description = "Convert a Twitter dataset to a TCAT-compatible format. This file can then be uploaded to TCAT."  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
 
-    followups = ["tcat-auto-upload"]
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Module to determine compatibility with
-        """
-        return module.type == "twitterv2-search"
+    # Allow processor on Twitter/X (API v2) datasets
+    compatibility = Compatibility(types={"twitterv2-search"}, preferred_followups=["tcat-auto-upload"])
 
     def process(self):
         """
@@ -138,7 +131,6 @@ class ConvertNDJSONToJSON(BasicProcessor):
                     # Storing full place object
                     'geo_full' : tweet.get('geo'),
                     }
-
 
         # Retweet - TCAT checks existance of 'retweeted_status' as key to determine if tweet is a retweet
         # We instead search for a referenced_tweets with type 'retweeted'

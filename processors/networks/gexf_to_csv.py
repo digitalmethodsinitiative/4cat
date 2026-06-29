@@ -2,6 +2,7 @@
 Convert a GEXF network file to a CSV file
 """
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 import networkx as nx
 import csv
@@ -23,14 +24,8 @@ class GexfToCsv(BasicProcessor):
     description = "Convert a GEXF network file to a CSV spreadsheet"
     extension = "csv"
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Module to determine compatibility with
-        """
-        return module.get_extension() in ["gexf"]
+    # Allow on GEXF datasets
+    compatibility = Compatibility(extensions={"gexf"})
 
     def process(self):
         """
@@ -58,7 +53,7 @@ class GexfToCsv(BasicProcessor):
                 result.update({"target": target})
                 result.update({f"target_{k}": v for k,v in target_attributes.items()})
                 result.update({f"edge_{attr_key}": edge_attributes[attr_key] for attr_key in sorted(edge_attributes, key=lambda k: k == "id", reverse=True)})
-        
+
                 if writer is False:
                     # Write header
                     # Notes: this assumes that all nodes have the same attributes which ought to be True for GEXF files written by 4CAT

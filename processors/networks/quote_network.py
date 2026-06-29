@@ -4,6 +4,7 @@ Extract most-used images from corpus
 import re
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 import networkx as nx
 
@@ -25,16 +26,9 @@ class QuoteNetworkGrapher(BasicProcessor):
 				  "Each reference to another post creates an edge between posts. "  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor to run on chan datasets
+	# chan datasets (posts reply to / quote each other)
+	compatibility = Compatibility(datasources={"fourchan", "eightchan", "eightkun"})
 
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun")
-		
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

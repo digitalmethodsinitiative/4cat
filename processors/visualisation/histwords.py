@@ -12,6 +12,7 @@ from sklearn.decomposition import PCA, TruncatedSVD
 from gensim.models import KeyedVectors
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas, convert_to_float
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -40,6 +41,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     title = "Chart diachronic nearest neighbours"  # title displayed in UI
     description = "Visualise nearest neighbours of a given query across all models and show the closest neighbours per model in one combined graph. Based on the 'HistWords' algorithm by Hamilton et al."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+
+    # Allow processor on word embedding models
+    compatibility = Compatibility(types={"generate-embeddings"})
 
     references = [
         "HistWords: [Hamilton, W. L., Leskovec, J., & Jurafsky, D. (2016). Diachronic word embeddings reveal statistical laws of semantic change. *arXiv preprint** arXiv:1605.09096.](https://arxiv.org/pdf/1605.09096.pdf)",
@@ -103,16 +107,6 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model."
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on token sets
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type == "generate-embeddings"
 
     def process(self):
         # parse parameters

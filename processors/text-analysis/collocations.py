@@ -10,6 +10,7 @@ from nltk.collocations import TrigramCollocationFinder, BigramCollocationFinder
 
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 
 class GetCollocations(BasicProcessor):
@@ -22,17 +23,8 @@ class GetCollocations(BasicProcessor):
 	description = "Extracts words appearing close to each other from a set of tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["preset-coword-network", "wordcloud"]
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on token sets
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "tokenise-posts"
+	# Allow processor on token sets
+	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["preset-coword-network", "wordcloud"])
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

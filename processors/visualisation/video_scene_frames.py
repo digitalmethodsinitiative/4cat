@@ -12,6 +12,7 @@ import oslex
 from packaging import version
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility, is_executable
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_ffmpeg_version
 
@@ -33,7 +34,8 @@ class VideoSceneFrames(BasicProcessor):
     description = "For each scene identified, extracts a key frame (e.g. the first frame)."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    followups = ["video-timelines"]
+    # Allow on detected video scenes when ffmpeg is available
+    compatibility = Compatibility(types={"video-scene-detector"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -71,20 +73,6 @@ class VideoSceneFrames(BasicProcessor):
                         "difference between the last frame of the previous scene, and the first frame of the next."
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine compatibility
-
-        Compatible with scene data only.
-
-        :param str module:  Module ID to determine compatibility with
-        :return bool:
-        """
-        return module.type in ["video-scene-detector"] and \
-               config.get("video-downloader.ffmpeg_path") and \
-               shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def process(self):
         """

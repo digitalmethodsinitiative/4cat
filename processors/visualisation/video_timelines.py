@@ -14,6 +14,7 @@ from svgwrite.image import Image as ImageElement
 from ural import is_url
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
@@ -38,6 +39,10 @@ class VideoTimelines(BasicProcessor):
                   "collage of sequential frames). Timelines are then vertically stacked."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
+    # Compatible with extracted video frames (or anything that stores related
+    # images in separate folders within a zip archive).
+    compatibility = Compatibility(types={"video-frames", "video-scene-frames"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -61,21 +66,6 @@ class VideoTimelines(BasicProcessor):
                 "max": 200
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine compatibility
-
-        Compatible with 'Extract video frames'. Can in principle run on
-        anything that stores related images in separate folders in a zip
-        archive. Each folder will be rendered as a separate timeline.
-
-        :param str module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.type in ["video-frames", "video-scene-frames"]
 
     def process(self):
         metadata = {}

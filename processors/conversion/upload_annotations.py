@@ -7,6 +7,7 @@ import io
 from flask import g
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, DataSetException
 from common.lib.helpers import UserInput
 from common.lib.dataset import DataSet
@@ -28,6 +29,9 @@ class UploadAnnotations(BasicProcessor):
 				   "The first column should contain item IDs; subsequent columns become annotation fields. "
 				   "For CSV file uploads, comma is used as the separator. For text input, a custom separator can be specified.")
 	extension = "csv"
+
+	# Allow on top-level CSV/NDJSON datasets
+	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -77,16 +81,6 @@ class UploadAnnotations(BasicProcessor):
 				"requires": "upload_method=text"
 			}
 		}
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on top-level CSV and NDJSON datasets
-
-		:param module: Module to determine compatibility with
-		:param config: Configuration reader (context-aware)
-		"""
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	@staticmethod
 	def validate_query(query, request, config):

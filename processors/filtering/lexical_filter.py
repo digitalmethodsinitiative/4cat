@@ -4,6 +4,7 @@ Filter posts by lexicon
 import re
 
 from processors.filtering.base_filter import BaseFilter
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -21,6 +22,9 @@ class LexicalFilter(BaseFilter):
     title = "Filter by words or phrases"  # title displayed in UI
     description = "Retains posts that contain selected words or phrases, including preset word lists. " \
                   "This creates a new dataset."  # description displayed in UI
+
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
     references = [
         "[Regex101](https://regex101.com/)"
@@ -61,16 +65,6 @@ class LexicalFilter(BaseFilter):
                 "help": "Case sensitive"
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on NDJSON and CSV files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def filter_items(self):
         """

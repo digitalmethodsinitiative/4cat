@@ -4,6 +4,7 @@ Twitter APIv2 custom statistics
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -20,6 +21,9 @@ class TwitterCustomStats(TwitterStatsBase):
     title = "Custom statistics"  # title displayed in UI
     description = "Group tweets by category and count tweets per timeframe to collect aggregate group statistics.\nFor retweets and quotes, hashtags, mentions, URLs, and images from the original tweet are included in the retweet/quote. Data on public metrics (e.g., number of retweets or likes of tweets) are as of the time the data was collected."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     sorted = 'Number of Tweets'
 
@@ -55,16 +59,6 @@ class TwitterCustomStats(TwitterStatsBase):
                 "help": "Produce counts per"
             },
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
     def map_data(self, post):
         """

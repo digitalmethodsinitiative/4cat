@@ -20,6 +20,7 @@ from common.lib.exceptions import ProcessorInterruptedException, QueryParameters
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
 from common.lib.llm.adapter import LLMAdapter
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 class LLMPrompter(BasicProcessor):
     """
@@ -31,6 +32,10 @@ class LLMPrompter(BasicProcessor):
     description = ("Use LLMs for analysis, via APIs or locally. This can be used for tasks like classification, "
                    "entity extraction, or OCR. Supported APIs include OpenAI, Google, Anthropic, Mistral, and DeepSeek.")
     extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
+
+    # coarse map spec; is_compatible_with (below) is the runtime truth -- it accepts csv/ndjson
+    # tables, OR zip archives of image/video/audio media (_almost_ all zips but not)
+    compatibility = Compatibility(extensions={"csv", "ndjson", "zip"})
 
     references = [
         "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307."
