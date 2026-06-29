@@ -19,8 +19,8 @@ from langchain_deepseek import ChatDeepSeek
 class LLMAdapter:
     def __init__(
             self,
-            config,
             model: dict,
+            server: dict = None,
             api_key: Optional[str] = None,
             temperature: float = 0.1,
             max_tokens: int = 1000,
@@ -29,17 +29,16 @@ class LLMAdapter:
         """
         Instantiate an adapter to interface with an LLM model
 
-        :param config:  4CAT config reader
-        :param dict model:  Model metadata (as in `llm.available_models` 4CAT setting)
+        :param dict model:  Model metadata (as in `llm.available_models` 4CAT
+          setting)
+        :param dict server:  Server metadata (as in `llm.servers` 4CAT setting)
         :param str api_key:  API key, if needed
         :param float temperature:  Temperature hyperparameter
         :param int max_tokens:  Max tokens to generate
         :param dict client_kwargs:  Optional parameters for the LLM adapter class
         """
-        known_servers = config.get("llm.servers", {})
-
         self.model = model
-        self.server = known_servers.get(model["server"])
+        self.server = server
         self.api_key = api_key
         self.temperature = temperature
         self.structured_output = False
@@ -103,7 +102,7 @@ class LLMAdapter:
             url += "v1/" if not url.endswith("v1/") else ""
 
             chat_params.update({"base_url": url})
-            if self.server["auth_header"]:
+            if self.server.get("auth_header"):
                 chat_params.update({
                     "default_headers": {
                         self.server["auth_header"]: self.server["auth_key"]
@@ -281,11 +280,24 @@ class LLMAdapter:
                     }}
                 return {"type": "image_url", "image_url": {"url": data_uri}}
 
-    def set_structure(self, json_schema):
+    def set_structure(self, json_schema, method=None, include_raw=False, strict=None):
         """
-        Set desired response JSON schema
+        Bind a JSON schema so the model returns schema-validated structured output.
 
-        :param json_schema:
+        :param json_schema: JSON schema dict (or JSON string) describing the output.
+        :param method: How structured output is enforced. None uses LangChain's
+            per-provider default (usually "function_calling", which binds a tool).
+            For reasoning models served over an OpenAI-compatible proxy, pass
+            "json_schema" — constrained decoding forces the answer channel itself
+            to match the schema, rather than relying on a clean tool call that the
+            model may emit in the wrong channel (yielding empty, unparseable output).
+        :param include_raw: When True, structured-output calls return a
+            {"raw", "parsed", "parsing_error"} dict instead of raising on a parse
+            failure, so callers can inspect the raw AIMessage (finish_reason,
+            reasoning channel, token usage) to diagnose what went wrong.
+        :param strict: Passed through to with_structured_output when not None.
+            Use strict=False for schemas that don't satisfy OpenAI strict-mode
+            requirements but are fine for a guided-decoding backend (e.g. vLLM).
         """
         if not json_schema:
             raise ValueError("json_schema is None")
@@ -296,9 +308,14 @@ class LLMAdapter:
         json.dumps(json_schema)  # To validate / raise an error
 
         # LM Studio needs some more guidance
-        if self.model["wrapper"] == "lmstudio":
+        if self.model["wrapper"] == "openai-like":
             json_schema = {"type": "json_schema", "json_schema": {"schema": json_schema}}
             self.llm = self.llm.bind(response_format=json_schema)
         else:
-            self.llm = self.llm.with_structured_output(json_schema)
+            kwargs = {"include_raw": include_raw}
+            if method:
+                kwargs["method"] = method
+            if strict is not None:
+                kwargs["strict"] = strict
+            self.llm = self.llm.with_structured_output(json_schema, **kwargs)
         self.structured_output = True

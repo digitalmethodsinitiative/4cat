@@ -521,14 +521,18 @@ class DataSet(FourcatModule):
         :param max_unmappable:  Skip at most this many unmappable items; if
         more are encountered, stop iterating. `None` to never stop.
         :param map_missing: Indicates what to do with mapped items for which
-        some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
+        some fields could not be mapped. Defaults to 'default'. Must be one of:
         - 'default': fill missing fields with the default passed by map_item
+        - 'keep': leave the MissingMappedField sentinel in place so the caller
+          can tell which fields were missing (useful for JSON serialisation
+          via MissingMappedFieldEncoder)
         - 'abort': raise a MappedItemIncompleteException if a field is missing
         - a callback: replace missing field with the return value of the
           callback. The MappedItem object is passed to the callback as the
           first argument and the name of the missing field as the second.
         - a dictionary with a key for each possible missing field: replace missing
-          field with a strategy for that field ('default', 'abort', or a callback)
+          field with a strategy for that field ('default', 'keep', 'abort', or
+          a callback)
         :param get_annotations: Whether to also fetch annotations from the database.
           This can be disabled to help speed up iteration.
         :param offset: After how many rows we should yield items.
@@ -612,6 +616,10 @@ class DataSet(FourcatModule):
                             mapped_item.data[missing_field] = strategy(
                                 mapped_item.data, missing_field
                             )
+                        elif strategy == "keep":
+                            # leave the MissingMappedField in place so the
+                            # caller can distinguish missing from present
+                            continue
                         elif strategy == "abort":
                             # raise an exception to be handled at the processor level
                             raise MappedItemIncompleteException(
@@ -624,7 +632,7 @@ class DataSet(FourcatModule):
                             ].value
                         else:
                             raise ValueError(
-                                "map_missing must be 'abort', 'default', or a callback."
+                                "map_missing must be 'abort', 'default', 'keep', or a callback."
                             )
             else:
                 mapped_item = original_item

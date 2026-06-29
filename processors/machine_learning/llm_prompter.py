@@ -366,7 +366,7 @@ class LLMPrompter(BasicProcessor):
         temperature = float(self.parameters.get("temperature", 0.1))
         temperature = min(max(temperature, 0), 2)
         max_input_len = int(self.parameters.get("truncate_input", 0))
-        max_tokens = int(self.parameters.get("max_tokens"))
+        max_tokens = int(self.parameters.get("max_tokens", 10000))
         system_prompt_base = self.parameters.get("system_prompt", "")
         limit = self.parameters.get("limit", 0)
         limit_reached = False
@@ -443,9 +443,10 @@ class LLMPrompter(BasicProcessor):
         self.dataset.update_status("Connecting to LLM server")
         base_url_str = "" if not server["url"] else f" at base URL '{server['url']}'"
         self.dataset.log(f"Using LLM server '{server['_id']}' with model '{model['local_id']}'{base_url_str}")
+
         try:
             llm = LLMAdapter(
-                config=self.config,
+                server=server,
                 model=model,
                 api_key=api_key,
                 temperature=temperature,
@@ -563,9 +564,10 @@ class LLMPrompter(BasicProcessor):
 
                     prompt = base_prompt if base_prompt else f"Analyze this {media_archive_type} file."
                     system_prompt = system_prompt_base
+                    model_id = model['local_id']
 
                     self.dataset.update_status(f"Processing {media_archive_type} file {row:,}/{max_processed:,} "
-                                               f"with {model}")
+                                               f"with {model['local_id']}")
                     try:
                         response = llm.generate_text(
                             prompt,
@@ -579,7 +581,7 @@ class LLMPrompter(BasicProcessor):
                         error_str = str(e).lower()
                         if "vision" in error_str or "image" in error_str or "multimodal" in error_str or "media" in error_str:
                             self.dataset.finish_with_error(
-                                f"The model '{model}' does not appear to support {media_archive_type} input. "
+                                f"The model '{model_id}' does not appear to support {media_archive_type} input. "
                                 f"Please use a model with {media_archive_type} support (e.g. a vision model for images): {e}"
                             )
                             return
@@ -588,13 +590,13 @@ class LLMPrompter(BasicProcessor):
 
                     # Set model name from the response for more details
                     if hasattr(response, "response_metadata"):
-                        model = response.response_metadata.get("model_name", model)
+                        model_id = response.response_metadata.get("model_name", model)
                         if "models/" in model:
-                            model = model.replace("models/", "")
+                            model_id = model_id.replace("models/", "")
 
                     if not response:
                         structured_warning = " with your specified JSON schema" if structured_output else ""
-                        warning = f"{model} could not return text{structured_warning}. Consider editing your prompt or changing settings."
+                        warning = f"{model_id} could not return text{structured_warning}. Consider editing your prompt or changing settings."
                         self.dataset.finish_with_warning(outputs, warning)
                         return
 
@@ -645,7 +647,7 @@ class LLMPrompter(BasicProcessor):
                             "prompt": prompt,
                             "temperature": temperature,
                             "max_tokens": max_tokens,
-                            "model": model["local_id"],
+                            "model": model_id,
                             "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                             "time_created_utc": time_created,
                             "batch_number": "",
@@ -656,11 +658,11 @@ class LLMPrompter(BasicProcessor):
 
                         if save_annotations:
                             if isinstance(output_item, dict):
-                                annotation_output = flatten_dict({model: output_item})
+                                annotation_output = flatten_dict({model_id: output_item})
                             elif self.parameters.get("annotation_label"):
                                 annotation_output = {self.parameters.get("annotation_label"): output_item}
                             else:
-                                annotation_output = {model + "_output": output_item}
+                                annotation_output = {model_id + "_output": output_item}
 
                             # Resolve filename to original post IDs from .metadata.json
                             # so annotations are saved against the top-level dataset's item IDs.
@@ -823,8 +825,8 @@ class LLMPrompter(BasicProcessor):
                                 json_schema = self.get_json_schema_for_batch(n_batched, custom_schema=json_schema_original)
                                 # `llm` becomes a RunnableSequence when used, so we'll need to reset it here
                                 llm = LLMAdapter(
-                                    config=self.config,
                                     model=model,
+                                    server=server,
                                     api_key=api_key,
                                     temperature=temperature,
                                     max_tokens=max_tokens,
@@ -963,11 +965,11 @@ class LLMPrompter(BasicProcessor):
                                 # Save annotations for every value produced by the LLM, in case of structured output.
                                 # Else this will just save one string.
                                 if isinstance(output_item, dict):
-                                    annotation_output = flatten_dict({model: output_item})
+                                    annotation_output = flatten_dict({model['name']: output_item})
                                 elif self.parameters.get("annotation_label"):
                                     annotation_output = {self.parameters.get("annotation_label"): output_item}
                                 else:
-                                    annotation_output = {model + "_output": output_item}
+                                    annotation_output = {model['name'] + "_output": output_item}
 
                                 for output_key, output_value in annotation_output.items():
 

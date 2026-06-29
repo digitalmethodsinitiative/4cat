@@ -46,6 +46,9 @@ webtool/venv/
 *.ipynb
 venv/
 __pycache__/
+.claude/
+# ignore symlink at the repo root -> config/extensions.
+/extensions
 
 # do not ignore interface images
 !webtool/static/img/*.png
