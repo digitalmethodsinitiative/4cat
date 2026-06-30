@@ -7,6 +7,7 @@ import openai
 from requests.exceptions import ConnectionError
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -30,7 +31,8 @@ class AudioToText(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
     icon = "closed-captioning"
 
-    followups = []
+    # Allow on audio datasets
+    compatibility = Compatibility(media_types={"audio"}, type_prefixes={"audio-extractor"})
 
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",
@@ -90,13 +92,6 @@ class AudioToText(BasicProcessor):
         
         # Queue per model/API type
         return f"{cls.type}-{dataset.parameters.get('model_host', 'local')}"
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on audio archives
-        """
-        return module.get_media_type() == 'audio' or module.type.startswith("audio-extractor")
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -514,10 +509,16 @@ class AudioToText(BasicProcessor):
 
         # Load the video metadata if available
         video_metadata = None
+        file_metadata_map = {}
         if staging_area.joinpath(".metadata.json").is_file():
             with open(staging_area.joinpath(".metadata.json")) as file:
                 video_metadata = json.load(file)
                 self.dataset.log("Found and loaded video metadata")
+
+            for video_id, video_data in video_metadata.items():
+                for file in video_data.get("files", []):
+                    file = ".".join(file["filename"].split(".")[:-1])
+                    file_metadata_map[file] = video_data
 
         self.dataset.update_status("Processing results...")
 
@@ -531,7 +532,7 @@ class AudioToText(BasicProcessor):
                 with open(output_dir.joinpath(result_filename), "r") as result_file:
                     result_data = json.loads("".join(result_file))
                     audio_name = ".".join(result_filename.split(".")[:-1])
-                    audio_metadata = video_metadata.get(audio_name, {}) if video_metadata else {}
+                    audio_metadata = file_metadata_map.get(audio_name, {}) if file_metadata_map else {}
                     fourcat_metadata = {
                         "audio_id": audio_name,
                         "model_host": model_host,

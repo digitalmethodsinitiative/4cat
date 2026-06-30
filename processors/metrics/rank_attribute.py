@@ -8,6 +8,7 @@ from collections import OrderedDict
 from itertools import islice, chain
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -31,23 +32,13 @@ class AttributeRanker(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
     icon = "list-ol"
 
-    followups = []
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     references = ["[regex010](https://regex101.com/)"]
 
     include_missing_data = True
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-
-        return module.get_extension() in ("csv", "ndjson")
-    
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
 
@@ -83,11 +74,14 @@ class AttributeRanker(BasicProcessor):
                 "type": UserInput.OPTION_CHOICE,
                 "options": {
                     "none": "Use column value",
-                    "urls": "URLs",
-                    "hostnames": "Domain names",
-                    "level2-hostnames": "Second-level domain names (e.g. m.youtube.com -> youtube.com)",
+                    "URL-related": {
+                        "urls": "URLs",
+                        "hostnames": "Domain names",
+                        "level2-hostnames": "Second-level domain names (e.g. m.youtube.com -> youtube.com)",
+                    },
                     "hashtags": "Hashtags (words starting with #)",
-                    "emoji": "Emoji (each used emoji in the column is counted individually)"
+                    "emoji": "Emoji (each used emoji in the column is counted individually)",
+                    "occurrence": "Values (the number of comma-separated values in the given field)"
                 },
                 "help": "Extract from column",
                 "tooltip": "This can be used to extract more specific values from the value of the selected column(s); for "

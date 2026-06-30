@@ -3,6 +3,7 @@ import json
 import imagehash
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, normalize_crhash_components
 
@@ -21,6 +22,9 @@ class HashGrouper(BasicProcessor):
     description = "Calculate groups of similar hashes from a CSV file."  # description displayed in UI
     extension = "csv"
     icon = "hashtag"
+
+    # Allow processor on image-hasher output (could also work on any CSV with the right fields)
+    compatibility = Compatibility(types={"image-hasher"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -45,17 +49,6 @@ class HashGrouper(BasicProcessor):
             }
         }
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on above hasher output
-
-        Could also allow on any CSV with appropriate fields
-
-        :param module: Module to determine compatibility with
-        """
-        return module.type == "image-hasher"
-    
     @staticmethod
     def compute_groups(hashes, hash_type: str, hash_size: int | None, similarity_pct: float) -> list[int]:
         """
@@ -159,7 +152,7 @@ class HashGrouper(BasicProcessor):
         for item in self.source_dataset.iterate_items(self):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while grouping hashes")
-            
+
             row = dict(item)
             # Discover and enforce a single hash_type
             row_hash_type = row.get("hash_type")

@@ -8,6 +8,7 @@ import multiprocessing
 import psutil
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 
@@ -33,6 +34,9 @@ class URLCoLinker(BasicProcessor):
 				  "Edges are weighted by amount of co-links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
 	icon = "circle-nodes"
+
+	# Allow on top-level CSV/NDJSON datasets
+	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -68,16 +72,6 @@ class URLCoLinker(BasicProcessor):
 			}
 		}
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-        Allow processor on top datasets.
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -88,7 +82,7 @@ class URLCoLinker(BasicProcessor):
 		if self.parameters.get("level") == "thread" and "thread_id" not in self.source_dataset.get_columns():
 			self.dataset.finish_with_error("Thread-level co-linking requires a 'thread_id' column in the dataset.")
 			return
-		
+
 		# we use these to extract URLs and host names if needed
 		link_regex = re.compile(r"https?://[^\s\]()]+")
 		www_regex = re.compile(r"^www\.")
@@ -178,7 +172,7 @@ class URLCoLinker(BasicProcessor):
 		self.dataset.update_status(f"Network has {len(network.nodes)} and {len(network.edges)} edges")
 		self.dataset.log(f"time elapsed: {time.time() - start_time:.2f} seconds")
 		self.dataset.update_status("Writing network file")
-		
+
 		writer = multiprocessing.Process(target=_write_gexf, args=(network, self.dataset.get_results_path()))
 		writer.start()
 		while writer.is_alive():
@@ -196,7 +190,7 @@ class URLCoLinker(BasicProcessor):
 			self.dataset.finish_with_error("Network write failed")
 			self.log.warning(f"Network writer exited with code {writer.exitcode} for dataset {self.dataset.key}")
 			return
-			
+
 		self.dataset.log(f"time to complete: {time.time() - start_time:.2f} seconds")
 		self.dataset.finish(len(network.nodes))
 

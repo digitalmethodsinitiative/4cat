@@ -4,6 +4,7 @@ Find most-used hashtags in a dataset
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 from processors.networks.cotag_network import CoTaggerPreset
+from common.lib.compatibility import Compatibility
 
 
 class TopHashtags(ProcessorPreset):
@@ -16,6 +17,9 @@ class TopHashtags(ProcessorPreset):
     description = "Count how often each hashtag occurs in the dataset and sort by this value"
     extension = "csv"
     icon = "hashtag"
+
+    # datasets with at least one tag-like column
+    compatibility = Compatibility(requires_any_columns=CoTaggerPreset.possible_tag_columns)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -43,18 +47,6 @@ class TopHashtags(ProcessorPreset):
                 "coerce_type": int,
             },
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Check if dataset has a hashtag attribute
-
-        :param module:  Dataset to check
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        columns = module.get_columns()
-        return columns and any([tag in columns for tag in CoTaggerPreset.possible_tag_columns])	
 
     def get_processor_pipeline(self):
         """

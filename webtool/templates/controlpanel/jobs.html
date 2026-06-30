@@ -47,9 +47,11 @@
                                 <div class="job-status">
                                     {% if job.is_finished %}
                                         Finished
+                                    {% elif job.is_parked %}
+                                        Crashed {{ (now - job.data.timestamp_lastclaimed)|timify }} ago (retries on restart){% if job.data.attempts %} &middot; {{ job.data.attempts }} attempt(s){% endif %}
                                     {% elif job.is_claimed %}
                                         Claimed since {{ (now - job.data.timestamp_lastclaimed)|timify }}
-                                    {% elif job.data.interval > 0 and (job.data.timestamp_after > now or (job.data.interval + job.data.timestamp_lastclaimed) > now) %}
+                                    {% elif job.is_recurring and (job.data.timestamp_after > now or (job.data.interval + job.data.timestamp_lastclaimed) > now) %}
                                         Scheduled (interval; next in {{ (([(job.data.timestamp_lastclaimed + job.data.interval), job.data.timestamp_after]|max) - now)|timify }})
                                     {% elif job.data.timestamp_after > now %}
                                         Scheduled (in {{ (job.data.timestamp_after - now)|timify }})
@@ -60,7 +62,15 @@
                             </td>
                             <td class="actions">
                                 <!-- Could add other types e.g. (clean-temp-files, check-for-updates, datasource-metrics, expire-datasets) -->
-                                {% if job.data["jobtype"] not in ("api") %} 
+                                {% if job.is_parked %}
+                                    <form class="inline" action="{{ url_for("admin.retry_job") }}" method="POST">
+                                        <input type="hidden" name="job_id" value="{{ job.data["id"] }}">
+                                        <input type="hidden" name="redirect_to_page" value="true">
+                                        <button class="tooltip-trigger" aria-controls="tooltip-retry-{{ job.data['id'] }}"><i class="fa fa-rotate-right" aria-hidden="true"></i><span class="sr-only">Retry job now</span></button>
+                                    </form>
+                                    <span role="tooltip" id="tooltip-retry-{{ job.data['id'] }}">Retry now (don't wait for a restart)</span>
+                                {% endif %}
+                                {% if job.data["jobtype"] not in ("api") %}
                                     <form class="inline" action="{{ url_for("admin.delete_job") }}" method="POST">
                                         <input type="hidden" name="job_id" value="{{ job.data["id"] }}">
                                         <input type="hidden" name="redirect_to_page" value="true">

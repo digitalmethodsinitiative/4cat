@@ -9,6 +9,7 @@ from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerE
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -27,8 +28,8 @@ class CategorizeImagesCLIP(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
     icon = "eye"
 
-    # Processors designed to handle input from this Dataset
-    followups = ["image-text-wall"]
+    # image datasets (image archives or image-downloader output), when BLIP2 is enabled
+    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.fc_blip2_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
 
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",
@@ -67,15 +68,6 @@ class CategorizeImagesCLIP(BasicProcessor):
         """
         # Unique queue for locally hosted models; used by other local model processors as well
         return "local_models" 
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on image archives if enabled in Control Panel
-        """
-        return config.get("dmi-service-manager.fc_blip2_enabled", False) and \
-               config.get("dmi-service-manager.ab_server_address", False) and \
-               (module.get_media_type() == "image" or module.type.startswith("image-downloader"))
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

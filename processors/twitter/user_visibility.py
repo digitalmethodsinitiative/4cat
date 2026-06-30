@@ -5,6 +5,7 @@ import datetime
 
 from common.lib.helpers import get_interval_descriptor
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
@@ -23,6 +24,9 @@ class TwitterUserVisibility(BasicProcessor):
     title = "User visibility"  # title displayed in UI
     description = "Collects usernames and totals how many tweets are authored by the user and how many tweets mention the user"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -44,16 +48,6 @@ class TwitterUserVisibility(BasicProcessor):
                 "help": "Produce counts per"
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
     def process(self):
         """

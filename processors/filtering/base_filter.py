@@ -6,6 +6,7 @@ import csv
 import json
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -27,15 +28,8 @@ class BaseFilter(BasicProcessor):
 
     item_ids = []
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        This is meant to be inherited by other child classes
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return False
+    # Abstract base filter; not runnable on its own (empty type set never matches)
+    compatibility = Compatibility(types=set())
 
     def process(self):
         """

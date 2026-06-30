@@ -7,6 +7,7 @@ import json
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -24,7 +25,8 @@ class VectorRanker(BasicProcessor):
 				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["wordcloud"]
+	# Allow processor on token vectors
+	compatibility = Compatibility(types={"vectorise-tokens"}, preferred_followups=["wordcloud"])
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -51,16 +53,6 @@ class VectorRanker(BasicProcessor):
 				"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
 			},
 		}
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on token vectors
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "vectorise-tokens"
 
 	def process(self):
 		"""
@@ -94,7 +86,7 @@ class VectorRanker(BasicProcessor):
 		# now rank the vectors by most prevalent per "file" (i.e. interval)
 		overall_top = {}
 		index = 0
-		for packed_vectors in self.source_dataset.iterate_items():
+		for packed_vectors in self.source_dataset.iterate_items(self):
 			# we support both pickle and json dumps of vectors
 			vector_unpacker = pickle if packed_vectors.file.suffix == "pb" else json
 
@@ -108,7 +100,7 @@ class VectorRanker(BasicProcessor):
 				vectors = vector_unpacker.load(binary_tokens)
 
 			vectors = sorted(vectors, key=lambda x: x[1], reverse=True)
-				
+
 			# for overall ranking we need the full vector space per interval
 			# because maybe an overall top-ranking vector is at the bottom
 			# in this particular interval - we'll truncate the top list at

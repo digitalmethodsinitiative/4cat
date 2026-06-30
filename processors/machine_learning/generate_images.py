@@ -11,6 +11,7 @@ from backend.lib.processor import BasicProcessor
 from processors.visualisation.download_images import ImageDownloader
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.user_input import UserInput
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -29,7 +30,9 @@ class StableDiffusionImageGenerator(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     icon = "images"
 
-    followups = ImageDownloader.followups
+    # coarse map spec; is_compatible_with (below) is the runtime truth -- it also requires the
+    # dataset to have columns (a prompt source), which can't be declared statically
+    compatibility = Compatibility(required_settings={"dmi-service-manager.sd_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=ImageDownloader.followups)
 
     references = [
         "[Stable Diffusion XL 1.0 model card](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)"

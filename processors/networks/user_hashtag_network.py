@@ -3,6 +3,7 @@ Generate bipartite user-hashtag graph of posts
 """
 from backend.lib.preset import ProcessorPreset
 from common.lib.user_input import UserInput
+from common.lib.compatibility import Compatibility
 
 
 __author__ = "Stijn Peeters"
@@ -22,6 +23,9 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     extension = "gexf"  # extension of result file, used internally and in UI
     icon = "circle-nodes"
 
+    # datasets with at least one tag-like column
+    compatibility = Compatibility(requires_any_columns={"tags", "hashtags", "groups"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         return {
@@ -32,18 +36,6 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
                 "tooltip": "Merges values with varying cases"
                 }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on datasets containing a tags column
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        usable_columns = {"tags", "hashtags", "groups"}
-        columns = module.get_columns()
-        return bool(set(columns) & usable_columns) if columns else False
 
     def get_processor_pipeline(self):
         """

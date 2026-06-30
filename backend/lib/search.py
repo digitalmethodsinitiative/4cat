@@ -11,7 +11,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
+from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache, format_import_item
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
 
 
@@ -169,7 +169,6 @@ class Search(BasicProcessor, ABC):
 				f"Processor {self.type} importing item without map_item method for Dataset {self.dataset.type} - {self.dataset.key}")
 
 		with path.open(encoding="utf-8") as infile:
-			unmapped_items = False
 			for i, line in enumerate(infile):
 				if self.interrupted:
 					raise WorkerInterruptedException()
@@ -190,10 +189,7 @@ class Search(BasicProcessor, ABC):
 					continue
 
 
-				new_item = {
-					**item["data"],
-					"__import_meta": {k: v for k, v in item.items() if k != "data"}
-				}
+				new_item = format_import_item(item)
 
 				# Check map item here!
 				if check_map_item:
@@ -218,8 +214,8 @@ class Search(BasicProcessor, ABC):
 					except MapItemException as e:
 						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
 						self.import_error_count += 1
-						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e, warn_admins=unmapped_items is False)
-						unmapped_items = True
+						# Per-item user-facing log entry.
+						self.dataset.warn_unmappable_item(item_count=i, processor=self, error_message=e)
 
 				yield new_item
 

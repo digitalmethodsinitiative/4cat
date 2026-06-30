@@ -6,6 +6,7 @@ import json
 
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 
 __author__ = "Dale Wahl"
@@ -22,15 +23,8 @@ class UpdateTikTok(BasicProcessor):
     extension = "ndjson"
     icon = "brand-tiktok"
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on NDJSON and CSV files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type in ["tiktok-search", "tiktok-urls-search"]
+    # Allow processor on TikTok datasets
+    compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"})
 
     def process(self):
         """
@@ -75,7 +69,7 @@ class UpdateTikTok(BasicProcessor):
         # Request standalone
         standalone = self.create_standalone()
         # Update the type
-        standalone.type = "tiktok-urls-search"
+        standalone.adopt_type("tiktok-urls-search")
 
     @classmethod
     def is_filter(cls):

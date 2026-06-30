@@ -73,7 +73,7 @@ FourcatModule (common/lib/fourcat_module.py)
 ## Deployment
 
 ### Docker (primary)
-- `docker-compose.yml` defines 4 services: `db` (Postgres), `memcached`, `backend`, `webtool`.
+- The Compose files each define 4 services: `db` (Postgres), `memcached`, `backend`, `frontend`.
 - All services are configured via a `.env` file (referenced by `env_file: .env`).
 - The Docker image is based on `python:3.11-slim-trixie` (see `docker/Dockerfile`). Dependencies are installed via `pip install -r requirements.txt` (which just runs `pip install -e .` using `setup.py`). Gunicorn is installed separately for the frontend.
 - **Backend entrypoint** (`docker/docker-entrypoint.sh`):
@@ -84,7 +84,25 @@ FourcatModule (common/lib/fourcat_module.py)
   5. Runs `docker.docker_setup` to sync `.env` vars into `config/config.ini`.
   6. Starts the backend daemon via `python3 4cat-daemon.py start`.
 - **Frontend entrypoint** (`docker/wait-for-backend.sh`): Waits for backend, runs frontend-specific migration, then starts Gunicorn (default: 4 workers, 4 threads, `gthread` class, binding `0.0.0.0:5000`).
-- Named volumes: `4cat_db`, `4cat_data`, `4cat_config`, `4cat_logs`.
+- Named volumes (used by `docker-compose.yml`): `4cat_db`, `4cat_data`, `4cat_config`, `4cat_logs`.
+
+#### Compose files
+4CAT ships several Compose files. Pick the **base** file that matches how the image should be sourced, and optionally layer the **dev override** on top with a second `-f`.
+
+| File | Image source | Data / config / logs storage | Intended use |
+|------|--------------|------------------------------|--------------|
+| `docker-compose.yml` | Pulled from Docker Hub (`digitalmethodsinitiative/4cat:${DOCKER_TAG}`) | Named Docker volumes | Standard install. The recommended way to run a released 4CAT. |
+| `docker-compose_build.yml` | Built locally from `docker/Dockerfile` | Bind-mounted host dirs (`./data/datasets`, `./data/config`, `./data/logs`, `./data/postgres`) | Running a source checkout that is not a published release. Source is baked into the image at build time, so code changes require a rebuild. |
+| `docker-compose_dev.yml` | — (override only; never used alone) | — | Bind-mounts the working copy (`.:/usr/src/app`) over the image's source so host edits to Python/templates are live without a rebuild or `docker cp`. Layered on top of either base file above. |
+| `docker-compose_public_ip.yml` | Pulled from Docker Hub (`:latest`) | Named Docker volumes | Deploying to a server reachable only at a bare IP address (e.g. SURF Research Cloud); derives `SERVER_NAME` from the container hostname. |
+
+Invocation (the plain `docker compose` command uses `docker-compose.yml`):
+- Standard: `docker compose up -d`
+- Build from source: `docker compose -f docker-compose_build.yml up -d`
+- Build from source + live edits: `docker compose -f docker-compose_build.yml -f docker-compose_dev.yml up -d`
+- Released image + live edits (fastest loop for pure-Python/template changes — no local build): `docker compose -f docker-compose.yml -f docker-compose_dev.yml up -d`
+
+`docker-compose_dev.yml` is an override, not a standalone stack: it only declares extra `volumes` and must be combined with a base file. It is *orthogonal* to the base — it controls whether the running source is live-mounted, independent of where the image comes from, which is why it is a separate file rather than being merged into `docker-compose_build.yml`. Dependency changes (`setup.py`, `docker/Dockerfile`) still require an image rebuild even with the dev override.
 
 ### Local development
 - Backend: `python 4cat-daemon.py start` (or `restart` / `stop`).

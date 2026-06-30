@@ -21,4 +21,4 @@ python3 -m helper-scripts.migrate.py -y -o logs/migrate-frontend.log --component
 : "${log_level:=info}"
 
 >&2 echo "Starting Gunicorn:"
-exec `gunicorn --worker-tmp-dir $worker_tmp_dir --workers $workers --threads $threads --worker-class $worker_class --access-logfile /usr/src/app/logs/access_gunicorn.log --log-level $log_level --bind 0.0.0.0:5000 webtool:app`
+exec gunicorn --worker-tmp-dir $worker_tmp_dir --workers $workers --threads $threads --worker-class $worker_class --access-logfile /usr/src/app/logs/access_gunicorn.log --log-level $log_level --bind 0.0.0.0:5000 webtool:app

@@ -1,3 +1,6 @@
+import {popup} from "./modules/popup.js";
+import {getRelativeURL, getLocalTimeStr} from "./modules/util.js";
+
 $(document).ready(function(){
 
 $(init);
@@ -25,7 +28,6 @@ function init() {
 
 		init: function() {
 
-			let editor = $("#annotation-fields-editor");
 			let editor_controls = $("#annotation-fields-editor-controls");
 
 			// Add a new annotation field when clicking the plus icon
@@ -77,7 +79,7 @@ function init() {
 				}
 				// Else we're removing this field ID from the new annotations and update
 				else {
-					annotations.applyAnnotationFields(delete_field=field_to_delete);
+					annotations.applyAnnotationFields(field_to_delete);
 				}
 			});
 
@@ -153,14 +155,14 @@ function init() {
 			let no_empty_fields = true;
 			let input_fields = $(el).parent().siblings();
 
-			if (!$(el).val().length > 0) {
+			if ($(el).val().length === 0) {
 				no_empty_fields = false;
 			}
 			input_fields.each(function(){
 				let input_field = $(this).find("input");
 				let val = input_field.val();
 
-				if (!val.length > 0) {
+				if (val.length === 0) {
 					no_empty_fields = false;
 				}
 			});
@@ -209,7 +211,6 @@ function init() {
 
 			let annotation_fields = {};
 			let warning = "";
-			let labels_added = []
 
 			annotations.warnEditor("");
 
@@ -229,7 +230,7 @@ function init() {
 				// can later check if it already exists.
 				let field_id = ann_field.attr("id").split("-")[1];
 				// Make sure the inputs have a label
-				if (!label.length > 0) {
+				if (label.length === 0) {
 					label_field.addClass("invalid");
 					warning  = "Field labels can't be empty";
 				}
@@ -240,8 +241,6 @@ function init() {
 					label_field.addClass("invalid");
 				}
 
-				// Keep track of the labels we've added
-				labels_added.push(label);
 				if (type === undefined) {
 					type = "text";
 				}
@@ -349,14 +348,13 @@ function init() {
 
 		applyAnnotationFields: function (delete_field=""){
 			// Applies the annotation fields to each item on this page.
-
 			// First we collect the annotation information from the editor
 			let new_annotation_fields = annotations.parseAnnotationFields();
-
 			// Potentially delete a field
 			if (delete_field) {
 				delete new_annotation_fields[delete_field];
 			}
+
 			// Show an error message if the annotation fields were not valid.
 			if (typeof new_annotation_fields == "string") {
 				annotations.warnEditor(new_annotation_fields);
@@ -395,10 +393,6 @@ function init() {
 
 			let dataset_key = $("#dataset-key").text();
 
-			if (new_fields.length < 1) {
-				return;
-			}
-
 			// AJAX the annotation forms
 			$.ajax({
 				url: getRelativeURL("explorer/save_annotation_fields/" + dataset_key),
@@ -412,14 +406,8 @@ function init() {
 				},
 				error: function (error) {
 					console.log(error);
-
-					if (error.status === 400) {
-						annotations.warnEditor(error.responseJSON.error);
-					}
-					else {
-						annotations.warnEditor("Server error, couldn't save annotation fields.")
-					}
-					$("#apply-annotation-fields").html("<i class='fa-solid fa-check'></i> Apply");
+					annotations.warnEditor("Server error (" + error.status + "), couldn't save annotation fields.")
+					$("#apply-annotation-fields").html("<i class='fa-solid fa-check'></i> Update fields");
 				}
 			});
 		},
@@ -448,7 +436,7 @@ function init() {
 							if ((text_fields.includes(old_type) && choice_fields.includes(new_type)) ||
 								(choice_fields.includes(old_type) && text_fields.includes(new_type)) ||
 								(choice_fields.includes(old_type) && choice_fields.includes(new_type))) {
-								changed_type_fields.push(new_type);
+								changed_type_fields.push(new_fields[old_field_id]["label"]);
 							}
 						}
 					}
@@ -517,7 +505,6 @@ function init() {
 					annotations.notifySaved();
 				},
 				error: function (error) {
-					console.log(error)
 					if (error.status === 400) {
 						annotations.warnEditor(error.responseJSON.error);
 					}
@@ -735,11 +722,11 @@ function init() {
 				</span>
 				<span class="option-fields"></span>
 				<div class="field-controls">
-					<a id="hide-field-${field_id}" class="tooltip-trigger button-like-small hide-field shown" aria-controls="tooltip-hide-field" id="hide-field-${field_id}"><i class='fas fa-eye'></i></a>
+					<a id="hide-field-${field_id}" class="tooltip-trigger button-like-small hide-field shown" aria-controls="tooltip-hide-field"><i class='fas fa-eye'></i></a>
 					<a id="delete-field-${field_id}" class="tooltip-trigger button-like-small delete-field" aria-controls="tooltip-delete-field"><i class='fas fa-trash'></i></a>
 				</div>
             </li>
-			`.replace("randomint", Math.floor(Math.random() * 100000000).toString());
+			`;
 			$("#annotation-field-settings").append(annotation_field);
 		},
 
@@ -752,7 +739,7 @@ function init() {
 			return field_id;
 		},
 
-		getOptionField: function(id){
+		getOptionField: function(){
 			return "<div class='option-field'><input type='text' id='option-" + annotations.getFieldId() + "' placeholder='New option'></div>";
 		},
 
@@ -888,27 +875,5 @@ const page_functions = {
 		if(dots[newIndex]) dots[newIndex].classList.add('active');
 	}
 };
-
-/**
- * Get absolute API URL to call
- *
- * Determines proper URL to call
- *
- * @param endpoint Relative URL to call (/api/endpoint)
- * @returns  Absolute URL
- */
-function getRelativeURL(endpoint) {
-	let root = $("body").attr("data-url-root");
-	if (!root) {
-		root = '/';
-	}
-	return root + endpoint;
-}
-
-function getLocalTimeStr(epoch_timestamp) {
-	let local_date = new Date(parseInt(epoch_timestamp) * 1000)
-	local_date = Intl.DateTimeFormat("en-GB", {dateStyle: "medium", timeStyle: "medium"}).format(local_date);
-	return local_date
-}
 
 });

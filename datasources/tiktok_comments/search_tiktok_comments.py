@@ -7,7 +7,7 @@ to its aggressive rate limiting. Instead, import data collected elsewhere.
 from datetime import datetime
 
 from backend.lib.search import Search
-from common.lib.item_mapping import MappedItem
+from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.helpers import normalize_url_encoding
 
 
@@ -42,14 +42,14 @@ class SearchTikTokComments(Search):
     def map_item(item):
         item_datetime = datetime.fromtimestamp(item["create_time"]).strftime("%Y-%m-%d %H:%M:%S")
         thread_id = item["aweme_id"] if item["reply_id"] == "0" else item["reply_id"]
-        avatar_url = item["user"]["avatar_thumb"]["url_list"][0]
+        avatar_url = item["user"]["avatar_thumb"]["url_list"][0] if "avatar_thumb" in item["user"] else MissingMappedField("")
 
         return MappedItem({
             "collected_from_url": normalize_url_encoding(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item["cid"],
             "thread_id": thread_id,
-            "author": item["user"]["unique_id"],
-            "author_full": item["user"]["nickname"],
+            "author": item["user"].get("unique_id", MissingMappedField(f'@{item["user"]["uid"]}')),
+            "author_full": item["user"].get("nickname", MissingMappedField("")),
             "author_avatar_url": avatar_url,
             "body": item["text"],
             "timestamp": item_datetime,

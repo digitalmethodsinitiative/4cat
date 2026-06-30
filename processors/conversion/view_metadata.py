@@ -7,6 +7,7 @@ import json
 import zipfile
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -28,6 +29,9 @@ class ViewMetadata(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	icon = "circle-info"
 
+	# Allow on downloaded media datasets
+	compatibility = Compatibility(type_prefixes={"video-downloader", "image-downloader"})
+
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
 		"""
@@ -47,16 +51,6 @@ class ViewMetadata(BasicProcessor):
 				"tooltip": "If enabled, rows that failed will also be included (e.g., due to errors et cetera)."
 			},
 		}
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Determine if processor is compatible with dataset
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type.startswith("video-downloader") or module.type.startswith("image-downloader")
 
 	def process(self):
 		"""

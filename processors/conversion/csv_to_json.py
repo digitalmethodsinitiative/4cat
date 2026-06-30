@@ -4,6 +4,7 @@ Convert a CSV file to JSON
 import json
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -21,16 +22,8 @@ class ConvertCSVToJSON(BasicProcessor):
 	extension = "json"  # extension of result file, used internally and in UI
 	icon = "square-js"
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Determine if processor is compatible with a dataset or processor
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		
-		return module.get_extension() == "csv"
+	# Allow on CSV datasets
+	compatibility = Compatibility(extensions={"csv"})
 
 	def process(self):
 		"""

@@ -8,6 +8,7 @@ import datetime
 from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -27,6 +28,10 @@ class ExportDatasets(BasicProcessor):
 				   "another 4CAT instance. Filters are not included. Results expire after one day.")  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 	icon = "file-export"
+
+	# coarse map spec; is_compatible_with (below) is the runtime truth -- it also checks
+	# the requesting user owns the dataset (is_accessible_by), which is per-user, not shape
+	compatibility = Compatibility(top_dataset_only=True)
 
 	@classmethod
 	def is_compatible_with(cls, module=None, config=None):
