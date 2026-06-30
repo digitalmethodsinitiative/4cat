@@ -585,9 +585,16 @@ class VideoDownloaderPlus(BasicProcessor):
             except FailedToCopy as e:
                 self.dataset.log(f"{str(e)}; attempting to download again")
         elif previous_vid_metadata.get("retry", True) is False:
-            urls_dict[url] = previous_vid_metadata
-            self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
-            result["skip"] = True
+            # Check if the previous attempt did not use yt-dlp but the current run does
+            previous_also_indirect = previous_vid_metadata.get("also_indirect", "none")
+            current_also_indirect = self.parameters.get("also_indirect", "none")
+            if previous_also_indirect == "none" and current_also_indirect != "none":
+                # Previous attempt didn't have yt-dlp; current run does, so retry
+                self.dataset.log(f"Previously identified as not a video without yt-dlp; retrying with yt-dlp: {url}")
+            else:
+                urls_dict[url] = previous_vid_metadata
+                self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
+                result["skip"] = True
             
         return result
 
@@ -766,6 +773,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 self.dataset.log(f"NotVideoLinkError: {str(e)}")
                 urls_dict[url]["error"] = str(e)
                 urls_dict[url]["retry"] = False
+                urls_dict[url]["also_indirect"] = also_indirect
                 result["not_a_video"] = True
                 
                 if last_domains.count(domain) >= 2:
@@ -780,6 +788,7 @@ class VideoDownloaderPlus(BasicProcessor):
             self.dataset.log(f"Request Error: {str(e)}")
             urls_dict[url]["error"] = str(e)
             urls_dict[url]["retry"] = False
+            urls_dict[url]["also_indirect"] = also_indirect
             result["not_a_video"] = True
             
             if last_domains.count(domain) >= 2:
