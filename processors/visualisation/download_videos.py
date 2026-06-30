@@ -585,12 +585,16 @@ class VideoDownloaderPlus(BasicProcessor):
             except FailedToCopy as e:
                 self.dataset.log(f"{str(e)}; attempting to download again")
         elif previous_vid_metadata.get("retry", True) is False:
-            # Check if the previous attempt did not use yt-dlp but the current run does
+            # Check if the current run has a more inclusive yt-dlp setting than the previous attempt
+            # Inclusivity order: "none" < "yt_only" < "all"
+            indirect_levels = {"none": 0, "yt_only": 1, "all": 2}
             previous_also_indirect = previous_vid_metadata.get("also_indirect", "none")
             current_also_indirect = self.parameters.get("also_indirect", "none")
-            if previous_also_indirect == "none" and current_also_indirect != "none":
-                # Previous attempt didn't have yt-dlp; current run does, so retry
-                self.dataset.log(f"Previously identified as not a video without yt-dlp; retrying with yt-dlp: {url}")
+            previous_level = indirect_levels.get(previous_also_indirect, 0)
+            current_level = indirect_levels.get(current_also_indirect, 0)
+            if current_level > previous_level:
+                # Current run has more inclusive yt-dlp setting; retry
+                self.dataset.log(f"Previously identified as not a video with also_indirect={previous_also_indirect}; retrying with also_indirect={current_also_indirect}: {url}")
             else:
                 urls_dict[url] = previous_vid_metadata
                 self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
