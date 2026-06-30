@@ -62,7 +62,7 @@ processor_packages = {
 	"networkx>=3.0",  # networks/*
 	"numpy",  # image_wall, histwords, video_hasher, hash_similarity_network, aggregate_stats, tf_idf
 	"pandas",  # youtube_imagewall, tf_idf
-	"pyahocorasick~=1.4.0",  # tokenise
+	"pyahocorasick~=2.3",  # tokenise
 	"PyTumblr==0.1.0",  # search_tumblr
 	"razdel~=0.5",  # tokenise
 	"scenedetect[opencv]>=0.7",  # video_scene_identifier
