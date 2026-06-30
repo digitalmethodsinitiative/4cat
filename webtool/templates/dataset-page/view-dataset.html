@@ -56,6 +56,7 @@
             </p>
         {% elif "copied_from" in dataset.parameters %}
             <p class="notice">
+                <i class="fa fa-filter" aria-hidden="true"></i>
                 This dataset was generated from
                 {% if copy_source is string %}
                     <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
