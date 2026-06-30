@@ -2,6 +2,10 @@
 <!DOCTYPE html>
 <head>
     <title>{% block title %}{{ __user_config("4cat.name_long") }}{% endblock %} &bull; {{ __user_config("4cat.name") }}</title>
+
+    <script src="{{ url_for("static", filename="js/lib/htmx.min.js") }}"></script>
+    <script defer src="{{ url_for("static", filename="js/lib/alpine.min.js") }}"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
