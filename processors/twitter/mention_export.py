@@ -4,6 +4,7 @@ Twitter APIv2 base stats class
 import csv
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -22,15 +23,8 @@ class TwitterMentionsExport(BasicProcessor):
     description = "Identifies mentions types and creates mentions table (tweet id, from author id, from username, to user id, to username, mention type)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type in ["twitterv2-search"]
+    # Allow processor on Twitter/X (API v2) datasets
+    compatibility = Compatibility(types={"twitterv2-search"})
 
     def process(self):
         """
@@ -150,15 +144,8 @@ class TCATMentionsExport(BasicProcessor):
     description = "Identifies mentions types and creates mentions table (tweet id, from author id, from username, to username)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager config:  Configuration reader (context-aware)
-        """
-        return module.type in ["dmi-tcat-search"]
+    # Allow processor on imported TCAT datasets
+    compatibility = Compatibility(types={"dmi-tcat-search"})
 
     def process(self):
         """

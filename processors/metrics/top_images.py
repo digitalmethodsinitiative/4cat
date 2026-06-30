@@ -6,6 +6,7 @@ import re
 from collections import Counter, OrderedDict
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -26,18 +27,8 @@ class TopImageCounter(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
     icon = "arrow-up-1-9"
 
-    followups = ["image-downloader"]
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        All top-level datasets, excluding Telegram, which has a different image logic
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-
-        return module.is_top_dataset() and module.type != "telegram-search" and module.get_extension() in ("csv", "ndjson")
+    # top-level csv/ndjson datasets, except Telegram (which has its own image logic)
+    compatibility = Compatibility(top_dataset_only=True, excluded_types={"telegram-search"}, extensions={"csv", "ndjson"}, preferred_followups=["image-downloader"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

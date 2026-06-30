@@ -137,7 +137,7 @@ def get_standalone_processors():
 			continue
 
 		# Check if the processor is compatible with the fake dataset
-		if hasattr(processor, "is_compatible_with") and not processor.is_compatible_with(fake_dataset):
+		if not processor.is_compatible_with(fake_dataset, g.config):
 			continue
 
 		available_processors[processor_type] = processor

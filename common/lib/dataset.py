@@ -13,6 +13,7 @@ import os
 import errno
 from enum import Enum
 from pathlib import Path
+from natsort import natsorted
 
 from common.lib.annotation import Annotation
 from common.lib.job import Job, JobNotFoundException
@@ -82,7 +83,8 @@ class DataSet(FourcatModule):
             type=None,
             is_private=True,
             owner="anonymous",
-            modules=None
+            modules=None,
+            check_owners=True
     ):
         """
         Create new dataset object
@@ -110,6 +112,9 @@ class DataSet(FourcatModule):
         :param modules: Module cache. If not given, will be loaded when needed
         (expensive). Used to figure out what processors are compatible with
         this dataset.
+        :param bool check_owners:  Update owner cache on instantiation. This
+        requires database querying, so may be useful to disable when
+        instantiating datasets in bulk. Ignored if `key` is set.
         """
         self.db = db
 
@@ -219,7 +224,8 @@ class DataSet(FourcatModule):
             # Reserve filename and update data['result_file']
             self.reserve_result_file(parameters, extension)
 
-        self.refresh_owners()
+        if check_owners:
+            self.refresh_owners()
 
     def check_dataset_finished(self):
         """
@@ -415,10 +421,30 @@ class DataSet(FourcatModule):
             raise RuntimeError(f"Staging area {staging_area} is not a valid folder")
 
         iterations = 0
+
+        def metadata_priority_sort(file):
+            """
+            Sorting key that always prioritises dotfiles
+
+            natsort (see below) will sort very well, but puts filenames
+            starting with a number (e.g. `15file.png`) before dotfiles. This
+            key function avoids that by prepending non-dotfiles with the string
+            "file_" so they are still sorted equally, but always behind
+            dotfiles.
+
+            :param ZipInfo file:  Archive file object
+            :return str:  Filename to use for sorting
+            """
+            if not file.filename.startswith("."):
+                return "file_" + file.filename
+            return file.filename
+
         with zipfile.ZipFile(path, "r") as archive_file:
             # sorting is important because it ensures .metadata.json is read
-            # first
-            archive_contents = sorted(archive_file.infolist(), key=lambda x: x.filename)
+            # first, and returns numbered items in the correct order
+            # for the latter purpose, we use natural sorting rather than
+            # python's built-in sorting
+            archive_contents = natsorted(archive_file.infolist(), key=metadata_priority_sort)
             for archived_file in archive_contents:
 
                 if filename_filter and archived_file.filename not in filename_filter:
@@ -495,14 +521,18 @@ class DataSet(FourcatModule):
         :param max_unmappable:  Skip at most this many unmappable items; if
         more are encountered, stop iterating. `None` to never stop.
         :param map_missing: Indicates what to do with mapped items for which
-        some fields could not be mapped. Defaults to 'empty_str'. Must be one of:
+        some fields could not be mapped. Defaults to 'default'. Must be one of:
         - 'default': fill missing fields with the default passed by map_item
+        - 'keep': leave the MissingMappedField sentinel in place so the caller
+          can tell which fields were missing (useful for JSON serialisation
+          via MissingMappedFieldEncoder)
         - 'abort': raise a MappedItemIncompleteException if a field is missing
         - a callback: replace missing field with the return value of the
           callback. The MappedItem object is passed to the callback as the
           first argument and the name of the missing field as the second.
         - a dictionary with a key for each possible missing field: replace missing
-          field with a strategy for that field ('default', 'abort', or a callback)
+          field with a strategy for that field ('default', 'keep', 'abort', or
+          a callback)
         :param get_annotations: Whether to also fetch annotations from the database.
           This can be disabled to help speed up iteration.
         :param offset: After how many rows we should yield items.
@@ -566,9 +596,8 @@ class DataSet(FourcatModule):
                     mapped_item = own_processor.get_mapped_item(item)
                 except MapItemException as e:
                     if warn_unmappable:
-                        self.warn_unmappable_item(
-                            i, processor, e, warn_admins=unmapped_items is False
-                        )
+                        # Update dataset log for unmappable items.
+                        self.warn_unmappable_item(i, processor, e)
 
                     unmapped_items += 1
                     if max_unmappable and unmapped_items > max_unmappable:
@@ -587,6 +616,10 @@ class DataSet(FourcatModule):
                             mapped_item.data[missing_field] = strategy(
                                 mapped_item.data, missing_field
                             )
+                        elif strategy == "keep":
+                            # leave the MissingMappedField in place so the
+                            # caller can distinguish missing from present
+                            continue
                         elif strategy == "abort":
                             # raise an exception to be handled at the processor level
                             raise MappedItemIncompleteException(
@@ -599,7 +632,7 @@ class DataSet(FourcatModule):
                             ].value
                         else:
                             raise ValueError(
-                                "map_missing must be 'abort', 'default', or a callback."
+                                "map_missing must be 'abort', 'default', 'keep', or a callback."
                             )
             else:
                 mapped_item = original_item
@@ -951,6 +984,7 @@ class DataSet(FourcatModule):
         :param StatusType status_type:  Status type to set the dataset to.
           If omitted, set to SUCCESS if num_rows > 0, else EMPTY
         """
+        # Without this guard, a second finish() silently overwrites status_type (e.g. WARNING → SUCCESS).
         if self.data["is_finished"]:
             raise RuntimeError("Cannot finish a finished dataset again")
         
@@ -2006,11 +2040,9 @@ class DataSet(FourcatModule):
             ):
                 continue
 
-            # consider a processor compatible if its is_compatible_with
-            # method returns True *or* if it has no explicit compatibility
-            # check and this dataset is top-level (i.e. has no parent)
-            if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
-                    or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self, config=config)):
+            # evaluates processor's declarative `compatibility`
+            # undeclared processors default to top-level-only
+            if processor.is_compatible_with(self, config=config):
                 available[processor_type] = processor
 
         return available
@@ -2045,13 +2077,62 @@ class DataSet(FourcatModule):
 
     def get_own_processor(self):
         """
-        Get the processor class that produced this dataset
+        Get the processor class corresponding to this dataset's data shape.
+
+        Normally this is the processor that produced the dataset, but for
+        datasets whose `type` was adopted from another datasource (e.g. by a
+        filter that copies its parent's NDJSON content verbatim), this is the
+        processor whose `map_item` / extension match the result file's
+        contents -- not necessarily the producing processor. See
+        `get_producer_processor` for the latter.
 
         :return:  Processor class, or `None` if not available.
         """
         processor_type = self.parameters.get("type", self.data.get("type"))
 
         return self.modules.processors.get(processor_type)
+
+    def get_producer_processor(self):
+        """
+        Get the processor class that actually produced this dataset.
+
+        Falls back to `get_own_processor()` for datasets whose `type` was not
+        rewritten via `adopt_type`. UI code that renders the parameter panel
+        should use this so labels/tooltips come from the producing processor's
+        options schema, not from a possibly-divergent data-shape processor.
+
+        :return:  Processor class, or `None` if not available.
+        """
+        producer_type = self.parameters.get("producer_type", self.data.get("type"))
+        return self.modules.processors.get(producer_type)
+
+    def adopt_type(self, new_type):
+        """
+        Rewrite this dataset's `type` to reflect a change in the result file's
+        data shape (e.g. after a filter has copied its parent's NDJSON content
+        verbatim into its result). The original producing processor's type is
+        preserved under `parameters["producer_type"]` on the first call, so
+        the UI can still look up the right options schema.
+
+        This is the only sanctioned path for rewriting `type` post-creation;
+        direct attribute assignment is blocked by `__setattr__`. `datasource`
+        is orthogonal -- adjust it separately via `change_datasource` if the
+        platform grouping also needs to change.
+
+        :param str new_type:  The type to adopt.
+        """
+        current_type = self.data.get("type")
+        if new_type == current_type:
+            return
+
+        if "producer_type" not in self.parameters:
+            # preserve only the original producer; chained adopt_type calls
+            # must not overwrite the first one
+            self.parameters = {**self.parameters, "producer_type": current_type}
+
+        # bypass the __setattr__ guard via the underlying DB update path
+        self.db.update("datasets", where={"key": self.key}, data={"type": new_type})
+        self.data["type"] = new_type
 
     def get_available_processors(self, config=None, exclude_hidden=False):
         """
@@ -2420,14 +2501,13 @@ class DataSet(FourcatModule):
         server = self.modules.config.get("flask.server_name")
         return f"{scheme}://{server}/download/{self.key}/"
 
-    def warn_unmappable_item(
-            self, item_count, processor=None, error_message=None, warn_admins=True
-    ):
+    def warn_unmappable_item(self, item_count, processor=None, error_message=None):
         """
-        Log an item that is unable to be mapped and warn administrators.
+        Log a per-item map_item failure to the dataset's own log.
 
         :param int item_count:			Item index
-        :param Processor processor:		Processor calling function8
+        :param Processor processor:		Processor calling function
+        :param error_message:			Optional exception or message
         """
         dataset_error_message = f"MapItemException (item {item_count}): {'is unable to be mapped! Check raw datafile.' if error_message is None else error_message}"
 
@@ -2440,21 +2520,39 @@ class DataSet(FourcatModule):
         # Log error to dataset log
         closest_dataset.log(dataset_error_message)
 
-        if warn_admins:
-            if processor is not None:
-                processor.log.warning(
-                    f"Processor {processor.type} unable to map item all items for dataset {closest_dataset.key}."
-                )
-            elif hasattr(self.db, "log"):
-                # borrow the database's log handler
-                self.db.log.warning(
-                    f"Unable to map item all items for dataset {closest_dataset.key}."
-                )
-            else:
-                # No other log available
-                raise DataSetException(
-                    f"Unable to map item {item_count} for dataset {closest_dataset.key} and properly warn"
-                )
+    def warn_unmappable_signatures(self, processor=None, signatures=None):
+        """
+        Emit a single rolled-up admin/dev alert summarising all unmappable-item
+        signatures encountered during an import.
+
+        Complements `warn_unmappable_item`, which writes one entry per item to
+        the user-facing dataset log; this method writes one rolled-up message
+        to the dev-facing log channel (Slack), so admins get file:line and
+        counts in a single alert rather than a stack trace per dataset.
+
+        :param processor:  Processor calling this method
+        :param dict signatures:  Mapping of (filename, lineno) -> {count, error, samples}
+        """
+        if not signatures:
+            return
+
+        total = sum(s["count"] for s in signatures.values())
+        proc_label = processor.type if processor is not None else "?"
+        lines = [
+            f"Processor {proc_label} could not map {total} item(s) for dataset "
+            f"{self.key} ({len(signatures)} signature(s)):"
+        ]
+        for (filename, lineno), info in sorted(signatures.items(), key=lambda kv: kv[1]["count"], reverse=True):
+            loc = f"{filename}:{lineno}" if lineno else (filename or "?")
+            sample_preview = ", ".join(str(s) for s in info.get("samples", []))
+            tail = f" (e.g. items {sample_preview})" if sample_preview else ""
+            lines.append(f"  {loc} — {info['count']} item(s): {info.get('error', '')}{tail}")
+
+        message = "\n".join(lines)
+        if processor is not None and hasattr(processor, "log"):
+            processor.log.warning(message)
+        elif hasattr(self.db, "log"):
+            self.db.log.warning(message)
 
     # Annotation functions (most of it is handled in Annotations)
     def has_annotations(self) -> bool:
@@ -2744,6 +2842,20 @@ class DataSet(FourcatModule):
         if attr in dir(self):
             super().__setattr__(attr, value)
             return
+
+        # `type` describes the data shape of the result file. It may diverge
+        # from the producing processor's type (e.g. a filter that copies its
+        # parent's NDJSON content verbatim). Direct rewrites would lose the
+        # producer identity needed by UI code; force callers through
+        # adopt_type() which preserves the original under parameters[
+        # "producer_type"].
+        if attr == "type" and self.data and self.data.get("type") and value != self.data["type"]:
+            raise AttributeError(
+                "Refusing to rewrite DataSet.type from %r to %r via direct attribute "
+                "assignment. Use DataSet.adopt_type() so the original producing "
+                "processor is preserved under parameters['producer_type']."
+                % (self.data["type"], value)
+            )
 
         if attr not in self.data:
             self.parameters[attr] = value

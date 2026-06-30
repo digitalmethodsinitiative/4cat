@@ -6,6 +6,7 @@ import json
 import pickle
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Dale Wahl"
@@ -23,16 +24,15 @@ class VectoriseByCategory(BasicProcessor):
 	description = "Counts all tokens per category."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["wordcloud", "render-graphs-isometric", "render-rankflow"]
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on token sets
-
-		:param module: Module to determine compatibility with
-		"""
-		return module.type == "tokenise-posts"
+	# Allow processor on token sets
+	compatibility = Compatibility(
+		types={"tokenise-posts"},
+		preferred_followups=["wordcloud", "render-graphs-isometric", "render-rankflow"],
+		excluded_followups=[
+			"consolidate-urls", "preset-neologisms", "sentence-split", "tokenise-posts",
+			"image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter",
+		],
+	)
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None):
@@ -178,7 +178,7 @@ class VectoriseByCategory(BasicProcessor):
 		category_column = self.parameters.get("category")
 		split_comma = self.parameters.get("split_categories")
 		file_to_category_mapping = {}
-		for row in category_dataset.iterate_items():
+		for row in category_dataset.iterate_items(self):
 			item_id = row.get("id")
 			if not item_id or not row.get(category_column) or item_id not in metadata:
 				# No item ID or category or metadata; skip
@@ -211,7 +211,7 @@ class VectoriseByCategory(BasicProcessor):
 		index = 0
 		# Each file is a token set (Tokenize processor separates tokens by dates or all) and contains a list of tokens for each document
 		# A single item/post may have multiple documents (e.g., if it was seperated by sentance)
-		for packed_tokens in self.source_dataset.iterate_items():
+		for packed_tokens in self.source_dataset.iterate_items(self):
 			if packed_tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue
@@ -294,12 +294,3 @@ class VectoriseByCategory(BasicProcessor):
 		# Finish
 		self.dataset.update_status("Finished")
 		self.dataset.finish(done)
-
-	@classmethod
-	def exclude_followup_processors(cls, processor_type):
-		"""
-		Exclude followups if they are not compatible with the module
-		"""
-		if processor_type in ["consolidate-urls", "preset-neologisms", "sentence-split", "tokenise-posts", "image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter"]:
-			return True
-		return False

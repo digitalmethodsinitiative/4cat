@@ -4,6 +4,7 @@ Create topic clusters based on datasets
 
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 
 import json
@@ -31,12 +32,14 @@ class TopicModeler(BasicProcessor):
                   "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    followups = ["document_count", "document_topic_matrix", "topic-model-words"]
+    # Allow processor on token sets
+    compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["document_count", "document_topic_matrix", "topic-model-words"])
+
     references = [
         'Blei, David M., Andrew Y. Ng, and Michael I. Jordan (2003). "Latent dirichlet allocation." the *Journal of machine Learning research* 3: 993-1022.',
         'Blei, David M. (2003). "Topic Modeling and Digital Humanities." *Journal of Digital Humanities* 2(1).'
     ]
-    
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -85,16 +88,6 @@ class TopicModeler(BasicProcessor):
             }
         }
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on token sets
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type == "tokenise-posts"
-
     def process(self):
         """
         Unzips token sets and builds topic models for each one. Model data is
@@ -112,7 +105,7 @@ class TopicModeler(BasicProcessor):
         model_metadata = {'parameters': self.parameters}
         # go through all archived token sets and vectorise them
         index = 0
-        for token in self.source_dataset.iterate_items():
+        for token in self.source_dataset.iterate_items(self):
             # Check for and open token metadata file
             if token.file.name == '.token_metadata.json':
                 # Copy the token metadata into our staging area

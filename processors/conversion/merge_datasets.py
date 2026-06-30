@@ -9,6 +9,7 @@ from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, DataSetException
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
+from common.lib.compatibility import Compatibility
 import ural
 
 __author__ = "Stijn Peeters"
@@ -30,15 +31,8 @@ class DatasetMerger(BasicProcessor):
                   "created containing a combination of items from the original datasets."  # description displayed in UI
     icon = "arrows-to-dot"
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on any top-level CSV or NDJSON file
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
+    # a collector's csv or ndjson output
+    compatibility = Compatibility(is_collector=True, extensions={"csv", "ndjson"})
 
     @staticmethod
     def get_dataset_from_url(url, db, modules=None):
@@ -288,5 +282,12 @@ class DatasetMerger(BasicProcessor):
         else:
             standalone.update_label(f"(Merged) {self.source_dataset.get_label()}")
 
-        standalone.parameters = {**self.dataset.parameters, "board": "merged"}
-        standalone.type = self.source_dataset.type
+        # Wholesale-overwriting parameters here would clobber the producer_type
+        # stashed by create_standalone -> adopt_type; preserve it explicitly so
+        # the UI can still resolve this dataset back to merge-datasets.
+        standalone.parameters = {
+            **self.dataset.parameters,
+            "board": "merged",
+            "producer_type": standalone.parameters.get("producer_type", self.type),
+        }
+        standalone.adopt_type(self.source_dataset.type)

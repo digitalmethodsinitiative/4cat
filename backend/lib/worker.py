@@ -140,11 +140,13 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             self.abort()
         except ProcessorException as e:
             self.log.error(str(e), frame=e.frame)
+            self.mark_job_after_crash()
         except Exception as e:
             stack = traceback.extract_tb(e.__traceback__)
             frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack]
             location = "->".join(frames)
             self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location), frame=stack)
+            self.mark_job_after_crash()
         finally:
             # Clean up after work successfully completed or terminates
             try:
@@ -168,6 +170,29 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
                     cfg.close_memcache()
             except Exception:
                 pass
+
+    def mark_job_after_crash(self):
+        """
+        Decide what happens to the job after an unhandled crash
+
+        On a crash the job is neither finished nor released by default, which
+        would leave it claimed (and so invisible to the delegator) until the
+        next restart. Instead:
+
+        - recurring jobs are released so they retry on their next interval;
+        - one-shot jobs are parked, i.e. retried only on restart, to avoid a
+          tight crash loop.
+
+        See `Job.park()` and `Job.release()`.
+        """
+        if self.job.is_finished:
+            # the worker already finalised the job before crashing
+            return
+
+        if self.job.is_recurring:
+            self.log.fatal("Worker %s crashed while processing recurring job %s - manaully release job for retry." % (self.type, self.job.data["remote_id"]))
+        
+        self.job.park()
 
     def clean_up(self):
         """
@@ -253,7 +278,15 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         )
 
         start_time = time.time()
+        stdout = None
+        stderr = None
         while process.poll() is None:
+            try:
+                stdout, stderr = process.communicate(timeout=0.1)
+                continue
+            except subprocess.TimeoutExpired:
+                pass
+
             if self.interrupted > self.INTERRUPT_NONE or (timeout and time.time() > start_time + timeout):
                 if self.interrupted == self.INTERRUPT_NONE:
                     self.log.info(f"Interruptable process {command[0]} for worker of type {self.type} timed out, "
@@ -295,7 +328,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
             
             time.sleep(0.1)
 
-        stdout, stderr = process.communicate()
+        if stdout is None or stderr is None:
+            stdout, stderr = process.communicate()
+
         return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
     @abc.abstractmethod

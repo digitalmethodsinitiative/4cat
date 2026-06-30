@@ -8,6 +8,7 @@ from ural import is_url
 from processors.conversion.extract_urls import ExtractURLs
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput, split_urls
 
 __author__ = "Dale Wahl"
@@ -28,6 +29,9 @@ class ConsolidateURLs(BasicProcessor):
     description = "Retain only the domain (and optionally path) of URLs; used for custom networks (e.g. author + domains)"
     extension = "csv"
     icon = "globe"
+
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     # Common domain prefaces to remove
     domain_prefaces = ["m", "www"]
@@ -233,7 +237,7 @@ class ConsolidateURLs(BasicProcessor):
                 "requires": "method==custom"
             },
         }
-        
+
         # Get the columns for the select columns option
         if parent_dataset:
             columns = parent_dataset.get_columns()  # call once
@@ -247,16 +251,6 @@ class ConsolidateURLs(BasicProcessor):
                     options["column"]["default"] = sorted(columns, key=lambda k: any([name in k.lower() for name in ["url", "urls", "link"]]), reverse=True)[0]
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        This is meant to be inherited by other child classes
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.get_extension() in ["csv", "ndjson"]
 
     def process(self):
         method = self.parameters.get("method", False)

@@ -4,6 +4,7 @@ Filter by pseudo-random posts
 import random
 
 from processors.filtering.base_filter import BaseFilter
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 from common.lib.exceptions import QueryParametersException
 
@@ -21,6 +22,9 @@ class RandomFilter(BaseFilter):
 	category = "Filtering"  # category
 	title = "Random sample"  # title displayed in UI
 	description = "Retain a pseudorandom set of posts. This creates a new dataset."  # description displayed in UI
+
+	# Allow on top-level CSV/NDJSON datasets
+	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -40,16 +44,6 @@ class RandomFilter(BaseFilter):
 				"default": ""
 			}
 		}
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on NDJSON and CSV files
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def filter_items(self):
 		"""

@@ -14,6 +14,7 @@ from common.lib.helpers import UserInput, url_to_filename
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.exceptions import ProcessorInterruptedException, FourcatException
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -44,6 +45,8 @@ class ImageDownloader(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image"  # media type of the dataset
 
+    # Shared list -- other download_* processors reuse this as ImageDownloader.followups
+    # (and preferred_followups below reuses it), so it stays a named attribute.
     followups = [
         "image-wall",
         "image-category-wall",
@@ -55,6 +58,9 @@ class ImageDownloader(BasicProcessor):
         "clarifai-api",
         "google-vision-api",
     ]
+
+    # top-image rankings or any collector's csv/ndjson output, except sources with their own image collection
+    compatibility = Compatibility(is_collector=True, types={"top-images"}, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search", "fourchan-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
 
     config = {
         "image-downloader.max": {
@@ -137,27 +143,6 @@ class ImageDownloader(BasicProcessor):
                 options["columns"]["default"] = "body"
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on top image rankings, collectors, but not specific collectors with their own image
-        collection methods
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return (
-            (module.type == "top-images" or module.is_from_collector())
-            and module.type
-            not in [
-                "tiktok-search",
-                "tiktok-urls-search",
-                "telegram-search",
-                "fourchan-search",
-            ]
-            and module.get_extension() in ("csv", "ndjson")
-        )
 
     def process(self):
         """

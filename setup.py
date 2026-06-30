@@ -26,6 +26,7 @@ core_packages = {
 	"langchain_mistralai",
 	"langchain_deepseek",
 	"markdown2==2.4.2",
+	"natsort",
 	"oslex",
 	"packaging",
 	"psutil~=5.0",
@@ -61,12 +62,12 @@ processor_packages = {
 	"networkx>=3.0",  # networks/*
 	"numpy",  # image_wall, histwords, video_hasher, hash_similarity_network, aggregate_stats, tf_idf
 	"pandas",  # youtube_imagewall, tf_idf
-	"pyahocorasick~=1.4.0",  # tokenise
+	"pyahocorasick~=2.3",  # tokenise
 	"PyTumblr==0.1.0",  # search_tumblr
 	"razdel~=0.5",  # tokenise
-	"scenedetect[opencv]",  # video_scene_identifier
+	"scenedetect[opencv]>=0.7",  # video_scene_identifier
 	"scikit-learn",  # image_wall, histwords, tf_idf, topic_modeling, classification_evaluation, confusion_matrix
-	"Telethon~=1.36.0",  # search_telegram, download-telegram-videos, download-telegram-images
+	"Telethon~=1.36.0",  # search_telegram, download_telegram_videos, download-telegram-images
 	"unidecode~=1.3",  # accent_fold
 	"wordcloud~=1.8",  # word-cloud
 	# The https://github.com/akamhy/videohash is not being maintained anymore; these are two patches

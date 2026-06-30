@@ -4,6 +4,7 @@ Create a confusion matrix with values of columns
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib
@@ -25,6 +26,9 @@ class ConfusionMatrix(BasicProcessor):
     description = "Create a confusion matrix with data from two columns."  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI
     icon = "table-columns"
+
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -51,17 +55,6 @@ class ConfusionMatrix(BasicProcessor):
             options["columns"]["options"] = {v: v for v in columns}
 
         return options
-
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
 

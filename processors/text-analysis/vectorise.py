@@ -6,6 +6,7 @@ import pickle
 import itertools
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -22,17 +23,8 @@ class Vectorise(BasicProcessor):
 	description = "Counts how often a token appears in the dataset. This creates a bag of words."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	followups = ["vector-ranker"]
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on token sets
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "tokenise-posts"
+	# Allow processor on token sets
+	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["vector-ranker"])
 
 	def process(self):
 		"""
@@ -47,7 +39,7 @@ class Vectorise(BasicProcessor):
 
 		# go through all archived token sets and vectorise them
 		index = 0
-		for packed_tokens in self.source_dataset.iterate_items():
+		for packed_tokens in self.source_dataset.iterate_items(self):
 			if packed_tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue

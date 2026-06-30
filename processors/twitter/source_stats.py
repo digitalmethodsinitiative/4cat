@@ -3,6 +3,7 @@ Twitter APIv2 hashtag statistics
 """
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -19,6 +20,9 @@ class TwitterHashtagStats(TwitterStatsBase):
     title = "Source statistics"  # title displayed in UI
     description = "Lists by source of tweet how many tweets contain hashtags, how many times those tweets have been retweeted/replied to/liked/quoted, and information about unique users and hashtags used alongside each hashtag.\nFor retweets and quotes, hashtags from the original tweet are included in the retweet/quote."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     sorted = 'Number of Tweets from Source'
 
@@ -51,16 +55,6 @@ class TwitterHashtagStats(TwitterStatsBase):
             #     "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
             # }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
     def map_data(self, post):
         """

@@ -7,6 +7,7 @@ import networkx as nx
 import numpy as np
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 
@@ -27,6 +28,9 @@ class HashSimilarityNetworker(BasicProcessor):
     description = "Calculate similarity of hashes and create a GEXF network file. Can identify near duplicate hashes."
     extension = "gexf"
     icon = "circle-nodes"
+
+    # Currently only allowed on video-hashes, though any row of bit hashes would work.
+    compatibility = Compatibility(types={"video-hashes"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -67,14 +71,6 @@ class HashSimilarityNetworker(BasicProcessor):
             options["descriptor_column"]["default"] = "id" if "id" in columns else sorted(columns, key=lambda k: "id" in k).pop()
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Currently only allowed on video-hashes, but technically any row of bit hashes will work. Could check for "hash"
-        in columns, but... how to make that a check as a classmethod?
-        """
-        return module.type == "video-hashes"
 
     def process(self):
         """

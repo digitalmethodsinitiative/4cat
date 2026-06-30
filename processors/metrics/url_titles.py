@@ -4,6 +4,7 @@ Retrieve HTML title (and other metadata) for URLs
 import csv
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
@@ -32,7 +33,8 @@ class URLFetcher(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
     icon = "globe"
 
-    followups = []
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
     config = {
         "url-metadata.timeout": {
@@ -43,17 +45,6 @@ class URLFetcher(BasicProcessor):
             "tooltip": "Time to wait before cancelling a request and potentially trying again"
         }
     }
-
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -195,14 +186,14 @@ class URLFetcher(BasicProcessor):
                 self.dataset.update_status(f"Processed {(urls_failed + urls_success):,} of {len(all_urls):,} URLs")
                 self.dataset.update_progress((urls_failed + urls_success) / len(all_urls))
 
-        # log warning if not everything succeeded
+        # and write everything to a CSV
         if urls_failed:
+            # log warning if not everything succeeded
             self.dataset.finish_with_warning(urls_success, f"{urls_failed:,} URL(s) could not be retrieved. See dataset "
                                        f"log for details.")
-
-        # and write everything to a CSV
-        self.dataset.finish(urls_success)
-        self.job.finish()
+        else:
+            self.dataset.finish(urls_success)
+            self.job.finish()
 
     @staticmethod
     def stream_url(response, *args, **kwargs):

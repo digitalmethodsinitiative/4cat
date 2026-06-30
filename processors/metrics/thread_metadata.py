@@ -5,6 +5,7 @@ import datetime
 import math
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -26,18 +27,8 @@ class ThreadMetadata(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
     icon = "circle-info"
 
-    followups = []
-
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
     def process(self):
         """

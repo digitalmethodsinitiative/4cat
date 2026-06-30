@@ -1,0 +1,252 @@
+# Auto-translate Zeeschuimer datasource `map_item` functions from Python to JS
+# and open a draft PR per module against digitalmethodsinitiative/zeeschuimer.
+#
+# Triggers on pushes to master that touch any Zeeschuimer datasource (or the
+# helper script itself). Also exposes a `workflow_dispatch` trigger with a
+# `bootstrap` input for the initial run that translates every Zeeschuimer
+# datasource at once (single PR). Datasources without a matching Zeeschuimer
+# module — e.g. facebook — are skipped automatically.
+#
+# Architecture: a `detect` job groups changed files by module and emits a
+# matrix; a `sync` job fans out one parallel run per module, each opening
+# (or updating) its own PR on a stable per-module branch. The planning
+# and PR-body logic are in `helper-scripts/map_item/ci.py` (# unit-tested
+# in tests/test_map_item_sync.py); the LLM translation and JS
+# splicing live in `helper-scripts/map_item/converter.py`.
+#
+# Required secrets (configured in repo Settings -> Secrets and variables -> Actions):
+#   ZEESCHUIMER_APP_ID           - numeric App ID of the GitHub App installed on
+#                                  digitalmethodsinitiative/zeeschuimer with permissions
+#                                  contents:write + pull-requests:write (and nothing else)
+#   ZEESCHUIMER_APP_PRIVATE_KEY  - full PEM private key for that App (including BEGIN/END lines)
+#   DMI_OLLAMA_KEY               - API key for https://ollama.digitalmethods.net (legacy fallback)
+#
+# Optional overrides — set in repo Settings -> Secrets and variables -> Actions to change
+# the provider used by automatic (push-triggered) runs without editing this file.
+# Resolution order for each setting (first non-empty wins):
+#   API key:         workflow_dispatch input  ->  LLM_PROVIDER_API_KEY secret  ->  DMI_OLLAMA_KEY secret
+#   provider/url/model/output_mode:  workflow_dispatch input  ->  repo variable  ->  hardcoded default below
+#
+#   LLM_PROVIDER_API_KEY  (secret)   - generic key for the active provider; swap when switching providers
+#   LLM_PROVIDER          (variable) - provider type for LLMAdapter         (default: ollama)
+#   LLM_BASE_URL          (variable) - provider base URL                    (default: https://ollama.digitalmethods.net)
+#   LLM_MODEL             (variable) - model name                           (default: qwen2.5-coder:14b)
+#   LLM_OUTPUT_MODE       (variable) - structured or prompt                 (default: structured)
+
+name: Sync Zeeschuimer map_item from 4CAT
+
+on:
+  push:
+    branches: [master]
+    paths:
+      # Only datasource changes drive a push-triggered translation: the detect
+      # job's plan-matrix diffs `datasources/**` and nothing else
+      - 'datasources/**/search_*.py'
+      - '.github/workflows/zeeschuimer_map_item_sync.yml'
+  workflow_dispatch:
+    # NOTE: defaults are '' which falls through to Github settings (see Optional overrides above)
+    inputs:
+      bootstrap:
+        description: 'Translate every Zeeschuimer datasource (initial sync, single PR). Ignored if "files" is set.'
+        type: boolean
+        default: false
+      files:
+        description: 'Space-separated list of datasource files to translate (e.g. "datasources/tiktok/search_tiktok.py"). Overrides bootstrap. One PR per module.'
+        type: string
+        default: ''
+      llm_provider:
+        description: 'LLM provider type for LLMAdapter. Leave blank to use LLM_PROVIDER variable or default (ollama).'
+        type: string
+        default: ''
+      llm_base_url:
+        description: 'LLM provider base URL. Leave blank to use LLM_BASE_URL variable or default (https://ollama.digitalmethods.net).'
+        type: string
+        default: ''
+      llm_api_key:
+        description: 'LLM API key. Leave blank to use LLM_PROVIDER_API_KEY secret or DMI_OLLAMA_KEY secret.'
+        type: string
+        default: ''
+      model:
+        description: 'LLM model name. Leave blank to use LLM_MODEL variable or default (qwen2.5-coder:14b). Examples: qwen2.5-coder:7b, deepseek-coder-v2:16b, gemma3:27b'
+        type: string
+        default: ''
+      output_mode:
+        description: 'LLM output mode (structured or prompt). Leave blank to use LLM_OUTPUT_MODE variable or default (structured). Use prompt for models that do not support structured output (e.g. gpt-oss-120b).'
+        type: string
+        default: ''
+
+# Least privilege: this workflow's own GITHUB_TOKEN only needs to read the 4CAT
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    name: Detect modules to translate
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Checkout 4CAT
+        uses: actions/checkout@v4
+        with:
+          # Full history: the push-event plan diffs `github.event.before`
+          # against `github.sha`. A shallow clone may not contain `before` for
+          # a multi-commit push, in which case the diff resolves to nothing and
+          # the change is silently skipped.
+          fetch-depth: 0
+
+      - name: Set up Python
+        # `detect` runs map_item/ci.py (stdlib only — no LLM deps installed
+        # here), but still needs a `python` on PATH; don't rely on the runner
+        # image happening to provide one.
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Plan translation matrix
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUTS_FILES: ${{ inputs.files }}
+          INPUTS_BOOTSTRAP: ${{ inputs.bootstrap }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        # Validates paths against a strict datasource shape (dropping anything
+        # else) and writes `mode` + `matrix` to $GITHUB_OUTPUT. See
+        # helper-scripts/map_item/ci.py.
+        run: python helper-scripts/map_item/ci.py plan-matrix
+
+  sync:
+    name: Sync ${{ matrix.target.module }}
+    needs: detect
+    if: needs.detect.outputs.mode != 'none'
+    runs-on: ubuntu-latest
+    # Per-module concurrency: a newer push to master supersedes any in-flight
+    # sync for the same module (LLM run gets cancelled, latest run wins).
+    # Each matrix instance gets its own group, so different modules don't block.
+    concurrency:
+      group: zeeschuimer-sync-${{ matrix.target.module }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.detect.outputs.matrix) }}
+    steps:
+      - name: Checkout 4CAT
+        uses: actions/checkout@v4
+        with:
+          # Full history so the PR-body builder can `git diff before..after`
+          # for the changed Python file (see map_item/ci.py build-pr-body).
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install LLM dependencies
+        run: |
+          # LLMAdapter (common/lib/llm.py) imports every provider's langchain
+          # package at module load, so all of them are required even though we
+          # only use the Ollama provider at runtime. Derive the exact list from
+          # setup.py (single source of truth) so it can't drift from what 4CAT
+          # declares; we install only this LLM subset, not all of 4CAT, to keep
+          # the job light. Write the specs to a requirements file (one per line)
+          # and install with `-r`, rather than an unquoted `pip install $VAR`:
+          # that way a version specifier that contains a shell metacharacter
+          # (e.g. a future `langchain_core>=0.3` pin — `>` is redirection) can't
+          # be misparsed by the shell.
+          python helper-scripts/map_item/ci.py llm-requirements > llm-requirements.txt
+          echo "Installing from setup.py:"
+          cat llm-requirements.txt
+          pip install -r llm-requirements.txt
+
+      - name: Mint Zeeschuimer App token
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ZEESCHUIMER_APP_ID }}
+          private-key: ${{ secrets.ZEESCHUIMER_APP_PRIVATE_KEY }}
+          owner: digitalmethodsinitiative
+          repositories: zeeschuimer
+
+      - name: Checkout Zeeschuimer
+        uses: actions/checkout@v4
+        with:
+          repository: digitalmethodsinitiative/zeeschuimer
+          path: zeeschuimer-checkout
+          token: ${{ steps.app_token.outputs.token }}
+
+      - name: Run translation
+        env:
+          PROVIDER_API_KEY: ${{ inputs.llm_api_key || secrets.LLM_PROVIDER_API_KEY || secrets.DMI_OLLAMA_KEY }}
+          LLM_PROVIDER: ${{ inputs.llm_provider || vars.LLM_PROVIDER || 'ollama' }}
+          LLM_BASE_URL: ${{ inputs.llm_base_url || vars.LLM_BASE_URL || 'https://ollama.digitalmethods.net' }}
+          LLM_MODEL: ${{ inputs.model || vars.LLM_MODEL || 'qwen2.5-coder:14b' }}
+          LLM_OUTPUT_MODE: ${{ inputs.output_mode || vars.LLM_OUTPUT_MODE || 'structured' }}
+          # Pass matrix values through env rather than interpolating. 
+          # IS_BOOTSTRAP is always the literal true/false the detect job emitted
+          # MODULE_FILES is a list of paths the detect job already validated against 
+          # `datasources/<module>/search_<name>.py` shape (no shell
+          # metacharacters), so the unquoted `$MODULE_FILES` expansion is safe
+          # and still word-splits into multiple --files arguments.
+          IS_BOOTSTRAP: ${{ matrix.target.bootstrap }}
+          MODULE_FILES: ${{ matrix.target.files }}
+        run: |
+          if [ "$IS_BOOTSTRAP" = "true" ]; then
+            # Bootstrap translates every datasource in one run; --no-fail-fast
+            # so one datasource failing doesn't abort the whole initial sync.
+            python helper-scripts/map_item/converter.py \
+              --bootstrap \
+              --no-fail-fast \
+              --zeeschuimer-checkout ./zeeschuimer-checkout \
+              --output-manifest ./manifest.json
+          else
+            python helper-scripts/map_item/converter.py \
+              --files $MODULE_FILES \
+              --zeeschuimer-checkout ./zeeschuimer-checkout \
+              --output-manifest ./manifest.json
+          fi
+
+      - name: Build PR body
+        id: pr_body
+        env:
+          MODULE: ${{ matrix.target.module }}
+          BOOTSTRAP: ${{ matrix.target.bootstrap }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+        # Reads manifest.json, writes pr_body.md, and writes `title` to
+        # $GITHUB_OUTPUT (delimiter form, injection-safe). See ci.py.
+        run: python helper-scripts/map_item/ci.py build-pr-body --manifest manifest.json --out pr_body.md
+
+      - name: Check there are JS changes to PR
+        id: have_changes
+        working-directory: zeeschuimer-checkout
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No JS changes produced by translation; not opening a PR."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update Zeeschuimer PR
+        if: steps.have_changes.outputs.has_changes == 'true'
+        # Third-party action that operates with a write token to the Zeeschuimer
+        # repo — pinned to a full commit SHA (the v6 release) rather than the
+        # mutable `@v6` tag, so a tag move can't silently change what runs here.
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
+        with:
+          path: zeeschuimer-checkout
+          token: ${{ steps.app_token.outputs.token }}
+          # Stable per-module branch: a fresh push that retranslates the same
+          # module updates the same PR. Different modules never share a branch.
+          branch: auto/4cat-map-item-sync-${{ matrix.target.module }}
+          title: ${{ steps.pr_body.outputs.title }}
+          commit-message: "chore: sync map_item for ${{ matrix.target.module }} from 4CAT ${{ github.sha }}"
+          body-path: pr_body.md
+          draft: true

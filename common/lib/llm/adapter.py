@@ -1,9 +1,10 @@
 import json
 import base64
 import mimetypes
-import requests
+
 from pathlib import Path
 from typing import List, Optional, Union
+
 from pydantic import SecretStr
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -18,111 +19,103 @@ from langchain_deepseek import ChatDeepSeek
 class LLMAdapter:
     def __init__(
             self,
-            provider: str,
-            model: str,
+            model: dict,
+            server: dict = None,
             api_key: Optional[str] = None,
-            base_url: Optional[str] = None,
             temperature: float = 0.1,
             max_tokens: int = 1000,
             client_kwargs: Optional[dict] = None,
     ):
         """
-        provider: 'openai', 'google', 'mistral', 'ollama', 'lmstudio', 'anthropic', 'deepseek'
-        model: model name (e.g., 'gpt-4o-mini', 'claude-3-opus', 'mistral-small', etc.)
-        api_key: API key if required (OpenAI, Claude, Google, Mistral)
-        base_url: for local models or Mistral custom endpoints
-        temperature: temperature hyperparameter,
-        max_tokens: how many output tokens may be used
-        client_kwargs: additional client parameters
+        Instantiate an adapter to interface with an LLM model
+
+        :param dict model:  Model metadata (as in `llm.available_models` 4CAT
+          setting)
+        :param dict server:  Server metadata (as in `llm.servers` 4CAT setting)
+        :param str api_key:  API key, if needed
+        :param float temperature:  Temperature hyperparameter
+        :param int max_tokens:  Max tokens to generate
+        :param dict client_kwargs:  Optional parameters for the LLM adapter class
         """
-        self.provider = provider.lower()
         self.model = model
-        self.api_key = api_key
-        self.base_url = base_url
+        self.server = server
+        self.api_key = api_key or "dummy-key"  # need a key, even if not required
         self.temperature = temperature
         self.structured_output = False
         self.parser = None
         self.max_tokens = max_tokens
         self.client_kwargs = dict(client_kwargs) if client_kwargs else {}
+
         self.llm: BaseChatModel = self._load_llm()
 
     def _load_llm(self) -> BaseChatModel:
-        if self.provider == "openai":
-            kwargs = {}
-            if "o3" not in self.model:
-                kwargs["temperature"] = self.temperature # temperature not supported for all models
-            return ChatOpenAI(
-                model=self.model,
-                api_key=SecretStr(self.api_key),
-                base_url=self.base_url or "https://api.openai.com/v1",
-                max_tokens=self.max_tokens,
-                **kwargs
-            )
-        elif self.provider == "google":
-            return ChatGoogleGenerativeAI(
-                model=self.model,
-                temperature=self.temperature,
-                google_api_key=self.api_key,
-                max_tokens=self.max_tokens
-            )
-        elif self.provider == "anthropic":
-            return ChatAnthropic(
-                model_name=self.model,
-                temperature=self.temperature,
-                api_key=SecretStr(self.api_key),
-                max_tokens=self.max_tokens,
-                timeout=100,
-                stop=None
-            )
-        elif self.provider == "mistral":
-            return ChatMistralAI(
-                model_name=self.model,
-                temperature=self.temperature,
-                api_key=SecretStr(self.api_key),
-                base_url=self.base_url,  # Optional override
-                max_tokens=self.max_tokens,
-            )
-        elif self.provider == "deepseek":
-            return ChatDeepSeek(
-                model=self.model,
-                temperature=self.temperature,
-                api_key=SecretStr(self.api_key),
-                base_url=self.base_url,
-                max_tokens=self.max_tokens if self.max_tokens <= 8192 else 8192,
-            )
-        elif self.provider == "ollama":
-            ollama_adapter = ChatOllama(
-                model=self.model,
-                temperature=self.temperature,
-                base_url=self.base_url or "http://localhost:11434",
-                max_tokens=self.max_tokens,
-                client_kwargs=self.client_kwargs
-            )
-            self.model = ollama_adapter.model
-            return ollama_adapter
-        elif self.provider in {"vllm", "lmstudio"}:
-            # OpenAI-compatible local servers
-            if self.provider == "lmstudio" and not self.api_key:
-                self.api_key = "lm-studio"
+        """
+        Load appropriate langchain chat class
 
-            # For vLLM, query the server to get the actual model name. We can't leave this empty, unfortunately.
-            if self.provider == "vllm" and self.model=="vllm_model":
-                model_name = self.get_vllm_model_name(self.base_url, self.api_key)
-                self.model = model_name
-            else:
-                model_name = self.model if self.model else "lmstudio-model"
+        :return BaseChatModel:  Langchain chat model for interfacing with model
+        """
+        # The "wrapper" is which LangChain chat class to use for this model. For
+        # self-hosted connections it equals the connection type; for the
+        # third-party catalog (connection type "api") it is the model's vendor,
+        # stamped per-model in build_model_entry. Dispatching on the wrapper
+        # rather than the connection type is what lets third-party models
+        # resolve to the right SDK.
+        wrapper = self.model["wrapper"]
+        print(wrapper)
 
-            llm = ChatOpenAI(
-                model=model_name,
-                temperature=self.temperature,
-                api_key=SecretStr(self.api_key),
-                base_url=self.base_url,
-                max_tokens=self.max_tokens,
-            )
-            self.model = llm.model_name
-            return llm
+        chat_params = {
+            "model": self.model["local_id"],
+            "api_key": SecretStr(self.api_key),
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+        # Only pass a base URL when the connection actually has one. An empty
+        # string is taken literally by some SDKs (Anthropic, DeepSeek -> empty
+        # endpoint) instead of falling back to the vendor default.
+        if self.server["url"]:
+            chat_params["base_url"] = self.server["url"]
+
+        if wrapper == "openai":
+            if "o3" in self.model["local_id"]:
+                del chat_params["temperature"]
+            adapter_class = ChatOpenAI
+
+        elif wrapper == "google":
+            adapter_class = ChatGoogleGenerativeAI
+
+        elif wrapper == "anthropic":
+            chat_params.update({"timeout": 100, "stop": None})
+            adapter_class = ChatAnthropic
+
+        elif wrapper == "mistral":
+            adapter_class = ChatMistralAI
+
+        elif wrapper == "deepseek":
+            chat_params["max_tokens"] = min(self.max_tokens, 8192)
+            adapter_class = ChatDeepSeek
+
+        elif wrapper == "ollama":
+            adapter_class = ChatOllama
+            chat_params.update({"client_kwargs": self.client_kwargs})
+
+        elif wrapper in {"litellm", "openai-like"}:
+            url = f"{self.server['url']}/" if not self.server["url"].endswith("/") else self.server['url']
+            url += "v1/" if not url.endswith("v1/") else ""
+
+            chat_params.update({"base_url": url})
+            if self.server.get("auth_header"):
+                chat_params.update({
+                    "default_headers": {
+                        self.server["auth_header"]: self.server["auth_key"]
+                    }
+                })
+
+            adapter_class = ChatOpenAI
+
         else:
-            raise ValueError(f"Unsupported LLM provider: {self.provider}")
+            raise ValueError(f"{self.__class__.__name__} Unsupported LLM wrapper: {wrapper}")
+
+        return adapter_class(**chat_params)
 
     def generate_text(
             self,
@@ -161,7 +154,8 @@ class LLMAdapter:
             lc_messages = messages
 
         kwargs = {"temperature": temperature}
-        if self.provider in ("google", "ollama") or "o3" in self.model or "gpt-5" in self.model:
+        if self.model["wrapper"] in ("google", "ollama") or "o3" in self.model["local_id"] or "gpt-5" in self.model[
+            "local_id"]:
             kwargs = {}
 
         try:
@@ -172,16 +166,16 @@ class LLMAdapter:
         return response
 
     def create_multimodal_content(
-        self,
-        text: str,
-        media_urls: Optional[List[str]] = None,
-        media_files: Optional[List[Union[str, Path]]] = None,
+            self,
+            text: str,
+            media_urls: Optional[List[str]] = None,
+            media_files: Optional[List[Union[str, Path]]] = None,
     ) -> List[dict]:
         """
         Create multimodal content structure for LangChain messages with media URLs
         and/or local media files (base64-encoded).
 
-        Supports images, video, and audio depending on the provider and model.
+        Supports images, video, and audio depending on the server and model.
 
         :param text: Text content
         :param media_urls: List of media URLs (http/https)
@@ -224,22 +218,22 @@ class LLMAdapter:
         return content
 
     def _format_media_block(
-        self,
-        url: Optional[str] = None,
-        b64_data: Optional[str] = None,
-        mime_type: str = "image/jpeg",
-        media_category: str = "image",
+            self,
+            url: Optional[str] = None,
+            b64_data: Optional[str] = None,
+            mime_type: str = "image/jpeg",
+            media_category: str = "image",
     ) -> dict:
         """
-        Format a single media block for the appropriate provider.
+        Format a single media block for the appropriate server.
 
         :param url: Media URL (if URL-based)
         :param b64_data: Base64-encoded data (if file-based)
         :param mime_type: MIME type of the media
         :param media_category: "image", "video", or "audio"
-        :returns: Provider-formatted content block
+        :returns: Server-formatted content block
         """
-        if self.provider == "anthropic":
+        if self.model["wrapper"] == "anthropic":
             if media_category == "image":
                 if url:
                     return {"type": "image", "source": {"type": "url", "url": url}}
@@ -255,15 +249,15 @@ class LLMAdapter:
                     return {"type": "document", "source": {
                         "type": "base64", "media_type": mime_type, "data": b64_data
                     }}
-        elif self.provider == "google":
+        elif self.model["wrapper"] == "google":
             if url:
                 return {"type": "image_url", "image_url": {"url": url}}
             else:
                 data_uri = f"data:{mime_type};base64,{b64_data}"
                 return {"type": "image_url", "image_url": {"url": data_uri}}
-        elif self.provider == "ollama":
+        elif self.model["wrapper"] == "ollama":
             if media_category != "image":
-                raise ValueError(f"Ollama provider only supports image media, got category '{media_category}'")
+                raise ValueError(f"Ollama only supports image media, got category '{media_category}'")
             if url:
                 return {
                     "type": "image_url",
@@ -281,13 +275,31 @@ class LLMAdapter:
                 return {"type": "image_url", "image_url": {"url": url}}
             else:
                 data_uri = f"data:{mime_type};base64,{b64_data}"
-                if media_category == "audio" and self.provider == "openai":
+                if media_category == "audio" and self.model["wrapper"] == "openai":
                     return {"type": "input_audio", "input_audio": {
                         "data": b64_data, "format": mime_type.split("/")[-1]
                     }}
                 return {"type": "image_url", "image_url": {"url": data_uri}}
 
-    def set_structure(self, json_schema):
+    def set_structure(self, json_schema, method=None, include_raw=False, strict=None):
+        """
+        Bind a JSON schema so the model returns schema-validated structured output.
+
+        :param json_schema: JSON schema dict (or JSON string) describing the output.
+        :param method: How structured output is enforced. None uses LangChain's
+            per-provider default (usually "function_calling", which binds a tool).
+            For reasoning models served over an OpenAI-compatible proxy, pass
+            "json_schema" — constrained decoding forces the answer channel itself
+            to match the schema, rather than relying on a clean tool call that the
+            model may emit in the wrong channel (yielding empty, unparseable output).
+        :param include_raw: When True, structured-output calls return a
+            {"raw", "parsed", "parsing_error"} dict instead of raising on a parse
+            failure, so callers can inspect the raw AIMessage (finish_reason,
+            reasoning channel, token usage) to diagnose what went wrong.
+        :param strict: Passed through to with_structured_output when not None.
+            Use strict=False for schemas that don't satisfy OpenAI strict-mode
+            requirements but are fine for a guided-decoding backend (e.g. vLLM).
+        """
         if not json_schema:
             raise ValueError("json_schema is None")
 
@@ -297,76 +309,14 @@ class LLMAdapter:
         json.dumps(json_schema)  # To validate / raise an error
 
         # LM Studio needs some more guidance
-        if self.provider == "lmstudio":
+        if self.model["wrapper"] == "openai-like":
             json_schema = {"type": "json_schema", "json_schema": {"schema": json_schema}}
             self.llm = self.llm.bind(response_format=json_schema)
         else:
-            self.llm = self.llm.with_structured_output(json_schema)
+            kwargs = {"include_raw": include_raw}
+            if method:
+                kwargs["method"] = method
+            if strict is not None:
+                kwargs["strict"] = strict
+            self.llm = self.llm.with_structured_output(json_schema, **kwargs)
         self.structured_output = True
-
-    @staticmethod
-    def get_model_options(config) -> dict:
-        """
-        Returns model choice options for UserInput
-        """
-        models = LLMAdapter.get_models(config)
-        if not models:
-            return {}
-        options = {model_id: model_values["name"] for model_id, model_values in models.items()}
-        return options
-
-    @staticmethod
-    def get_model_providers(config) -> dict:
-        """
-        Returns available model providers through APIs
-        """
-        models = LLMAdapter.get_models(config)
-        if not models:
-            return {}
-        providers = list(set([model_values.get("provider", "") for model_values in models.values()]))
-        if not providers:
-            return {}
-        options = {provider: provider.capitalize() for provider in providers if provider}
-        return options
-
-    @staticmethod
-    def get_models(config) -> dict:
-        """
-        Returns a dict with LLM models supported by 4CAT, either through an API or as a local option.
-        Make sure to keep up-to-date!
-
-        :returns dict, A dict with model IDs as keys and details as values
-        """
-        with (
-            config.get("PATH_ROOT")
-                    .joinpath("common/assets/llms.json")
-                    .open() as available_models
-        ):
-            available_models = json.loads(available_models.read())
-        return available_models
-
-
-    @staticmethod
-    def get_vllm_model_name(base_url: str, api_key: str = None) -> str:
-        """
-        Query vLLM server to get the name of the served model.
-        """
-
-        try:
-            # vLLM exposes available models at /v1/models endpoint
-            models_url = f"{base_url.rstrip('/')}/models"
-            headers = {}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-
-            response = requests.get(models_url, headers=headers, timeout=10)
-            response.raise_for_status()
-            models_data = response.json()
-
-            # Get the first available model
-            if models_data.get("data") and len(models_data["data"]) > 0:
-                return models_data["data"][0]["id"]
-            else:
-                raise ValueError("No models found on vLLM server")
-        except Exception as e:
-            raise ValueError(f"Could not retrieve model name from vLLM server: {e}")

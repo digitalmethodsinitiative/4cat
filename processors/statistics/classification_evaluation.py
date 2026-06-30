@@ -5,6 +5,7 @@ Generate accuracy, F1, recall, and precision scores for labels in two columns.
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, andify
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, cohen_kappa_score
@@ -26,6 +27,9 @@ class ClassificationEvaluation(BasicProcessor):
                    "and Cohen's Kappa). Produces overall and per-label metrics. Also supports multi-label values.")
     extension = "csv"  # extension of result file, used internally and in UI
     icon = "table-columns"
+
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -100,17 +104,6 @@ class ClassificationEvaluation(BasicProcessor):
                 options["column_pred"]["options"] = {v: v for v in parent_columns}
 
         return options
-
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
 

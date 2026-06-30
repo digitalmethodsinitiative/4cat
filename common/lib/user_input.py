@@ -4,6 +4,7 @@ from werkzeug.datastructures import ImmutableMultiDict
 import json
 
 import re
+from itertools import chain
 
 class RequirementsNotMetException(Exception):
     """
@@ -26,6 +27,7 @@ class UserInput:
     OPTION_TEXT = "string"  # simple string or integer (input text)
     OPTION_MULTI = "multi"  # multiple values out of a list (select multiple)
     OPTION_MULTI_SELECT = "multi_select"  # multiple values out of a dropdown list (select multiple)
+    OPTION_MULTI_OPTION = "multi_option"  # several instances of a collection of controls
     OPTION_INFO = "info"  # just a bit of text, not actual input
     OPTION_TEXT_LARGE = "textarea"  # longer text
     OPTION_TEXT_JSON = "json"  # text, but should be valid JSON
@@ -180,6 +182,45 @@ class UserInput:
                         table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
 
                 parsed_input[option] = table_input
+
+            elif settings.get("type") == UserInput.OPTION_MULTI_OPTION:
+                # these are collections of other input options that can be
+                # repeated an arbitrary amount of times and are saved as a
+                # list of these values
+                # i.e. forms within forms!!!
+                item_options = settings["options"]
+                input_items = {}
+                for key, value in input.items():
+                    if key_match := re.match(f"{option}-([0-9]+)-(.+)", key):
+                        input_index = int(key_match[1])
+                        # note: the index is just used to match inputs to items
+                        # it is not used for ordering
+                        option_item = key_match[2]
+                        if option_item not in item_options:
+                            continue
+
+                        if input_index not in input_items:
+                            input_items[input_index] = {}
+
+                        input_items[input_index][option_item] = UserInput.parse_value(item_options[option_item], value, input_items[input_index], silently_correct)
+
+                # discard items that are only default values
+                parsed_input[option] = []
+                for input_index, item in input_items.items():
+                    only_default = True
+                    for key, value in item.items():
+                        if value != item_options[key]["default"]:
+                            only_default = False
+
+                    if not only_default:
+                        parsed_input[option].append(item)
+
+                # may define a mapper to make this a dict
+                if settings.get("dict_key"):
+                    if callable(settings["dict_key"]):
+                        parsed_input[option] = {settings["dict_key"](value): {**value, "_id": settings["dict_key"](value)} for value in parsed_input[option]}
+                    else:
+                        parsed_input[option] = {value[settings["dict_key"]]: {**value, "_id": value[settings["dict_key"]]} for value in parsed_input[option]}
 
             elif option not in input:
                 # not provided? use default
@@ -392,9 +433,16 @@ class UserInput:
             # select box
             # one out of multiple options
             # return option if valid, or default
-            if choice not in settings.get("options"):
+            options = settings.get("options", {})
+
+            # if we have a categorised set of options, look deeper to get
+            # valid option values
+            is_categorised = all([type(o) is dict for o in options.values()])
+            match_options = list(chain(*[list(o.keys()) for o in options.values()])) if is_categorised else options
+
+            if choice not in match_options:
                 if not silently_correct:
-                    raise QueryParametersException(f"Invalid value selected; must be one of {', '.join(settings.get('options', {}).keys())}. {settings}")
+                    raise QueryParametersException(f"Invalid value selected; must be one of {', '.join(match_options)}.")
                 else:
                     return settings.get("default", "")
             else:

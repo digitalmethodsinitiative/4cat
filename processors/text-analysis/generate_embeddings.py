@@ -10,6 +10,7 @@ from gensim.models.phrases import Phrases, Phraser
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
@@ -32,7 +33,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 				  "Note that good models require a lot of data."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	followups = ["similar-word2vec", "histwords-vectspace"]
+	# Allow processor on token sets
+	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["similar-word2vec", "histwords-vectspace"])
 
 	references = [
 		"word2vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
@@ -114,16 +116,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 			}
 		}
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on token sets
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "tokenise-posts"
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a number of files containing
@@ -152,7 +144,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 
 		# go through all archived token sets and vectorise them
 		models = 0
-		for tokens in self.source_dataset.iterate_items():
+		for tokens in self.source_dataset.iterate_items(self):
 			if tokens.file.name == '.token_metadata.json':
 				# Skip metadata
 				continue

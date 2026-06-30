@@ -6,6 +6,7 @@ import csv
 
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -25,6 +26,9 @@ class ConvertText(BasicProcessor):
                    "also be added to the original dataset as annotations.")  # description displayed in UI
     extension = "csv"
     icon = "arrow-turn-to-dots"
+
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -83,16 +87,6 @@ class ConvertText(BasicProcessor):
                                                                                     key=lambda
                                                                                         k: "text" in k).pop()
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on NDJSON and CSV files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """

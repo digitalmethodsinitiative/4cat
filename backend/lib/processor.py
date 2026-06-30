@@ -2,6 +2,7 @@
 Basic post-processor worker - should be inherited by workers to post-process results
 """
 import traceback
+import inspect as py_inspect
 import zipfile
 import typing
 import shutil
@@ -12,10 +13,11 @@ import os
 import re
 import time
 
-from pathlib import PurePath
+from pathlib import PurePath, Path
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet, StatusType
+from common.lib.compatibility import Compatibility
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
@@ -24,6 +26,9 @@ from common.config_manager import ConfigWrapper
 from common.lib.user import User
 
 csv.field_size_limit(1024 * 1024 * 1024)
+
+# Shared instance for the legacy default `compatibility`
+_DEFAULT_COMPATIBILITY = Compatibility(top_dataset_only=True)
 
 
 class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
@@ -36,10 +41,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     be used as input for another processor (though whether and when this is
     useful is another question).
 
-    To determine whether a processor can process a given dataset, you can
-    define a `is_compatible_with(FourcatModule module=None, config=None):) -> bool` class
-    method which takes a dataset as argument and returns a bool that determines
-    if this processor is considered compatible with that dataset. For example:
+    To determine whether a processor can process a given dataset, declare a
+    Compatibility specification as the `compatibility` class attribute. The
+    default `is_compatible_with` is evaluated from it. For example:
+
+    .. code-block:: python
+
+        compatibility = Compatibility(types={"linguistic-features"})
+
+    Processors with genuinely dynamic requirements (e.g. ones that must inspect
+    a dataset's genealogy) may instead override `is_compatible_with(cls,
+    module=None, config=None) -> bool` directly; an override takes precedence
+    over the `compatibility` attribute. For example:
 
     .. code-block:: python
 
@@ -95,6 +108,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: path objects or dataset objects; for datasets, the
     #: `remove_disposable_files()` method will be called.
     for_cleanup = None
+
+    #: A common.lib.compatibility.Compatibility object describing which datasets
+    #: this processor accepts. When set, the default is_compatible_with() is
+    #: evaluated from it.
+    compatibility = None
 
     def work(self):
         """
@@ -361,6 +379,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 # dataset with key to attach to doesn't exist...
                 self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist, may have "
                                  "been deleted in the meantime)" % (self.dataset.key, self.parameters["attach_to"]))
+
+        # Validate map_item against the freshly finished dataset and emit a
+        # single rolled-up admin alert if anything is unmappable. Fires once
+        # per dataset creation; later processors that iterate this dataset
+        # don't re-alert.
+        self._validate_map_item_post_run()
 
         self.job.finish()
 
@@ -743,7 +767,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         except AttributeError:
             standalone.board = self.type
 
-        standalone.type = top_parent.type
+        standalone.adopt_type(top_parent.type)
 
         standalone.detach()
         standalone.delete_parameter("key_parent")
@@ -888,12 +912,110 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         try:
             mapped_item = cls.map_item(item)
         except (KeyError, IndexError) as e:
-            raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}")
+            # Walk the traceback to find the deepest frame inside the
+            # datasource's own map_item file, so the wrapped exception
+            # points at the access that failed rather than this line.
+            tb_frames = traceback.extract_tb(e.__traceback__)
+            chosen_frame = tb_frames[-1] if tb_frames else None
+            try:
+                map_item_file = Path(py_inspect.getfile(cls)).resolve()
+            except (TypeError, OSError):
+                map_item_file = None
+            if map_item_file is not None:
+                for frame in reversed(tb_frames):
+                    try:
+                        if Path(frame.filename).resolve() == map_item_file:
+                            chosen_frame = frame
+                            break
+                    except OSError:
+                        continue
+            raise MapItemException(f"Unable to map item: {type(e).__name__}-{e}", frame=chosen_frame)
 
         if not mapped_item:
             raise MapItemException("Unable to map item!")
 
         return mapped_item
+
+    def _validate_map_item_post_run(self):
+        """
+        Walk the just-finished dataset and run `map_item` over each item,
+        rolling up any failures into a single admin alert via
+        `DataSet.warn_unmappable_signatures`. Fires at at creation time, 
+        immediately after the dataset is marked finished and before this 
+        worker frees its queue slot.
+
+        Wrapped so a validation failure can never fail the dataset itself.
+
+        This holds the current worker's queue slot for the duration of the
+        iteration. Subsequent processors are unaffected — they pick up the
+        now-finished dataset on other workers. If this becomes a measurable
+        bottleneck for very large datasets, revisit moving to a daemon
+        thread or a dedicated validator worker.
+        """
+        try:
+            # Only run validation if the dataset is finished, has rows, and the processor
+            # has a compatible map_item method.
+            if not self.dataset.is_finished():
+                return
+            if self.dataset.data.get("num_rows", 0) <= 0:
+                return
+            if not self.map_item_method_available(dataset=self.dataset):
+                return
+
+            signatures = {}
+            for i, item in enumerate(self.dataset._iterate_items(processor=self)):
+                try:
+                    self.get_mapped_item(item)
+                except MapItemException as e:
+                    frame = getattr(e, "frame", None)
+                    fname = Path(frame.filename).name if frame and getattr(frame, "filename", None) else "?"
+                    lineno = getattr(frame, "lineno", 0) if frame else 0
+                    sig = signatures.setdefault(
+                        (fname, lineno),
+                        {"count": 0, "error": str(e), "samples": []}
+                    )
+                    sig["count"] += 1
+                    if len(sig["samples"]) < 3:
+                        sig["samples"].append(i)
+                except Exception:
+                    # Unexpected exception type — don't let it kill validation
+                    continue
+
+            if signatures:
+                self.dataset.warn_unmappable_signatures(processor=self, signatures=signatures)
+        except Exception as e:
+            # Validation must never fail the dataset
+            try:
+                self.log.warning(f"map_item validation hook failed for dataset {self.dataset.key}: {e}")
+            except Exception:
+                pass
+
+    @classmethod
+    def is_compatible_with(cls, module=None, config=None):
+        """
+        Determine whether this processor can run on a given module.
+
+        When the processor defines a `compatibility` attribute, this is
+        evaluated from it. Processors whose requirements cannot be expressed
+        that way (for example, ones that must inspect a dataset's ancestry) may
+        override this method instead; the override is used in preference to the
+        attribute.
+
+        When neither is provided, the processor accepts only top-level datasets
+        (those without a parent), which preserves the historical default.
+
+        :param module:  Dataset (normally) or processor to check against
+        :param ConfigManager|None config:  Context-aware configuration reader
+        :return bool:
+        """
+        if cls.compatibility is not None:
+            return cls.compatibility.is_compatible_with(module, config=config)
+
+        # Legacy default: a processor that declares no `compatibility` and does
+        # not override this method is compatible only with top-level datasets
+        # (those with no parent), i.e. it runs on collected data and not on the
+        # output of other processors.
+        return _DEFAULT_COMPATIBILITY.is_compatible_with(module, config=config)
 
     @classmethod
     def is_filter(cls):
@@ -997,19 +1119,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     @classmethod
     def exclude_followup_processors(cls, processor_type=None):
         """
-        Used for processor compatibility
+        Determine whether a follow-up processor should be excluded.
 
-        To be defined by the child processor if it should exclude certain follow-up processors.
-        e.g.:
+        Follow-up processors that should never be offered after this one are
+        listed in the `excluded_followups` field of the `compatibility`
+        specification. Processors with dynamic exclusion logic may override this
+        method instead.
 
-        def exclude_followup_processors(cls, processor_type):
-            if processor_type in ["undesirable-followup-processor"]:
-                return True
-            return False
-
-        :param str processor_type:  Processor type to exclude
-        :return bool:  True if processor should be excluded, False otherwise
+        :param str processor_type:  Processor type to check
+        :return bool:  True if the follow-up should be excluded, False otherwise
         """
+        if cls.compatibility is not None and processor_type in cls.compatibility.excluded_followups:
+            return True
         return False
 
     @abc.abstractmethod

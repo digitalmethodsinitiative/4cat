@@ -16,6 +16,7 @@ from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 
 from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorAdvancedPreset
+from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -34,6 +35,9 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     title = "Create video hashes to identify near duplicate videos"  # title displayed in UI
     description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only. This process can take a long time depending on video length, amount, and frames per second."
     extension = "gexf"
+
+    # video datasets, when ffmpeg is available
+    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -68,21 +72,6 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
                 "default": False
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine compatibility
-
-        Compatible with downloaded videos, and not really anything else!
-        Additionally ffmpeg needs to be available.
-
-        :param DataSet module:  Module ID to determine compatibility with
-        :return bool:
-        """
-        return (module.get_media_type() == "video" or module.type.startswith("video-downloader")) and \
-               config.get("video-downloader.ffmpeg_path") and \
-               shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def get_processor_advanced_pipeline(self, attach_to=None):
         """
@@ -145,7 +134,8 @@ class VideoHasher(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image" # media type of the result
 
-    followups = ["video-hash-network", "video-hash-similarity-matrix"]
+    # video datasets (collages are made from video frames)
+    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-hash-network", "video-hash-similarity-matrix"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -174,13 +164,6 @@ class VideoHasher(BasicProcessor):
 
         return options
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on videos only
-        """
-        return module.get_media_type() == "video" or module.type.startswith("video-downloader")
-
     def process(self):
         """
         This takes a zipped set of videos, uses https://pypi.org/project/videohash/ and https://ffmpeg.org/ to collect
@@ -208,7 +191,7 @@ class VideoHasher(BasicProcessor):
         processed_videos = 0
 
         self.dataset.update_status("Creating video hashes")
-        for video in self.source_dataset.iterate_items(staging_area=staging_area):
+        for video in self.source_dataset.iterate_items(self, staging_area=staging_area):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while creating video hashes")
 
@@ -356,6 +339,9 @@ class VideoHashNetwork(BasicProcessor):
     description = "Creates hashes network to identify duplicate or similar videos."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
 
+    # Allow on video hasher
+    compatibility = Compatibility(types={"video-hasher-1"})
+
     references = [
         "[Video Hash](https://github.com/akamhy/videohash#readme)",
     ]
@@ -369,13 +355,6 @@ class VideoHashNetwork(BasicProcessor):
             "min": 0,
             "max": 100
         }}
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on video hasher
-        """
-        return module.type in ["video-hasher-1"]
 
     def process(self):
         """
@@ -474,6 +453,9 @@ class VideoHashSimilarities(BasicProcessor):
     description = "Creates CSV with hashes and groups videos above similarity value."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow on video hasher
+    compatibility = Compatibility(types={"video-hasher-1"})
+
     references = [
         "[Video Hash](https://github.com/akamhy/videohash#readme)",
     ]
@@ -487,13 +469,6 @@ class VideoHashSimilarities(BasicProcessor):
             "min": 0,
             "max": 100
         }}
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow on video hasher
-        """
-        return module.type in ["video-hasher-1"]
 
     def process(self):
         """

@@ -65,13 +65,13 @@ class InternalAPI(BasicWorker):
 				break
 			except OSError as e:
 				if has_time and not self.interrupted:
-					self.manager.log.info("Could not open port %i yet (%s), retrying in 10 seconds" % (self.port, e))
+					self.manager.log.info(f"Could not open port {self.port} yet ({e}), retrying in 10 seconds")
 					time.sleep(10.0)  # wait a few seconds before retrying
 					continue
-				self.manager.log.error("Port %s is already in use! Local API not available. Check if a residual 4CAT process may still be listening at the port." % self.port)
+				self.manager.log.error(f"Cannot listen at port {self.port} ({e})! Local API not available. Check if a residual 4CAT process may still be listening at the port.")
 				return
-			except ConnectionRefusedError:
-				self.manager.log.error("OS refused listening at port %i! Local API not available." % self.port)
+			except ConnectionRefusedError as e:
+				self.manager.log.error(f"OS refused listening at port {self.port} ({e})! Local API not available.")
 				return
 
 		server.listen()
@@ -79,6 +79,7 @@ class InternalAPI(BasicWorker):
 		self.manager.log.info("Local API listening for requests at %s:%s" % (self.host, self.port))
 
 		# continually listen for new connections
+		client = None
 		while not self.interrupted:
 			try:
 				client, address = server.accept()
@@ -90,8 +91,11 @@ class InternalAPI(BasicWorker):
 				continue
 
 			self.api_response(client, address)
+
+		if client:
 			client.close()
 
+		server.close()
 		self.manager.log.info("Shutting down local API server")
 
 	def api_response(self, client, address):
@@ -256,35 +260,39 @@ class InternalAPI(BasicWorker):
 						worker = candidate
 						break
 				
-				is_claimed = job["timestamp_claimed"] > 0
-				if not is_claimed and not worker:
+				# a job's claim flag encodes three states:
+				#   0  -> queued/claimable
+				#  >0  -> claimed (running if a live worker exists, else a likely
+				#        hard-kill zombie)
+				#  -1  -> parked after a crash (Job.STATUS_PARKED); retried on the
+				#        next restart. see Job.park() / BasicWorker.run().
+				timestamp_claimed = job["timestamp_claimed"]
+				is_claimed = timestamp_claimed > 0
+				is_parked = timestamp_claimed == Job.STATUS_PARKED
+
+				if not worker and not is_claimed and not is_parked:
+					# truly queued and waiting to be claimed
 					if jobtype not in queue:
 						queue[jobtype] = 0
 					queue[jobtype] += 1
 				else:
-					# Claimed or has worker
-					if hasattr(worker, "dataset") and worker.dataset:
-						running_key = worker.dataset.key
-						running_user = worker.dataset.creator
-						running_parent = worker.dataset.top_parent().key
-					else:
-						running_key = None
-						running_user = None
-						running_parent = None
-
+					# has a live worker, or is claimed/parked without one. dataset
+					# resolution is left to the frontend (which treats remote_id as
+					# a dataset key only for processor jobtypes); the API just
+					# reports job state.
 					running.append({
 						"type": jobtype,
 						"queue_id": queue_key,
+						"remote_id": job["remote_id"],
 						"is_claimed": is_claimed,
 						"is_running": bool(worker),
-						"is_processor": hasattr(worker, "dataset"),
+						# Processors have DataSets
+						"is_processor": jobtype in self.modules.processors,
 						"is_recurring": (int(job["interval"]) > 0),
+						"is_parked": is_parked,
 						"is_maybe_crashed": is_claimed and not bool(worker),
-						"dataset_key": running_key,
-						"dataset_user": running_user,
-						"dataset_parent_key": running_parent,
 						"timestamp_queued": job["timestamp"],
-						"timestamp_claimed": job["timestamp_claimed"],
+						"timestamp_claimed": timestamp_claimed,
 						"timestamp_lastclaimed": job["timestamp_lastclaimed"],
 					})
 

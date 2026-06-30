@@ -10,6 +10,7 @@ from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -34,23 +35,14 @@ class ClarifaiAPIFetcher(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
     icon = "eye"
 
-    followups = ["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"]
+    # Allow on image sets
+    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"])
 
     references = [
         "[Clarifai](https://www.clarifai.com/)",
         "[Clarifai API Pricing & Free Usage Limits](https://www.clarifai.com/pricing)",
         "[Clarifai model browser](https://clarifai.com/clarifai/main/models)"
     ]
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on image sets
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.get_media_type() == "image" or module.type.startswith("image-downloader") or module.type == "video-frames"
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

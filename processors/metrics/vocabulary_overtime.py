@@ -4,6 +4,7 @@ Over-time trends
 import re
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -23,7 +24,8 @@ class OvertimeAnalysis(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
     icon = "chart-line"
 
-    followups = []
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
     references = [
         "[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
@@ -78,17 +80,6 @@ class OvertimeAnalysis(BasicProcessor):
                 "help": "Custom vocabulary (separate with commas)"
             }
         }
-
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """

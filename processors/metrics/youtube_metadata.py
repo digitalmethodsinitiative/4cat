@@ -11,6 +11,7 @@ from googleapiclient.errors import HttpError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
+from common.lib.compatibility import Compatibility
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -37,7 +38,8 @@ class YouTubeMetadata(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	icon = "brand-youtube"
 
-	followups = ["youtube-thumbnails"]
+	# collector output or extract-urls-filter output, as csv/ndjson (may contain youtube links)
+	compatibility = Compatibility(is_collector=True, types={"extract-urls-filter"}, extensions={"csv", "ndjson"}, preferred_followups=["youtube-thumbnails"])
 
 	max_retries = 3
 	sleep_time = 20
@@ -135,18 +137,6 @@ class YouTubeMetadata(BasicProcessor):
 			}
 
 		return options
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on datasets probably containing youtube links
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		# Compatible with every top-level dataset.
-		return ((module.is_top_dataset() and module.get_extension() in ("csv", "ndjson"))
-				or module.type == "extract-urls-filter")
 
 	def process(self):
 		"""
