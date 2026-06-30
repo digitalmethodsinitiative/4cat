@@ -49,6 +49,8 @@
     --spacing-large: calc(var(--spacing-tiny) * 8);
     --spacing-xlarge: calc(var(--spacing-tiny) * 12);
 
+    --slideout-header-height: 3rem;
+
     --stroke-light: calc(var(--font-base) * 0.1);
     --stroke: calc(var(--stroke-light) * 2);
     --stroke-journey: calc(var(--stroke-light) * 3);

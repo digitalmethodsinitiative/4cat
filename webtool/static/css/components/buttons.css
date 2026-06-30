@@ -20,12 +20,38 @@ button.no-style {
     border-style: none;
 }
 
-.button-like a {
+.button-like a, .button-like button {
     display: block;
 }
 
-.button-like a, .plain-page button, input[type=submit] {
+.button-like button {
+    border: 0;
+    margin: 0;
+    width: 100%;
+    text-align: inherit;
+    color: var(--button-grey);
+    font: inherit;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.button-like a, .button-like button, button.button-like, .plain-page button, input[type=submit] {
     padding: 8px 18px;
+}
+
+.button-like.emphasis, button.emphasis{
+    color: var(--button-grey);
+    background: var(--button-bg-regular);
+
+    outline: var(--stroke) solid var(--button-bg-regular);
+    border-radius: var(--radius);
+    border-color: var(--button-bg-regular);
+}
+
+.button-like.emphasis:hover, button.emphasis:hover {
+    color: var(--button-bg-regular);
+    background: transparent;
+    border-bottom: none;
 }
 
 .action-button-wrap {

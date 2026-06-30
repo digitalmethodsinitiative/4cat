@@ -8,7 +8,10 @@
         </aside>
         <div class="processor-card">
             <aside class="run-child-processor">
-                <button class="no-style">
+                <button class="no-style"
+                    hx-get="{{ url_for('dataset.processor_panel', key=dataset.key) }}"
+                    hx-target="#processor-grid" hx-swap="innerHTML"
+                    @click="showProcessorPanel = true">
                     <i class="fa-regular fa-square-plus" aria-hidden="true"></i> <span class="sr-only">Run processor on this dataset</span>
                 </button>
             </aside>

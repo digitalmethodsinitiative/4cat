@@ -1,3 +1,7 @@
+.dataset-container {
+    position: relative;
+}
+
 .dataset-metadata {
     background: var(--semidark);
     padding: var(--spacing-large) 0;

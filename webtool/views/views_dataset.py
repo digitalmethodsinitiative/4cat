@@ -511,14 +511,13 @@ def preview_items(key):
 """
 Individual result pages
 """
-@component.route('/results/<string:key>/processors/')
 @component.route('/results/<string:key>/')
 def show_result(key):
     """
     Show result page
 
     The page contains dataset details and a download link, but also shows a list
-    of finished and available processors.
+    of finished processors.
 
     :param key:  Result key
     :return:  Rendered template
@@ -609,6 +608,25 @@ def show_result(key):
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, breadcrumbs=breadcrumbs,
                            datasources=datasources, merge_sources=merge_sources, copy_source=copy_source)
 
+@component.route('/results/<string:key>/processor-grid/')
+@login_required
+def processor_grid(key):
+
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    processors_available = dataset.get_available_processors(config=g.config)
+
+    return render_template(
+        "components/processor-grid.html",
+        dataset=dataset,
+        processors=processors_available,
+    )
 
 @component.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
 @login_required

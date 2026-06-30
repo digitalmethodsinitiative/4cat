@@ -1,0 +1,11 @@
+.slide-enter {
+    transition: transform 0.2s ease-in-out;
+}
+
+.slide-from {
+    transform: translateY(100%);
+}
+
+.slide-to {
+    transform: translateY(0);
+}

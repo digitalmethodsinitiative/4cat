@@ -1,0 +1,9 @@
+.slideout-header {
+    height: var(--slideout-header-height);
+    display: flex;
+    column-gap: 20px;
+    align-items: center;
+    padding: var(--spacing-regular);
+    background: var(--panel-bg-0);
+    border-bottom: var(--stroke) solid var(--panel-bg-1);
+}

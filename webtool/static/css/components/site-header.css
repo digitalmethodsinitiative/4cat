@@ -81,21 +81,6 @@
     border-color: var(--button-grey);
 }
 
-.main-navigation li.emphasis {
-    color: var(--button-grey);
-    background: var(--button-bg-regular);
-
-    outline: var(--stroke) solid var(--button-bg-regular);
-    border-radius: var(--radius);
-    border-color: var(--button-bg-regular);
-}
-
-.main-navigation li.emphasis:hover {
-    color: var(--button-bg-regular);
-    background: transparent;
-    border-bottom: none;
-}
-
 .breadcrumbs {
     background: var(--button-grey);
     padding: var(--spacing-small) 0;
