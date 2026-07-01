@@ -42,9 +42,9 @@
                     <li class="emphasis button-like"><a href="#">Create Dataset</a></li>
                 {% endif %}
                 <li><a href="{{ url_for("dataset.show_results") }}">My Datasets</a></li>
-                <li><a href="#">About</a></li>
+                <li><a href="{{ url_for("misc.show_about") }}">About</a></li>
                 {% if __user_cp_access %}
-                    <li><a href="#">Control panel</a></li>
+                    <li><a href="{{ url_for("admin.frontpage") }}">Control panel</a></li>
                 {% endif %}
             </ul>
         </nav>
@@ -52,10 +52,12 @@
         <div class="user-panel">
             <ul>
 		        {% if current_user.is_authenticated %}
-                    <li><a href="#">stijn.peeters@uva.nl</a></li>
-                    <li><a href="#">Log out</a></li>
+                    <li><a href="#">{{ current_user.get_name() }}</a></li>
+                    {% if not current_user.is_special %}
+                        <li><a href="{{ url_for("user.logout") }}">Log out</a></li>
+                    {% endif %}
                 {% else %}
-                    <li><a href="#">Log in</a></li>
+                    <li><a href="{{ url_for("user.login") }}">Log in</a></li>
                 {% endif %}
             </ul>
         </div>
