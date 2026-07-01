@@ -9,6 +9,7 @@ import re
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.outputs import Datasource
 from common.lib.exceptions import MapItemException
 from common.lib.helpers import normalize_url_encoding
 
@@ -22,6 +23,8 @@ class SearchInstagram(Search):
     title = "Import scraped Instagram data"  # title displayed in UI
     description = "Import Instagram data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # the tag column the co-tag and hashtag networks look for
+    output = Datasource(columns={"hashtags"})
     is_from_zeeschuimer = True
     icon = "brand-instagram"
 

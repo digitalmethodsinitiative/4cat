@@ -6,6 +6,7 @@ import string
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import File
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -22,6 +23,8 @@ class Stringify(BasicProcessor):
 	title = "Merge texts"  # title displayed in UI
 	description = "Merges the data from the body column into a single text file. The result can be used for word clouds, word trees, etc."  # description displayed in UI
 	extension = "txt"  # extension of result file, used internally and in UI
+	# a single txt file
+	output = File("txt")
 	icon = "file-lines"
 
 	# Allow on top-level CSV/NDJSON datasets

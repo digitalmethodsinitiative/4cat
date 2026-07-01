@@ -21,6 +21,7 @@ from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_d
 from common.lib.llm.adapter import LLMAdapter
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 class LLMPrompter(BasicProcessor):
     """
@@ -33,6 +34,9 @@ class LLMPrompter(BasicProcessor):
                    "entity extraction, or OCR. Supported APIs include OpenAI, Google, Anthropic, Mistral, and DeepSeek.")
     extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
     icon = "robot"
+
+    # a derived table
+    output = Table(extension="ndjson")
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it accepts csv/ndjson
     # tables, OR zip archives of image/video/audio media (_almost_ all zips but not)

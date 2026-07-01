@@ -17,6 +17,7 @@ from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImpor
 from processors.visualisation.download_images import ImageDownloader
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 
 __author__ = "Dale Wahl"
@@ -30,6 +31,8 @@ class TikTokImageDownloader(BasicProcessor):
     title = "Download TikTok images"  # title displayed in UI
     description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
     extension = "zip"
+    # a zip archive of media files
+    output = MediaArchive(media="image")
     media_type = "image"
 
     # Allow processor on TikTok datasets

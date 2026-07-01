@@ -13,6 +13,7 @@ from packaging import version
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, ExecutableSibling
+from common.lib.outputs import Render
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_ffmpeg_version
@@ -36,9 +37,11 @@ class VideoStack(BasicProcessor):
                   "transparently to help visualise similarities. Does not work well with more than a dozen or so " \
                   "videos. Videos are stacked by length, i.e. the longest video is at the 'bottom' of the stack."  # description displayed in UI
     extension = "mp4"  # extension of result file, used internally and in UI
+    # a rendered video, no column table
+    output = Render("mp4", media="video")
 
     # Allow on video datasets when ffmpeg and ffprobe are available
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

@@ -16,6 +16,7 @@ __email__ = "4cat@oilab.eu"
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Network
 
 
 class ImageGrapher(BasicProcessor):
@@ -33,6 +34,8 @@ class ImageGrapher(BasicProcessor):
                    "the images were sourced from. Suitable for use with Gephi's "
                    "'Image Preview' plugin.")
     extension = "gexf"  # extension of result file, used internally and in UI
+    # a graph file, no column table
+    output = Network()
     icon = "circle-nodes"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also walks the

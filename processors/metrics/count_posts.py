@@ -5,6 +5,7 @@ Collapse post bodies into one long string
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -21,6 +22,8 @@ class CountPosts(BasicProcessor):
     title = "Count items per date"  # title displayed in UI
     description = "Counts how many items are in the dataset per date (or overall)."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a ranking table (date/item/value), so ranking visualisations can run on it
+    output = Table(columns={"date", "item", "value"})
     icon = "list-ol"
 
     # Allow on top-level CSV/NDJSON datasets

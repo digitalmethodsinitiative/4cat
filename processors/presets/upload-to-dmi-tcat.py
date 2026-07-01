@@ -4,6 +4,7 @@ Upload Twitter dataset to DMI-TCAT instance
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 
 class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     """
@@ -14,6 +15,8 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     title = "Upload to DMI-TCAT"  # title displayed in UI
     description = "Convert the dataset to a TCAT-compatible format and upload it to an available TCAT server."  # description displayed in UI
     extension = "html"
+    # a preset; its output is its last step's
+    output = Delegated()
     icon = "brand-twitter"
 
     # Twitter v2 search results, when a TCAT server is configured

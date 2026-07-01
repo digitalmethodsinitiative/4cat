@@ -8,6 +8,7 @@ import json
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -24,6 +25,8 @@ class VectorRanker(BasicProcessor):
 	description = "Ranks most used tokens per token set (overall or per timeframe). " \
 				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a ranking table (date/item/value), so ranking visualisations can run on it
+	output = Table(columns={"date", "item", "value"})
 
 	# Allow processor on token vectors
 	compatibility = Compatibility(types={"vectorise-tokens"}, preferred_followups=["wordcloud"])

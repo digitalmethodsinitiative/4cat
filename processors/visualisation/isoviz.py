@@ -7,6 +7,7 @@ import re
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, pad_interval, get_4cat_canvas
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 
 from calendar import month_abbr
 from math import sin, cos, tan, degrees, radians, copysign
@@ -35,6 +36,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	title = "Side-by-side area graphs"  # title displayed in UI
 	description = "Generate area graphs showing prevalence per item over time. These are visualised side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
+	# a rendered image, no column table
+	output = Render()
 	icon = "chart-area"
 
 	# rankable datasets with a single value per item (multiple_items=False)

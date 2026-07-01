@@ -20,6 +20,7 @@ from backend.lib.search import Search
 from common.lib.helpers import UserInput, strip_tags
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ConfigException
 from common.lib.item_mapping import MappedItem
+from common.lib.outputs import Datasource
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Tumblr API (api.tumblr.com)"]
@@ -36,6 +37,8 @@ class SearchTumblr(Search):
 	title = "Search Tumblr"  # title displayed in UI
 	description = "Retrieve Tumblr posts by tags or blogs."  # description displayed in UI
 	extension = "ndjson"  # extension of result file, used internally and in UI
+	# the tag column the co-tag and hashtag networks look for
+	output = Datasource(columns={"tags"})
 	is_local = False  # Whether this datasource is locally scraped
 	is_static = False  # Whether this datasource is still updated
 	icon = "brand-tumblr"

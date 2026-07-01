@@ -4,6 +4,7 @@
 from datasources.fourchan.search_4chan import Search4Chan
 
 from common.lib.helpers import UserInput
+from common.lib.outputs import Datasource
 
 
 class Search8Chan(Search4Chan):
@@ -16,6 +17,7 @@ class Search8Chan(Search4Chan):
     most methods are inherited from there.
     """
     type = "eightchan-search"
+    output = Datasource()
     sphinx_index = "8chan"
     title = "8chan search"
     prefix = "8chan"

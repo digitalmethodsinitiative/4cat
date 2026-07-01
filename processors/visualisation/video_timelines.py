@@ -15,6 +15,7 @@ from ural import is_url
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
@@ -38,6 +39,8 @@ class VideoTimelines(BasicProcessor):
     description = "For each video for which frames were extracted, create a video timeline (i.e. a horizontal " \
                   "collage of sequential frames). Timelines are then vertically stacked."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render()
 
     # Compatible with extracted video frames (or anything that stores related
     # images in separate folders within a zip archive).

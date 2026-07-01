@@ -18,6 +18,7 @@ from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -36,6 +37,9 @@ class ImageCategoryWallGenerator(BasicProcessor):
     title = "Visualise images by category"  # title displayed in UI
     description = "Combine images into a single image arranged by category"  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+
+    # a rendered image, no column table
+    output = Render()
 
     # image-category, image-downloader, or video-hash datasets (except screenshot downloads)
     compatibility = Compatibility(type_prefixes={"image-to-categories", "image-downloader", "video-hasher-1", "video-hash-similarity-matrix"}, excluded_types={"image-downloader-screenshots-search"})

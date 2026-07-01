@@ -9,6 +9,7 @@ from datetime import datetime
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.helpers import normalize_url_encoding
+from common.lib.outputs import Datasource
 
 
 class SearchPinterest(Search):
@@ -20,6 +21,7 @@ class SearchPinterest(Search):
     title = "Import scraped Pinterest data"  # title displayed in UI
     description = "Import Pinterest data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    output = Datasource()
     is_from_zeeschuimer = True
     icon = "brand-pinterest"
 

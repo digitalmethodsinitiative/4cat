@@ -10,6 +10,7 @@ import itertools
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import TfidfModel
@@ -31,6 +32,8 @@ class TfIdf(BasicProcessor):
 	title = "Tf-idf"  # title displayed in UI
 	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. time-separated)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a ranking table (date/item/value), so ranking visualisations can run on it
+	output = Table(columns={"date", "item", "value"})
 
 	# Allow processor on token sets
 	compatibility = Compatibility(

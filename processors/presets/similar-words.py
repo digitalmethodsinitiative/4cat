@@ -5,6 +5,7 @@ from nltk.stem.snowball import SnowballStemmer
 
 from backend.lib.preset import ProcessorPreset
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 
 from common.lib.helpers import UserInput
 
@@ -19,6 +20,8 @@ class SimilarWords(ProcessorPreset):
 	description = ("Create a word2vec model to find words used in a similar context as the queried word(s). Only works "
 				   "with large datasets (e.g. 100,000+ items).")
 	extension = "csv"
+	# a preset; its output is its last step's
+	output = Delegated()
 	icon = "comments"
 
 	# Allow on top-level CSV/NDJSON datasets

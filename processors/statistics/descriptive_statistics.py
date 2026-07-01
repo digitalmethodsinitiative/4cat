@@ -6,6 +6,7 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 import numpy as np
 
@@ -24,6 +25,8 @@ class DescriptiveStatistics(BasicProcessor):
     title = "Descriptive statistics"  # title displayed in UI
     description = "Calculate descriptive statistics (mean, median, std dev, etc.) for numerical columns."
     extension = "csv"  # extension of result file, used internally in UI
+    # a derived table
+    output = Table()
     icon = "table-columns"
 
     # Allow on CSV/NDJSON datasets

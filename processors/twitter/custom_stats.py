@@ -5,6 +5,7 @@ from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -21,6 +22,8 @@ class TwitterCustomStats(TwitterStatsBase):
     title = "Custom statistics"  # title displayed in UI
     description = "Group tweets by category and count tweets per timeframe to collect aggregate group statistics.\nFor retweets and quotes, hashtags, mentions, URLs, and images from the original tweet are included in the retweet/quote. Data on public metrics (e.g., number of retweets or likes of tweets) are as of the time the data was collected."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
     compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})

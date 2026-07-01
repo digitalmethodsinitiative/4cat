@@ -10,6 +10,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from common.lib.exceptions import QueryParametersException
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 
 from nltk.tokenize import word_tokenize, TweetTokenizer
 
@@ -198,6 +199,8 @@ class MakeWordtree(BasicProcessor):
     title = "Word tree"  # title displayed in UI
     description = "Generates a word tree for a given query, a \"graphical version of the traditional 'keyword-in-context' method\" (Wattenberg & Viégas, 2008)."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render()
 
     # any csv or ndjson dataset
     compatibility = Compatibility(extensions={"csv", "ndjson"})

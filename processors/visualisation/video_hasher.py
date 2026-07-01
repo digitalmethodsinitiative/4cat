@@ -17,6 +17,7 @@ from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.compatibility import Compatibility, is_executable
+from common.lib.outputs import Network, MediaArchive, Table, Delegated
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -35,9 +36,11 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     title = "Create video hashes to identify near duplicate videos"  # title displayed in UI
     description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only. This process can take a long time depending on video length, amount, and frames per second."
     extension = "gexf"
+    # a preset; its output is its last step's
+    output = Delegated()
 
     # video datasets, when ffmpeg is available
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -133,9 +136,11 @@ class VideoHasher(BasicProcessor):
     description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image" # media type of the result
+    # a zip archive of image files (video-frame collages)
+    output = MediaArchive(media="image")
 
     # video datasets (collages are made from video frames)
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-hash-network", "video-hash-similarity-matrix"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-hash-network", "video-hash-similarity-matrix"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -338,6 +343,8 @@ class VideoHashNetwork(BasicProcessor):
     title = "Create Video hashes network"  # title displayed in UI
     description = "Creates hashes network to identify duplicate or similar videos."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
+    # a graph file, no column table
+    output = Network()
 
     # Allow on video hasher
     compatibility = Compatibility(types={"video-hasher-1"})
@@ -452,6 +459,8 @@ class VideoHashSimilarities(BasicProcessor):
     title = "Calculates hashes and similarity groups"  # title displayed in UI
     description = "Creates CSV with hashes and groups videos above similarity value."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow on video hasher
     compatibility = Compatibility(types={"video-hasher-1"})

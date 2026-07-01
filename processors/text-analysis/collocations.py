@@ -11,6 +11,7 @@ from nltk.collocations import TrigramCollocationFinder, BigramCollocationFinder
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 
 class GetCollocations(BasicProcessor):
@@ -22,6 +23,9 @@ class GetCollocations(BasicProcessor):
 	title = "Extract co-words"  # title displayed in UI
 	description = "Extracts words appearing close to each other from a set of tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	# a derived table
+	output = Table()
 
 	# Allow processor on token sets
 	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["preset-coword-network", "wordcloud"])

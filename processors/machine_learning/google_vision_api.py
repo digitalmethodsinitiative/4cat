@@ -11,6 +11,7 @@ from pathlib import Path
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
@@ -37,8 +38,11 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
     icon = "eye"
 
+    # a derived table
+    output = Table(extension="ndjson")
+
     # Allow on image sets
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"])
 
     references = [
         "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",

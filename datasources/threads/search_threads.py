@@ -11,6 +11,7 @@ import re
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
 from common.lib.helpers import normalize_url_encoding
+from common.lib.outputs import Datasource
 
 
 class SearchThreads(Search):
@@ -22,6 +23,8 @@ class SearchThreads(Search):
     title = "Import scraped Threads data"  # title displayed in UI
     description = "Import Threads data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # the tag column the co-tag and hashtag networks look for
+    output = Datasource(columns={"hashtags"})
     is_from_zeeschuimer = True
     icon = "brand-threads"
 

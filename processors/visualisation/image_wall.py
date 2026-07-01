@@ -5,6 +5,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from sklearn.cluster import KMeans
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility, ExecutableSibling
+from common.lib.outputs import Render
 import colorsys
 import copy
 
@@ -29,9 +30,11 @@ class ImageWallGenerator(VideoWallGenerator):
     title = "Image wall"
     description = "Put all images in a single combined image, side by side. Images can be sorted and resized."
     extension = "png"
+    # a rendered image, no column table
+    output = Render("png")
 
     # Allow on image/video datasets when ffmpeg and ffprobe are available
-    compatibility = Compatibility(media_types={"video", "image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video", "image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

@@ -13,6 +13,7 @@ from packaging import version
 from common.lib.helpers import UserInput, get_ffmpeg_version, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, ExecutableSibling
+from common.lib.outputs import Render
 from common.lib.exceptions import ProcessorInterruptedException, MediaSignatureException
 
 __author__ = "Stijn Peeters"
@@ -35,8 +36,11 @@ class VideoWallGenerator(BasicProcessor):
     description = "Put all videos in a single combined video, side by side. Videos can be sorted and resized."
     extension = "mp4"  # extension of result file, used internally and in UI
 
+    # a rendered video, no column table
+    output = Render("mp4", media="video")
+
     # Allow on video datasets when ffmpeg and ffprobe are available
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
 
     # videos will be arranged and resized to fit these image wall dimensions
     # note that video aspect ratio may not allow for a precise fit

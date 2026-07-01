@@ -4,6 +4,7 @@ import imagehash
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, normalize_crhash_components
 
@@ -21,6 +22,8 @@ class HashGrouper(BasicProcessor):
     title = "Group similar hashes"  # title displayed in UI
     description = "Calculate groups of similar hashes from a CSV file."  # description displayed in UI
     extension = "csv"
+    # a derived table
+    output = Table()
     icon = "hashtag"
 
     # Allow processor on image-hasher output (could also work on any CSV with the right fields)

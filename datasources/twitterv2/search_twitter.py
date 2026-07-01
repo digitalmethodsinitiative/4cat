@@ -12,6 +12,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify
 from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.outputs import Datasource
 
 
 class SearchWithTwitterAPIv2(Search):
@@ -21,6 +22,8 @@ class SearchWithTwitterAPIv2(Search):
     type = "twitterv2-search"  # job ID
     title = "X/Twitter API (v2)"
     extension = "ndjson"
+    # the tag column the co-tag and hashtag networks look for
+    output = Datasource(columns={"hashtags"})
     is_local = False    # Whether this datasource is locally scraped
     is_static = False   # Whether this datasource is still updated
     icon = "brand-twitter"
