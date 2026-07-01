@@ -227,7 +227,7 @@
     left: calc((-1 * var(--spacing-xlarge)) - (2 * var(--stroke-journey)));
 }
 
-.processor-card > .dataset-header::after {
+.processor-card > .dataset-header::after, .big-processor-button::after {
     /** cover for outline on top of curve (break in stroke otherwise) **/
     content: '';
     position: absolute;
@@ -422,8 +422,13 @@ aside.run-child-processor button:hover {
     border-bottom-left-radius: var(--double-radius);
     border-top-width: 0;
     border-right-width: 0;
-    width: calc(var(--spacing-xlarge) + var(--stroke-journey));
+    width: calc(var(--spacing-xlarge));
     height: calc((100% - var(--stroke-journey)) / 2);
+    outline: var(--stroke-journey) solid var(--bright);
+}
+
+.big-processor-button::after {
+    left: 0;
 }
 
 .run-hint {
