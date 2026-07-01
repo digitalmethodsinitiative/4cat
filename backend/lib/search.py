@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache, format_import_item
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
+from common.lib.outputs import Datasource
 
 
 class Search(BasicProcessor, ABC):
@@ -31,6 +32,12 @@ class Search(BasicProcessor, ABC):
 	#: Search worker identifier - should end with 'search' for
 	#: backwards-compatibility reasons. For example, `instagram-search`.
 	type = "abstract-search"
+
+	#: Default output shape: a collected, top-level dataset whose extension is this
+	#: worker's own (ndjson for most, csv/zip for some). A data source that produces
+	#: media (an uploaded archive) or whose shape is only known at run time overrides
+	#: this with a MediaArchive or a per-worker Output.
+	output = Datasource()
 
 	# generic icon
 	icon = "comments"

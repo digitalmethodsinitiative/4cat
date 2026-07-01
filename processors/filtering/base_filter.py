@@ -7,6 +7,7 @@ import json
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Filter
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -27,6 +28,10 @@ class BaseFilter(BasicProcessor):
     icon = "filter"
 
     item_ids = []
+
+    # A filter re-emits its parent's rows, so its extension, media and columns are
+    # the parent's. Subclasses keep this; one that adds a column declares its own.
+    output = Filter()
 
     # Abstract base filter; not runnable on its own (empty type set never matches)
     compatibility = Compatibility(types=set())
