@@ -4,6 +4,7 @@ Change a dataset item to an annotation
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import NoOutput
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -23,6 +24,8 @@ class ItemToAnnotation(BasicProcessor):
     description = ("Convert a regular dataset item to an annotation. This will show it as a separate value in the "
                    "Explorer. Item values must be numbers or strings.")  # description displayed in UI
     extension = "csv"
+    # writes annotations to its parent, no result file of its own
+    output = NoOutput()
     icon = "tags"
 
     # Allow on top-level CSV/NDJSON datasets

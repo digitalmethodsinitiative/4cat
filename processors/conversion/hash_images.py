@@ -10,6 +10,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, hash_image, stringify_hash
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from processors.metrics.group_hashes import HashGrouper
 
 
@@ -28,6 +29,8 @@ class ImageHasher(BasicProcessor):
     title = "Hash images"  # title displayed in UI
     description = "Convert images to text hashes for comparison and similarity detection."  # description displayed in UI
     extension = "csv"
+    # a derived table
+    output = Table()
     icon = ""
 
     # image datasets: image archives, image-downloader output, or extracted video frames

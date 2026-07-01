@@ -5,6 +5,7 @@ import csv
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -29,6 +30,8 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     description = ("Convert the Vision API output to a simplified CSV file. Also allows writing results as annotations "
                    "to the original dataset.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
     icon = "file-csv"
 
     # Allow processor on Google Vision API output

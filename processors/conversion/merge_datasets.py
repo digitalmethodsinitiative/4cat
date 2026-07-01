@@ -10,6 +10,7 @@ from common.lib.exceptions import ProcessorInterruptedException, DataSetExceptio
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Filter
 import ural
 
 __author__ = "Stijn Peeters"
@@ -29,6 +30,8 @@ class DatasetMerger(BasicProcessor):
     title = "Merge datasets"  # title displayed in UI
     description = "Merge this dataset with other datasets of the same format. A new dataset is " \
                   "created containing a combination of items from the original datasets."  # description displayed in UI
+    # keeps the (primary parent's) shape; the merged datasets share its format
+    output = Filter()
     icon = "arrows-to-dot"
 
     # a collector's csv or ndjson output
