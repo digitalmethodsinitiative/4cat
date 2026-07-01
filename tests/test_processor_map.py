@@ -296,7 +296,7 @@ def test_processor_map_builds_and_answers(logger, fourcat_modules):
     how_to_run = info["how_to_run"]
     assert "notes" in how_to_run
     if not how_to_run.get("is_filter"):
-        assert "accepts" in how_to_run and "starting_points" in how_to_run
+        assert "accepts" in how_to_run and "examples" in how_to_run
     assert {"preferred", "filters", "others_by_category"} <= set(info["followups"])
 
     assert isinstance(pmap.search("data"), list)

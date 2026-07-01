@@ -264,33 +264,77 @@ class ProcessorMap:
             "from_processors": [self._step(p, self._edge.get((p, ptype))) for p in from_processors],
         }
 
-    def _starting_points(self, ptype):
+    def _confirmed_producers(self, ptype):
+        """Processors and data sources whose output `ptype` definitely accepts, filters
+        excluded (they are transparent -- see followups)."""
+        return [p for p in self._producers(ptype, "definite") if not self._filter[p]]
+
+    def _match_strength(self, consumer_type, producer_type):
         """
-        The sensible places to start: a data source you can run this on directly, or one
-        you can run it on after a single processor. The cap of one step is deliberate -- a
-        source only counts if it (or one processor run on it) directly produces something
-        this accepts. Longer routes usually exist, but reaching a processor through many
-        hops is seldom the sensible way in and would bury the obvious starts under every
-        distant path; those are found by opening the processors along the way. A source it
-        accepts directly has an empty `then` (run it straight away); otherwise `then` names
-        the one processor to run first. Filters are skipped (transparent).
+        How fully a producer's output matches what `consumer_type` says it accepts: the
+        number of "what kind of input" axes (type, type-prefix, media, datasource) the
+        producer definitely satisfies. Used only to order example paths, so a producer built
+        for the job (an image downloader for an image step) is preferred over one that
+        matches only incidentally (a chart that merely happens to be an image).
         """
-        routes = {}  # datasource -> [processor to run first]; [] means run it straight away
-        producers = self._producers(ptype, "definite")
-        # data sources this runs on directly
-        for producer in producers:
-            if self._collector[producer]:
-                routes[producer] = []
-        # data sources one step removed: source -> producer -> this, both links confirmed
-        for producer in producers:
-            if self._collector[producer] or self._filter[producer]:
-                continue
-            for source in self._producers(producer, "definite"):
-                if self._collector[source] and source not in routes:
-                    routes[source] = [producer]
-        return [{"datasource": source, "title": self._title(source),
-                 "then": [{"type": step, "title": self._title(step)} for step in then]}
-                for source, then in sorted(routes.items())]
+        spec = self._match_spec.get(consumer_type)
+        shape = self._shapes.get(producer_type)
+        if spec is None or shape is None:
+            return 0
+        strength = 0
+        if spec.types and shape.type in set(spec.types):
+            strength += 1
+        if spec.type_prefixes and shape.type and shape.type.startswith(tuple(spec.type_prefixes)):
+            strength += 1
+        if spec.media_types and shape.media is not UNKNOWN:
+            have = shape.media if isinstance(shape.media, (set, frozenset)) else {shape.media}
+            if have and have <= set(spec.media_types):
+                strength += 1
+        if spec.datasources and shape.datasource is not UNKNOWN and shape.datasource in set(spec.datasources):
+            strength += 1
+        return strength
+
+    def _examples(self, ptype, count=3):
+        """
+        A few concrete example paths from a data source to `ptype` -- illustrations of how
+        you might reach it, NOT a complete or curated list. Each example is a full chain (a
+        data source, the processors to run in order, then `ptype`) and shows a different
+        thing to run `ptype` on: one example per direct producer, via the shortest way to
+        reach that producer. Producers are ordered by how fully they match `ptype`'s stated
+        input (see _match_strength), so a processor built for the job leads and a merely
+        incidental match (a chart that happens to be an image, for an image step) shows only
+        if nothing better exists. One-per-producer also stops a processor with a single real
+        recipe being padded out with longer, roundabout ones. Confirmed links only, filters
+        skipped. Empty when nothing reaches `ptype` by confirmed steps (a likely spec gap).
+        """
+        # Walk producers backward from `ptype`, level by level so the shortest path to each
+        # producer surfaces first. `path` is stored tail-first ([node, ..., ptype]); a
+        # finished chain (one that reached a data source) drops `ptype` off the tail.
+        shortest = {}  # direct producer of ptype -> shortest complete chain ending in it
+        frontier = [[ptype]]
+        for _ in range(4):  # depth cap; deeper chains are not useful examples
+            if not frontier or len(shortest) >= 40:
+                break
+            nxt = []
+            for path in frontier:
+                for producer in self._confirmed_producers(path[0]):
+                    if producer in path:
+                        continue  # don't loop back on a processor already in this path
+                    if self._collector[producer]:
+                        chain = [producer] + path[:-1]  # reached a data source: chain complete
+                        direct = chain[-1]              # the producer `ptype` runs on directly
+                        if direct not in shortest or len(chain) < len(shortest[direct]):
+                            shortest[direct] = chain
+                    else:
+                        nxt.append([producer] + path)
+            frontier = nxt[:400]  # bound the search; plenty for a few short examples
+
+        ranked = sorted(shortest.values(),
+                        key=lambda chain: (-self._match_strength(ptype, chain[-1]),
+                                           len(chain), [self._title(step) for step in chain]))
+        return [{"datasource": chain[0], "title": self._title(chain[0]),
+                 "then": [{"type": step, "title": self._title(step)} for step in chain[1:]]}
+                for chain in ranked[:count]]
 
     def how_to_run(self, ptype):
         """
@@ -299,8 +343,9 @@ class ProcessorMap:
         * a filter answers with a single note -- it runs on almost anything and can be
           inserted anywhere, so listing producers would be noise;
         * otherwise `accepts` is what it runs on directly (its declared requirement +
-          the confirmed data sources and processors), and `starting_points` is where to
-          begin (a data source, and one processor to run first if needed);
+          the confirmed data sources and processors), and `examples` gives a few of the
+          shortest full paths from a data source -- concrete illustrations, not a curated
+          or complete list of ways to get here;
         * `notes` carries the data-source, filter, column and override caveats.
         """
         if self._filter[ptype]:
@@ -329,7 +374,7 @@ class ProcessorMap:
         return {
             "type": ptype,
             "accepts": self._accepts(ptype),
-            "starting_points": self._starting_points(ptype),
+            "examples": self._examples(ptype),
             "notes": notes,
         }
 

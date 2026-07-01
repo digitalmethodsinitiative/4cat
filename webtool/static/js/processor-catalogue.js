@@ -103,8 +103,7 @@
   // --- detail ("how to run this" / "what can run on this") ---
 
   // Load one processor's full detail from the API and render it into the top pane. Then
-  // wire the interactive bits: every element carrying a data-type is a link that opens
-  // that processor, and each "+N more" button reveals the sources its group was hiding.
+  // wire the links: every element carrying a data-type opens that processor when clicked.
   async function showDetail(type) {
     const body = document.getElementById("pc-detail-body");
     body.innerHTML = '<p class="banner">Loading…</p>';
@@ -123,12 +122,6 @@
     body.innerHTML = detailHtml(info);
     body.querySelectorAll("[data-type]").forEach(el =>
       el.addEventListener("click", e => { e.stopPropagation(); showDetail(el.dataset.type); }));
-    body.querySelectorAll(".pc-more").forEach(el =>
-      el.addEventListener("click", () => {
-        const hidden = el.previousElementSibling;   // the wrap of overflow chips
-        if (hidden) hidden.hidden = false;
-        el.remove();
-      }));
   }
 
   // A row of clickable chips, one per processor. A link the map is only unsure about
@@ -177,51 +170,30 @@
     return `<div class="pc-chips">${chips}</div>`;
   }
 
-  // Clickable data-source chips. A long group is capped and the overflow hidden behind a
-  // "+N more" button (revealed by the handler in showDetail), so one big group can't
-  // swamp the panel.
-  function sourceChips(sources) {
-    const CAP = 12;
-    const chip = t => `<button class="pc-chip pc-src" data-type="${esc(t)}">${esc(titleOf(t))}</button>`;
-    if (sources.length <= CAP) return `<div class="pc-chips">${sources.map(chip).join("")}</div>`;
-    const shown = sources.slice(0, CAP).map(chip).join("");
-    const rest = sources.slice(CAP).map(chip).join("");
-    return `<div class="pc-chips">${shown}<span class="pc-more-wrap" hidden>${rest}</span>`
-      + `<button class="pc-more" type="button">+${sources.length - CAP} more</button></div>`;
-  }
+  // A few concrete example paths, each drawn as a chain: data source → steps → this. The
+  // API returns the shortest few (one per distinct recipe), so these read as "here are a
+  // couple of ways it's done", not an exhaustive list. Empty means nothing reaches this by
+  // confirmed steps -- flagged, as that usually points at a spec gap.
+  function examplesHtml(examples, currentTitle) {
+    const heading = '<p class="pc-sub">Example ways to reach this</p>';
+    if (!examples || !examples.length)
+      return heading + '<p class="pc-cond">No data source reaches this by confirmed steps — likely an '
+        + 'over-strict requirement or a missing link between processors.</p>';
 
-  // The sensible ways to start, grouped by route. Each group is "run this one processor,
-  // then this" (or "run it straight away"), with the data sources that fit that route
-  // listed under it -- so a route many sources share is shown once, not once per source.
-  // Only short routes appear: the API caps a route at one step, because reaching a
-  // processor through many hops is rarely the sensible way in. Longer paths are still
-  // there to find by opening the processors in a chain.
-  function dataSourcesHtml(points, currentTitle) {
-    if (!points || !points.length) return "";
-    const groups = new Map();  // route key -> {then: [step], sources: [type]}
-    points.forEach(sp => {
-      const then = sp.then || [];
-      const key = then.map(step => step.type).join(">") || "__direct__";
-      if (!groups.has(key)) groups.set(key, { then, sources: [] });
-      groups.get(key).sources.push(sp.datasource);
-    });
-    // direct routes ("run it straight away") first, then the one-step routes
-    const entries = [...groups.entries()].sort((a, b) =>
-      a[0] === "__direct__" ? -1 : b[0] === "__direct__" ? 1 : a[0].localeCompare(b[0]));
-
-    const rows = entries.map(([key, group]) => {
-      const label = key === "__direct__"
-        ? `<span class="pc-route-direct">Run directly → ${esc(currentTitle)}</span>`
-        : "via " + group.then.map(step =>
-            `<span class="pc-route-step" data-type="${esc(step.type)}">${esc(step.title)}</span>`).join(" → ")
-          + ` → ${esc(currentTitle)}`;
-      const sources = group.sources.slice().sort((a, b) => titleOf(a).localeCompare(titleOf(b)));
-      return `<div class="pc-route"><p class="pc-route-label">${label}</p>${sourceChips(sources)}</div>`;
+    const chains = examples.map(example => {
+      const parts = [`<span class="pc-step pc-src" data-type="${esc(example.datasource)}">${esc(example.title)}</span>`];
+      (example.then || []).forEach(step => {
+        parts.push('<span class="pc-arrow">→</span>');
+        parts.push(`<span class="pc-step" data-type="${esc(step.type)}">${esc(step.title)}</span>`);
+      });
+      parts.push('<span class="pc-arrow">→</span>');
+      parts.push(`<span class="pc-step pc-current">${esc(currentTitle)}</span>`);
+      return `<div class="pc-chain">${parts.join("")}</div>`;
     }).join("");
-    const note = '<p class="pc-cond">The most direct routes only. A processor can often be '
-      + 'reached through longer chains as well — follow those by opening a processor to see what '
-      + 'runs on its output, or from the "run processor" menu on a dataset.</p>';
-    return '<p class="pc-sub">Data sources — sensible ways to start</p>' + rows + note;
+
+    const note = '<p class="pc-cond">A few of the shortest ways in — examples, not the only routes. '
+      + 'Most processors can be reached other ways too; click any step to explore from there.</p>';
+    return heading + chains + note;
   }
 
   // A large collapsible block in the detail pane (How to run / What can run on this /
@@ -238,9 +210,9 @@
   }
 
   // The "How to run" block. A filter or a data source doesn't "run on" anything, so each
-  // gets a one-line explanation. Any other processor leads with the sensible data sources
-  // to start from (the main takeaway), then the dataset it needs, then -- collapsed --
-  // the processors whose output it takes directly, then any caveats.
+  // gets a one-line explanation. Any other processor leads with a few example paths to
+  // reach it, then the dataset it needs, then -- collapsed -- the processors whose output
+  // it takes directly, then any caveats.
   function howToRunHtml(info) {
     const htr = info.how_to_run || {};
 
@@ -253,7 +225,7 @@
         .map(note => `<p>${esc(note)}</p>`).join("");
 
     const accepts = htr.accepts || {};
-    let how = dataSourcesHtml(htr.starting_points, info.title || info.type);
+    let how = examplesHtml(htr.examples, info.title || info.type);
     how += '<p class="pc-sub">Needs a dataset that…</p>' + requirementHtml(accepts.requirement);
     if ((accepts.from_processors || []).length)
       how += subCollapse("Runs on the output of", accepts.from_processors.length,
