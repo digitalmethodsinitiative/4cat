@@ -40,7 +40,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     output = Delegated()
 
     # video datasets, when ffmpeg is available
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -140,7 +140,7 @@ class VideoHasher(BasicProcessor):
     output = MediaArchive(media="image")
 
     # video datasets (collages are made from video frames)
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-hash-network", "video-hash-similarity-matrix"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-hash-network", "video-hash-similarity-matrix"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

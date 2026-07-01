@@ -35,7 +35,7 @@ class CategorizeImagesCLIP(BasicProcessor):
     output = Table(extension="ndjson")
 
     # image datasets (image archives or image-downloader output), when CLIP is enabled
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.cc_clip_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-category-wall"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.cc_clip_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-category-wall"])
 
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",

@@ -43,7 +43,7 @@ class ImageTextDetector(BasicProcessor):
     icon = "language"
 
     # image datasets (image archives or image-downloader output), when the OCR server is enabled
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.eb_ocr_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.eb_ocr_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
 
     references = [
         "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",

@@ -39,7 +39,7 @@ class PixPlotGenerator(BasicProcessor):
     icon = "images"
 
     # image datasets (image archives or image-downloader output), when PixPlot is enabled
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.db_pixplot_enabled", "dmi-service-manager.ab_server_address"})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.db_pixplot_enabled", "dmi-service-manager.ab_server_address"})
 
     references = [
         "[PixPlot](https://pixplot.io/)",

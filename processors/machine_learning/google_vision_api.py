@@ -42,7 +42,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     output = Table(extension="ndjson")
 
     # Allow on image sets
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"])
 
     references = [
         "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",

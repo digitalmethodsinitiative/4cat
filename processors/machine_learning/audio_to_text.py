@@ -35,7 +35,7 @@ class AudioToText(BasicProcessor):
     icon = "closed-captioning"
 
     # Allow on audio datasets
-    compatibility = Compatibility(media_types={"audio"}, type_prefixes={"audio-extractor"})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"audio"}, type_prefixes={"audio-extractor"})
 
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",

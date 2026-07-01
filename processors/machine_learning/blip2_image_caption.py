@@ -32,7 +32,7 @@ class CategorizeImagesCLIP(BasicProcessor):
     icon = "eye"
 
     # image datasets (image archives or image-downloader output), when BLIP2 is enabled
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.fc_blip2_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.fc_blip2_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
 
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",

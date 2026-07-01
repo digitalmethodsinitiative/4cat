@@ -34,7 +34,7 @@ class ImageWallGenerator(VideoWallGenerator):
     output = Render("png")
 
     # Allow on image/video datasets when ffmpeg and ffprobe are available
-    compatibility = Compatibility(media_types={"video", "image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video", "image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

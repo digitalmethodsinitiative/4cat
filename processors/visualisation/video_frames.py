@@ -36,7 +36,7 @@ class VideoFrames(BasicProcessor):
 	output = MediaArchive(media="image")
 
 	# Allow on video datasets when ffmpeg is available
-	compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"] + VideoDownloaderPlus.followups)
+	compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"] + VideoDownloaderPlus.followups)
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

@@ -39,7 +39,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
     icon = "eye"
 
     # Allow on image sets
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"])
 
     references = [
         "[Clarifai](https://www.clarifai.com/)",

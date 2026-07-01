@@ -45,7 +45,7 @@ class VideoSceneDetector(BasicProcessor):
 	output = Table()
 
 	# Allow on video datasets
-	compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-scene-frames", "video-timelines"])
+	compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-scene-frames", "video-timelines"])
 
 	references = [
 		"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",

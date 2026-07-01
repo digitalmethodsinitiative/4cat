@@ -30,7 +30,7 @@ class UniqueImageFilter(BasicProcessor):
     output = MediaArchive(media="image")
 
     # image datasets: image archives, image-downloader output, or extracted video frames
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"})
 
     references = [
         "[Imagehash library](https://github.com/JohannesBuchner/imagehash?tab=readme-ov-file)",
