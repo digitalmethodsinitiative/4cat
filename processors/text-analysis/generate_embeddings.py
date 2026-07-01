@@ -33,6 +33,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 				  "e.g. exist of 100 numbers). These numeric word representations can be used to extract words with similar contexts. " \
 				  "Note that good models require a lot of data."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	icon = "cube"
 
 	# a zip archive of data files
 	output = Archive()

@@ -23,6 +23,7 @@ class GetCollocations(BasicProcessor):
 	title = "Extract co-words"  # title displayed in UI
 	description = "Extracts words appearing close to each other from a set of tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "timeline"
 
 	# a derived table
 	output = Table()

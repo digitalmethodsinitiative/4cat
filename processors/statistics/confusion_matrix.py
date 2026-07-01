@@ -29,6 +29,7 @@ class ConfusionMatrix(BasicProcessor):
     # a rendered image, no column table
     output = Render("png")
     icon = "table-columns"
+    icon = "table-cells"
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

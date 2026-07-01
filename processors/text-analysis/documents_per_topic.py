@@ -23,8 +23,11 @@ class TopicModelWordExtractor(BasicProcessor):
     type = "document_count"  # job type ID
     category = "Text analysis"  # category
     title = "Count documents per topic"  # title displayed in UI
-    description = "Uses the LDA model to predict to which topic each item or sentence belongs and counts as belonging to whichever topic has the highest probability."  # description displayed in UI
+    description = ("Uses the LDA model to predict to which topic each item or sentence belongs and counts as belonging "
+                   "to whichever topic has the highest probability.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "file-circle-question"
+
 
     # a derived table
     output = Table()

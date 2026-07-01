@@ -27,6 +27,7 @@ class VectorRanker(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a ranking table (date/item/value), so ranking visualisations can run on it
 	output = Table(columns={"date", "item", "value"})
+	icon = "ranking-star"
 
 	# Allow processor on token vectors
 	compatibility = Compatibility(types={"vectorise-tokens"}, preferred_followups=["wordcloud"])

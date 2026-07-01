@@ -24,6 +24,7 @@ class VectoriseByCategory(BasicProcessor):
 	title = "Count words by category"  # title displayed in UI
 	description = "Counts all tokens per category."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "list-ol"
 
 	# a ranking table (date/item/value), so ranking visualisations can run on it
 	output = Table(columns={"date", "item", "value"})

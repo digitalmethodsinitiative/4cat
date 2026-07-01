@@ -25,6 +25,7 @@ class Vectorise(BasicProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 	# a zip archive of data files
 	output = Archive()
+	icon = "list-ol"
 
 	# Allow processor on token sets
 	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["vector-ranker"])

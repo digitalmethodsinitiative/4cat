@@ -28,6 +28,7 @@ class SimilarWord2VecWords(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a ranking table (date/item/value), so ranking visualisations can run on it
 	output = Table(columns={"date", "item", "value"})
+	icon = "language"
 
 	# Allow processor on word embedding models
 	compatibility = Compatibility(types={"generate-embeddings"}, preferred_followups=["wordcloud"])

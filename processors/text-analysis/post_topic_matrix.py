@@ -32,6 +32,7 @@ class TopicModelWordExtractor(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()
+    code = "table-cells"
 
     # Allow processor on topic models
     compatibility = Compatibility(types={"topic-modeller"})

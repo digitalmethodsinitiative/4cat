@@ -34,6 +34,7 @@ class TfIdf(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a ranking table (date/item/value), so ranking visualisations can run on it
 	output = Table(columns={"date", "item", "value"})
+	icon = "ranking-star"
 
 	# Allow processor on token sets
 	compatibility = Compatibility(

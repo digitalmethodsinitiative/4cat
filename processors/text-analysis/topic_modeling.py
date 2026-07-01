@@ -32,6 +32,7 @@ class TopicModeler(BasicProcessor):
                   "For a given number of topics, tokens are assigned a relevance weight per topic, " \
                   "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    icon = "boxes-stacked"
 
     # a zip archive of data files
     output = Archive()

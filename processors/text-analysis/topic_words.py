@@ -27,6 +27,7 @@ class TopicModelWordExtractor(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()
+    icon = "ranking-star"
 
     # Allow processor on topic models
     compatibility = Compatibility(types={"topic-modeller"}, preferred_followups=["wordcloud"])

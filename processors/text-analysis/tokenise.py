@@ -37,6 +37,7 @@ class Tokenise(BasicProcessor):
                   "The output is a list of lists, each list representing all item tokens or " \
                   "tokens per sentence."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    icon = "pallet"
 
     # a zip archive of data files
     output = Archive()
