@@ -9,6 +9,7 @@ from itertools import islice, chain
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -30,6 +31,8 @@ class AttributeRanker(BasicProcessor):
     title = "Count values"  # title displayed in UI
     description = "Count values in a dataset column, like URLs or hashtags (overall or per timeframe)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a ranking table (date/item/value), so ranking visualisations can run on it
+    output = Table(columns={"date", "item", "value"})
     icon = "list-ol"
 
     # Allow on CSV/NDJSON datasets
