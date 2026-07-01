@@ -5,6 +5,7 @@ Extracts topics per model and top associated words
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
 
 import csv
@@ -29,6 +30,8 @@ class TopicModelWordExtractor(BasicProcessor):
                    "(e.g. only the 'body' column), there is one row per post/item, otherwise a post may be represented "
                    "by multiple rows (for each sentence and/or column used).")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow processor on topic models
     compatibility = Compatibility(types={"topic-modeller"})

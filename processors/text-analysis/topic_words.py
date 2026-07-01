@@ -5,6 +5,7 @@ Extracts topics per model and top associated words
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
 
 import pickle
@@ -24,6 +25,8 @@ class TopicModelWordExtractor(BasicProcessor):
     title = "Top words per topic"  # title displayed in UI
     description = "Creates a CSV file with the top tokens (words) per topic in the generated topic model, and their associated weights."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow processor on topic models
     compatibility = Compatibility(types={"topic-modeller"}, preferred_followups=["wordcloud"])

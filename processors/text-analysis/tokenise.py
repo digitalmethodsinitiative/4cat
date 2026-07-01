@@ -18,6 +18,7 @@ from razdel.substring import Substring
 from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Archive
 
 __author__ = ["Stijn Peeters", "Sal Hagen"]
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
@@ -36,6 +37,9 @@ class Tokenise(BasicProcessor):
                   "The output is a list of lists, each list representing all item tokens or " \
                   "tokens per sentence."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+
+    # a zip archive of data files
+    output = Archive()
 
     compatibility = Compatibility(extensions={"csv", "ndjson"}, preferred_followups=["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller", ])
 
