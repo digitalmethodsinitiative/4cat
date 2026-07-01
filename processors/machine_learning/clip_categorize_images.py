@@ -11,6 +11,7 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -29,6 +30,9 @@ class CategorizeImagesCLIP(BasicProcessor):
                    "the likelihood an image belongs to a category (total of all category values will be 100%).")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     icon = "eye"
+
+    # a derived table
+    output = Table(extension="ndjson")
 
     # image datasets (image archives or image-downloader output), when CLIP is enabled
     compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.cc_clip_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-category-wall"])

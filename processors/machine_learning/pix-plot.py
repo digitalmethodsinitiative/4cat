@@ -14,6 +14,7 @@ from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, Dm
 from common.lib.helpers import UserInput, ellipsiate
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import File
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -33,6 +34,8 @@ class PixPlotGenerator(BasicProcessor):
     description = "Put all images from an archive into a PixPlot visualisation: an explorable map of images " \
                   "algorithmically grouped by similarity."
     extension = "html"  # extension of result file, used internally and in UI
+    # a single html file
+    output = File("html")
     icon = "images"
 
     # image datasets (image archives or image-downloader output), when PixPlot is enabled

@@ -14,6 +14,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -37,6 +38,8 @@ class ImageTextDetector(BasicProcessor):
     sort them into likely groupings based on locations within the original image.
     """
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table(extension="ndjson")
     icon = "language"
 
     # image datasets (image archives or image-downloader output), when the OCR server is enabled
