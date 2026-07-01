@@ -8,6 +8,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, hash_file
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -24,6 +25,9 @@ class UniqueImageFilter(BasicProcessor):
     title = "Filter for unique images"  # title displayed in UI
     description = "Only keeps one instance per image using various detection methods."  # description displayed in UI
     extension = "zip"
+    media_type = "image"  # the retained files are images; set so the map and runtime agree
+    # a zip archive of image files
+    output = MediaArchive(media="image")
 
     # image datasets: image archives, image-downloader output, or extracted video frames
     compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"})

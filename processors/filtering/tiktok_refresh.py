@@ -7,6 +7,7 @@ import json
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Output, PASSTHROUGH
 
 
 __author__ = "Dale Wahl"
@@ -21,6 +22,10 @@ class UpdateTikTok(BasicProcessor):
     title = "Recollect TikTok data"  # title displayed in UI
     description = "Re-query TikTok URLs to update the dataset, e.g. to refresh video URLs or like counts."
     extension = "ndjson"
+    # re-collects the parent's TikTok data as ndjson; made standalone and adopts the
+    # collector's type, so its position and collector-ness are unknown here
+    output = Output(extension="ndjson", columns=PASSTHROUGH, position=None, collector=None,
+                    datasource=PASSTHROUGH)
     icon = "brand-tiktok"
 
     # Allow processor on TikTok datasets
