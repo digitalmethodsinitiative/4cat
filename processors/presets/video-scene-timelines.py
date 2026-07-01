@@ -24,7 +24,7 @@ class VideoSceneTimelineCreator(ProcessorPreset):
     output = Delegated()
 
     # Allow on video datasets when ffmpeg is available
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
+    compatibility = Compatibility(extension={"zip"},media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
 
     def get_processor_pipeline(self):
         """
