@@ -42,6 +42,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     title = "Chart diachronic nearest neighbours"  # title displayed in UI
     description = "Visualise nearest neighbours of a given query across all models and show the closest neighbours per model in one combined graph. Based on the 'HistWords' algorithm by Hamilton et al."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+    icon = "diagram-project"
 
     # a rendered image, no column table
     output = Render()

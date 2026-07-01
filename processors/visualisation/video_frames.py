@@ -34,6 +34,7 @@ class VideoFrames(BasicProcessor):
 	media_type = "image"  # the extracted frames are images; set so the map and runtime agree
 	# a zip archive of image files
 	output = MediaArchive(media="image")
+	icon = "photo-film"
 
 	# Allow on video datasets when ffmpeg is available
 	compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"] + VideoDownloaderPlus.followups)

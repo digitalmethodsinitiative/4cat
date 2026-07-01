@@ -37,6 +37,7 @@ class VideoSceneFrames(BasicProcessor):
     media_type = "image"  # the extracted frames are images; set so the map and runtime agree
     # a zip archive of image files
     output = MediaArchive(media="image")
+    icon = "photo-film"
 
     # Allow on detected video scenes when ffmpeg is available
     compatibility = Compatibility(types={"video-scene-detector"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"])

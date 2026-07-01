@@ -33,6 +33,7 @@ class YouTubeThumbnails(BasicProcessor):
 	# a zip archive of media files
 	output = MediaArchive(media="image")
 	media_type = "image"  # media type of the result
+	icon = "images"
 
 	# Allow processor on YouTube metadata sets
 	compatibility = Compatibility(types={"youtube-metadata"}, preferred_followups=["youtube-imagewall"])

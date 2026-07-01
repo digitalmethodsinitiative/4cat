@@ -34,6 +34,7 @@ class TikTokImageDownloader(BasicProcessor):
     # a zip archive of media files
     output = MediaArchive(media="image")
     media_type = "image"
+    icon = "images"
 
     # Allow processor on TikTok datasets
     compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"}, preferred_followups=ImageDownloader.followups)

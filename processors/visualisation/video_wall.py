@@ -35,6 +35,7 @@ class VideoWallGenerator(BasicProcessor):
     title = "Video wall"  # title displayed in UI
     description = "Put all videos in a single combined video, side by side. Videos can be sorted and resized."
     extension = "mp4"  # extension of result file, used internally and in UI
+    icon = "panorama"
 
     # a rendered video, no column table
     output = Render("mp4", media="video")

@@ -45,6 +45,7 @@ class ImageDownloader(BasicProcessor):
     )  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image"  # media type of the dataset
+    icon = "images"
 
     # a zip archive of media files
     output = MediaArchive(media="image")

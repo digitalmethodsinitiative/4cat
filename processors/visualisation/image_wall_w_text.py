@@ -36,6 +36,7 @@ class ImageTextWallGenerator(BasicProcessor):
     title = "Image wall with captions"  # title displayed in UI
     description = "Combine images into a single image including text"  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+    icon = "panorama"
 
     # a rendered image, no column table
     output = Render()

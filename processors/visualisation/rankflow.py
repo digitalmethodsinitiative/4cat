@@ -44,6 +44,7 @@ class RankFlowRenderer(BasicProcessor):
     extension = "svg"  # extension of result file, used internally and in UI
     # a rendered image, no column table
     output = Render()
+    icon = "shuffle"
 
     # rankable datasets, including multi-column rankings (e.g. top vectors per interval)
     compatibility = Compatibility(rankable=True)

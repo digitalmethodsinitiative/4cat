@@ -35,6 +35,7 @@ class TelegramImageDownloader(TelegramVideoDownloader):
     # a zip archive of media files
     output = MediaArchive(media="image")
     media_type = "image"
+    icon = "images"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth (Telegram API creds)
     compatibility = Compatibility(types={"telegram-search"}, preferred_followups=ImageDownloader.followups)

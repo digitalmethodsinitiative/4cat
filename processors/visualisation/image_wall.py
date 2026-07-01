@@ -32,6 +32,7 @@ class ImageWallGenerator(VideoWallGenerator):
     extension = "png"
     # a rendered image, no column table
     output = Render("png")
+    icon = "panorama"
 
     # Allow on image/video datasets when ffmpeg and ffprobe are available
     compatibility = Compatibility(extensions={"zip"}, media_types={"video", "image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})

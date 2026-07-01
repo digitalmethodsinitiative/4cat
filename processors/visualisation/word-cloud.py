@@ -27,6 +27,7 @@ class MakeWordCloud(BasicProcessor):
 	extension = "svg"
 	# a rendered image, no column table
 	output = Render()
+	icon = "cloud"
 
 	# Allow processor on rankable items
 	compatibility = Compatibility(types={

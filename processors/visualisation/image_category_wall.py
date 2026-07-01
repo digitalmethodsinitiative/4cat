@@ -37,6 +37,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
     title = "Visualise images by category"  # title displayed in UI
     description = "Combine images into a single image arranged by category"  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+    icon = "panorama"
 
     # a rendered image, no column table
     output = Render()

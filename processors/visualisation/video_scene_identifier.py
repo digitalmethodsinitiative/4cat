@@ -40,6 +40,7 @@ class VideoSceneDetector(BasicProcessor):
 	description = "Detect distinct 'scenes' in videos based on various parameters (e.g. change in color and " \
 				  "intensity or cuts and fades to black) and extract the scene metadata."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "clapperboard"
 
 	# a derived table
 	output = Table()

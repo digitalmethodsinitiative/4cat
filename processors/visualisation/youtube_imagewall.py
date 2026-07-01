@@ -35,6 +35,7 @@ class YouTubeImageWall(BasicProcessor):
     extension = "png"  # extension of result file, used internally and in UI
     # a rendered image, no column table
     output = Render("png")
+    icon = "panorama"
 
     # Allow processor on YouTube thumbnail sets
     compatibility = Compatibility(types={"youtube-thumbnails"})

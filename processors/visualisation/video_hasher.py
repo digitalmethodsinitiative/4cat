@@ -38,6 +38,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     extension = "gexf"
     # a preset; its output is its last step's
     output = Delegated()
+    icon = "file-half-dashed"
 
     # video datasets, when ffmpeg is available
     compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})

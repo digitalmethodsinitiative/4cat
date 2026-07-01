@@ -45,6 +45,7 @@ class TelegramFileDownloader(TelegramVideoDownloader):
     # a zip archive of media files
     output = MediaArchive(media="file")
     media_type = "file"
+    icon = "file"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth (Telegram API creds).
     # No preferred_followups -- file outputs are heterogeneous and don't map cleanly to

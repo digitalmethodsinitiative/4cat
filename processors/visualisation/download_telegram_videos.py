@@ -49,6 +49,8 @@ class TelegramVideoDownloader(BasicProcessor):
     # a zip archive of media files
     output = MediaArchive(media="video")
     flawless = True
+    icon = "film"
+
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also checks the
     # source dataset carries Telegram API credentials, which are read from the dataset

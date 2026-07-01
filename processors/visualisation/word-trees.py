@@ -201,6 +201,7 @@ class MakeWordtree(BasicProcessor):
     extension = "svg"  # extension of result file, used internally and in UI
     # a rendered image, no column table
     output = Render()
+    icon = "tree"
 
     # any csv or ndjson dataset
     compatibility = Compatibility(extensions={"csv", "ndjson"})

@@ -41,6 +41,7 @@ class VideoTimelines(BasicProcessor):
     extension = "svg"  # extension of result file, used internally and in UI
     # a rendered image, no column table
     output = Render()
+    icon = "photo-film"
 
     # Compatible with extracted video frames (or anything that stores related
     # images in separate folders within a zip archive).

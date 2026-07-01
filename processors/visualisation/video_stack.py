@@ -39,6 +39,7 @@ class VideoStack(BasicProcessor):
     extension = "mp4"  # extension of result file, used internally and in UI
     # a rendered video, no column table
     output = Render("mp4", media="video")
+    icon = "layer-group"
 
     # Allow on video datasets when ffmpeg and ffprobe are available
     compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})

@@ -29,6 +29,7 @@ class TikTokVideoDownloader(ProcessorPreset):
     media_type = "video"
     # its pipeline downloads the videos into a zip archive
     output = MediaArchive(media="video")
+    icon = "film"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also accepts
     # tiktok uploads, which depends on the dataset label and can't be declared statically

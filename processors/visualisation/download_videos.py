@@ -96,6 +96,7 @@ class VideoDownloaderPlus(BasicProcessor):
                   "retrieved externally."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "video"  # media type of the processor
+    icon = "film"
 
     # a zip archive of media files
     output = MediaArchive(media="video")
