@@ -240,21 +240,6 @@ class ProcessorMap:
                 producers.append(producer)
         return producers
 
-    def _reachable_sources(self, node, cache, stack):
-        """The data sources reachable from `node` by following confirmed (definite)
-        links back. Memoised in `cache`; `stack` guards against cycles. Linear in the
-        size of the confirmed graph -- it collects a set, it does not enumerate paths."""
-        if node in cache:
-            return cache[node]
-        sources = set()
-        for producer in self._producers(node, "definite"):
-            if self._collector[producer]:
-                sources.add(producer)
-            elif producer not in stack and not self._filter[producer]:
-                sources |= self._reachable_sources(producer, cache, stack | {producer})
-        cache[node] = sources
-        return sources
-
     # -- how to run one processor --
 
     def _accepts(self, ptype):
@@ -281,22 +266,27 @@ class ProcessorMap:
 
     def _starting_points(self, ptype):
         """
-        Where to begin: the data sources from which `ptype` is reachable by confirmed
-        links. A source `ptype` accepts directly has an empty `then` (run it straight
-        away); otherwise `then` names one processor to run first. Filters are skipped
-        (transparent), so a route is never padded with them.
+        The sensible places to start: a data source you can run this on directly, or one
+        you can run it on after a single processor. The cap of one step is deliberate -- a
+        source only counts if it (or one processor run on it) directly produces something
+        this accepts. Longer routes usually exist, but reaching a processor through many
+        hops is seldom the sensible way in and would bury the obvious starts under every
+        distant path; those are found by opening the processors along the way. A source it
+        accepts directly has an empty `then` (run it straight away); otherwise `then` names
+        the one processor to run first. Filters are skipped (transparent).
         """
-        cache = {}
-        routes = {}  # datasource -> [processors to run first]
-        definite = self._producers(ptype, "definite")
-        for producer in definite:
+        routes = {}  # datasource -> [processor to run first]; [] means run it straight away
+        producers = self._producers(ptype, "definite")
+        # data sources this runs on directly
+        for producer in producers:
             if self._collector[producer]:
                 routes[producer] = []
-        for producer in definite:
+        # data sources one step removed: source -> producer -> this, both links confirmed
+        for producer in producers:
             if self._collector[producer] or self._filter[producer]:
                 continue
-            for source in self._reachable_sources(producer, cache, {ptype, producer}):
-                if source not in routes:
+            for source in self._producers(producer, "definite"):
+                if self._collector[source] and source not in routes:
                     routes[source] = [producer]
         return [{"datasource": source, "title": self._title(source),
                  "then": [{"type": step, "title": self._title(step)} for step in then]}

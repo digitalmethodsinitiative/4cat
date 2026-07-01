@@ -1,29 +1,35 @@
 /* Processor catalogue (prototype).
  *
  * A thin reactive client over the /api/processor-map/* endpoints: browse/search
- * processors, then open one to see "how to run this" (what dataset it accepts and
- * concrete ways to get there from a data source) and "what can run on this" (the
+ * processors, then open one to see "how to run this" (the dataset it needs and the
+ * sensible ways to get there from a data source) and "what can run on this" (the
  * follow-up processors and filters its output unlocks). Holds no compatibility
- * logic itself -- that all lives in common/lib/processor_map.py.
+ * logic itself -- that all lives in common/lib/processor_map.py; this file only
+ * fetches what that computed and lays it out.
  */
 (function () {
   "use strict";
 
   const API = "/api/processor-map";
-  let CATALOGUE = [];
-  const TITLE = {};
+  let CATALOGUE = [];   // every processor, as returned by the catalogue endpoint
+  const TITLE = {};     // processor type -> display title, so links can show names not ids
 
+  // small text helpers: escape for HTML, look up a title by type, join a value for display
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
     c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const titleOf = t => TITLE[t] || t;
   const listOf = v => Array.isArray(v) ? v.join(", ") : String(v);
 
+  // Fetch one of the map's JSON endpoints. Throws on an HTTP error so the caller can
+  // show a message rather than rendering half a page.
   async function getJSON(url) {
     const response = await fetch(url);
     if (!response.ok) throw new Error("HTTP " + response.status);
     return response.json();
   }
 
+  // On load: pull the whole catalogue once, remember every title, wire up the search
+  // box and category dropdown, and draw the list. Everything after this is redrawing.
   async function init() {
     let data;
     try {
@@ -41,6 +47,7 @@
     renderCatalogue();
   }
 
+  // Fill the category dropdown with the categories actually present in the catalogue.
   function populateCategories() {
     const categories = [...new Set(CATALOGUE.map(p => p.category || "(uncategorised)"))].sort();
     const select = document.getElementById("pc-category");
@@ -54,6 +61,9 @@
 
   // --- catalogue (browse / search) ---
 
+  // Draw the browse list: keep the processors matching the search box and the selected
+  // category, group them by category, and render a card for each. Also updates the
+  // "N of M" count and re-attaches the click handler that opens a card's detail.
   function renderCatalogue() {
     const query = document.getElementById("pc-search").value.trim().toLowerCase();
     const category = document.getElementById("pc-category").value;
@@ -76,6 +86,8 @@
     section.querySelectorAll(".pc-card").forEach(el => el.addEventListener("click", () => showDetail(el.dataset.type)));
   }
 
+  // One processor as a clickable browse card: title, a badge or two (data source /
+  // filter / keeps a custom compatibility override), and its description.
   function card(p) {
     const badges = [
       p.is_datasource ? '<span class="inline-label property-badge pc-source">data source</span>' : "",
@@ -90,6 +102,9 @@
 
   // --- detail ("how to run this" / "what can run on this") ---
 
+  // Load one processor's full detail from the API and render it into the top pane. Then
+  // wire the interactive bits: every element carrying a data-type is a link that opens
+  // that processor, and each "+N more" button reveals the sources its group was hiding.
   async function showDetail(type) {
     const body = document.getElementById("pc-detail-body");
     body.innerHTML = '<p class="banner">Loading…</p>';
@@ -116,8 +131,9 @@
       }));
   }
 
-  // a row of clickable chips linking to other processors. `steps` are objects
-  // carrying at least a `type`; a "maybe" certainty is shown as an unconfirmed chip.
+  // A row of clickable chips, one per processor. A link the map is only unsure about
+  // ("maybe") is marked with a "?" -- the specs can't promise it applies, only that it
+  // might, so it is shown but flagged rather than hidden.
   function chipRow(steps, cls) {
     if (!steps || !steps.length) return '<span class="pc-muted">none</span>';
     return '<div class="pc-chips">' + steps.map(step => {
@@ -129,7 +145,8 @@
     }).join("") + "</div>";
   }
 
-  // the declared requirement (from describe_spec) as plain, non-clickable chips
+  // Turns each condition a processor declares (the keys of the map's "requirement")
+  // into a short plain phrase. A key not listed here falls back to a generic "key: value".
   const REQ_LABEL = {
     types: v => `type is ${listOf(v)}`,
     type_prefixes: v => `type starts with ${listOf(v)}`,
@@ -147,6 +164,8 @@
     required_packages: v => `package: ${listOf(v)}`,
   };
 
+  // The dataset conditions a processor needs, as plain non-clickable chips; says
+  // "almost any dataset" when it declares none.
   function requirementHtml(requirement) {
     const keys = Object.keys(requirement || {});
     if (!keys.length) return '<p class="pc-muted">Runs on almost any dataset.</p>';
@@ -158,7 +177,9 @@
     return `<div class="pc-chips">${chips}</div>`;
   }
 
-  // clickable data-source chips, capped with a "+N more" reveal when the group is large
+  // Clickable data-source chips. A long group is capped and the overflow hidden behind a
+  // "+N more" button (revealed by the handler in showDetail), so one big group can't
+  // swamp the panel.
   function sourceChips(sources) {
     const CAP = 12;
     const chip = t => `<button class="pc-chip pc-src" data-type="${esc(t)}">${esc(titleOf(t))}</button>`;
@@ -169,9 +190,12 @@
       + `<button class="pc-more" type="button">+${sources.length - CAP} more</button></div>`;
   }
 
-  // "Where to start": the data sources, grouped by the route to reach this processor.
-  // Sources you can run it on directly come first; the rest are grouped by the one step
-  // you run first (so a route shared by many sources is shown once, not once per source).
+  // The sensible ways to start, grouped by route. Each group is "run this one processor,
+  // then this" (or "run it straight away"), with the data sources that fit that route
+  // listed under it -- so a route many sources share is shown once, not once per source.
+  // Only short routes appear: the API caps a route at one step, because reaching a
+  // processor through many hops is rarely the sensible way in. Longer paths are still
+  // there to find by opening the processors in a chain.
   function dataSourcesHtml(points, currentTitle) {
     if (!points || !points.length) return "";
     const groups = new Map();  // route key -> {then: [step], sources: [type]}
@@ -181,6 +205,7 @@
       if (!groups.has(key)) groups.set(key, { then, sources: [] });
       groups.get(key).sources.push(sp.datasource);
     });
+    // direct routes ("run it straight away") first, then the one-step routes
     const entries = [...groups.entries()].sort((a, b) =>
       a[0] === "__direct__" ? -1 : b[0] === "__direct__" ? 1 : a[0].localeCompare(b[0]));
 
@@ -193,19 +218,29 @@
       const sources = group.sources.slice().sort((a, b) => titleOf(a).localeCompare(titleOf(b)));
       return `<div class="pc-route"><p class="pc-route-label">${label}</p>${sourceChips(sources)}</div>`;
     }).join("");
-    return '<p class="pc-sub">Data sources — where to start</p>' + rows;
+    const note = '<p class="pc-cond">The most direct routes only. A processor can often be '
+      + 'reached through longer chains as well — follow those by opening a processor to see what '
+      + 'runs on its output, or from the "run processor" menu on a dataset.</p>';
+    return '<p class="pc-sub">Data sources — sensible ways to start</p>' + rows + note;
   }
 
+  // A large collapsible block in the detail pane (How to run / What can run on this /
+  // Compatibility). `open` decides whether it starts expanded.
   function section(title, open, inner) {
     return `<details class="pc-section"${open ? " open" : ""}><summary>${esc(title)}</summary><div class="pc-section-body">${inner}</div></details>`;
   }
 
-  // a collapsible sub-heading (styled like a pc-sub label), collapsed by default
+  // A smaller collapsible sub-heading inside a block, with a count, collapsed by default
+  // -- for a secondary list that would otherwise crowd out the main point.
   function subCollapse(title, count, inner) {
     const badge = count != null ? ` <span class="pc-muted">(${count})</span>` : "";
     return `<details class="pc-collapse"><summary class="pc-sub">${esc(title)}${badge}</summary>${inner}</details>`;
   }
 
+  // The "How to run" block. A filter or a data source doesn't "run on" anything, so each
+  // gets a one-line explanation. Any other processor leads with the sensible data sources
+  // to start from (the main takeaway), then the dataset it needs, then -- collapsed --
+  // the processors whose output it takes directly, then any caveats.
   function howToRunHtml(info) {
     const htr = info.how_to_run || {};
 
@@ -218,7 +253,6 @@
         .map(note => `<p>${esc(note)}</p>`).join("");
 
     const accepts = htr.accepts || {};
-    // data sources first -- the main takeaway: where can I start to reach this?
     let how = dataSourcesHtml(htr.starting_points, info.title || info.type);
     how += '<p class="pc-sub">Needs a dataset that…</p>' + requirementHtml(accepts.requirement);
     if ((accepts.from_processors || []).length)
@@ -228,6 +262,9 @@
     return how;
   }
 
+  // The "What can run on this" block: the curated "suggested next" first, then filters
+  // (kept apart -- they narrow the data without changing its format), then everything
+  // else grouped by category. A closing note appears for filters (see the API).
   function followupsHtml(info) {
     const fu = info.followups || {};
     let next = "";
@@ -243,6 +280,9 @@
     return next || '<p class="pc-muted">Nothing runs on this output.</p>';
   }
 
+  // Assemble the whole detail pane for one processor: heading and badges, a short
+  // metadata list (type / category / what it produces / description), then the three
+  // blocks. "Produces" is left out when the output shape didn't pin down a format.
   function detailHtml(info) {
     const shape = info.output_shape || {};
 
