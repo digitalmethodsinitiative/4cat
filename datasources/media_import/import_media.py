@@ -9,6 +9,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
 from common.lib.helpers import andify
+from common.lib.outputs import MediaArchive
 
 class SearchMedia(BasicProcessor):
     type = "media-import-search"  # job ID
@@ -19,6 +20,10 @@ class SearchMedia(BasicProcessor):
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
     icon = "images"
+
+    # A top-level archive of uploaded media; one upload is a single media type, but
+    # which one is only known at run time, so the output media is that bounded set.
+    output = MediaArchive(media={"image", "video", "audio"}, collector=True, position="top")
 
     max_workers = 1
 
