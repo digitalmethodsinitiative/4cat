@@ -13,6 +13,7 @@ from processors.visualisation.download_videos import VideoDownloaderPlus
 from backend.lib.processor import BasicProcessor
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive, Table
 
 class TikTokVideoDownloader(ProcessorPreset):
     """
@@ -26,6 +27,8 @@ class TikTokVideoDownloader(ProcessorPreset):
     description = "Downloads full videos for TikTok"
     extension = "zip"
     media_type = "video"
+    # its pipeline downloads the videos into a zip archive
+    output = MediaArchive(media="video")
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also accepts
     # tiktok uploads, which depends on the dataset label and can't be declared statically
@@ -125,6 +128,8 @@ class TikTokVideoMetadata(BasicProcessor):
     description = "Retrieves updated video URLs from TikTok"
     extension = "csv"
     media_type = "text"
+    # a derived table
+    output = Table()
 
     consecutive_failures = None
 

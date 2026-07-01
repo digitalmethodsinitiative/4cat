@@ -15,6 +15,7 @@ from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.exceptions import ProcessorInterruptedException, FourcatException
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -44,6 +45,9 @@ class ImageDownloader(BasicProcessor):
     )  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image"  # media type of the dataset
+
+    # a zip archive of media files
+    output = MediaArchive(media="image")
 
     # Shared list -- other download_* processors reuse this as ImageDownloader.followups
     # (and preferred_followups below reuses it), so it stays a named attribute.

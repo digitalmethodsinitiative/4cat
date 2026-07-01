@@ -9,6 +9,7 @@ from common.lib.helpers import UserInput
 from processors.visualisation.download_images import ImageDownloader
 from processors.visualisation.download_telegram_videos import TelegramVideoDownloader
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -31,6 +32,8 @@ class TelegramImageDownloader(TelegramVideoDownloader):
                   "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
                   "archive."
     extension = "zip"
+    # a zip archive of media files
+    output = MediaArchive(media="image")
     media_type = "image"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth (Telegram API creds)

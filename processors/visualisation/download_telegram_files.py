@@ -15,6 +15,7 @@ from telethon import utils as telethon_utils
 from common.lib.helpers import UserInput
 from processors.visualisation.download_telegram_videos import TelegramVideoDownloader
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -41,6 +42,8 @@ class TelegramFileDownloader(TelegramVideoDownloader):
                    "owner has asked clients not to save its content and Telegram will refuse "
                    "the file fetch.")
     extension = "zip"
+    # a zip archive of media files
+    output = MediaArchive(media="file")
     media_type = "file"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth (Telegram API creds).
