@@ -32,8 +32,9 @@ class HashSimilarityNetworker(BasicProcessor):
     output = Network()
     icon = "circle-nodes"
 
-    # Currently only allowed on video-hashes, though any row of bit hashes would work.
-    compatibility = Compatibility(types={"video-hashes"})
+    # Runs on the video hasher's output (like the other video-hash networks); any
+    # dataset of bit-hash rows would work.
+    compatibility = Compatibility(types={"video-hasher-1"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
