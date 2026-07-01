@@ -8,6 +8,7 @@ import numpy as np
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Network
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 
@@ -27,6 +28,8 @@ class HashSimilarityNetworker(BasicProcessor):
     title = "Hash similarity network"
     description = "Calculate similarity of hashes and create a GEXF network file. Can identify near duplicate hashes."
     extension = "gexf"
+    # a graph file, no column table
+    output = Network()
     icon = "circle-nodes"
 
     # Currently only allowed on video-hashes, though any row of bit hashes would work.

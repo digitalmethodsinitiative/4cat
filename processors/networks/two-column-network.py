@@ -6,6 +6,7 @@ from functools import partial
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Network
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 import networkx as nx
@@ -27,6 +28,8 @@ class ColumnNetworker(BasicProcessor):
     description = "Create a GEXF network file comprised of linked values between a custom set of columns " \
                   "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
     extension = "gexf"
+    # a graph file, no column table
+    output = Network()
     icon = "circle-nodes"
 
     # Allow on CSV/NDJSON datasets
