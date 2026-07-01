@@ -356,7 +356,7 @@ def find_extensions():
     return extensions, errors
 
 
-def convert_to_int(value, default=0):
+def convert_to_int(value, default: int=0) -> int:
     """
     Convert a value to an integer, with a fallback
 
