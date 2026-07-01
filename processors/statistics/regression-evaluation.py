@@ -6,6 +6,7 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import numpy as np
@@ -26,6 +27,9 @@ class RegressionEvaluation(BasicProcessor):
     description = "Calculate regression metrics (MAE, MSE, R2, RMSE) between two numerical columns."
     extension = "csv"  # extension of result file, used internally in UI
     icon = "table-columns"
+
+    # a derived table
+    output = Table()
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

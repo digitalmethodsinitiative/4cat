@@ -5,6 +5,7 @@ import csv
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -22,6 +23,8 @@ class TwitterMentionsExport(BasicProcessor):
     title = "Mentions export"  # title displayed in UI
     description = "Identifies mentions types and creates mentions table (tweet id, from author id, from username, to user id, to username, mention type)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow processor on Twitter/X (API v2) datasets
     compatibility = Compatibility(types={"twitterv2-search"})
@@ -143,6 +146,8 @@ class TCATMentionsExport(BasicProcessor):
     title = "Mentions Export"  # title displayed in UI
     description = "Identifies mentions types and creates mentions table (tweet id, from author id, from username, to username)"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow processor on imported TCAT datasets
     compatibility = Compatibility(types={"dmi-tcat-search"})

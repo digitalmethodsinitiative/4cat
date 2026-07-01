@@ -5,6 +5,7 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib
@@ -25,6 +26,8 @@ class ConfusionMatrix(BasicProcessor):
     title = "Confusion matrix"  # title displayed in UI
     description = "Create a confusion matrix with data from two columns."  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render("png")
     icon = "table-columns"
 
     # Allow on CSV/NDJSON datasets
