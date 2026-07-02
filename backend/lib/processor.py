@@ -33,7 +33,7 @@ _DEFAULT_COMPATIBILITY = Compatibility(top_dataset_only=True)
 
 @dataclass
 class ProcessorDescription:
-    name: str
+    title: str
     category: str
     description: str
     references: typing.List[str]
@@ -45,9 +45,9 @@ def ui_warning(message):
     Add a warning to the processor's description, which will be displayed in the web interface
     """
     def decorator(cls):
-        if "_ui_warnings" not in cls.__dict__:
-            cls._ui_warnings = set()
-        cls._ui_warnings.add(message)
+        if "warnings" not in cls.__dict__:
+            cls.warnings = set()
+        cls.warnings.add(message)
         return cls
     return decorator
 
@@ -56,9 +56,9 @@ def ui_info(message):
     Add an info message to the processor's description, which will be displayed in the web interface
     """
     def decorator(cls):
-        if "_ui_info" not in cls.__dict__:
-            cls._ui_info = set()
-        cls._ui_info.add(message)
+        if "info" not in cls.__dict__:
+            cls.info = set()
+        cls.info.add(message)
         return cls
     return decorator
 
@@ -1176,12 +1176,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             return cls.description
         else:
             return ProcessorDescription(
-                name=getattr(cls, "name", cls.__name__),
+                title=getattr(cls, "title", cls.__name__),
                 category=getattr(cls, "category", "Uncategorized"),
                 description=getattr(cls, "description", ""),
                 references=getattr(cls, "references", []),
-                info=getattr(cls, "ui_info", set()),
-                warning=getattr(cls, "ui_warnings", set()),
+                info=getattr(cls, "info", set()),
+                warning=getattr(cls, "warnings", set()),
             )
 
     @abc.abstractmethod
