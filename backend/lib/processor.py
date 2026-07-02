@@ -1,7 +1,7 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import traceback
 import inspect as py_inspect
 import zipfile
@@ -33,34 +33,34 @@ _DEFAULT_COMPATIBILITY = Compatibility(top_dataset_only=True)
 
 @dataclass
 class ProcessorDescription:
+    """
+    A processor's user-facing description: the information shown about it in
+    the web interface. A processor can declare one of these directly (as its
+    `description` attribute) or declare the individual attributes; either way
+    the result is available via `Processor.get_description()`.
+    """
     title: str
     category: str
     description: str
-    references: typing.List[str]
-    info: set
-    warning: set
+    references: typing.List[str] = field(default_factory=list)
+    info: set = field(default_factory=set)
+    warnings: set = field(default_factory=set)
+    icon: str = ""
 
-def ui_warning(message):
-    """
-    Add a warning to the processor's description, which will be displayed in the web interface
-    """
-    def decorator(cls):
-        if "warnings" not in cls.__dict__:
-            cls.warnings = set()
-        cls.warnings.add(message)
-        return cls
-    return decorator
 
-def ui_info(message):
+class _DescriptionField:
     """
-    Add an info message to the processor's description, which will be displayed in the web interface
+    Exposes one ProcessorDescription field as an attribute on the processor,
+    e.g. `Processor.title`. A plain `property` only runs on instance access;
+    this descriptor also runs on class access (`owner` is the class in both
+    cases), so `Processor.title` and `self.title` both return the value from
+    the processor's ProcessorDescription.
     """
-    def decorator(cls):
-        if "info" not in cls.__dict__:
-            cls.info = set()
-        cls.info.add(message)
-        return cls
-    return decorator
+    def __init__(self, name):
+        self.name = name
+
+    def __get__(self, obj, owner):
+        return getattr(owner._processor_description, self.name)
 
 class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     """
@@ -112,11 +112,30 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: The file that is being processed
     source_file = None
 
-    #: Processor description, which will be displayed in the web interface
-    description = "No description available"
+    #: The processor's user-facing description (title, category, description
+    #: text and references) as a single object. A processor may set this
+    #: directly, or set the individual attributes below; both are normalised
+    #: into `_processor_description` when the class is defined.
+    _processor_description = ProcessorDescription(
+        title="", 
+        category="Other", 
+        description="No description available", 
+        references=[],
+        info=set(),
+        warnings=set(),
+        icon=""
+        )
 
-    #: Category identifier, used to group processors in the web interface
-    category = "Other"
+    #: Title, category, description text and references, read from the
+    #: processor's ProcessorDescription. Defined as descriptors so that both
+    #: `Processor.title` and `self.title` resolve to the stored value.
+    title = _DescriptionField("title")
+    category = _DescriptionField("category")
+    description = _DescriptionField("description")
+    references = _DescriptionField("references")
+    info = _DescriptionField("info")
+    warnings = _DescriptionField("warnings")
+    icon = _DescriptionField("icon")
 
     #: Extension of the file created by the processor
     extension = "csv"
@@ -1165,24 +1184,54 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             return True
         return False
 
+    def __init_subclass__(cls, **kwargs):
+        """
+        Normalise a processor's description when its class is defined.
+
+        A processor may declare its description either as a ProcessorDescription
+        object (assigned to `description`) or as the individual attributes
+        (title, category, description, references, info, warnings, icon). Either
+        way it is folded into a single `_processor_description` object here, and
+        the raw attributes are removed so the descriptors on BasicProcessor
+        provide access to them.
+        """
+        super().__init_subclass__(**kwargs)
+
+        # the description inherited from the nearest ancestor (cls has none yet)
+        inherited = getattr(cls, "_processor_description", None)
+
+        # read the raw class-body value, bypassing the descriptor
+        declared = cls.__dict__.get("description")
+        if isinstance(declared, ProcessorDescription):
+            description = declared
+        else:
+            # build from the flat attributes, falling back to inherited values
+            # so a legacy subclass keeps anything an ancestor set
+            description = ProcessorDescription(
+                title=cls.__dict__.get("title", inherited.title),
+                category=cls.__dict__.get("category", inherited.category),
+                description=cls.__dict__.get("description", inherited.description),
+                references=list(cls.__dict__.get("references", inherited.references)),
+                info=set(cls.__dict__.get("info", inherited.info)),
+                warnings=set(cls.__dict__.get("warnings", inherited.warnings)),
+                icon=cls.__dict__.get("icon", inherited.icon),
+            )
+
+        # remove raw attributes so the inherited descriptors govern access
+        for name in ("title", "category", "description", "references", "info", "warnings", "icon"):
+            if name in cls.__dict__:
+                delattr(cls, name)
+
+        cls._processor_description = description
+
     @classmethod
     def get_description(cls):
         """
-        Get processor description
+        Get the processor's user-facing description
 
         :return ProcessorDescription:  Description of this processor
         """
-        if cls.description and isinstance(cls.description, ProcessorDescription):
-            return cls.description
-        else:
-            return ProcessorDescription(
-                title=getattr(cls, "title", cls.__name__),
-                category=getattr(cls, "category", "Uncategorized"),
-                description=getattr(cls, "description", ""),
-                references=getattr(cls, "references", []),
-                info=getattr(cls, "info", set()),
-                warning=getattr(cls, "warnings", set()),
-            )
+        return cls._processor_description
 
     @abc.abstractmethod
     def process(self):
