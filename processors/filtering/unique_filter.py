@@ -4,6 +4,7 @@ Filter by unique posts
 import json
 
 from processors.filtering.base_filter import BaseFilter
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
@@ -18,9 +19,15 @@ class UniqueFilter(BaseFilter):
     Retain only posts matching a given lexicon
     """
     type = "unique-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Filter for unique items"  # title displayed in UI
-    description = "Only keeps the first encounter of an item. This creates a new dataset."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Filter for unique items",
+        category="Filtering",
+        tags=["filter"],
+        description="Keep only the first item for each unique combination of the selected columns, removing later duplicates. This creates a new dataset.",
+        info=[
+            "Choose which columns define uniqueness, and whether to treat items as duplicates when all selected values match or when any single value matches.",
+        ],
+    )
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path
 import oslex
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.outputs import MediaArchive
 from common.lib.exceptions import ProcessorInterruptedException
@@ -28,15 +28,20 @@ class AudioExtractor(BasicProcessor):
     Uses ffmpeg to extract audio from videos and saves them in an archive.
     """
     type = "audio-extractor"  # job type ID
-    name = "Audio Extractor" 
-    category = "Audio"  # category
-    title = "Extract audio from videos"  # title displayed in UI
-    description = "Create audio files per video"  # description displayed in UI
+    description = ProcessorDescription(
+        title="Extract audio from videos",
+        category="Audio",
+        tags=["extract", "needs ffmpeg"],
+        description="Extract the audio track from each video and save the results as WAV files in a ZIP archive. Uses ffmpeg to convert audio to 16 kHz.",
+        info=[
+            "Follow up with 'Convert audio to text' to transcribe the extracted audio.",
+        ],
+        icon="closed-captioning",
+    )
     extension = "zip"  # extension of result file, used internally and in UI
     # a zip archive of media files
     output = MediaArchive(media="audio")
     media_type = "audio"
-    icon = "closed-captioning"
 
     # Allow on video datasets when ffmpeg is available
     compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["audio-to-text"])

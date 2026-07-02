@@ -9,7 +9,7 @@ import operator
 from nltk.collocations import TrigramCollocationFinder, BigramCollocationFinder
 
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -19,11 +19,17 @@ class GetCollocations(BasicProcessor):
 	Generates word collocations from input tokens
 	"""
 	type = "collocations"  # job type ID
-	category = "Text analysis"  # category
-	title = "Extract co-words"  # title displayed in UI
-	description = "Extracts words appearing close to each other from a set of tokens."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Extract co-words",
+		category="Text analysis",
+		tags=["extract", "counts"],
+		description="Find pairs or triplets of words that appear close together in a set of tokens, along with how often each combination occurs. A window size sets how near words must be to count as co-words. Results can be limited to combinations containing a required word, filtered by a minimum frequency, and optionally saved as annotations.",
+		info=[
+			"Follow up with 'Co-word network' or 'Word cloud' to visualise the results.",
+		],
+		icon="timeline",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
-	icon = "timeline"
 
 	# a derived table
 	output = Table()

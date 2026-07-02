@@ -3,7 +3,7 @@ Filter by pseudo-random posts
 """
 import random
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from processors.filtering.base_filter import BaseFilter
 from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
@@ -20,9 +20,12 @@ class RandomFilter(BaseFilter):
 	Retain a pseudo-random amount of posts
 	"""
 	type = "random-filter"  # job type ID
-	category = "Filtering"  # category
-	title = "Random sample"  # title displayed in UI
-	description = "Retain a random sample of items from the dataset. Creates a new dataset containing the sampled items."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Random sample",
+		category="Filtering",
+		tags=["sample"],
+		description="Retain a pseudo-random sample of a chosen number of items from the dataset. This creates a new dataset containing the sampled items.",
+	)
 
 	# Allow on top-level CSV/NDJSON/ZIP datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson", "zip"})
@@ -127,9 +130,12 @@ class RandomProcessorFilter(RandomFilter):
     Retain only posts where a given column matches a given value
     """
     type = "random-processor-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Random sample"  # title displayed in UI
-    description = "Retain a random sample of items from the dataset. Creates a new dataset containing the sampled items."
+    description = ProcessorDescription(
+        title="Random sample",
+        category="Filtering",
+        tags=["sample"],
+        description="Retain a pseudo-random sample of a chosen number of items from the dataset. This creates a new dataset containing the sampled items.",
+    )
 
     # child (non-top-level) csv/ndjson/zip datasets
     compatibility = Compatibility(child_only=True, extensions={"csv", "ndjson", "zip"})

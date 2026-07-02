@@ -8,7 +8,7 @@ import pandas as pd
 import itertools
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -28,13 +28,33 @@ class TfIdf(BasicProcessor):
 
 	"""
 	type = "tfidf"  # job type ID
-	category = "Text analysis"  # category
-	title = "Tf-idf"  # title displayed in UI
-	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. time-separated)."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Calculate tf-idf",
+		category="Text analysis",
+		tags=["rank", "counts"],
+		description="Calculate the tf-idf (term frequency-inverse document frequency) value of tokenised text, a "
+					"measure of how distinctive each word is to a document. Choose between the scikit-learn and gensim "
+					"libraries and return the top-scoring words per timeframe. Works better with more documents, for "
+					"example when the input is separated by time.",
+		info=[
+			"Run this on the output of the 'Tokenise' processor.",
+			"Use gensim rather than scikit-learn for large datasets, as it uses less memory.",
+		],
+		references=[
+			"[Spärck Jones, Karen. 1972. \"A statistical interpretation of term specificity and its application in retrieval.\" *Journal of Documentation* (28), 1: 11–21.](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.115.8343&rep=rep1&type=pdf)",
+			"[Robertson, Stephen. 2004. \"Understanding Inverse Document value: On Theoretical arguments for IDF.\" *Journal of Documentation* (60), 5: 503–520](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.438.2284&rep=rep1&type=pdf)",
+			"[Spärck Jones, Karen. 2004. \"IDF term weighting and IR research lessons\". *Journal of Communication* (60), 5: 521-523.](https://www.staff.city.ac.uk/~sb317/idfpapers/ksj_reply.pdf)",
+			"[Gensim tf-idf documentation.](https://radimrehurek.com/gensim/models/tfidfmodel.html)",
+			"[Scikit learn tf-idf documentation.](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html)",
+			"[Tf-idf - Wikipedia.](https://en.wikipedia.org/wiki/Tf%E2%80%93idf)",
+			"[What is tf-idf? - William Scott](https://towardsdatascience.com/tf-idf-for-document-ranking-from-scratch-in-python-on-real-world-dataset-796d339a4089)",
+			"[SMART Information Retrieval System](https://en.wikipedia.org/wiki/SMART_Information_Retrieval_System)",
+		],
+		icon="ranking-star",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a ranking table (date/item/value), so ranking visualisations can run on it
 	output = Table(columns={"date", "item", "value"})
-	icon = "ranking-star"
 
 	# Allow processor on token sets
 	compatibility = Compatibility(
@@ -45,17 +65,6 @@ class TfIdf(BasicProcessor):
 			"image-downloader-stable-diffusion", "word-trees", "histogram", "extract-urls-filter",
 		],
 	)
-
-	references = [
-		"[Spärck Jones, Karen. 1972. \"A statistical interpretation of term specificity and its application in retrieval.\" *Journal of Documentation* (28), 1: 11–21.](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.115.8343&rep=rep1&type=pdf)",
-		"[Robertson, Stephen. 2004. \"Understanding Inverse Document value: On Theoretical arguments for IDF.\" *Journal of Documentation* (60), 5: 503–520](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.438.2284&rep=rep1&type=pdf)",
-		"[Spärck Jones, Karen. 2004. \"IDF term weighting and IR research lessons\". *Journal of Communication* (60), 5: 521-523.](https://www.staff.city.ac.uk/~sb317/idfpapers/ksj_reply.pdf)",
-		"[Gensim tf-idf documentation.](https://radimrehurek.com/gensim/models/tfidfmodel.html)",
-		"[Scikit learn tf-idf documentation.](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html)",
-		"[Tf-idf - Wikipedia.](https://en.wikipedia.org/wiki/Tf%E2%80%93idf)",
-		"[What is tf-idf? - William Scott](https://towardsdatascience.com/tf-idf-for-document-ranking-from-scratch-in-python-on-real-world-dataset-796d339a4089)",
-		"[SMART Information Retrieval System](https://en.wikipedia.org/wiki/SMART_Information_Retrieval_System)"
-	]
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

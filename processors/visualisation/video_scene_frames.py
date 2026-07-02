@@ -11,7 +11,7 @@ import oslex
 
 from packaging import version
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.outputs import MediaArchive
 from common.lib.user_input import UserInput
@@ -30,14 +30,20 @@ class VideoSceneFrames(BasicProcessor):
     Uses ffmpeg to extract a certain number of frames per second at different sizes and saves them in an archive.
     """
     type = "video-scene-frames"  # job type ID
-    category = "Visual"  # category
-    title = "Extract key frames from each scene"  # title displayed in UI
-    description = "For each scene identified, extracts a key frame (e.g. the first frame)."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Extract key frames from each scene",
+        category="Visual",
+        tags=["extract"],
+        description="Extract one key frame from each detected scene and save the frames as an image archive. Choose the first, middle, or last frame of each scene, optionally resized to a fixed size.",
+        info=[
+            "Follow up with 'Create video timelines' to arrange the extracted frames into a visual overview.",
+        ],
+        icon="photo-film",
+    )
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image"  # the extracted frames are images; set so the map and runtime agree
     # a zip archive of image files
     output = MediaArchive(media="image")
-    icon = "photo-film"
 
     # Allow on detected video scenes when ffmpeg is available
     compatibility = Compatibility(types={"video-scene-detector"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"])

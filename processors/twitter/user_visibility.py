@@ -4,7 +4,7 @@ Twitter APIv2 base stats class
 import datetime
 
 from common.lib.helpers import get_interval_descriptor
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
@@ -21,9 +21,12 @@ class TwitterUserVisibility(BasicProcessor):
     Collect User stats as both author and mention.
     """
     type = "twitter-user-visibility"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "User visibility"  # title displayed in UI
-    description = "Collects usernames and totals how many tweets are authored by the user and how many tweets mention the user"  # description displayed in UI
+    description = ProcessorDescription(
+        title="User visibility",
+        category="Twitter analysis",
+        tags=["authors", "counts", "time-series"],
+        description="Count, per user and per chosen time interval, how many tweets each user authored and how many tweets mention them. Results are sorted by the combined total.",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
 
     # a derived table

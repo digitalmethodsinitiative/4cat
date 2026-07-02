@@ -3,7 +3,7 @@ Make a bipartite Image-Item network
 """
 import json
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.helpers import hash_file
 
 import networkx as nx
@@ -27,16 +27,19 @@ class ImageGrapher(BasicProcessor):
     images were sourced from
     """
     type = "image-bipartite-network"  # job type ID
-    category = "Networks"
-    title = "Bipartite image-item network"  # title displayed in UI
-    description = ("Create a GEXF network file with a bipartite network of "
-                   "images and some data field (e.g. author) of the dataset "
-                   "the images were sourced from. Suitable for use with Gephi's "
-                   "'Image Preview' plugin.")
+    description = ProcessorDescription(
+        title="Bipartite image-item network",
+        category="Networks",
+        tags=["network", "authors"],
+        description="Create a GEXF network file with a bipartite network of images and a data field (for example author) of the dataset the images were sourced from. Suitable for use with Gephi's Image Preview plugin.",
+        info=[
+            "Optionally merge similar images into a single node using file hashing or perceptual hashing.",
+        ],
+        icon="circle-nodes",
+    )
     extension = "gexf"  # extension of result file, used internally and in UI
     # a graph file, no column table
     output = Network()
-    icon = "circle-nodes"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also walks the
     # genealogy to find an image-downloader root (get_root_dataset)

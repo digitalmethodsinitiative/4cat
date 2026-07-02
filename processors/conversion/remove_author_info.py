@@ -9,7 +9,7 @@ import shutil
 import json
 import csv
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Filter
 from common.lib.helpers import dict_search_and_update, UserInput, HashCache
@@ -27,22 +27,27 @@ class AuthorInfoRemover(BasicProcessor):
     Retain only posts where a given column matches a given value
     """
     type = "author-info-remover"  # job type ID
-    category = "Conversion"  # category
     filter = True  # to indicate we're filtering the top dataset
+    description = ProcessorDescription(
+        title="Pseudonymise or anonymise",
+        category="Conversion",
+        tags=["anonymise", "authors"],
+        description="Remove or replace values in fields that hold personal information, such as author and user columns. Choose to replace values with 'REDACTED' or with a salted Blake2b hash that hides the value while still marking equal values as equal.",
+        references=[
+            "[What is a hash?](https://techterms.com/definition/hash)",
+            "[What is a salt?](https://en.wikipedia.org/wiki/Salt_(cryptography))",
+            "[What is Blake2?](https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE2)"
+        ],
+        warnings=[
+            "This overwrites the original dataset in place and cannot be undone.",
+        ],
+        icon="user-secret",
+    )
     # keeps the parent's shape, with personal-information fields removed or replaced
     output = Filter()
-    title = "Pseudonymise or anonymise"  # title displayed in UI
-    description = "Removes or replaces data from the dataset in fields identified as containing personal information"
-    icon = "user-secret"
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
-
-    references = [
-        "[What is a hash?](https://techterms.com/definition/hash)",
-        "[What is a salt?](https://en.wikipedia.org/wiki/Salt_(cryptography))",
-        "[What is Blake2?](https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE2)"
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

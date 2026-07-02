@@ -3,7 +3,7 @@ Twitter APIv2 base stats class
 """
 import csv
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
@@ -19,9 +19,12 @@ class TwitterMentionsExport(BasicProcessor):
     Collect User stats as both author and mention.
     """
     type = "twitter-mentions-export"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "Mentions export"  # title displayed in UI
-    description = "Identifies mentions types and creates mentions table (tweet id, from author id, from username, to user id, to username, mention type)"  # description displayed in UI
+    description = ProcessorDescription(
+        title="Mentions export",
+        category="Twitter analysis",
+        tags=["authors", "extract"],
+        description="Extract every mention between users into a table, with one row per mention. Each row lists the tweet identifier, the author's identifier and username, the mentioned user's identifier and username, and the mention type (mention, reply, retweet, or quote).",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()
@@ -142,9 +145,15 @@ class TCATMentionsExport(BasicProcessor):
     Collect User stats as both author and mention.
     """
     type = "tcat-mentions-export"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Mentions Export"  # title displayed in UI
-    description = "Identifies mentions types and creates mentions table (tweet id, from author id, from username, to username)"  # description displayed in UI
+    description = ProcessorDescription(
+        title="Mentions export",
+        category="Twitter analysis",
+        tags=["authors", "extract"],
+        description="Extract every mention between users into a table, with one row per mention. Each row lists the tweet identifier, the author's identifier and username, and the mentioned username.",
+        info=[
+            "Imported TCAT data does not record the mention type or the mentioned user's identifier, so those are omitted.",
+        ],
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()

@@ -1,7 +1,7 @@
 """
 Convert a GEXF network file to a CSV file
 """
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -20,13 +20,16 @@ class GexfToCsv(BasicProcessor):
     Convert a GEXF network file to a CSV file
     """
     type = "gexf-to-csv"
-    category = "Networks"
-    title = "Export Network as CSV Spreadsheet"
-    description = "Convert a GEXF network file to a CSV spreadsheet"
+    description = ProcessorDescription(
+        title="Convert network to CSV",
+        category="Networks",
+        tags=["convert format"],
+        description="Convert a GEXF network file to a CSV file, with one row per edge. Each row lists the source and target nodes, their attributes, and the edge attributes. Edges are sorted by weight, from most to least frequent.",
+        icon="file-csv",
+    )
     extension = "csv"
     # a derived table
     output = Table()
-    icon = "file-csv"
 
     # Allow on GEXF datasets
     compatibility = Compatibility(extensions={"gexf"})

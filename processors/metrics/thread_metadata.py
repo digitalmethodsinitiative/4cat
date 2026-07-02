@@ -4,7 +4,7 @@ Thread data
 import datetime
 import math
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -19,14 +19,17 @@ class ThreadMetadata(BasicProcessor):
     """
 
     type = "thread-metadata"  # job type ID
-    category = "Metrics"  # category
-    title = "Thread metadata"  # title displayed in UI
-    description = (
-        "Extract various metadata on the threads in the dataset, including time data and post counts. Note "
-        "that this extracted only on the basis of the items present this dataset."
-    )  # description displayed in UI
+    description = ProcessorDescription(
+        title="Thread metadata",
+        category="Metrics",
+        tags=["counts", "time-series"],
+        description="Extract metadata for each thread in the dataset, such as the first and last post timestamps, thread age, subject, author, and post and image counts.",
+        info=[
+            "Metadata is derived only from the items present in the dataset, so incomplete threads yield partial figures.",
+        ],
+        icon="circle-info",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
-    icon = "circle-info"
 
     # a derived table
     output = Table()

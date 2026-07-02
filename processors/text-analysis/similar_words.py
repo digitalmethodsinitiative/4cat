@@ -6,7 +6,7 @@ import shutil
 from gensim.models import KeyedVectors
 
 from common.lib.helpers import UserInput, convert_to_int, convert_to_float
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
@@ -22,13 +22,20 @@ class SimilarWord2VecWords(BasicProcessor):
 	Find similar words based on word2vec modeling
 	"""
 	type = "similar-word2vec"  # job type ID
-	category = "Text analysis"  # category
-	title = "Extract similar words"  # title displayed in UI
-	description = "Uses a word2vec model to find words used in a similar context"  # description displayed in UI
+	description = ProcessorDescription(
+		title="Extract similar words",
+		category="Text analysis",
+		tags=["similarity"],
+		description="Use a word2vec model to find words that appear in similar contexts to the words you provide. "
+					"Set a similarity threshold and a crawl depth to also follow the neighbours of neighbours.",
+		info=[
+			"Run this on the output of the 'Generate word embedding models' processor.",
+		],
+		icon="language",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a ranking table (date/item/value), so ranking visualisations can run on it
 	output = Table(columns={"date", "item", "value"})
-	icon = "language"
 
 	# Allow processor on word embedding models
 	compatibility = Compatibility(types={"generate-embeddings"}, preferred_followups=["wordcloud"])

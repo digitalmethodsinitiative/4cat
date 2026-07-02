@@ -5,7 +5,7 @@ import unicodedata
 import csv
 
 from unidecode import unidecode
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Output, PASSTHROUGH
 from common.lib.helpers import UserInput
@@ -23,16 +23,18 @@ class AccentFoldingFilter(BasicProcessor):
     Fold accents, case, and diacritics.
     """
     type = "accent-folder"  # job type ID
-    category = "Filtering"  # category
-    title = "Convert accented and non-Latin characters"  # title displayed in UI
-    description = ("Replaces or transliterates non-Latin characters with the closest ASCII equivalent, converting e.g. "
-                   "'á' to 'a', 'ç' to 'c', etc. This creates a new dataset.")
+    description = ProcessorDescription(
+        title="Fold accents and non-Latin characters",
+        category="Filtering",
+        tags=["clean text"],
+        description="Replace accented and non-Latin characters with their closest ASCII equivalent, converting for example 'á' to 'a' and 'ç' to 'c'. Fold only accented Latin characters, or transliterate all non-ASCII characters. Optionally convert all text to lowercase. This creates a new dataset.",
+        icon="language",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # writes a new csv keeping the parent's columns; made standalone, so its position
     # and collector-ness take on the original dataset's and are unknown here
     output = Output(extension="csv", columns=PASSTHROUGH, position=None, collector=None,
                     datasource=PASSTHROUGH)
-    icon = "language"
 
     # Allow on top-level CSV datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv"})

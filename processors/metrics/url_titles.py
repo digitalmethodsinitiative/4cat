@@ -3,7 +3,7 @@ Retrieve HTML title (and other metadata) for URLs
 """
 import csv
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from backend.lib.proxied_requests import FailedProxiedRequest
@@ -27,14 +27,19 @@ class URLFetcher(BasicProcessor):
     Retrieve HTML title (and other metadata) for URLs
     """
     type = "url-metadata"  # job type ID
-    category = "Metrics"  # category
-    title = "Fetch URL metadata"  # title displayed in UI
-    description = ("Fetches the page title and other metadata for URLs referenced in the dataset. Makes a request to "
-                   "each URL, optionally following HTTP redirects.")  # description displayed in UI
+    description = ProcessorDescription(
+        title="Fetch URL metadata",
+        category="Metrics",
+        tags=["urls"],
+        description="Fetch the page title, final URL, domain name, and HTTP status for each URL referenced in the dataset. Make one request per URL, optionally following HTTP redirects.",
+        warnings=[
+            "This visits every URL in the dataset live, which can be slow for large datasets and may expose your server's IP address to those sites.",
+        ],
+        icon="globe",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()
-    icon = "globe"
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

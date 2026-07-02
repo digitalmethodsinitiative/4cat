@@ -3,6 +3,7 @@ Twitter APIv2 hashtag statistics
 """
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -17,9 +18,12 @@ class TwitterIdenticalTweets(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-identical-tweets"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "Identical tweet frequency"  # title displayed in UI
-    description = "Groups tweets by text and counts the number of times they have been (re)tweeted indentically."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Identical tweet frequency",
+        category="Twitter analysis",
+        tags=["counts", "grouping"],
+        description="Group tweets by their text and count how often each identical tweet was posted or retweeted. Retweet text is expanded to its original wording so retweets are grouped with the tweet they repeat. List the original tweet identifiers behind each group.",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
 
     # a derived table

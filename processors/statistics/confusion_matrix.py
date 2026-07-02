@@ -3,7 +3,7 @@ Create a confusion matrix with values of columns
 """
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Render
 
@@ -22,14 +22,19 @@ class ConfusionMatrix(BasicProcessor):
     Create a confusion matrix with values from two columns
     """
     type = "confusion-matrix"  # job type ID
-    category = "Statistics"  # category
-    title = "Confusion matrix"  # title displayed in UI
-    description = "Create a confusion matrix with data from two columns."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Create a confusion matrix",
+        category="Statistics",
+        tags=["counts", "chart"],
+        description="Build a confusion matrix comparing true labels and predicted labels from two columns. The result is a rendered image cross-tabulating how often each true category was predicted as each category. Supports up to 500 unique labels.",
+        info=[
+            "Best used to evaluate a classifier by comparing its predictions against known correct labels.",
+        ],
+        icon="table-cells",
+    )
     extension = "png"  # extension of result file, used internally and in UI
     # a rendered image, no column table
     output = Render("png")
-    icon = "table-columns"
-    icon = "table-cells"
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

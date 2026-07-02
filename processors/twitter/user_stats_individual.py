@@ -3,6 +3,7 @@ Twitter APIv2 individual user statistics
 """
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorException
@@ -18,9 +19,12 @@ class TwitterStats(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-user-stats-individual"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "Individual user statistics"  # title displayed in UI
-    description = "Lists users and their number of tweets, number of followers, number of friends, how many times they are listed, their UTC time offset, whether the user has a verified account and how many times they appear in the data set."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Individual user statistics",
+        category="Twitter analysis",
+        tags=["authors", "counts", "time-series"],
+        description="List each user with their number of tweets, retweets, quotes, replies, hashtags, mentions, images, and URLs, along with their follower and following counts and whether the account is verified. Counts are grouped per chosen time interval.",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()

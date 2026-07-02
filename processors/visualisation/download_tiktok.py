@@ -15,7 +15,7 @@ from common.lib.user_input import UserInput
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
 from processors.visualisation.download_images import ImageDownloader
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import MediaArchive
 
@@ -27,14 +27,20 @@ __email__ = "4cat@oilab.eu"
 
 class TikTokImageDownloader(BasicProcessor):
     type = "image-downloader-tiktok"  # job type ID
-    category = "Visual"  # category
-    title = "Download TikTok images"  # title displayed in UI
-    description = "Downloads video/music thumbnails for TikTok; refreshes TikTok data if URLs have expired"
+    description = ProcessorDescription(
+        title="Download TikTok images",
+        category="Visual",
+        tags=["download media"],
+        description="Download video thumbnails, music thumbnails, or author avatars for TikTok posts. Refreshes TikTok data through the scraper when a thumbnail URL has expired. Saves the images to a zip archive.",
+        info=[
+            "Choose which image to download per post: video thumbnail, music thumbnail, or author avatar.",
+        ],
+        icon="images",
+    )
     extension = "zip"
     # a zip archive of media files
     output = MediaArchive(media="image")
     media_type = "image"
-    icon = "images"
 
     # Allow processor on TikTok datasets
     compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"}, preferred_followups=ImageDownloader.followups)

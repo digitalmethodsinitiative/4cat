@@ -5,6 +5,7 @@ import dateutil.parser
 from dateutil.parser import ParserError
 from datetime import datetime
 
+from backend.lib.processor import ProcessorDescription
 from processors.filtering.base_filter import BaseFilter
 from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
@@ -21,9 +22,15 @@ class DateFilter(BaseFilter):
     Retain only posts between specific dates
     """
     type = "date-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Filter by date"  # title displayed in UI
-    description = "Retains posts between given dates. This creates a new dataset."
+    description = ProcessorDescription(
+        title="Filter by date",
+        category="Filtering",
+        tags=["filter", "time-series"],
+        description="Retain items whose timestamp falls between a given start and end date. Choose which column holds the date; values can be Unix timestamps or 'YYYY-MM-DD HH:MM:SS' strings. This creates a new dataset.",
+        info=[
+            "Items with a missing or unreadable date are skipped and counted as invalid.",
+        ],
+    )
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

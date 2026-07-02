@@ -4,6 +4,7 @@ Twitter APIv2 custom statistics
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -18,9 +19,15 @@ class TwitterCustomStats(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-1-custom-stats"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "Custom statistics"  # title displayed in UI
-    description = "Group tweets by category and count tweets per timeframe to collect aggregate group statistics.\nFor retweets and quotes, hashtags, mentions, URLs, and images from the original tweet are included in the retweet/quote. Data on public metrics (e.g., number of retweets or likes of tweets) are as of the time the data was collected."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Custom statistics",
+        category="Twitter analysis",
+        tags=["counts", "grouping", "time-series"],
+        description="Group tweets by author, type, source, place, or language and count them per chosen time frame. Aggregate metrics include retweets, replies, quotes, likes, and tweets containing hashtags, mentions, URLs, or images. For retweets and quotes, entities from the original tweet are counted as part of the retweet or quote.",
+        info=[
+            "Public metrics such as retweet and like counts reflect the moment the data was collected.",
+        ],
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()

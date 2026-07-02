@@ -5,7 +5,7 @@ import abc
 import datetime
 
 from common.lib.helpers import pad_interval, get_interval_descriptor
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
@@ -20,9 +20,12 @@ class TwitterStatsBase(BasicProcessor):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-stats-base"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "Twitter base statistics"  # title displayed in UI
-    description = "This is a class to help other twitter classes"  # description displayed in UI
+    description = ProcessorDescription(
+        title="Twitter base statistics",
+        category="Twitter analysis",
+        tags=["internal"],
+        description="Shared base class for the Twitter statistics processors. This processor is not meant to be run on its own.",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
 
     # Abstract base for the Twitter statistics processors; not runnable on its

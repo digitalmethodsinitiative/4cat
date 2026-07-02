@@ -3,6 +3,7 @@ Twitter APIv2 hashtag statistics
 """
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -17,9 +18,12 @@ class TwitterHashtagStats(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-hashtag-stats"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "Hashtag statistics"  # title displayed in UI
-    description = "Lists by hashtag how many tweets contain hashtags, how many times those tweets have been retweeted/replied to/liked/quoted, and information about unique users and hashtags used alongside each hashtag.\nFor retweets and quotes, hashtags from the original tweet are included in the retweet/quote."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Hashtag statistics",
+        category="Twitter analysis",
+        tags=["hashtags", "counts", "grouping"],
+        description="Group tweets by hashtag and count how many tweets contain each one, along with their retweets, replies, likes, and quotes. Report the unique users, mentions, and co-occurring hashtags for each hashtag. For retweets and quotes, hashtags from the original tweet are counted as part of the retweet or quote.",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()

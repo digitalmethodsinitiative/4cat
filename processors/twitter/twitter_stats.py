@@ -3,6 +3,7 @@ Twitter APIv2 general tweet statistics
 """
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -17,9 +18,12 @@ class TwitterStats(TwitterStatsBase):
     Collect Twitter statistics. Built to emulate TCAT statistic.
     """
     type = "twitter-0-stats"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "Twitter statistics"  # title displayed in UI
-    description = "Contains the number of tweets, number of tweets with links, number of tweets with hashtags, number of tweets with mentions, number of retweets, and number of replies"  # description displayed in UI
+    description = ProcessorDescription(
+        title="Twitter statistics",
+        category="Twitter analysis",
+        tags=["counts", "time-series"],
+        description="Count tweets per time frame, along with how many contain links, hashtags, mentions, or images and how many are retweets, replies, or quotes. Report the number of unique authors and the top ten authors, hashtags, and mentions per interval. Optionally include intervals with zero tweets so the time series stays continuous.",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()

@@ -3,7 +3,7 @@ Extract most-used images from corpus
 """
 import re
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Network
 
@@ -21,14 +21,16 @@ class QuoteNetworkGrapher(BasicProcessor):
 	Creates a network of posts quoting each other
 	"""
 	type = "quote-network"  # job type ID
-	category = "Networks"
-	title = "Reply network"  # title displayed in UI
-	description = "Create a GEXF network file of posts replying to each other. " \
-				  "Each reference to another post creates an edge between posts. "  # description displayed in UI
+	description = ProcessorDescription(
+		title="Reply network",
+		category="Networks",
+		tags=["network"],
+		description="Create a GEXF network file of posts replying to each other. Each reference to another post creates an edge between the two posts.",
+		icon="circle-nodes",
+	)
 	extension = "gexf"  # extension of result file, used internally and in UI
 	# a graph file, no column table
 	output = Network()
-	icon = "circle-nodes"
 
 	# chan datasets (posts reply to / quote each other)
 	compatibility = Compatibility(datasources={"fourchan", "eightchan", "eightkun"})

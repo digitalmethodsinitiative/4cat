@@ -3,7 +3,7 @@ Extracts topics per model and top associated words
 """
 
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
@@ -23,12 +23,18 @@ class TopicModelWordExtractor(BasicProcessor):
     Extracts topics per model and top associated words
     """
     type = "document_topic_matrix"  # job type ID
-    category = "Text analysis"  # category
-    title = "Post/topic matrix"  # title displayed in UI
-    description = ("Predict which item or sentence belong to which topics using LDA. Creates a CSV file where "
-                   "each line represents one 'document'. If tokens are grouped per 'item' and only one column is used "
-                   "(e.g. only the 'body' column), there is one row per post/item, otherwise a post may be represented "
-                   "by multiple rows (for each sentence and/or column used).")  # description displayed in UI
+    description = ProcessorDescription(
+        title="Match items to topics",
+        category="Text analysis",
+        tags=["classify"],
+        description="Use Latent Dirichlet Allocation to predict which topics each item or sentence belongs to. "
+                    "Write a CSV file where each row is one document. If tokens are grouped per item and only one "
+                    "column is used, there is one row per item, otherwise an item spans several rows, one per "
+                    "sentence or column used.",
+        info=[
+            "Run this on the output of the 'Topic modelling' processor.",
+        ],
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()

@@ -3,7 +3,7 @@ Create topic clusters based on datasets
 """
 
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Archive
 from common.lib.exceptions import ProcessorInterruptedException
@@ -26,24 +26,27 @@ class TopicModeler(BasicProcessor):
     Generate topic models
     """
     type = "topic-modeller"  # job type ID
-    category = "Text analysis"  # category
-    title = "Generate topic models"  # title displayed in UI
-    description = "Creates topic models per token set using Latent Dirichlet Allocation (LDA). " \
-                  "For a given number of topics, tokens are assigned a relevance weight per topic, " \
-                  "which can be used to find clusters of related words."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Generate topic models",
+        category="Text analysis",
+        tags=["grouping", "similarity"],
+        description="Create topic models per token set using Latent Dirichlet Allocation (LDA). For a given number of topics, tokens are assigned a relevance weight per topic. Use these weights to find clusters of related words.",
+        references=[
+            'Blei, David M., Andrew Y. Ng, and Michael I. Jordan (2003). "Latent dirichlet allocation." the *Journal of machine Learning research* 3: 993-1022.',
+            'Blei, David M. (2003). "Topic Modeling and Digital Humanities." *Journal of Digital Humanities* 2(1).',
+        ],
+        info=[
+            "Follow up with 'Top words per topic' to see the tokens that define each topic.",
+        ],
+        icon="boxes-stacked",
+    )
     extension = "zip"  # extension of result file, used internally and in UI
-    icon = "boxes-stacked"
 
     # a zip archive of data files
     output = Archive()
 
     # Allow processor on token sets
     compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["document_count", "document_topic_matrix", "topic-model-words"])
-
-    references = [
-        'Blei, David M., Andrew Y. Ng, and Michael I. Jordan (2003). "Latent dirichlet allocation." the *Journal of machine Learning research* 3: 993-1022.',
-        'Blei, David M. (2003). "Topic Modeling and Digital Humanities." *Journal of Digital Humanities* 2(1).'
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

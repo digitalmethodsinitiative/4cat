@@ -6,6 +6,7 @@ swaps the downloadable types, file extension, and adds a thumbnail fallback
 for video documents and webpage previews.
 """
 from common.lib.helpers import UserInput
+from backend.lib.processor import ProcessorDescription
 from processors.visualisation.download_images import ImageDownloader
 from processors.visualisation.download_telegram_videos import TelegramVideoDownloader
 from common.lib.compatibility import Compatibility
@@ -26,16 +27,21 @@ class TelegramImageDownloader(TelegramVideoDownloader):
     `TelegramVideoDownloader`; only the media-specific bits are overridden.
     """
     type = "image-downloader-telegram"  # job type ID
-    category = "Visual"
-    title = "Download Telegram images"
-    description = "Download images and store in a ZIP file. Downloads through the Telegram API might take a while. " \
-                  "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
-                  "archive."
+    description = ProcessorDescription(
+        title="Download Telegram images",
+        category="Visual",
+        tags=["download media", "external service"],
+        description="Download the images attached to Telegram messages and store them in a ZIP file. Video and link preview thumbnails can optionally be included. A JSON metadata file recording the download outcome per message is included in the archive.",
+        warnings=[
+            "Images are fetched through the Telegram API, so this can take a long time and some images may fail to download.",
+            "Channels with 'Restrict Saving Content' enabled will refuse the download; those images cannot be retrieved.",
+        ],
+        icon="images",
+    )
     extension = "zip"
     # a zip archive of media files
     output = MediaArchive(media="image")
     media_type = "image"
-    icon = "images"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth (Telegram API creds)
     compatibility = Compatibility(types={"telegram-search"}, preferred_followups=ImageDownloader.followups)

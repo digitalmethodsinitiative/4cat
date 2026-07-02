@@ -1,7 +1,7 @@
 """
 Google Vision API co-label network
 """
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Network
 from common.lib.helpers import UserInput
@@ -19,15 +19,16 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
     Google Vision API co-label network
     """
     type = "clarifai-bipartite-network"  # job type ID
-    category = "Networks"  # category
-    title = "Clarifai Bipartite Annotation Network"  # title displayed in UI
-    description = "Create a GEXF network file comprised of all annotations returned by the Clarifai API. Labels " \
-                  "returned by the API, and image file names, are nodes. Edges are created between file names and " \
-                  "labels if the label occurs for the image with that file name."
+    description = ProcessorDescription(
+        title="Create Clarifai co-label network",
+        category="Networks",
+        tags=["network"],
+        description="Build a bipartite network from Clarifai image annotations. Image file names and Clarifai labels are the nodes, and an edge connects a file name to a label when Clarifai assigned that label to that image. Use the minimum confidence option to drop low-confidence labels.",
+        icon="circle-nodes",
+    )
     extension = "gexf"  # extension of result file, used internally and in UI
     # a graph file, no column table
     output = Network()
-    icon = "circle-nodes"
 
     # Allow processor to run on Clarifai API data
     compatibility = Compatibility(types={"clarifai-api"})

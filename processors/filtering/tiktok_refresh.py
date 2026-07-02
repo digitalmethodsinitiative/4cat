@@ -5,7 +5,7 @@ import asyncio
 import json
 
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Output, PASSTHROUGH
 
@@ -18,15 +18,21 @@ __email__ = "4cat@oilab.eu"
 
 class UpdateTikTok(BasicProcessor):
     type = "tiktok-update-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Recollect TikTok data"  # title displayed in UI
-    description = "Re-query TikTok URLs to update the dataset, e.g. to refresh video URLs or like counts."
+    description = ProcessorDescription(
+        title="Recollect TikTok data",
+        category="Filtering",
+        tags=["filter"],
+        description="Re-query the TikTok URLs in the dataset to refresh their metadata, such as video URLs or like counts.",
+        warnings=[
+            "This re-fetches every item from TikTok, so it can be slow on large datasets.",
+        ],
+        icon="brand-tiktok",
+    )
     extension = "ndjson"
     # re-collects the parent's TikTok data as ndjson; made standalone and adopts the
     # collector's type, so its position and collector-ness are unknown here
     output = Output(extension="ndjson", columns=PASSTHROUGH, position=None, collector=None,
                     datasource=PASSTHROUGH)
-    icon = "brand-tiktok"
 
     # Allow processor on TikTok datasets
     compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"})

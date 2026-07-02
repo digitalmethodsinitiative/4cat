@@ -6,7 +6,7 @@ import numpy as np
 import statistics
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Render, Table
 from common.lib.exceptions import ProcessorException
@@ -22,9 +22,12 @@ class TwitterAggregatedStats(BasicProcessor):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-aggregated-stats"  # job type ID
-    category = "Twitter analysis"  # category
-    title = "Aggregated statistics"  # title displayed in UI
-    description = "Group tweets by category and count tweets per timeframe and then calculate aggregate group statistics (i.e. min, max, average, Q1, median, Q3, and trimmed mean): number of tweets, urls, hashtags, mentions, etc. \nUse for example to find the distribution of the number of tweets per author and compare across time."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Aggregated statistics",
+        category="Twitter analysis",
+        tags=["counts", "grouping", "time-series"],
+        description="Group tweets by author, type, source, place, or language, count them per time interval, and calculate aggregate statistics per group: minimum, maximum, mean, first quartile, median, third quartile, and trimmed mean of the number of tweets, retweets, replies, likes, quotes, URLs, hashtags, mentions, and images.",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()
@@ -256,16 +259,21 @@ class TwitterAggregatedStatsVis(TwitterAggregatedStats):
     Collect Twitter statistics and create boxplots to visualise.
     """
     type = "twitter-aggregated-stats-vis"  # job type ID
-    category = "Twitter Analysis"  # category
-    title = "Aggregated Statistics Visualization"  # title displayed in UI
-    description = "Gathers Aggregated Statistics data and creates Box Plots visualising the spread of intervals. A large number of intervals will not properly display. "  # description displayed in UI
+    description = ProcessorDescription(
+        title="Aggregated statistics visualisation",
+        category="Twitter analysis",
+        tags=["counts", "grouping", "time-series", "chart"],
+        description="Calculate the same aggregated statistics as 'Aggregated statistics' and draw box plots showing the spread of each metric across time intervals. One box plot is drawn per metric.",
+        warnings=[
+            "A large number of time intervals will not display properly on the box plots.",
+        ],
+        references=[
+            "[matplotlib.pyplot.boxplot documentation](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.boxplot.html)",
+        ],
+    )
     extension = "png"  # extension of result file, used internally and in UI
     # a rendered image, no column table
     output = Render("png")
-
-    references = [
-        "[matplotlib.pyplot.boxplot documentation](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.boxplot.html)"
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

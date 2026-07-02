@@ -2,6 +2,7 @@
 Upload Twitter dataset to DMI-TCAT instance
 """
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Delegated
@@ -11,13 +12,19 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     Run processor pipeline to extract neologisms
     """
     type = "preset-upload-tcat"  # job type ID
-    category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Upload to DMI-TCAT"  # title displayed in UI
-    description = "Convert the dataset to a TCAT-compatible format and upload it to an available TCAT server."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Upload to DMI-TCAT",
+        category="Combined processors",
+        tags=["convert format", "external service"],
+        description="Convert the dataset to a DMI-TCAT-compatible format and upload it to a configured DMI-TCAT server.",
+        warnings=[
+            "This sends the dataset to a DMI-TCAT server, an external service.",
+        ],
+        icon="brand-twitter",
+    )
     extension = "html"
     # a preset; its output is its last step's
     output = Delegated()
-    icon = "brand-twitter"
 
     # Twitter v2 search results, when a TCAT server is configured
     compatibility = Compatibility(types={"twitterv2-search"}, required_settings={"tcat-auto-upload.server_url", "tcat-auto-upload.token", "tcat-auto-upload.username", "tcat-auto-upload.password"})
