@@ -46,6 +46,12 @@ class ProcessorDescription:
     info: set = field(default_factory=set)
     warnings: set = field(default_factory=set)
     icon: str = ""
+    tags: typing.List[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        # when no tags are given, use the category as the single default tag
+        if not self.tags and self.category:
+            self.tags = [self.category]
 
 
 class _DescriptionField:
@@ -136,6 +142,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     info = _DescriptionField("info")
     warnings = _DescriptionField("warnings")
     icon = _DescriptionField("icon")
+    tags = _DescriptionField("tags")
 
     #: Extension of the file created by the processor
     extension = "csv"
@@ -1190,10 +1197,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         A processor may declare its description either as a ProcessorDescription
         object (assigned to `description`) or as the individual attributes
-        (title, category, description, references, info, warnings, icon). Either
-        way it is folded into a single `_processor_description` object here, and
-        the raw attributes are removed so the descriptors on BasicProcessor
-        provide access to them.
+        (title, category, description, references, info, warnings, icon, tags).
+        Either way it is folded into a single `_processor_description` object
+        here, and the raw attributes are removed so the descriptors on
+        BasicProcessor provide access to them.
         """
         super().__init_subclass__(**kwargs)
 
@@ -1215,10 +1222,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 info=set(cls.__dict__.get("info", inherited.info)),
                 warnings=set(cls.__dict__.get("warnings", inherited.warnings)),
                 icon=cls.__dict__.get("icon", inherited.icon),
+                # tags default to this class's category (see __post_init__), so
+                # don't inherit them — re-derive from the resolved category
+                tags=list(cls.__dict__.get("tags", ())),
             )
 
         # remove raw attributes so the inherited descriptors govern access
-        for name in ("title", "category", "description", "references", "info", "warnings", "icon"):
+        for name in ("title", "category", "description", "references", "info", "warnings", "icon", "tags"):
             if name in cls.__dict__:
                 delattr(cls, name)
 
