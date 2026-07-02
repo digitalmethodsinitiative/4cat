@@ -1,37 +1,37 @@
-@import url('reset.css');
-@import url('dataset-page.css');
-@import url('colours.css');
+@import url('old/reset.css');
+@import url('old/dataset-page.css');
+@import url('old/colours.css');
 
 /** --------------------- *
             Fonts
   * --------------------- */
 @font-face {
     font-family: 'Open Sans';
-    src: url("../fonts/OpenSans-Regular.ttf")
+    src: url("../../fonts/OpenSans-Regular.ttf")
 }
 
 @font-face {
     font-family: 'Open Sans';
     font-weight: bold;
-    src: url("../fonts/OpenSans-Bold.ttf")
+    src: url("../../fonts/OpenSans-Bold.ttf")
 }
 
 @font-face {
     font-family: 'Open Sans';
     font-style: italic;
-    src: url("../fonts/OpenSans-Italic.ttf")
+    src: url("../../fonts/OpenSans-Italic.ttf")
 }
 
 @font-face {
     font-family: 'Open Sans';
     font-weight: bold;
     font-style: italic;
-    src: url("../fonts/OpenSans-BoldItalic.ttf")
+    src: url("../../fonts/OpenSans-BoldItalic.ttf")
 }
 
 @font-face {
     font-family: 'Fixedsys';
-    src: url("../fonts/fsex300-webfont.woff")
+    src: url("../../fonts/fsex300-webfont.woff")
 }
 
 

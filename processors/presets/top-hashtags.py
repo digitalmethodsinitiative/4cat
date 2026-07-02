@@ -5,6 +5,7 @@ from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 from processors.networks.cotag_network import CoTaggerPreset
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 
 
 class TopHashtags(ProcessorPreset):
@@ -16,6 +17,9 @@ class TopHashtags(ProcessorPreset):
     title = "Top hashtags"  # title displayed in UI
     description = "Count how often each hashtag occurs in the dataset and sort by this value"
     extension = "csv"
+    # a preset; its output is its last step's
+    output = Delegated()
+    icon = "hashtag"
 
     # datasets with at least one tag-like column
     compatibility = Compatibility(requires_any_columns=CoTaggerPreset.possible_tag_columns)

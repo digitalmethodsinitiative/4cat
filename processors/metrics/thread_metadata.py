@@ -6,6 +6,7 @@ import math
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -25,6 +26,10 @@ class ThreadMetadata(BasicProcessor):
         "that this extracted only on the basis of the items present this dataset."
     )  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "circle-info"
+
+    # a derived table
+    output = Table()
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

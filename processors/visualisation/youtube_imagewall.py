@@ -11,6 +11,7 @@ from PIL import Image, ImageOps, ImageDraw, ImageFont
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 from common.lib.helpers import UserInput, convert_to_int
 
 __author__ = "Sal Hagen"
@@ -32,6 +33,9 @@ class YouTubeImageWall(BasicProcessor):
     title = "YouTube thumbnails image wall"  # title displayed in UI
     description = "Make an image wall from YouTube video thumbnails."  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render("png")
+    icon = "panorama"
 
     # Allow processor on YouTube thumbnail sets
     compatibility = Compatibility(types={"youtube-thumbnails"})

@@ -6,6 +6,7 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, andify
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, cohen_kappa_score
@@ -27,6 +28,10 @@ class ClassificationEvaluation(BasicProcessor):
                    "and Cohen's Kappa) with labels from two columns. Produces overall and per-label metrics. "
                    "Also supports multi-label values.")
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "table-columns"
+
+    # a derived table
+    output = Table()
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

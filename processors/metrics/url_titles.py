@@ -5,6 +5,7 @@ import csv
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
@@ -31,6 +32,9 @@ class URLFetcher(BasicProcessor):
     description = ("Fetches the page title and other metadata for URLs referenced in the dataset. Makes a request to "
                    "each URL, optionally following HTTP redirects.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
+    icon = "globe"
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

@@ -11,6 +11,7 @@ import oslex
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
+from common.lib.outputs import MediaArchive
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -32,10 +33,13 @@ class AudioExtractor(BasicProcessor):
     title = "Extract audio from videos"  # title displayed in UI
     description = "Create audio files per video"  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    # a zip archive of media files
+    output = MediaArchive(media="audio")
     media_type = "audio"
+    icon = "closed-captioning"
 
     # Allow on video datasets when ffmpeg is available
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["audio-to-text"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["audio-to-text"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

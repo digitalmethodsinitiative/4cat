@@ -126,7 +126,8 @@ app.config.from_mapping({
     "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
     "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
     "HOSTNAME_WHITELIST_API": config.get("flask.autologin.api"),
-    "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http"
+    "PREFERRED_URL_SCHEME": "https" if config.get("flask.https") else "http",
+    "TEMPLATES_AUTO_RELOAD": True
 })
 
 # Set number of form parts to accept (default is 1000; affects number of files that can be uploaded)
@@ -178,6 +179,8 @@ with app.app_context():
     import webtool.views.views_explorer  # noqa: E402
     import webtool.views.api_standalone  # noqa: E402
     import webtool.views.api_tool  # noqa: E402
+    import webtool.views.api_processor_map  # noqa: E402
+    import webtool.views.views_processor_map  # noqa: E402
 
     app.register_blueprint(webtool.views.views_restart.component)
     app.register_blueprint(webtool.views.views_admin.component)
@@ -189,6 +192,8 @@ with app.app_context():
     app.register_blueprint(webtool.views.views_explorer.component)
     app.register_blueprint(webtool.views.api_standalone.component)
     app.register_blueprint(webtool.views.api_tool.component)
+    app.register_blueprint(webtool.views.api_processor_map.component)
+    app.register_blueprint(webtool.views.views_processor_map.component)
 
     @app.before_request
     def before_request():

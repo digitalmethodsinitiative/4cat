@@ -11,6 +11,7 @@ import csv
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Filter
 from common.lib.helpers import dict_search_and_update, UserInput, HashCache
 
 __author__ = "Stijn Peeters"
@@ -28,8 +29,11 @@ class AuthorInfoRemover(BasicProcessor):
     type = "author-info-remover"  # job type ID
     category = "Conversion"  # category
     filter = True  # to indicate we're filtering the top dataset
+    # keeps the parent's shape, with personal-information fields removed or replaced
+    output = Filter()
     title = "Pseudonymise or anonymise"  # title displayed in UI
     description = "Removes or replaces data from the dataset in fields identified as containing personal information"
+    icon = "user-secret"
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

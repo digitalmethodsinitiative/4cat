@@ -3,6 +3,7 @@ Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 
 from common.lib.helpers import UserInput
 
@@ -17,6 +18,9 @@ class NeologismExtractor(ProcessorPreset):
     description = ("Retrieve uncommon terms by deleting all words that appears in dictionary lists. Assumes English-"
                    "language data. Uses stopwords-iso as a stopword filter.")
     extension = "csv"
+    # a preset; its output is its last step's
+    output = Delegated()
+    icon = "comment-medical"
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

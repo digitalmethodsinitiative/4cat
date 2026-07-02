@@ -5,6 +5,7 @@ import csv
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -27,6 +28,10 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
     title = "Convert Clarifai results to CSV"  # title displayed in UI
     description = "Convert the Clarifai API output to a simplified CSV file."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    icon = "file-csv"
+
+    # a derived table
+    output = Table()
 
     # Allow processor on Clarifai API output
     compatibility = Compatibility(types={"clarifai-api"})

@@ -4,6 +4,7 @@ Twitter APIv2 individual user statistics
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorException
 
 __author__ = "Dale Wahl"
@@ -21,6 +22,8 @@ class TwitterStats(TwitterStatsBase):
     title = "Individual user statistics"  # title displayed in UI
     description = "Lists users and their number of tweets, number of followers, number of friends, how many times they are listed, their UTC time offset, whether the user has a verified account and how many times they appear in the data set."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
     compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})

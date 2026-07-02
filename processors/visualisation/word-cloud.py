@@ -7,6 +7,7 @@ from wordcloud import WordCloud
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -24,6 +25,9 @@ class MakeWordCloud(BasicProcessor):
 	title = "Word cloud"  # title displayed in UI
 	description = "Generates a word cloud with words sized on occurrence."  # description displayed in UI
 	extension = "svg"
+	# a rendered image, no column table
+	output = Render()
+	icon = "cloud"
 
 	# Allow processor on rankable items
 	compatibility = Compatibility(types={

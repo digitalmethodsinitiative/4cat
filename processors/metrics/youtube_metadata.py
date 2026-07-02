@@ -12,6 +12,7 @@ from googleapiclient.errors import HttpError
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -36,6 +37,9 @@ class YouTubeMetadata(BasicProcessor):
 	description = ("Collect metadata from YouTube videos, channels, and playlists that are linked to in the dataset. "
 				   "Uses the YouTube API.")  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a derived table
+	output = Table()
+	icon = "brand-youtube"
 
 	# collector output or extract-urls-filter output, as csv/ndjson (may contain youtube links)
 	compatibility = Compatibility(is_collector=True, types={"extract-urls-filter"}, extensions={"csv", "ndjson"}, preferred_followups=["youtube-thumbnails"])

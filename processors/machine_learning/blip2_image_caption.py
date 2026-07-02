@@ -10,6 +10,7 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -26,9 +27,12 @@ class CategorizeImagesCLIP(BasicProcessor):
     title = "Generate image captions using OpenAI's BLIP2 model"  # title displayed in UI
     description = "The BLIP2 model uses a pretrained image encoder combined with an LLM to generate image captions. The model can also be prompted and uses the image plus prompt to generate text responses."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table(extension="ndjson")
+    icon = "eye"
 
     # image datasets (image archives or image-downloader output), when BLIP2 is enabled
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.fc_blip2_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.fc_blip2_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
 
     references = [
         "[OpenAI CLIP blog](https://openai.com/research/clip)",

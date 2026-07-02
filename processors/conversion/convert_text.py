@@ -7,6 +7,7 @@ import csv
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -25,6 +26,10 @@ class ConvertText(BasicProcessor):
     description = ("Find text in selected fields, replace parts of it, and write to a new dataset. Converted texts can "
                    "also be added to the original dataset as annotations.")  # description displayed in UI
     extension = "csv"
+    icon = "arrow-turn-to-dots"
+
+    # a derived table
+    output = Table()
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

@@ -5,6 +5,7 @@ Generate co-tag network of co-occurring (hash)tags in items
 from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -23,6 +24,9 @@ class CoTaggerPreset(ProcessorPreset):
                   "Edges are weighted by the amount of tag co-occurrences; nodes " \
                   "are weighted by how often the tag appears in the dataset."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
+    # a preset; its output is its last step's
+    output = Delegated()
+    icon = "circle-nodes"
 
 
     possible_tag_columns = {"tags", "hashtags", "groups"}

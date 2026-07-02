@@ -13,6 +13,7 @@ from packaging import version
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
+from common.lib.outputs import MediaArchive
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_ffmpeg_version
 
@@ -33,6 +34,10 @@ class VideoSceneFrames(BasicProcessor):
     title = "Extract key frames from each scene"  # title displayed in UI
     description = "For each scene identified, extracts a key frame (e.g. the first frame)."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "image"  # the extracted frames are images; set so the map and runtime agree
+    # a zip archive of image files
+    output = MediaArchive(media="image")
+    icon = "photo-film"
 
     # Allow on detected video scenes when ffmpeg is available
     compatibility = Compatibility(types={"video-scene-detector"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"])

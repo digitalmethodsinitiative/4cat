@@ -5,6 +5,7 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -22,6 +23,9 @@ class OvertimeAnalysis(BasicProcessor):
     title = "Over-time word counts"  # title displayed in UI
     description = "Determines the counts over time of particular set of words or phrases."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a ranking table (date/item/value), so ranking visualisations can run on it
+    output = Table(columns={"date", "item", "value"})
+    icon = "chart-line"
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

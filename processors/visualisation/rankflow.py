@@ -8,6 +8,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_4cat_canvas
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 
 from svgwrite.shapes import Rect
 from svgwrite.path import Path
@@ -41,6 +42,9 @@ class RankFlowRenderer(BasicProcessor):
         "Bernhard Rieder's RankFlow."
     )  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render()
+    icon = "shuffle"
 
     # rankable datasets, including multi-column rankings (e.g. top vectors per interval)
     compatibility = Compatibility(rankable=True)

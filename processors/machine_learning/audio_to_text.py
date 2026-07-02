@@ -8,6 +8,7 @@ from requests.exceptions import ConnectionError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -29,9 +30,12 @@ class AudioToText(BasicProcessor):
     description = ("Detect speech and other sounds in audio and convert to text with either OpenAI's Whisper or "
                    " GPT models (GPT only via API).")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table(extension="ndjson")
+    icon = "closed-captioning"
 
     # Allow on audio datasets
-    compatibility = Compatibility(media_types={"audio"}, type_prefixes={"audio-extractor"})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"audio"}, type_prefixes={"audio-extractor"})
 
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",

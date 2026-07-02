@@ -1,0 +1,26 @@
+footer#processing-status {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--panel-bg-0);
+    display: flex;
+    align-items: stretch;
+    font-family: Chivo, sans-serif;
+    z-index: var(--z-footer-header);
+}
+
+#processing-status h2 {
+    background: var(--dark);
+    color: var(--panel-bg-0);
+    font-size: var(--font-body);
+}
+
+#processing-status p, #processing-status h2 {
+    padding: 1em 1.5em;
+    margin: 0;
+}
+
+#processing-status .active {
+    background: var(--panel-bg-2);
+}

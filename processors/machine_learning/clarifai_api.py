@@ -11,6 +11,7 @@ from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -33,9 +34,12 @@ class ClarifaiAPIFetcher(BasicProcessor):
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \
                   "requests will be credited by Clarifai to the owner of the API token you provide."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table(extension="ndjson")
+    icon = "eye"
 
     # Allow on image sets
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"])
 
     references = [
         "[Clarifai](https://www.clarifai.com/)",

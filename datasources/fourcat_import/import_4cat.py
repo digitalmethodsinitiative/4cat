@@ -13,6 +13,7 @@ from common.lib.exceptions import (QueryParametersException, FourcatException, P
                                    DataSetException)
 from common.lib.helpers import UserInput, get_software_version
 from common.lib.dataset import DataSet
+from common.lib.outputs import Output
 
 
 class FourcatImportException(FourcatException):
@@ -26,6 +27,10 @@ class SearchImportFromFourcat(BasicProcessor):
     description = "Import a dataset from another 4CAT server or from a zip file (exported from a 4CAT server)"  # description displayed in UI
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    # a top-level import; extension, media and columns are copied from whatever dataset
+    # is imported, so none of them are known ahead of the run
+    output = Output(extension=None, media=None, columns=None, position="top", collector=True)
+    icon = "file-import"
 
     max_workers = 1  # this cannot be more than 1, else things get VERY messy
 

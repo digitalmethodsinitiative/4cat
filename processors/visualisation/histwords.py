@@ -13,6 +13,7 @@ from gensim.models import KeyedVectors
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas, convert_to_float
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -41,6 +42,10 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     title = "Chart diachronic nearest neighbours"  # title displayed in UI
     description = "Visualise nearest neighbours of a given query across all models and show the closest neighbours per model in one combined graph. Based on the 'HistWords' algorithm by Hamilton et al."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
+    icon = "diagram-project"
+
+    # a rendered image, no column table
+    output = Render()
 
     # Allow processor on word embedding models
     compatibility = Compatibility(types={"generate-embeddings"})

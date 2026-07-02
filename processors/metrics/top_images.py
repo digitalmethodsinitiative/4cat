@@ -7,6 +7,7 @@ from collections import Counter, OrderedDict
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -25,6 +26,9 @@ class TopImageCounter(BasicProcessor):
     title = "Rank image URLs"  # title displayed in UI
     description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a ranking table (date/item/value), so ranking visualisations can run on it
+    output = Table(columns={"date", "item", "value"})
+    icon = "arrow-up-1-9"
 
     # top-level csv/ndjson datasets, except Telegram (which has its own image logic)
     compatibility = Compatibility(top_dataset_only=True, excluded_types={"telegram-search"}, extensions={"csv", "ndjson"}, preferred_followups=["image-downloader"])

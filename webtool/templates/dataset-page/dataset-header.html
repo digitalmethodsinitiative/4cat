@@ -1,0 +1,91 @@
+<header class="dataset-header">
+    {% if dataset.get_own_processor().icon %}{% set icon = dataset.get_own_processor().icon %}{% elif not icon %}
+        {% set icon = "puzzle-piece" %}{% endif %}
+    {% if icon.startswith("brand-") %}{% set icon_type="fab" %}{% set icon = icon[6:] %}{% else %}
+        {% set icon_type="fa" %}{% endif %}
+    <i class="{{ icon_type }} fa-{{ icon }}" aria-hidden="true"></i>
+    <{% if level %}{{ level }}{% else %}h3{% endif %}>
+        {% if lite_header %}<a href="{{ url_for("dataset.show_result", key=dataset.key) }}">{% endif %}
+        {% if dataset.get_label(default=None) %}{{ dataset.get_label() }}{% else %}{{ processors[dataset.type].title if
+        not deprecated else "(Deprecated analysis) " + dataset.type }}{% endif %}
+        {% if lite_header %}</a>{% endif %}
+    </{% if level %}{{ level }}{% else %}h3{% endif %}>
+    {% if not lite_header %}
+        <nav class="quick-links">
+            <ul class="dataset-actions">
+                {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or
+            dataset.is_accessible_by(current_user, "owner")) %}
+                    <li><a href="#"><i class="fa fa-fw fa-edit" aria-hidden="true"></i>
+                        <span class="sr-only is-icon-tooltip">Edit dataset label</span></a></li>
+                {% endif %}
+                <li><a href="#"><i class="fa fa-fw fa-mortar-board" aria-hidden="true"></i>
+                    <span class="sr-only is-icon-tooltip">Processor references</span></a>
+                </li>
+                {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
+                    <li><a href="{{ url_for('dataset.view_log', key=dataset.key) }}"><i
+                            class="fa fa-fw fa-clipboard-list"
+                            aria-hidden="true"></i>
+                        <span class="sr-only is-icon-tooltip">View dataset log</span></a></li>
+                {% endif %}
+                <li>
+                    <a href="{{ dataset.get_version_url(" backend/processors/" + dataset.get_own_processor().filepath) }}"><i
+                            class="fab fa-fw fa-github" aria-hidden="true"></i>
+                        <span class="sr-only is-icon-tooltip">View processor source code</span></a>
+                </li>
+            </ul>
+        </nav>
+    {% endif %}
+    <nav class="actions">
+        {% include "dataset-page/dropdown-button.html" %}
+    </nav>
+</header>
+
+<section class="status">
+    <dl class="badge-list dataset-status">
+        <div class="status-badge-annotated status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
+            <dt>{% if not dataset.is_finished %}Processing{% elif dataset.num_rows %}Completed{% else %}No
+                results{% endif %}</dt>
+            <dd>{{ dataset.get_status() or "Processor finished." }}</dd>
+        </div>
+        {% if dataset.num_rows %}
+            <div>
+                <dt>Items</dt>
+                <dd>{{ dataset.num_rows|commafy }}</dd>
+            </div>
+        {% endif %}
+
+
+        {% if __user_config("ui.show_datasource") and dataset.parameters.datasource %}
+            <div>
+                <dt>Created from</dt>
+                <dd>
+                    {% if dataset.parameters.datasource in datasources %}
+                        <a href="{{ url_for("misc.data_overview", datasource=dataset.parameters.datasource) }}">
+                    {% endif %}
+                    {{ dataset.parameters.datasource }}
+                    {% if dataset.parameters.datasource in datasources %}
+                        </a>
+                    {% endif %}
+                </dd>
+            </div>
+        {% endif %}
+
+        <div>
+            <dt>Created</dt>
+            <dd>
+                {% if dataset.parameters.original_timestamp %}
+                    <i class="fa fa-file-import tooltip-trigger" aria-hidden="true"
+                       aria-controls="tooltip-{{ dataset.key }}-imported"></i>
+                    <span class="sr-only">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
+                    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-imported">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
+                {% endif %}
+                {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
+            </dd>
+        </div>
+    </dl>
+    {% if dataset.parameters|visible_parameters %}
+        <dl class="badge-list parameters with-overflow">
+            {% include "dataset-page/dataset-parameters.html" %}
+        </dl>
+    {% endif %}
+</section>

@@ -5,6 +5,7 @@ Create topic clusters based on datasets
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Archive
 from common.lib.exceptions import ProcessorInterruptedException
 
 import json
@@ -31,6 +32,10 @@ class TopicModeler(BasicProcessor):
                   "For a given number of topics, tokens are assigned a relevance weight per topic, " \
                   "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    icon = "boxes-stacked"
+
+    # a zip archive of data files
+    output = Archive()
 
     # Allow processor on token sets
     compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["document_count", "document_topic_matrix", "topic-model-words"])

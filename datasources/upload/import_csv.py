@@ -14,6 +14,7 @@ from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
 from backend.lib.processor import BasicProcessor
+from common.lib.outputs import Datasource
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException, \
     QueryNeedsExplicitConfirmationException, CsvDialectException
 from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
@@ -25,8 +26,11 @@ class SearchCustom(BasicProcessor):
     title = "Custom Dataset Upload"  # title displayed in UI
     description = "Upload your own CSV file to be used as a dataset"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a collected, top-level csv; the columns depend on the uploaded file, so unknown here
+    output = Datasource()
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    icon = "file-import"
 
     max_workers = 1
     

@@ -14,6 +14,7 @@ from common.lib.exceptions import QueryParametersException, ProcessorInterrupted
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
 from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.outputs import Datasource
 
 from datetime import datetime
 from telethon import TelegramClient, utils
@@ -34,8 +35,10 @@ class SearchTelegram(Search):
     title = "Telegram API search"  # title displayed in UI
     description = "Scrapes messages from open Telegram groups via its API."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    output = Datasource()
     is_local = False  # Whether this datasource is locally scraped
     is_static = False  # Whether this datasource is still updated
+    icon = "brand-telegram"
 
     # cache
     details_cache = None

@@ -1,0 +1,20 @@
+@import url('variables.css');
+
+@import url('base.css');
+
+@import url('animations.css');
+
+@import url('components/tooltips.css');
+@import url('components/buttons.css');
+@import url('components/badges.css');
+@import url('components/forms.css');
+
+@import url('components/plain-page.css');
+@import url('components/site-header.css');
+@import url('components/dataset-header.css');
+@import url('components/dataset-result.css');
+@import url('components/dataset-overview.css');
+@import url('components/footer.css');
+@import url('components/analysis-tree.css');
+@import url('components/processors.css');
+@import url('components/slideout-menu.css');

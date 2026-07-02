@@ -5,6 +5,7 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Network
 
 import networkx as nx
 
@@ -25,6 +26,9 @@ class QuoteNetworkGrapher(BasicProcessor):
 	description = "Create a GEXF network file of posts replying to each other. " \
 				  "Each reference to another post creates an edge between posts. "  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
+	# a graph file, no column table
+	output = Network()
+	icon = "circle-nodes"
 
 	# chan datasets (posts reply to / quote each other)
 	compatibility = Compatibility(datasources={"fourchan", "eightchan", "eightkun"})

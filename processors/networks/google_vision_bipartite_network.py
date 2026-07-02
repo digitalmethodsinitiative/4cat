@@ -3,6 +3,7 @@ Google Vision API co-label network
 """
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Network
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -25,6 +26,9 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
                   "returned by the API, and image file names, are nodes. Edges are created between file names and " \
                   "labels if the label occurs for the image with that file name."
     extension = "gexf"  # extension of result file, used internally and in UI
+    # a graph file, no column table
+    output = Network()
+    icon = "circle-nodes"
 
     # Allow processor to run on Google Vision API data
     compatibility = Compatibility(types={"google-vision-api"})

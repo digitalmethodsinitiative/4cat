@@ -13,6 +13,7 @@ from svgwrite.text import Text
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, pad_interval, get_4cat_canvas
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -28,6 +29,10 @@ class SVGHistogramRenderer(BasicProcessor):
 	title = "Histogram"  # title displayed in UI
 	description = "Generates a histogram from time frequencies."  # description displayed in UI
 	extension = "svg"
+	icon = "square-poll-vertical"
+
+	# a rendered image, no column table
+	output = Render()
 
 	# rankable datasets with a single value per item (multiple_items=False)
 	compatibility = Compatibility(rankable=True, rankable_multiple_items=False)

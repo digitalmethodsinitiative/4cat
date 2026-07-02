@@ -1,0 +1,40 @@
+<li class="{% if not dataset.is_finished %}in-progress{% endif %}{% if dataset.get_children() %} with-children{% endif %}">
+    <article>
+        <aside class="subway-station">
+            <p class="timestamp">
+                <span class="date">{{ dataset.timestamp|datetime(fmt="%-d %b")|safe }}</span>
+                <span class="time">{{ dataset.timestamp|datetime(fmt="%H:%M")|safe }}</span>
+            </p>
+        </aside>
+        <div class="processor-card">
+            <aside class="run-child-processor">
+                <button class="no-style run-processor-button"
+                    {# hx-get="{{ url_for('dataset.processor_panel', key=dataset.key) }}" #}
+                    hx-target="#processor-grid" hx-swap="innerHTML"
+                    @click="showProcessorPanel = true">
+                    <i class="fa-solid fa-star-of-life" aria-hidden="true"></i> <span class="sr-only">Run processor on this dataset</span>
+                </button>
+            </aside>
+            <button class="journey-marker{% if not dataset.get_children() %} end{% endif %}">
+            {% if not dataset.is_finished %}
+                &#62193; {# spinner #}
+            {% elif not dataset.num_rows %}
+                &#62796; {# skull #}
+            {% else %}
+                <span class="status-indicator status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}"></span>
+            {% endif %}
+            </button>
+            {% include "dataset-page/dataset-header.html" %}
+        </div>
+    </article>
+    <div class="run-hint">
+        <p>Run a processor on this dataset...</p>
+    </div>
+{% if dataset.get_children() %}
+    <ul class="sub tree">
+    {% for child in dataset.get_children() %}
+        {% with dataset=child %}{% include "dataset-page/child-dataset.html" %}{% endwith %}
+    {% endfor %}
+    </ul>
+{% endif %}
+</li>

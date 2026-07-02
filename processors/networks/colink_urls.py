@@ -9,6 +9,7 @@ import psutil
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Network
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 
@@ -33,6 +34,9 @@ class URLCoLinker(BasicProcessor):
 	description = "Create a GEXF network file comprised of URLs appearing together (in a post or thread). " \
 				  "Edges are weighted by amount of co-links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
+	# a graph file, no column table
+	output = Network()
+	icon = "circle-nodes"
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

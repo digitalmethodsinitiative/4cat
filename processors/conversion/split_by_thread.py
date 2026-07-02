@@ -5,6 +5,7 @@ import csv
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Archive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -25,6 +26,10 @@ class ThreadSplitter(BasicProcessor):
 	title = "Split by thread"  # title displayed in UI
 	description = "Split the dataset per thread. The result is a ZIP archive containing separate CSV files."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	icon = "scissors"
+
+	# a zip archive of data files
+	output = Archive()
 
 	# datasets with a thread structure (4chan/8chan, reddit, breitbart)
 	compatibility = Compatibility(datasources={"fourchan", "eightchan", "reddit", "breitbart"})

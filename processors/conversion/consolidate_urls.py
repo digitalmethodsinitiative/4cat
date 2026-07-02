@@ -9,6 +9,7 @@ from processors.conversion.extract_urls import ExtractURLs
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput, split_urls
 
 __author__ = "Dale Wahl"
@@ -28,6 +29,9 @@ class ConsolidateURLs(BasicProcessor):
     title = "Consolidate URLs"  # title displayed in UI
     description = "Retain only the domain (and optionally path) of URLs; used for custom networks (e.g. author + domains)"
     extension = "csv"
+    # a derived table
+    output = Table()
+    icon = "globe"
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

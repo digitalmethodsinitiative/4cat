@@ -21,6 +21,7 @@ from yt_dlp.utils import ExistingVideoReached
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
 from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
@@ -95,6 +96,10 @@ class VideoDownloaderPlus(BasicProcessor):
                   "retrieved externally."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "video"  # media type of the processor
+    icon = "film"
+
+    # a zip archive of media files
+    output = MediaArchive(media="video")
 
     # Shared list -- other download_* processors reuse this as VideoDownloaderPlus.followups
     # (and preferred_followups below reuses it), so it stays a named attribute.

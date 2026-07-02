@@ -11,6 +11,7 @@ from gensim.models.phrases import Phrases, Phraser
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Archive
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
@@ -32,6 +33,10 @@ class GenerateWordEmbeddings(BasicProcessor):
 				  "e.g. exist of 100 numbers). These numeric word representations can be used to extract words with similar contexts. " \
 				  "Note that good models require a lot of data."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	icon = "cube"
+
+	# a zip archive of data files
+	output = Archive()
 
 	# Allow processor on token sets
 	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["similar-word2vec", "histwords-vectspace"])

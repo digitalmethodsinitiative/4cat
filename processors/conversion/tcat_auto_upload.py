@@ -10,6 +10,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_last_line
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import File
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -27,6 +28,9 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     title = "Upload to DMI-TCAT"  # title displayed in UI
     description = "Send a TCAT-ready JSON file to a particular DMI-TCAT server."  # description displayed in UI
     extension = "html"  # extension of result file, used internally and in UI
+    # a single html file
+    output = File("html")
+    icon = "brand-twitter"
 
     # the TCAT converter's output, when a TCAT server is configured
     compatibility = Compatibility(types={"convert-ndjson-for-tcat"}, required_settings={"tcat-auto-upload.server_url", "tcat-auto-upload.token", "tcat-auto-upload.username", "tcat-auto-upload.password"})

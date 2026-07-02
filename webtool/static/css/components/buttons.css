@@ -1,0 +1,165 @@
+button.no-style {
+  padding: 0;
+  border: none;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  background: none
+}
+
+.button-like, input[type=submit], .plain-page button {
+    font-variant: small-caps;
+    text-transform: lowercase;
+
+    color: var(--button-bg-regular);
+    background: transparent;
+
+    outline: var(--stroke) solid var(--button-bg-regular);
+    border-radius: var(--radius);
+    border-color: var(--button-bg-regular);
+    border-style: none;
+}
+
+.button-like a, .button-like button {
+    display: block;
+}
+
+.button-like button {
+    border: 0;
+    margin: 0;
+    width: 100%;
+    text-align: inherit;
+    color: var(--button-grey);
+    font: inherit;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.button-like a, .button-like button, button.button-like, .plain-page button, input[type=submit] {
+    padding: 8px 18px;
+}
+
+.button-like.emphasis, button.emphasis{
+    color: var(--button-grey);
+    background: var(--button-bg-regular);
+
+    outline: var(--stroke) solid var(--button-bg-regular);
+    border-radius: var(--radius);
+    border-color: var(--button-bg-regular);
+}
+
+.button-like.emphasis:hover, button.emphasis:hover {
+    color: var(--button-bg-regular);
+    background: transparent;
+    border-bottom: none;
+}
+
+.action-button-wrap {
+    display: flex;
+    column-gap: 1em;
+}
+
+.with-dropdown .button-like a {
+    height: 1.25em;
+}
+
+.button-like:hover, .with-dropdown ul li:hover, .with-dropdown:hover .dropdown-action-button::before, input[type=submit]:hover, .plain-page button:hover {
+    color: var(--button-grey);
+    background: var(--button-bg-regular);
+    outline-color: var(--button-bg-regular);
+    border-color: var(--button-bg-regular);
+    cursor: pointer;
+}
+
+.with-dropdown {
+    position: relative;
+}
+
+.with-dropdown .button-like {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    margin-right: 2.5em;
+}
+
+.dropdown-action-button::before {
+    content: '\f078';  /* downwards caret */
+    font-family: 'Font Awesome 6 Free', monospace;
+    font-weight: 900;
+
+    color: var(--button-grey);
+    background: var(--button-bg-regular);
+
+    outline: var(--stroke) solid var(--button-bg-regular);
+    border-top-right-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+    border-color: var(--button-bg-regular);
+
+    padding: 8px 8px;
+    position: absolute;
+    right: 0;
+    top: calc(-2.5em - var(--stroke));
+    height: 1.25em;
+    z-index: var(--z-button);
+}
+
+.with-dropdown ul:hover {
+    z-index: var(--z-button-dropdown);
+}
+
+.with-dropdown ul {
+    position: absolute;
+    right: 0;
+    display: block;
+    margin-top: calc(2.5em + var(--stroke));
+    border-radius: var(--radius);
+    border-top-right-radius: 0;
+    width: fit-content;
+    min-width: calc(100% + var(--radius));
+    top: 0;
+}
+
+.with-dropdown ul li {
+    display: none;
+    background: var(--button-bg-regular);
+    color: var(--button-grey);
+    font-variant: small-caps;
+    text-transform: lowercase;
+    white-space: nowrap;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 18px;
+}
+
+.with-dropdown ul li:not(:last-child) {
+    border-bottom: var(--stroke) solid var(--button-grey);
+}
+
+.with-dropdown ul li:first-child {
+    border-top-left-radius: var(--radius);
+}
+
+.with-dropdown ul li:last-child {
+    border-bottom-right-radius: var(--radius);
+    border-bottom-left-radius: var(--radius);
+}
+
+.with-dropdown:hover .button-like {
+    border-bottom-left-radius: 0;
+}
+
+.with-dropdown ul li a {
+    padding: 0;
+}
+
+.with-dropdown:hover .dropdown-action-button::before {
+    border-bottom-right-radius: 0;
+    height: calc(1.2em - var(--stroke));
+}
+
+.with-dropdown:hover ul {
+    outline: var(--stroke) solid var(--button-grey);
+}
+
+.with-dropdown:hover ul li {
+    display: block;
+}

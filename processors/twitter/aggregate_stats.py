@@ -8,6 +8,7 @@ import statistics
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render, Table
 from common.lib.exceptions import ProcessorException
 
 __author__ = "Dale Wahl"
@@ -25,6 +26,8 @@ class TwitterAggregatedStats(BasicProcessor):
     title = "Aggregated statistics"  # title displayed in UI
     description = "Group tweets by category and count tweets per timeframe and then calculate aggregate group statistics (i.e. min, max, average, Q1, median, Q3, and trimmed mean): number of tweets, urls, hashtags, mentions, etc. \nUse for example to find the distribution of the number of tweets per author and compare across time."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
     compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
@@ -257,6 +260,8 @@ class TwitterAggregatedStatsVis(TwitterAggregatedStats):
     title = "Aggregated Statistics Visualization"  # title displayed in UI
     description = "Gathers Aggregated Statistics data and creates Box Plots visualising the spread of intervals. A large number of intervals will not properly display. "  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render("png")
 
     references = [
         "[matplotlib.pyplot.boxplot documentation](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.boxplot.html)"

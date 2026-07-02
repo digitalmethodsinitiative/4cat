@@ -11,6 +11,7 @@ from scenedetect import open_video, SceneManager, VideoOpenFailure, FrameTimecod
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -39,9 +40,13 @@ class VideoSceneDetector(BasicProcessor):
 	description = "Detect distinct 'scenes' in videos based on various parameters (e.g. change in color and " \
 				  "intensity or cuts and fades to black) and extract the scene metadata."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	icon = "clapperboard"
+
+	# a derived table
+	output = Table()
 
 	# Allow on video datasets
-	compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-scene-frames", "video-timelines"])
+	compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-scene-frames", "video-timelines"])
 
 	references = [
 		"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",

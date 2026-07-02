@@ -8,6 +8,7 @@ from flask import g
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, DataSetException
 from common.lib.helpers import UserInput
 from common.lib.dataset import DataSet
@@ -29,6 +30,9 @@ class UploadAnnotations(BasicProcessor):
 				   "The first column should contain item IDs; subsequent columns become annotation fields. "
 				   "For CSV file uploads, comma is used as the separator. For text input, a custom separator can be specified.")
 	extension = "csv"
+	# a derived table
+	output = Table()
+	icon = "tags"
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

@@ -13,6 +13,7 @@ from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Stijn Peeters", "Dale Wahl", "Sal Hagen"]
@@ -31,6 +32,9 @@ class ExtractURLs(BasicProcessor):
     title = "Extract and expand URLs"  # title displayed in UI
     description = "Extract any URLs from selected column(s) with the option to expand shortened URLs."
     extension = "csv"
+    # a derived table
+    output = Table()
+    icon = "globe"
 
     # any csv/ndjson dataset, except this processor's own filter output
     compatibility = Compatibility(extensions={"csv", "ndjson"}, excluded_types={"extract-urls-filter"})

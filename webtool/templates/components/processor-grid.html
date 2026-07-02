@@ -1,0 +1,5 @@
+<ol>
+{% for processor_id, processor in processors.items() %}
+    <li><strong>{{ processor.title }}:</strong> {{ processor.description }}</li>
+{% endfor %}
+</ol>

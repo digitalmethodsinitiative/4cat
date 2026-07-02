@@ -5,6 +5,7 @@ import json
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import File
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -20,6 +21,9 @@ class ConvertCSVToJSON(BasicProcessor):
 	title = "Convert to JSON"  # title displayed in UI
 	description = "Change a CSV file to a JSON file"  # description displayed in UI
 	extension = "json"  # extension of result file, used internally and in UI
+	# a single json file
+	output = File("json")
+	icon = "square-js"
 
 	# Allow on CSV datasets
 	compatibility = Compatibility(extensions={"csv"})

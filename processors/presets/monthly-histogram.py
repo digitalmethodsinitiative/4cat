@@ -3,6 +3,7 @@ Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 from processors.metrics.count_posts import CountPosts
 
 
@@ -15,6 +16,10 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	title = "Histogram"  # title displayed in UI
 	description = "Create a histogram that shows the number of items over time."  # description displayed in UI
 	extension = "svg"
+	icon = "square-poll-vertical"
+
+	# a preset; its output is its last step's
+	output = Delegated()
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

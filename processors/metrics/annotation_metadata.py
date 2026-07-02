@@ -4,6 +4,7 @@ Retrieves metadata on annotations for this dataset.
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 from datetime import datetime
 
@@ -17,6 +18,9 @@ class AnnotationMetadata(BasicProcessor):
 	description = ("Download annotations and their metadata for this dataset. "
 				   "Includes annotation author, timestamp, type, etc.") # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a derived table
+	output = Table()
+	icon = "circle-info"
 
 	# coarse map spec (accepts any dataset); is_compatible_with (below) is the runtime
 	# truth -- it requires the dataset to actually have annotations (annotation_fields)

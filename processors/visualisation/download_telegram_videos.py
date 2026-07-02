@@ -23,6 +23,7 @@ from processors.visualisation.download_videos import VideoDownloaderPlus
 from common.lib.helpers import UserInput, timify
 from common.lib.dataset import DataSet
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -45,7 +46,11 @@ class TelegramVideoDownloader(BasicProcessor):
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "video"  # media type of the result
+    # a zip archive of media files
+    output = MediaArchive(media="video")
     flawless = True
+    icon = "film"
+
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also checks the
     # source dataset carries Telegram API credentials, which are read from the dataset

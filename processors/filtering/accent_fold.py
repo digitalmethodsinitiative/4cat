@@ -7,6 +7,7 @@ import csv
 from unidecode import unidecode
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Output, PASSTHROUGH
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -27,6 +28,11 @@ class AccentFoldingFilter(BasicProcessor):
     description = ("Replaces or transliterates non-Latin characters with the closest ASCII equivalent, converting e.g. "
                    "'á' to 'a', 'ç' to 'c', etc. This creates a new dataset.")
     extension = "csv"  # extension of result file, used internally and in UI
+    # writes a new csv keeping the parent's columns; made standalone, so its position
+    # and collector-ness take on the original dataset's and are unknown here
+    output = Output(extension="csv", columns=PASSTHROUGH, position=None, collector=None,
+                    datasource=PASSTHROUGH)
+    icon = "language"
 
     # Allow on top-level CSV datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv"})
