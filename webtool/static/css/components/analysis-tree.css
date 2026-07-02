@@ -400,8 +400,8 @@ aside.run-child-processor button:hover {
 }
 
 .run-processor-button.inline {
-    width: calc(var(--font-body) * 1.5);
-    height: calc(var(--font-body) * 1.5);
+    width: calc(var(--font-body) * 1.45);
+    height: calc(var(--font-body) * 1.45);
     line-height: calc(var(--font-body) * 1.5);
 }
 
