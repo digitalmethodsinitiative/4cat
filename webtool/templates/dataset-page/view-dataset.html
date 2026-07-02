@@ -5,7 +5,9 @@
 {% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
 
 {% block body %}
-    <div class="dataset-container" x-data="{ showProcessorPanel: false, selectedDatasetType: null }">
+    <div class="dataset-container"
+         x-data="{ slideoutActive: false, selectedProcessorType: null, selectedDatasetType: null }"
+         x-effect="document.body.classList.toggle('slideout-open', slideoutActive)">
         <section class="dark dataset-metadata" data-dataset-key="{{ dataset.key }}">
             <nav>
                 <ul>
@@ -79,7 +81,7 @@
                             hx-target="#processor-grid"
                             hx-swap="innerHTML"
                             hx-trigger="click"
-                            @click="showProcessorPanel = true; selectedDatasetType = '{{ dataset.type }}'"
+                            @click="slideoutActive = true; selectedDatasetType = '{{ dataset.type }}'"
                         >
                             <em>
                                 <span class="run-processor-button inline">
@@ -97,8 +99,8 @@
             </ul>
         </section>
 
-        <div class="processor-panel slideout"
-             x-show="showProcessorPanel"
+        <div class="processor-panel slideout slideout-root"
+             x-show="slideoutActive"
              x-transition:enter="slide-enter"
              x-transition:enter-start="slide-from"
              x-transition:enter-end="slide-to"
@@ -106,9 +108,9 @@
              x-transition:leave-start="slide-to"
              x-transition:leave-end="slide-from"
         >
-            {# todo: add processor breadcrump component #}
+            {# todo: add processor breadcrumb component #}
             <div class="processor-panel-header slideout-header">
-                <div x-if="selectedDatasetType" class="slideout-header-title">
+                <div class="slideout-header-title">
                     <ul>
                         <li>
                             <h1>Processors for <span class="code" x-text="selectedDatasetType"></span></h1>
@@ -116,17 +118,40 @@
                     </ul>
                 </div>
                 <div class="slideout-header-controls">
-                    <ul>
-                        <li class="search-box">
-                            SEARCH BOX
-                        </li>
+                    <ul> <span x-text="selectedProcessorType"></span>
+                        <template x-if="!selectedProcessorType">
+                            <li class="search-box">
+                                SEARCH BOX
+                            </li>
+                        </template>
                         <li>
-                            <button class="emphasis button-like" @click="showProcessorPanel = false"><i class="fa-solid fa-xmark"></i></button>
+                            <button class="emphasis button-like" @click="slideoutActive = false"><i class="fa-solid fa-xmark"></i></button>
                         </li>
                     </ul>
                 </div>
             </div>
-            <div id="processor-grid">
+            <div class="processor-panel-contents slideout-contents">
+                <div id="processor-grid" class="slideout-body">
+                </div>
+                <div class="processor-options slideout"
+                     x-show="selectedProcessorType"
+                     x-transition:enter="slide-enter"
+                     x-transition:enter-start="slide-from"
+                     x-transition:enter-end="slide-to"
+                     x-transition:leave="slide-enter"
+                     x-transition:leave-start="slide-to"
+                     x-transition:leave-end="slide-from">
+                    <div class="slideout-header narrow">
+                        <div class="slideout-header-title">
+                            <h2><span x-text="selectedProcessorType"></span> options</h2>
+                        </div>
+                        <div class="slideout-header-controls">
+                            <button class="button-like" @click="selectedProcessorType = null">
+                                <i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <div id="processor-options" class="slideout-body">TEST</div>
+                </div>
             </div>
         </div>
     </div>

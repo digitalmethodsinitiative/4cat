@@ -622,7 +622,6 @@ def show_result(key):
     standalone = "processors" not in request.url
     template = "dataset-page/view-dataset.html" if standalone else "components/result-details.html"
 
-
     breadcrumbs = [{
             "url": url_for("dataset.show_results"),
             "label": "Datasets"
