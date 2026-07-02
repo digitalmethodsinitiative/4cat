@@ -7,7 +7,7 @@
 {% block body %}
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/processor-catalogue.css') }}">
 
-<article>
+<article id="pc-page" data-initial-processor="{{ processor_type|default('', true) }}">
     <section id="pc-detail">
         <div id="pc-detail-body">
             <p class="pc-placeholder">Select a processor below to see how to run it and what it unlocks.</p>

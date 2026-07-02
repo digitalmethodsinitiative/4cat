@@ -29,7 +29,10 @@
 	<meta charset='UTF-8'>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}"
+      x-data="{ slideoutActive: false }"
+      x-effect="document.body.style.overflow = slideoutActive ? 'clip' : ''"
+>
 <section id="header-container">
 <header id="site-header">
     <section class="header-orientation">
@@ -93,4 +96,15 @@
 		<p>Welcome.</p>
 	{% endblock %}
 </article>
+
+<script>
+    // keep --site-header-height in sync with the sticky site header, so
+    // overlays (e.g. slideout menus) can position themselves below it
+    const headerContainer = document.getElementById('header-container');
+    if (headerContainer) {
+        new ResizeObserver(() => {
+            document.documentElement.style.setProperty('--site-header-height', headerContainer.offsetHeight + 'px');
+        }).observe(headerContainer);
+    }
+</script>
 </body>

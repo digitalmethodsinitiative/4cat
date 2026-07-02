@@ -16,5 +16,6 @@
 @import url('components/dataset-overview.css');
 @import url('components/footer.css');
 @import url('components/analysis-tree.css');
-@import url('components/processors.css');
 @import url('components/slideout-menu.css');
+@import url('components/processor-panel.css');
+@import url('components/processor-box.css');
