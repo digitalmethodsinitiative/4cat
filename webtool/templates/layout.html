@@ -39,7 +39,7 @@
         <nav class="main-navigation">
             <ul>
                 {% if __user_config("privileges.can_create_dataset") %}
-                    <li class="emphasis button-like"><a href="#">Create Dataset</a></li>
+                    <li class="emphasis"><a class="button-like" href="#">Create Dataset</a></li>
                 {% endif %}
                 <li><a href="{{ url_for("dataset.show_results") }}">My Datasets</a></li>
                 <li><a href="{{ url_for("misc.show_about") }}">About</a></li>

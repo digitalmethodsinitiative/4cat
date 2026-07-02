@@ -20,7 +20,7 @@ button.no-style {
     border-style: none;
 }
 
-.button-like a, .button-like button {
+a.button-like, button {
     display: block;
 }
 
@@ -35,7 +35,7 @@ button.no-style {
     text-transform: uppercase;
 }
 
-.button-like a, .button-like button, button.button-like, .plain-page button, input[type=submit] {
+a.button-like, .button-like button, button.button-like, .plain-page button, input[type=submit] {
     padding: 8px 18px;
 }
 
@@ -59,7 +59,7 @@ button.no-style {
     column-gap: 1em;
 }
 
-.with-dropdown .button-like a {
+.with-dropdown a.button-like {
     height: 1.25em;
 }
 

@@ -338,7 +338,6 @@ aside.run-child-processor {
     position: absolute;
     top: calc(var(--font-body) * 3);
     left: calc((-0.5 * var(--spacing-xlarge)) - (var(--stroke-journey) / 2) - var(--font-body));
-    /** 1px needed to center on stroke, for some reason **/
     color: var(--fourcat-accent);
     background: var(--bright);
     font-size: calc(var(--font-body) * 2);

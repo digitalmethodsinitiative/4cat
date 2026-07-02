@@ -21,9 +21,8 @@
     column-gap: var(--spacing-regular);
 }
 
-.dataset-metadata > nav > ul > li {
+.dataset-metadata > nav > ul > li > .button-like {
     outline-color: var(--button-grey);
-    background: transparent;
 }
 
 .dataset-metadata .button-like {

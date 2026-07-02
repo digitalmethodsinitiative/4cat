@@ -10,16 +10,16 @@
             <nav>
                 <ul>
                 {% if current_user.is_authenticated and current_user.can_access_dataset(dataset) %}
-                    <li class="button-like"><a href="{{ url_for("toolapi.toggle_favourite", key=dataset.key) }}?redirect">{% if is_favourite %}Un-f{% else %}F{% endif %}avourite</a></li>
+                    <li><a class="button-like" href="{{ url_for("toolapi.toggle_favourite", key=dataset.key) }}?redirect">{% if is_favourite %}Un-f{% else %}F{% endif %}avourite</a></li>
                 {% endif %}
                 {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
-                    <li class="button-like"><a href="{{ url_for('toolapi.toggle_private', key=dataset.key) }}?redirect">Make public</a></li>
+                    <li><button class="button-like" href="{{ url_for('toolapi.toggle_private', key=dataset.key) }}?redirect">Make public</button></li>
                 {% endif %}
-                    <li class="button-like"><a href="{{ url_for('dataset.show_result', key=dataset.key) }}">Permalink</a>
+                    <li><a class="button-like" href="{{ url_for('dataset.show_result', key=dataset.key) }}">Permalink</a>
                     </li>
                     {% if __user_config("privileges.admin.can_manipulate_all_datasets") or
                     dataset.is_accessible_by(current_user, "owner") %}
-                    <li class="button-like"><a href="{{ url_for('toolapi.add_dataset_owner') }}">
+                    <li><a class="button-like" href="{{ url_for('toolapi.add_dataset_owner') }}">
                         Manage access
                         {% if dataset.get_owners(None)|length > 1 %}
                         (<i class="fa fa-users" aria-hidden="true"></i> {{ dataset.get_owners(None)|length }})

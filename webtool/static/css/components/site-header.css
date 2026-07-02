@@ -64,21 +64,24 @@
     padding-bottom: calc(var(--spacing-smaller) - var(--stroke));
 
     color: var(--button-bg-regular);
+}
+
+.main-navigation li:not(.emphasis) {
     border-bottom: var(--stroke) solid var(--text-grey-80);
 }
 
-.main-navigation li.button-like {
-    padding: 0;
-}
-
-.main-navigation li:not(.button-like), .user-panel li:not(.button-like) {
+.main-navigation li, .user-panel li {
     height: 1.25em;
 }
 
-.main-navigation li:hover, .user-panel li:hover {
+.main-navigation li:not(.emphasis):hover, .user-panel li:hover {
     background: var(--button-bg-regular);
     color: var(--button-grey);
     border-color: var(--button-grey);
+}
+
+.main-navigation .button-like {
+    margin-top: -8px;
 }
 
 .breadcrumbs {

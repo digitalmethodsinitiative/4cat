@@ -45,3 +45,7 @@ pre {
     padding: var(--spacing-regular);
     background: var(--panel-bg-0);
 }
+
+button {
+    font: inherit;
+}
