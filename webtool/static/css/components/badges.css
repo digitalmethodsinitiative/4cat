@@ -52,6 +52,14 @@
     padding: var(--spacing-tiny) var(--spacing-small);
 }
 
+.badge-list.dataset-status dt {
+    align-self: start;
+}
+
+.badge-list.dataset-status dd {
+    white-space: wrap;
+}
+
 .status-badge dt {
     display: none;
 }
