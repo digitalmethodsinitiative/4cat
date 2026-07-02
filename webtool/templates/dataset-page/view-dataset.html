@@ -13,7 +13,7 @@
                     <li><a class="button-like" href="{{ url_for("toolapi.toggle_favourite", key=dataset.key) }}?redirect">{% if is_favourite %}Un-f{% else %}F{% endif %}avourite</a></li>
                 {% endif %}
                 {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
-                    <li><button class="button-like" href="{{ url_for('toolapi.toggle_private', key=dataset.key) }}?redirect">Make public</button></li>
+                    <li><a class="button-like" href="{{ url_for('toolapi.toggle_private', key=dataset.key) }}?redirect">Make public</a></li>
                 {% endif %}
                     <li><a class="button-like" href="{{ url_for('dataset.show_result', key=dataset.key) }}">Permalink</a>
                     </li>
