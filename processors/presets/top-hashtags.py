@@ -2,6 +2,7 @@
 Find most-used hashtags in a dataset
 """
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.helpers import UserInput
 from processors.networks.cotag_network import CoTaggerPreset
 from common.lib.compatibility import Compatibility
@@ -13,13 +14,19 @@ class TopHashtags(ProcessorPreset):
     Run processor pipeline to find top hashtags
     """
     type = "preset-top-hashtags"  # job type ID
-    category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Top hashtags"  # title displayed in UI
-    description = "Count how often each hashtag occurs in the dataset and sort by this value"
+    description = ProcessorDescription(
+        title="Top hashtags",
+        category="Combined processors",  # 'Combined processors' are always listed first in the UI
+        tags=["hashtags", "counts", "rank"],
+        description="Count how often each hashtag occurs in the dataset and rank them from most to least frequent.",
+        info=[
+            "Runs on any dataset that has a hashtag-like column, such as 'hashtags' or 'tags'.",
+        ],
+        icon="hashtag",
+    )
     extension = "csv"
     # a preset; its output is its last step's
     output = Delegated()
-    icon = "hashtag"
 
     # datasets with at least one tag-like column
     compatibility = Compatibility(requires_any_columns=CoTaggerPreset.possible_tag_columns)

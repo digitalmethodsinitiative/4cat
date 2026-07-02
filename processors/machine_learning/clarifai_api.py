@@ -9,7 +9,7 @@ from clarifai_grpc.grpc.api.status import status_code_pb2
 from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -28,24 +28,34 @@ class ClarifaiAPIFetcher(BasicProcessor):
     Request tags and labels from the Clarifai API for a given set of images
     """
     type = "clarifai-api"  # job type ID
-    category = "Machine learning"  # category
-    title = "Clarifai analysis"  # title displayed in UI
-    description = "Use the Clarifai API to annotate images with tags and labels identified via machine learning. " \
-                  "One request will be made per image per annotation type. Note that this is NOT a free service and " \
-                  "requests will be credited by Clarifai to the owner of the API token you provide."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Label images with Clarifai",
+        category="Machine learning",
+        tags=["classify", "api key required", "external service"],
+        description="Use the Clarifai API to tag and label images with machine learning. One request is made per "
+                    "image for each model you select.",
+        references=[
+            "[Clarifai](https://www.clarifai.com/)",
+            "[Clarifai API pricing and free usage limits](https://www.clarifai.com/pricing)",
+            "[Clarifai model browser](https://clarifai.com/clarifai/main/models)",
+        ],
+        warnings=[
+            "This is a paid service. Clarifai bills the owner of the API key you provide, and every image and every "
+            "selected model adds to the number of requests made.",
+            "Images are sent to Clarifai, an external service, to be analysed.",
+        ],
+        info=[
+            "Follow up with 'Convert Clarifai results to CSV' for a flat table, or 'Clarifai bipartite network' to "
+            "link images to the labels they share.",
+        ],
+        icon="eye",
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI
     # a derived table
     output = Table(extension="ndjson")
-    icon = "eye"
 
     # Allow on image sets
     compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"])
-
-    references = [
-        "[Clarifai](https://www.clarifai.com/)",
-        "[Clarifai API Pricing & Free Usage Limits](https://www.clarifai.com/pricing)",
-        "[Clarifai model browser](https://clarifai.com/clarifai/main/models)"
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
