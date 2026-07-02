@@ -77,9 +77,7 @@ set: main_header = True for a header at the top of the analyiss tree (e.g. on th
             <dd>
                 {% if dataset.parameters.original_timestamp %}
                     <i class="fa fa-file-import tooltip-trigger" aria-hidden="true"
-                       aria-controls="tooltip-{{ dataset.key }}-imported"></i>
-                    <span class="sr-only">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
-                    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-imported">This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}.</span>
+                       aria-controls="tooltip-{{ dataset.key }}-imported" x-tooltip="This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}."></i>
                 {% endif %}
                 {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
             </dd>
