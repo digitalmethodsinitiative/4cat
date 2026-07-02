@@ -245,7 +245,7 @@ class SearchInstagram(Search):
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
-        user = node.get("user")
+        user = node.get("user") or {}
         owner = node.get("owner")
         if node.get("user") and node.get("owner"):
             if owner.get("id") == user.get("id"):
