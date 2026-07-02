@@ -1,6 +1,7 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+from dataclasses import dataclass
 import traceback
 import inspect as py_inspect
 import zipfile
@@ -30,6 +31,37 @@ csv.field_size_limit(1024 * 1024 * 1024)
 # Shared instance for the legacy default `compatibility`
 _DEFAULT_COMPATIBILITY = Compatibility(top_dataset_only=True)
 
+@dataclass
+class ProcessorDescription:
+    name: str
+    type: str
+    category: str
+    description: str
+    references: typing.List[str]
+    info: set
+    warning: set
+
+def ui_warning(message):
+    """
+    Add a warning to the processor's description, which will be displayed in the web interface
+    """
+    def decorator(cls):
+        if "_ui_warnings" not in cls.__dict__:
+            cls._ui_warnings = set()
+        cls._ui_warnings.add(message)
+        return cls
+    return decorator
+
+def ui_info(message):
+    """
+    Add an info message to the processor's description, which will be displayed in the web interface
+    """
+    def decorator(cls):
+        if "_ui_info" not in cls.__dict__:
+            cls._ui_info = set()
+        cls._ui_info.add(message)
+        return cls
+    return decorator
 
 class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     """
@@ -1133,6 +1165,23 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if cls.compatibility is not None and processor_type in cls.compatibility.excluded_followups:
             return True
         return False
+
+    @classmethod
+    def get_description(cls):
+        """
+        Get processor description
+
+        :return ProcessorDescription:  Description of this processor
+        """
+        return ProcessorDescription(
+            name=getattr(cls, "name", cls.__name__),
+            type=getattr(cls, "type", "unknown"),
+            category=getattr(cls, "category", "Uncategorized"),
+            description=getattr(cls, "description", ""),
+            references=getattr(cls, "references", []),
+            info=getattr(cls, "_ui_info", set()),
+            warning=getattr(cls, "_ui_warnings", set()),
+        )
 
     @abc.abstractmethod
     def process(self):

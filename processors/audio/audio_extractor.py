@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path
 import oslex
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription, ui_warning, ui_info
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.outputs import MediaArchive
 from common.lib.exceptions import ProcessorInterruptedException
@@ -21,7 +21,8 @@ __email__ = "4cat@oilab.eu"
 
 from common.lib.user_input import UserInput
 
-
+@ui_warning("This processor requires ffmpeg to be installed in 4CAT's backend.")
+@ui_info("This processor extracts audio from video files using ffmpeg. The output will be a zip archive of audio files.")
 class AudioExtractor(BasicProcessor):
     """
     Audio from video Extractor
@@ -29,6 +30,7 @@ class AudioExtractor(BasicProcessor):
     Uses ffmpeg to extract audio from videos and saves them in an archive.
     """
     type = "audio-extractor"  # job type ID
+    name = "Audio Extractor" 
     category = "Audio"  # category
     title = "Extract audio from videos"  # title displayed in UI
     description = "Create audio files per video"  # description displayed in UI
