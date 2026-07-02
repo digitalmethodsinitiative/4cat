@@ -1,15 +1,21 @@
+{#
+set: lite_header = True for a header included on another page as a clickable entry point
+                        into the dataset (e.g. dataset overview page)
+set: main_header = True for a header at the top of the analyiss tree (e.g. on the dataset
+                        result page)
+#}
 <header class="dataset-header">
     {% if dataset.get_own_processor().icon %}{% set icon = dataset.get_own_processor().icon %}{% elif not icon %}
         {% set icon = "puzzle-piece" %}{% endif %}
     {% if icon.startswith("brand-") %}{% set icon_type="fab" %}{% set icon = icon[6:] %}{% else %}
         {% set icon_type="fa" %}{% endif %}
     <i class="{{ icon_type }} fa-{{ icon }}" aria-hidden="true"></i>
-    <{% if level %}{{ level }}{% else %}h3{% endif %}>
+    <{% if main_header %}h1{% else %}h3{% endif %}>
         {% if lite_header %}<a href="{{ url_for("dataset.show_result", key=dataset.key) }}">{% endif %}
         {% if dataset.get_label(default=None) %}{{ dataset.get_label() }}{% else %}{{ processors[dataset.type].title if
         not deprecated else "(Deprecated analysis) " + dataset.type }}{% endif %}
         {% if lite_header %}</a>{% endif %}
-    </{% if level %}{{ level }}{% else %}h3{% endif %}>
+    </{% if main_header %}h1{% else %}h3{% endif %}>
     {% if not lite_header %}
         <nav class="quick-links">
             <ul class="dataset-actions">
@@ -47,6 +53,9 @@
                 results{% endif %}</dt>
             <dd>{{ dataset.get_status() or "Processor finished." }}</dd>
         </div>
+    </dl>
+
+    <dl class="badge-list">
         {% if dataset.num_rows %}
             <div>
                 <dt>Items</dt>
@@ -70,6 +79,8 @@
             </div>
         {% endif %}
 
+        {% if main_header %}
+            {# children have the timestamp in the 'metro map' already #}
         <div>
             <dt>Created</dt>
             <dd>
@@ -82,6 +93,7 @@
                 {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
             </dd>
         </div>
+        {% endif %}
     </dl>
     {% if dataset.parameters|visible_parameters %}
         <dl class="badge-list parameters with-overflow">

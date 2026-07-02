@@ -266,7 +266,7 @@
 }
 
 /** any badge list in a processor card that is not the last one **/
-.processor-card .badge-list.dataset-status:not(:last-child) {
+.processor-card .badge-list:not(:last-child) {
     border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
 }
 
