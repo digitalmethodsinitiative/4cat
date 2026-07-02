@@ -13,6 +13,7 @@
   const API = "/api/processor-map";
   let CATALOGUE = [];   // every processor, as returned by the catalogue endpoint
   const TITLE = {};     // processor type -> display title, so links can show names not ids
+  let BROWSE_PLACEHOLDER = "";  // detail pane's empty state, kept so back/forward can restore it
 
   // small text helpers: escape for HTML, look up a title by type, join a value for display
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
@@ -30,7 +31,19 @@
 
   // On load: pull the whole catalogue once, remember every title, wire up the search
   // box and category dropdown, and draw the list. Everything after this is redrawing.
+  // When the page is a deep link, the selected processor is fetched and drawn first --
+  // its request goes out alongside the catalogue's, and its detail paints before the grid.
   async function init() {
+    const initial = (document.getElementById("pc-page").dataset.initialProcessor || "").trim();
+
+    // On a deep link, start the selected processor's request right away -- in parallel with
+    // the larger catalogue request rather than queued behind it -- so its content is ready
+    // as soon as possible. Pre-caught to null so a bad type raises no unhandled rejection;
+    // showDetail then treats null as "not found".
+    const detailPromise = initial
+      ? getJSON(`${API}/processor/${encodeURIComponent(initial)}`).catch(() => null)
+      : null;
+
     let data;
     try {
       data = await getJSON(`${API}/catalogue`);
@@ -44,6 +57,27 @@
     populateCategories();
     document.getElementById("pc-search").addEventListener("input", renderCatalogue);
     document.getElementById("pc-category").addEventListener("change", renderCatalogue);
+
+    // Remember the empty-state markup (before anything overwrites it) so back/forward can
+    // restore it when the visitor navigates back past every processor they opened.
+    BROWSE_PLACEHOLDER = document.getElementById("pc-detail-body").innerHTML;
+
+    // Keep the view in step with the address bar on back/forward. Each opened processor
+    // pushed a history entry carrying its type; an entry with no type is the bare
+    // catalogue, so restore the empty state.
+    window.addEventListener("popstate", event => {
+      const type = event.state && event.state.pcType;
+      if (type) showDetail(type, "none");
+      else document.getElementById("pc-detail-body").innerHTML = BROWSE_PLACEHOLDER;
+    });
+
+    // If the page was opened as a deep link (/processor-catalogue/<type>), draw that
+    // processor before the browse grid -- but only if it really exists, so a stale or
+    // mistyped link just falls through to the browse view. Its request is already in
+    // flight (detailPromise) and TITLE is now ready for its follow-up chips. "replace"
+    // attaches the type to the current history entry rather than adding a duplicate.
+    if (initial && TITLE[initial]) await showDetail(initial, "replace", detailPromise);
+
     renderCatalogue();
   }
 
@@ -104,13 +138,16 @@
 
   // Load one processor's full detail from the API and render it into the top pane. Then
   // wire the links: every element carrying a data-type opens that processor when clicked.
-  async function showDetail(type) {
+  // `urlMode` says how to reflect this in the address bar (see the note by the history call).
+  // `infoPromise`, when given, is an already-in-flight request for this processor (used on
+  // first load to avoid firing a second, duplicate request).
+  async function showDetail(type, urlMode = "push", infoPromise = null) {
     const body = document.getElementById("pc-detail-body");
     body.innerHTML = '<p class="banner">Loading…</p>';
     window.scrollTo({ top: 0, behavior: "smooth" });
     let info;
     try {
-      info = await getJSON(`${API}/processor/${encodeURIComponent(type)}`);
+      info = await (infoPromise || getJSON(`${API}/processor/${encodeURIComponent(type)}`));
     } catch (e) {
       body.innerHTML = '<p class="banner">Could not load this processor.</p>';
       return;
@@ -120,6 +157,13 @@
       return;
     }
     body.innerHTML = detailHtml(info);
+    // Reflect the open processor in the address bar so the visitor can copy the URL to
+    // share exactly what they are looking at. "push" adds a history entry (a normal
+    // click); "replace" rewrites the current one (first load, where the URL is already
+    // right); "none" leaves it alone (a back/forward already moved the URL for us).
+    const url = `/processor-catalogue/${encodeURIComponent(type)}`;
+    if (urlMode === "push") history.pushState({ pcType: type }, "", url);
+    else if (urlMode === "replace") history.replaceState({ pcType: type }, "", url);
     body.querySelectorAll("[data-type]").forEach(el =>
       el.addEventListener("click", e => { e.stopPropagation(); showDetail(el.dataset.type); }));
   }
@@ -280,7 +324,7 @@
         ${info.description ? `<div class="fullwidth"><dt>About</dt><dd>${esc(info.description)}</dd></div>` : ""}
       </dl>
       ${section("How to run", true, howToRunHtml(info))}
-      ${section("What can run on this", true, followupsHtml(info))}
+      ${section("What can run on this", false, followupsHtml(info))}
       ${section("Compatibility (declared)", false, spec)}
     `;
   }

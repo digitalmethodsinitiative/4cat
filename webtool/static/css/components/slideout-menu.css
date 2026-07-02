@@ -1,5 +1,29 @@
+.slideout {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background-color: var(--bright);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* top-level slideout: pinned to the viewport, starting below the
+   (dynamic-height, sticky) site header and covering down to the bottom
+   of the viewport, regardless of page scroll position */
+.slideout-root {
+    position: fixed;
+    top: var(--site-header-height, 0px);
+    z-index: var(--z-slideout);
+}
+
+/* set while a slideout is active, so the page behind it cannot scroll */
+body.slideout-open {
+    overflow: hidden;
+}
+
 .slideout-header {
-    height: var(--slideout-header-height);
+    flex: 0 0 auto;
     display: flex;
     flex-wrap: wrap;
     column-gap: 20px;
@@ -10,11 +34,17 @@
     border-bottom: var(--stroke) solid var(--panel-bg-1);
 }
 
+.slideout-header.narrow {
+    padding: var(--spacing-small);
+    padding-left: var(--spacing-regular);
+    padding-right: var(--spacing-regular);
+}
+
 .slideout-header .slideout-header-title {
     flex-grow: 1;
 }
 
-.slideout-header .slideout-header-title h1 {
+.slideout-header .slideout-header-title h1, .slideout-header .slideout-header-title h2 {
     margin: 0;
     line-height: 1;
 }
@@ -24,4 +54,23 @@
     column-gap: 20px;
     flex-grow: 1;
     align-items: center;
+}
+
+.slideout-contents {
+    position: relative;   /* nested .slideout resolves inset:0 against this,
+                             so it lands below this slideout's header */
+    flex: 1 1 auto;
+    min-height: 0;        /* allow shrinking below content height, so
+                             .slideout-body scrolls instead of overflowing */
+    overflow: hidden;     /* clips a nested slideout parked off-screen */
+    display: flex;
+    flex-direction: column;
+}
+
+.slideout-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: scroll;
+    overscroll-behavior: contain;
+    padding: var(--spacing-regular);
 }
