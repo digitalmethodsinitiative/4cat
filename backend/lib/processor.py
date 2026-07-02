@@ -768,6 +768,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             standalone.board = self.type
 
         standalone.adopt_type(top_parent.type)
+        standalone.media_type = top_parent.get_media_type()
 
         standalone.detach()
         standalone.delete_parameter("key_parent")
