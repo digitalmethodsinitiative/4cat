@@ -10,9 +10,13 @@ document.addEventListener('alpine:init', () => {
     tooltips.id = 'tooltips';
     document.querySelector('body').appendChild(tooltips);
 
-    Alpine.directive('tooltip', el => {
+    Alpine.directive('tooltip', (el, { value, expression }) => {
+        el.alpine_side = value;
         let spec = 3;
-        const tooltip_content = el.getAttribute('x-tooltip');
+        const tooltip_content = expression;
+        if(!tooltip_content) {
+            return;
+        }
         const bits = ['tooltip', ...tooltip_content.toLowerCase().replace(/[^a-z0-9- ]/g, '').replace(/[\s+]/g, '-').split('-')];
         let tooltip_id;
         while (!tooltip_id || bits.length >= spec) {
@@ -58,7 +62,7 @@ function show_tooltip(e, parent = false) {
     const tooltip_d = tooltip_container.getBoundingClientRect();
 
     let top_position, hor_position;
-    if (trigger.hasAttribute('x-tooltip-side')) {
+    if (trigger.alpine_side === 'side') {
         top_position = trigger_y + (trigger_d.height / 2) - (tooltip_d.height / 2);
         hor_position = trigger_x + trigger_d.width + TOOLTIP_GAP;
         if (hor_position + trigger_d.width + TOOLTIP_GAP > document.documentElement.clientWidth) {

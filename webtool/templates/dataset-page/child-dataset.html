@@ -12,7 +12,7 @@
             {% set has_processors = dataset.is_finished() and (dataset.get_children() or (dataset.num_rows > 0 and current_user.is_authenticated and dataset.get_available_processors(config=__config, exclude_hidden=True))) %}
             {% if has_processors %}
             <aside class="run-child-processor">
-                <button class="no-style run-processor-button hint--right" x-tooltip="Run processor" x-tooltip-side
+                <button class="no-style run-processor-button hint--right" x-tooltip:side="Run processor"
                     {# hx-get="{{ url_for('dataset.processor_panel', key=dataset.key) }}" #}
                     hx-target="#processor-grid" hx-swap="innerHTML"
                     @click="showProcessorPanel = true">
