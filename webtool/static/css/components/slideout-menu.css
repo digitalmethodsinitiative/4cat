@@ -1,9 +1,27 @@
 .slideout-header {
     height: var(--slideout-header-height);
     display: flex;
+    flex-wrap: wrap;
     column-gap: 20px;
     align-items: center;
+    justify-content: center;
     padding: var(--spacing-regular);
     background: var(--panel-bg-0);
     border-bottom: var(--stroke) solid var(--panel-bg-1);
+}
+
+.slideout-header .slideout-header-title {
+    flex-grow: 1;
+}
+
+.slideout-header .slideout-header-title h1 {
+    margin: 0;
+    line-height: 1;
+}
+
+.slideout-header ul {
+    display: flex;
+    column-gap: 20px;
+    flex-grow: 1;
+    align-items: center;
 }

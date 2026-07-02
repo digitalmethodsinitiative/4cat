@@ -108,8 +108,23 @@
         >
             {# todo: add processor breadcrump component #}
             <div class="processor-panel-header slideout-header">
-                <button class="emphasis button-like" @click="showProcessorPanel = false">back</button>
-                <h1 x-if="selectedDatasetType">Processors to run on <span x-text="selectedDatasetType"></span></h1>
+                <div x-if="selectedDatasetType" class="slideout-header-title">
+                    <ul>
+                        <li>
+                            <h1>Processors for <span class="code" x-text="selectedDatasetType"></span></h1>
+                        </li>
+                    </ul>
+                </div>
+                <div class="slideout-header-controls">
+                    <ul>
+                        <li class="search-box">
+                            SEARCH BOX
+                        </li>
+                        <li>
+                            <button class="emphasis button-like" @click="showProcessorPanel = false"><i class="fa-solid fa-xmark"></i></button>
+                        </li>
+                    </ul>
+                </div>
             </div>
             <div id="processor-grid">
             </div>
