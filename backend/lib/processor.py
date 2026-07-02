@@ -34,7 +34,6 @@ _DEFAULT_COMPATIBILITY = Compatibility(top_dataset_only=True)
 @dataclass
 class ProcessorDescription:
     name: str
-    type: str
     category: str
     description: str
     references: typing.List[str]
@@ -1173,15 +1172,17 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         :return ProcessorDescription:  Description of this processor
         """
-        return ProcessorDescription(
-            name=getattr(cls, "name", cls.__name__),
-            type=getattr(cls, "type", "unknown"),
-            category=getattr(cls, "category", "Uncategorized"),
-            description=getattr(cls, "description", ""),
-            references=getattr(cls, "references", []),
-            info=getattr(cls, "_ui_info", set()),
-            warning=getattr(cls, "_ui_warnings", set()),
-        )
+        if cls.description and isinstance(cls.description, ProcessorDescription):
+            return cls.description
+        else:
+            return ProcessorDescription(
+                name=getattr(cls, "name", cls.__name__),
+                category=getattr(cls, "category", "Uncategorized"),
+                description=getattr(cls, "description", ""),
+                references=getattr(cls, "references", []),
+                info=getattr(cls, "ui_info", set()),
+                warning=getattr(cls, "ui_warnings", set()),
+            )
 
     @abc.abstractmethod
     def process(self):
