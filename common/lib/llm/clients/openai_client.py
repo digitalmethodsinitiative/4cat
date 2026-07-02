@@ -5,6 +5,7 @@ This includes vLLM and LM Studio. And LiteLLM, technically, but LiteLLM has
 some useful API endpoints exclusive to it that we can benefit from, so use
 the dedicated class for tht instead.
 """
+import requests
 from common.lib.llm.llm_client import LLMServerClient
 
 
@@ -14,6 +15,86 @@ class OpenAICompatibleClient(LLMServerClient):
     _models_info_path = "/api/v1/models"
     _models_info_key = "models"
     _model_id_key = "key"
+
+    def get_status(self) -> bool | int:
+        """
+        Check if the server is reachable
+        Tries the LM studio native endpoint first then falls back to
+        standard OpenAI-spec /v1/models endpoint.
+        """
+        
+        # LM Studio native path
+        try:
+            r = self._session.get(
+                f"{self.base_url}{self._models_info_path}",
+                headers=self._headers,
+                timeout=self.timeout,
+            )
+            if r.status_code == 200:
+                return 200
+        except requests.RequestException:
+            pass
+
+        # Standard OpenAI-compatible fallback
+        try:
+            r = self._session.get(
+                f"{self.base_url}/v1/models",
+                headers=self._headers,
+                timeout=self.timeout,
+            )
+            if r.status_code == 200:
+                return 200
+            if self.log:
+                self.log.warning(
+                    f"{self.__class__.__name__}: server responded with status code {r.status_code} during availability check: {r.text}")
+            return r.status_code
+        except requests.RequestException as e:
+            if self.log:
+                self.log.warning(f"{self.__class__.__name__}: server is not available at {self.base_url}: {e}")
+            return False
+            
+    def list_models(self) -> list[dict]:
+        """
+        List available models from server.
+        
+        Same try logic as get_status
+        """
+        
+                # LM Studio native path
+        try:
+            r = self._session.get(
+                f"{self.base_url}{self._models_info_path}",
+                headers=self._headers,
+                timeout=self.timeout,
+            )
+            if r.status_code == 200:
+                return r.json().get(self._models_info_key, [])
+        except requests.RequestException:
+            pass
+
+        # Standard OpenAI-compatible fallback
+        try:
+            r = self._session.get(
+                f"{self.base_url}/v1/models",
+                headers=self._headers,
+                timeout=self.timeout,
+            )
+            if r.status_code == 200:
+                return r.json().get("data", [])
+            if self.log:
+                self.log.warning(
+                    f"{self.__class__.__name__}: failed to list models from {self.base_url}, status code {r.status_code}: {r.text}")
+        except requests.RequestException as e:
+            if self.log:
+                self.log.warning(f"{self.__class__.__name__}: failed to list models from {self.base_url}: {e}")
+        return []
+        
+    def get_model_id(self, meta: dict) -> str:
+        """
+        Choose model based on metadata. Supports LM Studio's `key` field and OpenAI spec `id` field
+        """
+        
+        return meta.get(self._model_id_key) or meta.get("id", "")
 
     def parse_supported_media_types(self, meta: dict) -> list[str]:
         """
