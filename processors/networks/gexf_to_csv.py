@@ -3,6 +3,7 @@ Convert a GEXF network file to a CSV file
 """
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 import networkx as nx
 import csv
@@ -23,6 +24,8 @@ class GexfToCsv(BasicProcessor):
     title = "Export Network as CSV Spreadsheet"
     description = "Convert a GEXF network file to a CSV spreadsheet"
     extension = "csv"
+    # a derived table
+    output = Table()
     icon = "file-csv"
 
     # Allow on GEXF datasets

@@ -6,6 +6,7 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -23,6 +24,8 @@ class QuoteRanker(BasicProcessor):
 	title = "Sort by most replied-to"  # title displayed in UI
 	description = "Sort posts by how often they were replied to by other posts in the dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a derived table
+	output = Table()
 	icon = "comments"
 
 	# chan datasets (posts reply to / quote each other)

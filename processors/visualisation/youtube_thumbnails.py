@@ -8,6 +8,7 @@ from apiclient.discovery import build
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_yt_compatible_ids, UserInput
 
@@ -29,7 +30,10 @@ class YouTubeThumbnails(BasicProcessor):
 	title = "Download YouTube thumbnails"  # title displayed in UI
 	description = "Downloads the thumbnails of YouTube videos and stores it in a zip archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	# a zip archive of media files
+	output = MediaArchive(media="image")
 	media_type = "image"  # media type of the result
+	icon = "images"
 
 	# Allow processor on YouTube metadata sets
 	compatibility = Compatibility(types={"youtube-metadata"}, preferred_followups=["youtube-imagewall"])

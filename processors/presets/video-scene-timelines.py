@@ -4,6 +4,7 @@ Create scene-by-scene timelines
 
 from backend.lib.preset import ProcessorPreset
 from common.lib.compatibility import Compatibility, is_executable
+from common.lib.outputs import Delegated
 
 
 class VideoSceneTimelineCreator(ProcessorPreset):
@@ -19,8 +20,11 @@ class VideoSceneTimelineCreator(ProcessorPreset):
     extension = "svg"
     icon = "film"
 
+    # a preset; its output is its last step's
+    output = Delegated()
+
     # Allow on video datasets when ffmpeg is available
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
 
     def get_processor_pipeline(self):
         """

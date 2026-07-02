@@ -9,6 +9,7 @@ import json
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
+from common.lib.outputs import Datasource
 
 
 class SearchFacebook(Search):
@@ -20,6 +21,7 @@ class SearchFacebook(Search):
     title = "Import scraped Facebook data"  # title displayed in UI
     description = "Import Facebook data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    output = Datasource()
     is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets

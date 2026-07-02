@@ -55,24 +55,45 @@
 }
 
 /** processor datetime **/
-.analysis-results .timestamp {
+.analysis-results .subway-station {
     position: absolute;
     left: 0;
     font-size: var(--font-body);
 }
 
-.analysis-results .timestamp .date {
+.analysis-results .subway-station .date {
     font-weight: bold;
 }
 
-.analysis-results .timestamp .time {
+.analysis-results .subway-station .time {
     color: var(--stroke-bright)
 }
 
-.analysis-results .timestamp span {
+.analysis-results .subway-station span {
     display: block;
     text-align: right;
     text-transform: uppercase;
+}
+
+.analysis-results .subway-station .new-notice {
+    position: absolute;
+    top: 0;
+    left: calc(-3.8rem - var(--spacing-small));
+    text-align: right;
+    width: 3rem;
+    padding-right: calc(var(--font-normal));
+}
+
+.analysis-results .subway-station .new-notice::before {
+    content: '';
+    display: block;
+    position: absolute;
+    top: 25%;
+    right: 0;
+    background: var(--red);
+    width: calc(var(--font-normal) * 0.5);
+    height: calc(var(--font-normal) * 0.5);
+    border-radius: 50%;
 }
 
 .journey-marker {
@@ -197,13 +218,26 @@
     border-right-width: 0;
     width: calc(var(--font-body) * 1.5);
     height: calc(var(--font-body) * 2.25);
-
+    outline: var(--stroke-journey) solid var(--bright);
     position: absolute;
     top: 0;
     background: transparent;
     display: block;
     content: '';
     left: calc((-1 * var(--spacing-xlarge)) - (2 * var(--stroke-journey)));
+}
+
+.processor-card > .dataset-header::after, .big-processor-button::after {
+    /** cover for outline on top of curve (break in stroke otherwise) **/
+    content: '';
+    position: absolute;
+    top: calc(var(--stroke-journey) * -1);
+    background: transparent;
+    display: block;
+    left: calc((-1 * var(--spacing-xlarge)) - (2 * var(--stroke-journey)));
+    width: var(--stroke-journey);
+    height: var(--stroke-journey);
+    background: var(--semidark);
 }
 
 .processor-card .dataset-header {
@@ -285,16 +319,27 @@
 }
 
 /** 'run processor' button/icon **/
-.run-processor-button {
-    color: var(--stroke-bright);
+.run-processor-button, button.run-processor-button {
+    color: var(--fourcat-accent);
+    display: inline-block;
+    border: var(--stroke-journey) solid var(--fourcat-accent);
+    border-radius: 50%;
+    width: calc(var(--font-body) * 2);
+    height: calc(var(--font-body) * 2);
+    font-size: calc(var(--font-body) * 1.1);
+    line-height: calc(var(--font-body) * 1.6);
+}
+
+button.run-processor-button {
+    outline: var(--stroke-journey) solid var(--bright)
 }
 
 aside.run-child-processor {
     position: absolute;
     top: calc(var(--font-body) * 3);
-    left: calc((-0.5 * var(--spacing-xlarge)) - (var(--stroke-journey) / 2) - var(--font-body) + 1px);
+    left: calc((-0.5 * var(--spacing-xlarge)) - (var(--stroke-journey) / 2) - var(--font-body));
     /** 1px needed to center on stroke, for some reason **/
-    color: var(--stroke-bright);
+    color: var(--fourcat-accent);
     background: var(--bright);
     font-size: calc(var(--font-body) * 2);
     padding-top: var(--spacing-regular);
@@ -309,9 +354,11 @@ aside.run-child-processor::before {
     content: '';
 }
 
-aside.run-child-processor i:hover::before {
+aside.run-child-processor button:hover {
     font-weight: 900;
     cursor: pointer;
+    background: var(--fourcat-accent);
+    color: var(--bright);
 }
 
 /** 'run new processor' button at bottom **/
@@ -353,6 +400,17 @@ aside.run-child-processor i:hover::before {
     font-size: var(--font-normal)
 }
 
+.run-processor-button.inline {
+    width: calc(var(--font-body) * 1.5);
+    height: calc(var(--font-body) * 1.5);
+    line-height: calc(var(--font-body) * 1.5);
+}
+
+.big-processor-button:hover .run-processor-button {
+    border-color: var(--bright);
+    color: var(--bright);
+}
+
 .big-processor-button::before {
     /** curve towards button **/
     content: '';
@@ -364,8 +422,13 @@ aside.run-child-processor i:hover::before {
     border-bottom-left-radius: var(--double-radius);
     border-top-width: 0;
     border-right-width: 0;
-    width: calc(var(--spacing-xlarge) + var(--stroke-journey));
+    width: calc(var(--spacing-xlarge));
     height: calc((100% - var(--stroke-journey)) / 2);
+    outline: var(--stroke-journey) solid var(--bright);
+}
+
+.big-processor-button::after {
+    left: 0;
 }
 
 .run-hint {

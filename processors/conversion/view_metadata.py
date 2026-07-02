@@ -8,6 +8,7 @@ import zipfile
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -27,6 +28,8 @@ class ViewMetadata(BasicProcessor):
 	title = "View media metadata"  # title displayed in UI
 	description = "Reformats the .metadata.json file and calculates analytics"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a derived table
+	output = Table()
 	icon = "circle-info"
 
 	# Allow on downloaded media datasets

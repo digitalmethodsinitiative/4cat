@@ -7,6 +7,7 @@ import itertools
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Archive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -22,6 +23,9 @@ class Vectorise(BasicProcessor):
 	title = "Count words"  # title displayed in UI
 	description = "Counts how often a token appears in the dataset. This creates a bag of words."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	# a zip archive of data files
+	output = Archive()
+	icon = "list-ol"
 
 	# Allow processor on token sets
 	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["vector-ranker"])

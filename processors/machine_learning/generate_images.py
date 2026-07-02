@@ -12,6 +12,7 @@ from processors.visualisation.download_images import ImageDownloader
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
 from common.lib.user_input import UserInput
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -28,6 +29,9 @@ class StableDiffusionImageGenerator(BasicProcessor):
     title = "Generate images from text prompts"  # title displayed in UI
     description = "Given a list of prompts, generates images using the Stable Diffusion XL image model."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "image"  # the generated files are images; set so the map and runtime agree
+    # a zip archive of image files
+    output = MediaArchive(media="image")
     icon = "images"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also requires the

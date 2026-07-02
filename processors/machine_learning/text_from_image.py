@@ -14,6 +14,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -37,10 +38,12 @@ class ImageTextDetector(BasicProcessor):
     sort them into likely groupings based on locations within the original image.
     """
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table(extension="ndjson")
     icon = "language"
 
     # image datasets (image archives or image-downloader output), when the OCR server is enabled
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.eb_ocr_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.eb_ocr_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
 
     references = [
         "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",

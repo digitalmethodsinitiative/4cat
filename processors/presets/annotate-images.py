@@ -3,6 +3,7 @@ Annotate top images
 """
 from backend.lib.preset import ProcessorPreset
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 
 from common.lib.helpers import UserInput, convert_to_int
 
@@ -17,6 +18,8 @@ class AnnotateImages(ProcessorPreset):
     description = "Use the Google Vision API to extract labels detected in the most-linked images from the dataset. Note that " \
                   "this is a paid service and will count towards your API credit."
     extension = "csv"
+    # a preset; its output is its last step's
+    output = Delegated()
     icon = "tags"
 
     # Allow on top-level CSV/NDJSON datasets

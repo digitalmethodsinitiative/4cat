@@ -4,6 +4,7 @@ Generate co-word network of word collocations
 
 from backend.lib.preset import ProcessorPreset
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -23,6 +24,9 @@ class CowordNetworker(ProcessorPreset):
                   "amount of co-word occurrences."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
     icon = "circle-nodes"
+
+    # a preset; its output is its last step's
+    output = Delegated()
 
     # Allow processor to run on collocations
     compatibility = Compatibility(types={"collocations"})
