@@ -23,8 +23,9 @@ class ClassificationEvaluation(BasicProcessor):
     type = "classification_evaluation"  # job type ID
     category = "Statistics"  # category
     title = "Classification evaluation"  # title displayed in UI
-    description = ("Use labels from two columns to calculate evaluation metrics (accuracy, precision, recall, F1, "
-                   "and Cohen's Kappa). Produces overall and per-label metrics. Also supports multi-label values.")
+    description = ("Use calculate evaluation metrics (accuracy, precision, recall, F1, "
+                   "and Cohen's Kappa) with labels from two columns. Produces overall and per-label metrics. "
+                   "Also supports multi-label values.")
     extension = "csv"  # extension of result file, used internally and in UI
 
     # Allow on CSV/NDJSON datasets

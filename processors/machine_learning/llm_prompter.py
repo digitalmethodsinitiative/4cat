@@ -29,8 +29,9 @@ class LLMPrompter(BasicProcessor):
     type = "llm-prompter"  # job type ID
     category = "Machine learning"  # category
     title = "LLM prompting"  # title displayed in UI
-    description = ("Use LLMs for analysis, via APIs or locally. This can be used for tasks like classification, "
-                   "entity extraction, or OCR. Supported APIs include OpenAI, Google, Anthropic, Mistral, and DeepSeek.")
+    description = ("Use LLMs to analyze a dataset per item, via APIs or locally. Suitable for a wide arrange of tasks like "
+                   "classification, entity extraction, or OCR. Supported APIs include OpenAI, Google, Anthropic, "
+                   "Mistral, and DeepSeek.")
     extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it accepts csv/ndjson
