@@ -1,6 +1,7 @@
 import datetime
 
 import json
+import time
 import ural
 import uuid
 import math
@@ -556,6 +557,7 @@ def inject_now():
     return {
         "__has_https": g.config.get("flask.https"),
         "__datenow": datetime.datetime.utcnow(),
+        "__now": time.time(),
         "__notifications": current_user.get_notifications(),
         "__user_config": lambda setting: g.config.get(setting),
         "__config": g.config,

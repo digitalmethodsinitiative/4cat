@@ -5,6 +5,8 @@
                 <span class="date">{{ dataset.timestamp|datetime(fmt="%-d %b")|safe }}</span>
                 <span class="time">{{ dataset.timestamp|datetime(fmt="%H:%M")|safe }}</span>
             </p>
+            {# todo: make this based on last visit, not just the timestamp #}
+            {% if dataset.timestamp_finished > (__now - 3600) %}<p class="new-notice">New!</p>{% endif %}
         </aside>
         <div class="processor-card">
             <aside class="run-child-processor">
