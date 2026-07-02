@@ -1,9 +1,11 @@
 .slide-enter {
-    transition: transform 0.2s ease-in-out;
+    transition: transform 0.2s linear;
+    will-change: transform;
+    backface-visibility: hidden;
 }
 
 .slide-from {
-    transform: translateY(100%);
+    transform: translateY(100vh);
 }
 
 .slide-to {
