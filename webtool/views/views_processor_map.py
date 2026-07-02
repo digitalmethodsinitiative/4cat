@@ -14,7 +14,14 @@ component = Blueprint("processormapview", __name__)
 
 
 @component.route("/processor-catalogue")
+@component.route("/processor-catalogue/<processor_type>")
 @login_required
-def processor_catalogue_page():
-    """Render the processor catalogue: browse/search, then "how to run this"."""
-    return render_template("processor-catalogue.html")
+def processor_catalogue_page(processor_type=None):
+    """Render the processor catalogue: browse/search, then "how to run this".
+
+    With a processor type in the path, the page opens with that processor's detail
+    already loaded, so a direct link lands on it instead of the visitor having to
+    find and click it. The type is passed through to the client, which validates it
+    against the catalogue -- an unknown type just falls back to the browse view.
+    """
+    return render_template("processor-catalogue.html", processor_type=processor_type)
