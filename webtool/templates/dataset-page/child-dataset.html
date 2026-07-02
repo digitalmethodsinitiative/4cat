@@ -5,8 +5,12 @@
                 <span class="date">{{ dataset.timestamp|datetime(fmt="%-d %b")|safe }}</span>
                 <span class="time">{{ dataset.timestamp|datetime(fmt="%H:%M")|safe }}</span>
             </p>
+            {# todo: make this based on last visit, not just the timestamp #}
+            {% if dataset.timestamp_finished > (__now - 3600) %}<p class="new-notice">New!</p>{% endif %}
         </aside>
         <div class="processor-card">
+            {% set has_processors = dataset.is_finished() and (dataset.get_children() or (dataset.num_rows > 0 and current_user.is_authenticated and dataset.get_available_processors(config=__config, exclude_hidden=True))) %}
+            {% if has_processors %}
             <aside class="run-child-processor">
                 <button class="no-style run-processor-button"
                     {# hx-get="{{ url_for('dataset.processor_panel', key=dataset.key) }}" #}
@@ -15,7 +19,8 @@
                     <i class="fa-solid fa-star-of-life" aria-hidden="true"></i> <span class="sr-only">Run processor on this dataset</span>
                 </button>
             </aside>
-            <button class="journey-marker{% if not dataset.get_children() %} end{% endif %}">
+            {% endif %}
+            <button class="journey-marker{% if not has_processors %} end{% endif %}">
             {% if not dataset.is_finished %}
                 &#62193; {# spinner #}
             {% elif not dataset.num_rows %}

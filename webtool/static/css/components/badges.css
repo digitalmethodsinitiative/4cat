@@ -1,18 +1,34 @@
 .badge-list {
     display: flex;
     column-gap: var(--spacing-regular);
-    font-size: var(--font-base);
+    font-size: var(--font-body);
+    position: relative;
+}
+
+.badge-list.no-overflow {
+    flex-wrap: wrap;
+    row-gap: var(--spacing-small);
 }
 
 .badge-list.with-overflow {
-    background: linear-gradient(90deg, transparent 0%, transparent 90%, var(--panel-bg-1) 100%);
     overflow-y: auto;
     white-space: nowrap;
+}
+
+.badge-list.with-overflow::before {
+    display: block;
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, transparent 80%, var(--bright) 100%);
     border-bottom-right-radius: var(--radius);
 }
 
-.dark .badge-list.with-overflow {
-    background: linear-gradient(90deg, var(--brighten-12) 0%, var(--brighten-12) 90%, var(--panel-bg-3) 100%);
+.dark .badge-list.with-overflow::before {
+    background: linear-gradient(90deg, transparent 0%, transparent 80%, var(--panel-bg-3) 100%);
 }
 
 .badge-list div {
@@ -34,6 +50,14 @@
 .badge-list dd {
     background: var(--brighten-12);
     padding: var(--spacing-tiny) var(--spacing-small);
+}
+
+.badge-list.dataset-status dt {
+    align-self: start;
+}
+
+.badge-list.dataset-status dd {
+    white-space: wrap;
 }
 
 .status-badge dt {
