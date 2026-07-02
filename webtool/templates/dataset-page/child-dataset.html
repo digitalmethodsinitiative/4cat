@@ -2,13 +2,13 @@
     <article>
         <aside class="subway-station">
             <p class="timestamp">
-                <span class="date">{{ dataset.timestamp|datetime(fmt="%-d %b")|safe }}</span>
+                <span class="date">{{ dataset.timestamp|datetime(fmt="%d %b")|safe }}</span>
                 <span class="time">{{ dataset.timestamp|datetime(fmt="%H:%M")|safe }}</span>
             </p>
             {# todo: make this based on last visit, not just the timestamp #}
             {% if dataset.timestamp_finished > (__now - 3600) %}<p class="new-notice">New!</p>{% endif %}
         </aside>
-        <div class="processor-card">
+        <div class="module-card">
             {% set has_processors = dataset.is_finished() and (dataset.get_children() or (dataset.num_rows > 0 and current_user.is_authenticated and dataset.get_available_processors(config=__config, exclude_hidden=True))) %}
             {% if has_processors %}
             <aside class="run-child-processor">
@@ -29,7 +29,7 @@
                 <span class="status-indicator status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}"></span>
             {% endif %}
             </button>
-            {% include "dataset-page/dataset-header.html" %}
+            {% include "dataset-page/dataset-card.html" %}
         </div>
     </article>
     <div class="run-hint">

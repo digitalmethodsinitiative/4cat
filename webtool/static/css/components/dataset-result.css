@@ -16,15 +16,6 @@
     margin-top: var(--spacing-regular);
 }
 
-.dataset-metadata nav > ul, .dataset-actions {
-    display: flex;
-    column-gap: var(--spacing-regular);
-}
-
-.dataset-metadata > nav > ul > li > .button-like {
-    outline-color: var(--button-grey);
-}
-
 .dataset-metadata .button-like {
     color: var(--bright);
 }
@@ -57,24 +48,6 @@
 .dataset-metadata h1 {
     font-family: Chivo, sans-serif;
     font-weight: normal;
-}
-
-.dataset-actions li {
-    border-bottom: var(--stroke) solid var(--button-grey);
-    background: var(--brighten-12);
-    height: calc(var(--font-normal) + 2 * var(--spacing-small));
-}
-
-.dataset-actions li a {
-    padding: var(--spacing-small);
-    display: block;
-    animation: 200ms;
-    height: var(--font-normal);
-}
-
-.dataset-actions li:hover {
-    color: var(--button-bg-regular);
-    background: var(--button-grey);
 }
 
 .dataset-fetch .button-like {

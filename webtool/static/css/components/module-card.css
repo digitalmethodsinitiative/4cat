@@ -1,0 +1,125 @@
+.module-card {
+    position: relative;
+}
+
+.module-card .card-header {
+    color: inherit;
+    border: var(--stroke-light) solid var(--dark);
+    border-radius: var(--radius);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom-color: var(--panel-bg-2);
+    background: var(--panel-bg-0);
+    padding: var(--spacing-regular);
+}
+
+.quick-links {
+    flex-grow: 1;
+}
+
+.quick-links li:hover {
+    background: var(--button-bg-regular);
+    color: var(--panel-bg-0);
+}
+
+.module-actions {
+    display: flex;
+    column-gap: var(--spacing-regular);
+}
+
+.module-actions li {
+    background: var(--panel-bg-1);
+    color: var(--semidark);
+    border-bottom-color: var(--semidark);
+    border-bottom: var(--stroke) solid var(--semidark);
+    height: calc(var(--font-normal) + 2 * var(--spacing-small));
+}
+
+.module-actions li:hover {
+    color: var(--button-bg-regular);
+    background: var(--button-grey);
+}
+
+.module-actions li a {
+    padding: var(--spacing-small);
+    display: block;
+    animation: 200ms;
+    height: var(--font-normal);
+}
+
+.module-actions .button-like {
+    outline-color: var(--button-grey);
+}
+
+/** colours for dropdown button in module cards **/
+.module-card .button-like {
+    color: var(--button-bg-regular);
+    background-color: transparent;
+    outline-color: var(--button-bg-regular);
+}
+
+.module-card .dropdown-action-button::before {;
+    outline-color: var(--button-bg-regular);
+    background-color: var(--button-bg-regular);
+}
+
+.module-card .button-like:hover, .module-card .with-dropdown ul li:hover, .module-card .with-dropdown:hover .dropdown-action-button::before {
+    color: var(--panel-bg-0);
+    background: var(--button-bg-regular);
+    outline-color: var(--button-bg-regular);
+}
+
+.module-card .with-dropdown:hover ul {
+    outline-color: var(--button-bg-regular);
+}
+
+.module-card .with-dropdown ul li {
+    background-color: var(--panel-bg-0);
+    border-color: var(--button-bg-regular);
+    color: var(--button-bg-regular);
+}
+
+.module-card .badge-list {
+    padding: var(--spacing-small) var(--spacing-regular);
+}
+
+/** any badge list in a processor card that is not the last one **/
+.module-card .badge-list:not(:last-child) {
+    border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
+.module-card .badge-list dd {
+    border: var(--stroke) solid var(--button-grey);
+    box-sizing: content-box;
+}
+
+.module-card .card-content {
+    border: var(--stroke-light) solid var(--dark);
+    border-top: 0;
+    border-radius: var(--radius);
+    border-top-right-radius: 0;
+    border-top-left-radius: 0;
+    border-bottom-width: var(--stroke-journey);
+}
+
+.module-card .card-description {
+    padding: var(--spacing-regular);
+    color: var(--dark);
+}
+
+.module-card .output-hints {
+    border-top: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
+.module-card .output-hints dd {
+    display: inline;
+}
+
+/* follow-up hints: lay the label, badges and "See all" out in a row and
+   push the whole group to the right edge of the (flex) badge-list */
+.module-card .output-hints .followup-hints {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-small);
+    margin-left: auto;
+}

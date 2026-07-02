@@ -1,0 +1,24 @@
+.module-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--spacing-regular);
+}
+
+.module-grid > .module-card {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: calc((100% - 2 * var(--spacing-regular)) / 3);
+    min-width: min(35rem, 100%);
+    box-sizing: border-box;
+}
+
+.processor-card .badge-list {
+    margin: 0;
+}
+
+.no-results {
+    padding: var(--spacing-large);
+    text-align: center;
+    color: var(--semidark);
+}

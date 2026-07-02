@@ -176,7 +176,7 @@
 }
 
 /** journey marker of first item in tree, and any item with children **/
-:first-child > article > .processor-card > .journey-marker::before, .with-children > article > .processor-card > .journey-marker::before {
+:first-child > article > .module-card > .journey-marker::before, .with-children > article > .module-card > .journey-marker::before {
     /** block top of border that extends above journey marker **/
     content: '';
     display: block;
@@ -188,17 +188,11 @@
     height: calc(var(--spacing-regular) + 0.5em);
 }
 
-/** any processor card **/
-/** standard processor card height **/
-:root {
-    --card-height: calc(var(--font-h1) * 10);
-}
-.processor-card {
-    position: relative;
+.analysis-results .module-card {
     padding: var(--spacing-regular) 0;
 }
 
-.processor-card::before {
+.analysis-results .module-card::before {
     /** dotted line connecting card to journey marker **/
     content: '';
     display: block;
@@ -210,7 +204,7 @@
     border-width: calc(var(--stroke-journey) / 2) 0;
 }
 
-.processor-card > .dataset-header::before {
+.analysis-results .module-card > .card-header::before {
     /** curve towards journey marker **/
     border: var(--stroke-journey) solid var(--semidark);
     border-bottom-left-radius: var(--double-radius);
@@ -227,7 +221,7 @@
     left: calc((-1 * var(--spacing-xlarge)) - (2 * var(--stroke-journey)));
 }
 
-.processor-card > .dataset-header::after, .big-processor-button::after {
+.analysis-results .module-card > .card-header::after, .big-processor-button::after {
     /** cover for outline on top of curve (break in stroke otherwise) **/
     content: '';
     position: absolute;
@@ -238,84 +232,6 @@
     width: var(--stroke-journey);
     height: var(--stroke-journey);
     background: var(--semidark);
-}
-
-.processor-card .dataset-header {
-    color: inherit;
-    border: var(--stroke-light) solid var(--dark);
-    border-radius: var(--radius);
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    border-bottom-color: var(--panel-bg-2);
-    background: var(--panel-bg-0);
-    padding: var(--spacing-regular);
-}
-
-/** badge list container **/
-.processor-card .status {
-    border: var(--stroke-light) solid var(--dark);
-    border-top: 0;
-    border-radius: var(--radius);
-    border-top-right-radius: 0;
-    border-top-left-radius: 0;
-    border-bottom-width: var(--stroke-journey);
-}
-
-.processor-card .badge-list {
-    padding: var(--spacing-small) var(--spacing-regular);
-}
-
-/** any badge list in a processor card that is not the last one **/
-.processor-card .badge-list:not(:last-child) {
-    border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
-}
-
-.processor-card .badge-list dd {
-    border: var(--stroke) solid var(--button-grey);
-    box-sizing: content-box;
-}
-
-.processor-card .quick-links {
-    flex-grow: 1;
-}
-
-.processor-card .quick-links li:hover {
-    background: var(--button-bg-regular);
-    color: var(--panel-bg-0);
-}
-
-.analysis-results .dataset-actions li {
-    background: var(--panel-bg-1);
-    color: var(--semidark);
-    border-bottom-color: var(--semidark);
-}
-
-/** colours for dropdown button in processor cards **/
-.processor-card .button-like {
-    color: var(--button-bg-regular);
-    background-color: transparent;
-    outline-color: var(--button-bg-regular);
-}
-
-.processor-card .dropdown-action-button::before {;
-    outline-color: var(--button-bg-regular);
-    background-color: var(--button-bg-regular);
-}
-
-.processor-card .button-like:hover, .processor-card .with-dropdown ul li:hover, .processor-card .with-dropdown:hover .dropdown-action-button::before {
-    color: var(--panel-bg-0);
-    background: var(--button-bg-regular);
-    outline-color: var(--button-bg-regular);
-}
-
-.processor-card .with-dropdown:hover ul {
-    outline-color: var(--button-bg-regular);
-}
-
-.processor-card .with-dropdown ul li {
-    background-color: var(--panel-bg-0);
-    border-color: var(--button-bg-regular);
-    color: var(--button-bg-regular);
 }
 
 /** 'run processor' button/icon **/

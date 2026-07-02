@@ -65,7 +65,7 @@
                         class="result{% if dataset.is_finished() %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% else %} dataset-unfinished{% endif %}"
                         data-numrows="{{ dataset.num_rows }}" data-dataset-key="{{ dataset.key }}">
                         {% with lite_header=True %}
-                            {% include "dataset-page/dataset-header.html" %}
+                            {% include "dataset-page/dataset-card.html" %}
                         {% endwith %}
                     </li>
                 {% endif %}{% endfor %}

@@ -1,7 +1,0 @@
-.processor-box {
-    border-radius: var(--radius);
-    border: var(--stroke-light) solid var(--dark);
-    border-bottom-width: var(--stroke-journey);
-    padding: var(--spacing-small);
-    text-align: center;
-}

@@ -1,0 +1,34 @@
+input[type=search] {
+    font-family: Roboto, serif;
+    border: none;
+    background-color: transparent;
+    color: var(--gray);
+    border-bottom: var(--stroke) solid var(--semidark);
+    line-height: 1.5rem;
+}
+
+input[type=search]:active,
+input[type=search]:focus {
+    outline: none;
+    border-bottom: var(--stroke-heavy) solid var(--semidark);
+}
+
+.search-box {
+    position: relative;
+}
+
+.search-box::before {
+    content: "\f002";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    left: var(--spacing-small);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--semidark);
+    pointer-events: none;
+}
+
+.search-box input[type="search"] {
+    padding-left: calc(var(--spacing-small) * 2 + 1em);
+}

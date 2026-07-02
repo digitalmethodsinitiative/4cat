@@ -1,4 +1,4 @@
-.dataset-header {
+.card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -9,7 +9,7 @@
     box-sizing: border-box;
 }
 
-.dataset-header h3, .dataset-header h1 {
+.card-header h3, .card-header h1 {
     font-family: Chivo, sans-serif;
     font-weight: normal;
     font-size: var(--font-h1);
@@ -18,7 +18,7 @@
     margin: 0;
 }
 
-.dataset-header nav {
+.card-header nav {
     position: relative;
     align-items: center;
     display: flex;
@@ -26,16 +26,16 @@
     justify-content: space-between;
 }
 
-.dataset-header nav ul.dataset-fetch {
+.card-header nav ul.dataset-fetch {
     text-align: right;
     column-gap: 0;
     position: relative;
 }
 
-.dataset-header nav.actions {
+.card-header nav.actions {
     justify-content: end;
 }
 
-.dataset-header > i {
+.card-header > i {
     font-size: calc(var(--font-h1) * 1.5);
 }

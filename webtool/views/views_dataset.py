@@ -657,6 +657,33 @@ def processor_grid(key):
         processors=processors_available,
     )
 
+@component.route('/results/<string:key>/processor-options/<string:processor>/')
+@login_required
+def processor_options(key, processor):
+    """
+    Get the options form for a processor, rendered as a partial
+
+    :param str key:  Dataset key to show processor options for
+    :param str processor:  ID of the processor to show options for
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    available_processors = dataset.get_available_processors(config=g.config)
+    if processor not in available_processors:
+        return error(404, error="This processor is not available for this dataset.")
+
+    return render_template(
+        "components/processor-options.html",
+        dataset=dataset,
+        processor=available_processors[processor],
+    )
+
 @component.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
 @login_required
 def queue_processor_interactive(key, processor):

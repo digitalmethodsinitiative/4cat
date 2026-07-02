@@ -1,0 +1,31 @@
+<form action="{{ url_for('dataset.queue_processor_interactive', key=dataset.key, processor=processor.type) }}"
+      method="POST" class="processor-options-form">
+
+    <p class="processor-description">{{ processor.description|markdown|safe }}</p>
+
+    <input type="hidden" name="key" value="{{ dataset.key }}">
+    <input type="hidden" name="processor" value="{{ processor.type }}">
+
+    {% set processor_options = processor.get_options(dataset, __config) %}
+    {% if processor_options %}
+        <fieldset class="processor-options">
+            {% for option in processor_options %}{% if not processor_options[option].delegated %}
+                {% include "components/processor-option.html" %}
+            {% endif %}{% endfor %}
+
+            {% if __user_config("ui.option_email") in ["both", "processor_only"] and __user_config("mail.server") %}
+                <div class="form-element combo-checkbox-input">
+                    <label>
+                        <input type="checkbox" name="email-complete" id="data-email-complete">
+                        Receive email on completion:
+                    </label>
+                    <input id="data-email-user" type="email" name="email-user" value="{{ current_user.get_name() }}">
+                </div>
+            {% endif %}
+        </fieldset>
+    {% endif %}
+
+    <button class="button-like emphasis processor-queue-button">
+        <i class="fa fa-play" aria-hidden="true"></i> Run processor
+    </button>
+</form>

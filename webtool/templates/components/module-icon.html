@@ -1,0 +1,10 @@
+{% if not icon %}
+    {% set icon = "puzzle-piece" %}
+{% endif %}
+{% if icon.startswith("brand-") %}
+    {% set icon_type="fab" %}
+    {% set icon = icon[6:] %}
+{% else %}
+    {% set icon_type="fa" %}
+{% endif %}
+<i class="{{ icon_type }} fa-{{ icon }}" aria-hidden="true"></i>

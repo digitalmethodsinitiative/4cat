@@ -991,6 +991,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 pass
 
     @classmethod
+    def get_repo_link(cls, config):
+        """
+        Get a link to the processor's source code repository
+
+        :param ConfigManager config:  Configuration reader
+        :return str:  URL to the processor's source code repository
+        """
+        repo_url = config.get("4cat.github_url")
+        path = cls.filepath.replace("\\", "/").lstrip("/")
+        return f"{repo_url.rstrip('/')}/blob/master/{path}"
+
+    @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
         Determine whether this processor can run on a given module.

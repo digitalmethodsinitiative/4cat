@@ -1,0 +1,41 @@
+<div class="module-card processor-card"
+     data-search="{{ (processor.title ~ ' ' ~ processor.description ~ ' ' ~ processor.category)|lower }}"
+     x-show="!processorSearch.trim() || $el.dataset.search.includes(processorSearch.toLowerCase().trim())">
+    <header class="card-header processor-header">{% if processor.icon %}{% set icon = processor.icon %}{% endif %}
+    {% include 'components/module-icon.html' %}
+    <h3>{{ processor.title }}</h3>
+        {% include 'components/processor-card-actions.html' %}
+        <nav class="actions">
+            <button
+                class="button-like"
+                hx-get="{{ url_for('dataset.processor_options', key=dataset.key, processor=processor.type) }}"
+                hx-target="#processor-options"
+                hx-swap="innerHTML"
+                hx-trigger="click"
+                @click='selectedProcessor = { type: {{ processor.type|tojson }}, label: {{ processor.title|tojson }}, repo: {{ processor.get_repo_link(__config)|tojson }} }'>Select</button>
+        </nav>
+    </header>
+    <section class="card-content">
+        <div class="processor-card-content">
+            <div class="card-description">
+                {{ processor.description }}
+            </div>
+            <dl class="badge-list output-hints">
+                <div><dt>Output</dt><dd>{{ processor.extension }}</dd></div>
+                {% if processor.compatibility %}
+                <div class="followup-hints">
+                    <dt>Follow-ups</dt>
+                    {% if processor.compatibility.preferred_followups %}
+                        {% for followup in (processor.compatibility.preferred_followups|list)[:3] %}
+                            <a href="/processor-catalogue/{{ followup }}"><dd>{{ followup }}</dd></a>
+                        {% endfor %}
+                    {% endif %}
+                    <ul class="module-actions">
+                        <li><a href="/processor-catalogue/{{ processor.type }}">See all</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </section>
+</div>

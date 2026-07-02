@@ -11,11 +11,12 @@
 
 @import url('components/plain-page.css');
 @import url('components/site-header.css');
-@import url('components/dataset-header.css');
+@import url('components/card-header.css');
 @import url('components/dataset-result.css');
 @import url('components/dataset-overview.css');
 @import url('components/footer.css');
 @import url('components/analysis-tree.css');
 @import url('components/slideout-menu.css');
-@import url('components/processor-panel.css');
-@import url('components/processor-box.css');
+@import url('components/module-grid.css');
+@import url('components/module-card.css');
+@import url('components/user-input.css');

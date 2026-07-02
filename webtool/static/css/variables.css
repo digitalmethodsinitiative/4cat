@@ -49,10 +49,13 @@
     --spacing-large: calc(var(--spacing-tiny) * 8);
     --spacing-xlarge: calc(var(--spacing-tiny) * 12);
 
+    --card-height: calc(var(--font-h1) * 10);
+
     --slideout-header-height: 3rem;
 
     --stroke-light: calc(var(--font-base) * 0.1);
     --stroke: calc(var(--stroke-light) * 2);
+    --stroke-heavy: calc(var(--stroke-light) * 4);
     --stroke-journey: calc(var(--stroke-light) * 3);
     --radius: calc(var(--font-base) / 6 * 5);
     --double-radius: calc(2 * var(--radius));

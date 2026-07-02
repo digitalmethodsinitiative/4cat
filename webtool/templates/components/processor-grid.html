@@ -1,5 +1,8 @@
-<ol>
-{% for processor_id, processor in processors.items() %}
-    {% include "components/processor-box.html" %}
-{% endfor %}
-</ol>
+<div class="module-grid">
+    {% for processor_id, processor in processors.items() %}
+        {% include "components/processor-card.html" %}
+    {% endfor %}
+</div>
+<p class="no-results" style="display: none" x-show="noProcessorResults()">
+    No processors match <strong x-text="processorSearch"></strong>.
+</p>
