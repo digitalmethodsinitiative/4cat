@@ -1,12 +1,8 @@
 {% macro format_parameter(dataset, label, tooltip=None) %}
-<div{% if tooltip %}{% set tooltip_id %}{{ label|idify }}{% endset %} class="tooltip-trigger"
-                                                    aria-controls="tooltip-{{ dataset.key }}-{{ tooltip_id }}"{% endif %}>
+<div{% if tooltip %} x-tooltip="{{ tooltip }}"{% endif %}>
     <dt class="copy-to-clipboard">{{ label|replace('-', ' ')|replace('_', ' ') }}</dt>
     <dd class="has-more" data-max-length="75">
         {{ caller() }}
-        {% if tooltip %}
-            <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-{{ tooltip_id }}">{{ tooltip }}</span>
-        {% endif %}
     </dd>
 </div>
 {% endmacro %}

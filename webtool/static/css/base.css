@@ -49,3 +49,14 @@ pre {
 button {
     font: inherit;
 }
+
+.sr-only {
+    /** content hidden, but not for screen readers */
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}

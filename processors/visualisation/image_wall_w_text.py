@@ -41,8 +41,8 @@ class ImageTextWallGenerator(BasicProcessor):
     # a rendered image, no column table
     output = Render()
 
-    image_datasets = ["image-downloader", "video-hasher-1"]
-    caption_datasets = ["image-captions", "text-from-images"]
+    image_datasets = ["image-downloader", "video-hasher-1", "media-import-search"]
+    caption_datasets = ["image-captions", "text-from-images", "llm-prompter"]
     combined_dataset = ["image-downloader-stable-diffusion"]
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it walks the
@@ -176,6 +176,15 @@ class ImageTextWallGenerator(BasicProcessor):
                     image_text = item.get("prompt", "")
                     max_text_len = max(max_text_len, len(image_text))
                     filename_to_text_mapping[item["filename"]] = image_text
+        elif text_dataset.type == "llm-prompter":
+            # llm-prompter store filename as "id" and text as "output"
+            for item in text_dataset.iterate_items(self):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while collecting text")
+                if "id" in item:
+                    image_text = item.get("output", "")
+                    max_text_len = max(max_text_len, len(image_text))
+                    filename_to_text_mapping[item["id"]] = image_text
         else:
             # For datasets with separate images and text
             for item in text_dataset.iterate_items(self):
@@ -207,7 +216,7 @@ class ImageTextWallGenerator(BasicProcessor):
         load_errors = []
         self.dataset.update_status("Creating Image wall")
         self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
-        for image in image_dataset.iterate_items(self):
+        for image in image_dataset.iterate_items(self, immediately_delete=False):
             if image.file.name in [".metadata.json"]:
                 if convert_to_int(self.parameters.get("amount"), 100) == 0:
                     max_images = max_images - 1

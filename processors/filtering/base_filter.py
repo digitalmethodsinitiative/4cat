@@ -4,6 +4,7 @@ Base filter class to handle filetypes
 import abc
 import csv
 import json
+import shutil
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
@@ -54,6 +55,7 @@ class BaseFilter(BasicProcessor):
         # Check if we need to copy over annotations
         copy_annotations = True if self.source_dataset.num_annotations() > 0 else False
 
+        zip_file = False
         with self.dataset.get_results_path().open("w", encoding="utf-8", **kwargs) as outfile:
 
             writer = None
@@ -73,6 +75,12 @@ class BaseFilter(BasicProcessor):
                     writer.writerow(item_original)
                 elif parent_extension == "ndjson":
                     outfile.write(json.dumps(item_original) + "\n")
+                elif parent_extension == "zip":
+                    if not zip_file:
+                        staging_area = self.dataset.get_staging_area()
+                        zip_file = True
+                    # copy the file from the source dataset to the new dataset
+                    shutil.copy2(item.file, staging_area)
                 else:
                     raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
 
@@ -89,7 +97,16 @@ class BaseFilter(BasicProcessor):
             return
 
         self.dataset.update_label(f"({self.title}) {self.source_dataset.get_label()}")
-        self.dataset.finish(num_posts)
+
+        # Write the archive if needed and finish the dataset
+        if zip_file:
+            # check for metadata file and copy it over if it exists
+            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_dataset.get_results_path())
+            if metadata_file:
+                shutil.copy2(metadata_file, staging_area)
+            self.write_archive_and_finish(staging_area, num_posts)
+        else:
+            self.dataset.finish(num_posts)
 
     def after_process(self):
         super().after_process()

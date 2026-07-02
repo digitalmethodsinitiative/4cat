@@ -31,7 +31,6 @@ class UserInput:
     OPTION_INFO = "info"  # just a bit of text, not actual input
     OPTION_TEXT_LARGE = "textarea"  # longer text
     OPTION_TEXT_JSON = "json"  # text, but should be valid JSON
-    OPTION_DATE = "date"  # a single date
     OPTION_DATERANGE = "daterange"  # a beginning and end date
     OPTION_DIVIDER = "divider"  # meta-option, divides related sets of options
     OPTION_FILE = "file"  # file upload
@@ -393,7 +392,7 @@ class UserInput:
             else:
                 raise QueryParametersException("Toggle invalid input")
 
-        elif input_type in (UserInput.OPTION_DATE, UserInput.OPTION_DATERANGE):
+        elif input_type == UserInput.OPTION_DATERANGE:
             # parse either integers (unix timestamps) or try to guess the date
             # format (the latter may be used for input if JavaScript is turned
             # off in the front-end and the input comes from there)
