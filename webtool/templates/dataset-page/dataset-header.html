@@ -50,20 +50,13 @@ set: main_header = True for a header at the top of the analyiss tree (e.g. on th
     <dl class="badge-list dataset-status">
         <div class="status-badge-annotated status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
             <dt>{% if not dataset.is_finished %}Processing{% elif dataset.num_rows %}Completed{% else %}No
-                results{% endif %}</dt>
+                results{% endif %}{% if dataset.num_rows %} ({{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %}){% endif %}</dt>
             <dd>{{ dataset.get_status() or "Processor finished." }}</dd>
         </div>
     </dl>
 
+    {% if main_header %}
     <dl class="badge-list">
-        {% if dataset.num_rows %}
-            <div>
-                <dt>Items</dt>
-                <dd>{{ dataset.num_rows|commafy }}</dd>
-            </div>
-        {% endif %}
-
-
         {% if __user_config("ui.show_datasource") and dataset.parameters.datasource %}
             <div>
                 <dt>Created from</dt>
@@ -79,8 +72,6 @@ set: main_header = True for a header at the top of the analyiss tree (e.g. on th
             </div>
         {% endif %}
 
-        {% if main_header %}
-            {# children have the timestamp in the 'metro map' already #}
         <div>
             <dt>Created</dt>
             <dd>
@@ -93,8 +84,8 @@ set: main_header = True for a header at the top of the analyiss tree (e.g. on th
                 {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
             </dd>
         </div>
-        {% endif %}
     </dl>
+        {% endif %}
     {% if dataset.parameters|visible_parameters %}
         <dl class="badge-list parameters with-overflow">
             {% include "dataset-page/dataset-parameters.html" %}
