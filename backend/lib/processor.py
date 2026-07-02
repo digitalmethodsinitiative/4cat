@@ -40,18 +40,26 @@ class ProcessorDescription:
     the result is available via `Processor.get_description()`.
     """
     title: str
-    category: str
     description: str
+    category: str = ""
+    tags: typing.List[str] = field(default_factory=list)
     references: typing.List[str] = field(default_factory=list)
-    info: set = field(default_factory=set)
-    warnings: set = field(default_factory=set)
+    info: typing.List[str] = field(default_factory=list)
+    warnings: typing.List[str] = field(default_factory=list)
     icon: str = ""
     tags: typing.List[str] = field(default_factory=list)
 
     def __post_init__(self):
-        # when no tags are given, use the category as the single default tag
-        if not self.tags and self.category:
+        # `category` is kept as the first entry of `tags`, so 4CAT can move to
+        # tags (which allow several per processor and can be filtered on) while
+        # `category` keeps working. Derive whichever is missing; when both are
+        # given, make sure the category leads the tag list.
+        if self.category and not self.tags:
             self.tags = [self.category]
+        elif self.tags and not self.category:
+            self.category = self.tags[0]
+        elif self.category and self.tags:
+            self.tags = [self.category] + [tag for tag in self.tags if tag != self.category]
 
 
 class _DescriptionField:
@@ -127,8 +135,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         category="Other", 
         description="No description available", 
         references=[],
-        info=set(),
-        warnings=set(),
+        info=[],
+        warnings=[],
         icon=""
         )
 
@@ -141,6 +149,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     references = _DescriptionField("references")
     info = _DescriptionField("info")
     warnings = _DescriptionField("warnings")
+    tags = _DescriptionField("tags")
     icon = _DescriptionField("icon")
     tags = _DescriptionField("tags")
 
@@ -1219,8 +1228,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 category=cls.__dict__.get("category", inherited.category),
                 description=cls.__dict__.get("description", inherited.description),
                 references=list(cls.__dict__.get("references", inherited.references)),
-                info=set(cls.__dict__.get("info", inherited.info)),
-                warnings=set(cls.__dict__.get("warnings", inherited.warnings)),
+                info=list(cls.__dict__.get("info", inherited.info)),
+                warnings=list(cls.__dict__.get("warnings", inherited.warnings)),
+                tags=list(cls.__dict__.get("tags", [])),
                 icon=cls.__dict__.get("icon", inherited.icon),
                 # tags default to this class's category (see __post_init__), so
                 # don't inherit them — re-derive from the resolved category
@@ -1228,7 +1238,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             )
 
         # remove raw attributes so the inherited descriptors govern access
-        for name in ("title", "category", "description", "references", "info", "warnings", "icon", "tags"):
+        for name in ("title", "category", "description", "references", "info", "warnings", "tags", "icon"):
             if name in cls.__dict__:
                 delattr(cls, name)
 
