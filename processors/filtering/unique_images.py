@@ -4,7 +4,7 @@ Filter by unique images
 import shutil
 import json
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, hash_file
 from common.lib.compatibility import Compatibility
@@ -21,9 +21,21 @@ class UniqueImageFilter(BasicProcessor):
     Retain only unique images, by a user-defined metric
     """
     type = "image-downloader-unique"  # job type ID
-    category = "Visualisation"  # category
-    title = "Filter for unique images"  # title displayed in UI
-    description = "Only keeps one instance per image using various detection methods."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Filter for unique images",
+        category="Visual",
+        tags=["filter", "similarity"],
+        description="Keep only one copy of each image, detecting duplicates with an exact file hash or with a perceptual, colour, average, or difference hash. The remaining images are saved as a new image archive.",
+        info=[
+            "The file hash only matches byte-for-byte identical files; the perceptual, colour, average, and difference hashes also match visually similar images such as crops or re-saves.",
+        ],
+        references=[
+            "[Imagehash library](https://github.com/JohannesBuchner/imagehash?tab=readme-ov-file)",
+            "Explainer: [Average hash](https://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html)",
+            "Explainer: [Perceptual hashing](https://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html)",
+            "Explainer: [Difference hash](https://www.hackerfactor.com/blog/index.php?/archives/529-Kind-of-Like-That.html)",
+        ],
+    )
     extension = "zip"
     media_type = "image"  # the retained files are images; set so the map and runtime agree
     # a zip archive of image files
@@ -31,14 +43,6 @@ class UniqueImageFilter(BasicProcessor):
 
     # image datasets: image archives, image-downloader output, or extracted video frames
     compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"})
-
-    references = [
-        "[Imagehash library](https://github.com/JohannesBuchner/imagehash?tab=readme-ov-file)",
-        "Explainer: [Average hash](https://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html)",
-        "Explainer: [Perceptual hashing](https://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html)",
-        "Explainer: [Difference hash](https://www.hackerfactor.com/blog/index.php?/archives/529-Kind-of-Like-That.html)",
-
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

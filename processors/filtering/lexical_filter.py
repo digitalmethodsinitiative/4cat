@@ -4,6 +4,7 @@ Filter posts by lexicon
 import re
 
 from processors.filtering.base_filter import BaseFilter
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
@@ -18,17 +19,26 @@ class LexicalFilter(BaseFilter):
     Retain only posts matching a given lexicon
     """
     type = "lexical-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Filter by words or phrases"  # title displayed in UI
-    description = "Retains posts that contain selected words or phrases, including preset word lists. " \
-                  "This creates a new dataset."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Filter by words or phrases",
+        category="Filtering",
+        tags=["filter"],
+        description=("Retain only items whose text contains one of the given words or phrases. Accepts a custom "
+                    "comma-separated list, built-in word lists, and regular expressions."),
+        references=[
+            "[Regex101](https://regex101.com/)",
+        ],
+        info=[
+            "Produces a new dataset with the matching items; the original dataset is left unchanged.",
+        ],
+        warnings=[
+            ("With the regular-expression option the word list is read as a single Python regular expression, so a "
+             "malformed expression may match nothing."),
+        ],
+    )
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
-
-    references = [
-        "[Regex101](https://regex101.com/)"
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

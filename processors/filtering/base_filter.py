@@ -6,7 +6,7 @@ import csv
 import json
 import shutil
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Filter
 
@@ -23,10 +23,13 @@ class BaseFilter(BasicProcessor):
     Retain only posts where a given column matches a given value
     """
     type = "column-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Base Filter"  # title displayed in UI
-    description = "This should not be available."
-    icon = "filter"
+    description = ProcessorDescription(
+        title="Base filter",
+        category="Filtering",
+        tags=["internal"],
+        description="Abstract base class for filters that re-emit a parent dataset's rows. Not runnable on its own.",
+        icon="filter",
+    )
 
     item_ids = []
 
