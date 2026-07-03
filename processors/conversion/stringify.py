@@ -4,7 +4,7 @@ Collapse post bodies into one long string
 import re
 import string
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import File
 from common.lib.helpers import UserInput
@@ -19,13 +19,19 @@ class Stringify(BasicProcessor):
 	Merge post body into one long string
 	"""
 	type = "stringify-posts"  # job type ID
-	category = "Conversion" # category
-	title = "Merge texts"  # title displayed in UI
-	description = "Merges the data from the body column into a single text file. The result can be used for word clouds, word trees, etc."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Merge texts",
+		category="Conversion",
+		tags=["clean text"],
+		description="Merge the text from the body column of every item into a single continuous text file. Optionally strip URLs, numbers, or punctuation, and convert the text to lowercase.",
+		info=[
+			"The output works well as input for word clouds, word trees, and similar text visualisations.",
+		],
+		icon="file-lines",
+	)
 	extension = "txt"  # extension of result file, used internally and in UI
 	# a single txt file
 	output = File("txt")
-	icon = "file-lines"
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
