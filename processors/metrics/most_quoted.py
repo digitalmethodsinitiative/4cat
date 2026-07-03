@@ -4,7 +4,7 @@ Example post-processor worker
 import csv
 import re
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -20,13 +20,16 @@ class QuoteRanker(BasicProcessor):
 	Rank posts by most-quoted
 	"""
 	type = "quote-ranker"  # job type ID
-	category = "Metrics" # category
-	title = "Sort by most replied-to"  # title displayed in UI
-	description = "Sort posts by how often they were replied to by other posts in the dataset."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Sort by most replied-to",
+		category="Metrics",
+		tags=["rank", "counts"],
+		description="Sort posts by how often they were replied to by other posts in the dataset, adding a column with the number of replies each post received.",
+		icon="comments",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a derived table
 	output = Table()
-	icon = "comments"
 
 	# chan datasets (posts reply to / quote each other)
 	compatibility = Compatibility(datasources={"fourchan", "eightchan", "eightkun"})

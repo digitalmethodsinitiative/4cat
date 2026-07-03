@@ -6,7 +6,7 @@ import json
 
 from PIL import UnidentifiedImageError
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, hash_image, stringify_hash
 from common.lib.compatibility import Compatibility
@@ -25,21 +25,25 @@ class ImageHasher(BasicProcessor):
     Hash images
     """
     type = "image-hasher"  # job type ID
-    category = "Conversion"  # category
-    title = "Hash images"  # title displayed in UI
-    description = "Convert images to text hashes for comparison and similarity detection."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Hash images",
+        category="Conversion",
+        tags=["similarity"],
+        description="Calculate a perceptual hash for each image so near-duplicate images can be compared. Choose a perceptual, wavelet, or crop-resistant hash, and optionally group visually similar images together using a similarity threshold.",
+        references=[
+            "[Imagehash library](https://github.com/JohannesBuchner/imagehash?tab=readme-ov-file)",
+            "Explainer: [Perceptual hashing](https://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html)",
+        ],
+        info=[
+            "Smaller hash sizes are faster; larger sizes are more accurate. Lower the similarity threshold for stricter grouping.",
+        ],
+    )
     extension = "csv"
     # a derived table
     output = Table()
-    icon = ""
 
     # image datasets: image archives, image-downloader output, or extracted video frames
     compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"})
-
-    references = [
-        "[Imagehash library](https://github.com/JohannesBuchner/imagehash?tab=readme-ov-file)",
-        "Explainer: [Perceptual hashing](https://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html)",
-    ]
 
     # "phash": "Perceptual (DCT) hash: strong general-purpose near-duplicate. Robust to resize, JPEG, small blur/contrast tweaks; weaker to large crop/rotation. Hamming; size=16≈256-bit (use ~20–40 threshold), size=32≈1024-bit.",
     # "whash-haar": "Wavelet (Haar) hash: similar to pHash but often more stable to brightness/exposure shifts. Robust to resize/compression/exposure; weaker to large crop/rotation. Hamming; size=16≈256-bit.",

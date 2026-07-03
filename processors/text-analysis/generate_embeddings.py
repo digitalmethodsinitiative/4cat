@@ -9,7 +9,7 @@ from gensim.models import Word2Vec, FastText
 from gensim.models.phrases import Phrases, Phraser
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Archive
 from common.lib.exceptions import ProcessorInterruptedException
@@ -25,28 +25,29 @@ class GenerateWordEmbeddings(BasicProcessor):
 	Generate Word Embeddings
 	"""
 	type = "generate-embeddings"  # job type ID
-	category = "Text analysis"  # category
-	title = "Generate word embedding models"  # title displayed in UI
-	description = "Generates word2vec or FastText word embedding models (overall or per timeframe). " \
-				  "These calculate coordinates (vectors) per word on the basis of their context. The " \
-				  "coordinates are positioned in a \"vector space\" with a large amount of dimensions (so a coordinate can " \
-				  "e.g. exist of 100 numbers). These numeric word representations can be used to extract words with similar contexts. " \
-				  "Note that good models require a lot of data."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Generate word embedding models",
+		category="Text analysis",
+		tags=["similarity"],
+		description="Train word2vec or FastText word embedding models from tokens, either for the whole dataset or per time interval. Each word is assigned a position in a multi-dimensional vector space based on the words it appears alongside, so words used in similar contexts end up close together. These models can then be used to find words with similar contexts or to track how word usage shifts over time.",
+		references=[
+			"word2vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
+			"word2vec: [Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” *ICLR Workshop Papers*, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
+			"word2vec: [A Beginner's Guide to Word Embedding with Gensim Word2Vec Model - Towards Data Science](https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92)",
+			"FastText: [Bojanowski, P., Grave, E., Joulin, A., & Mikolov, T. (2017). Enriching word vectors with subword information. *Transactions of the Association for Computational Linguistics*, 5, 135-146.](https://www.mitpressjournals.org/doi/abs/10.1162/tacl_a_00051)",
+		],
+		warnings=[
+			"Models trained on small amounts of text are unreliable; good results need a large corpus.",
+		],
+		icon="cube",
+	)
 	extension = "zip"  # extension of result file, used internally and in UI
-	icon = "cube"
 
 	# a zip archive of data files
 	output = Archive()
 
 	# Allow processor on token sets
 	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["similar-word2vec", "histwords-vectspace"])
-
-	references = [
-		"word2vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
-		"word2vec: [Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” *ICLR Workshop Papers*, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
-		"word2vec: [A Beginner's Guide to Word Embedding with Gensim Word2Vec Model - Towards Data Science](https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92)",
-		"FastText: [Bojanowski, P., Grave, E., Joulin, A., & Mikolov, T. (2017). Enriching word vectors with subword information. *Transactions of the Association for Computational Linguistics*, 5, 135-146.](https://www.mitpressjournals.org/doi/abs/10.1162/tacl_a_00051)"
-	]
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

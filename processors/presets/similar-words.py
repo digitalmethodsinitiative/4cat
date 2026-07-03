@@ -4,6 +4,7 @@ Find similar words
 from nltk.stem.snowball import SnowballStemmer
 
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Delegated
 
@@ -15,14 +16,19 @@ class SimilarWords(ProcessorPreset):
 	Run processor pipeline to find similar words
 	"""
 	type = "preset-similar-words"  # job type ID
-	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-	title = "Find similar words"  # title displayed in UI
-	description = ("Create a word2vec model to find words used in a similar context as the queried word(s). Only works "
-				   "with large datasets (e.g. 100,000+ items).")
+	description = ProcessorDescription(
+		title="Find similar words",
+		category="Combined processors",
+		tags=["similarity", "extract"],
+		description="Train a word2vec model on the dataset to find words used in a context similar to the words you enter.",
+		warnings=[
+			"This only produces useful results on large datasets, roughly 100,000 items or more.",
+		],
+		icon="comments",
+	)
 	extension = "csv"
 	# a preset; its output is its last step's
 	output = Delegated()
-	icon = "comments"
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

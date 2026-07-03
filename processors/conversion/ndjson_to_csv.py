@@ -5,7 +5,7 @@ import csv
 import json
 
 from common.lib.helpers import flatten_dict
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
@@ -22,14 +22,16 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 	Convert a NDJSON file to CSV
 	"""
 	type = "convert-ndjson-csv"  # job type ID
-	category = "Conversion"  # category
-	title = "Convert NDJSON file to CSV"  # title displayed in UI
-	description = "Create a CSV file from an NDJSON file. Note that some data may be lost as CSV files cannot " \
-				  "contain nested data."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Convert NDJSON file to CSV",
+		category="Conversion",
+		tags=["convert format"],
+		description="Create a CSV file from an NDJSON dataset, flattening nested fields into separate columns.",
+		icon="file-csv",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a derived table
 	output = Table()
-	icon = "file-csv"
 
 	# Allow on NDJSON datasets
 	compatibility = Compatibility(extensions={"ndjson"})

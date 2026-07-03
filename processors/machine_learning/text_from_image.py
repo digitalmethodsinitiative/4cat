@@ -10,7 +10,7 @@ import os
 
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException, DsmConnectionError
 from common.lib.helpers import UserInput, hash_to_md5
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
@@ -26,32 +26,26 @@ class ImageTextDetector(BasicProcessor):
     Send images to DMI OCR server for OCR analysis
     """
     type = "text-from-images"  # job type ID
-    category = "Conversion"  # category
-    title = "Extract text from images"  # title displayed in UI
-    description = """
-    Uses optical character recognition (OCR) to extract text from images via machine learning.
-
-    This processor first detects areas of an image that may contain text with the pretrained
-    Character-Region Awareness For Text (CRAFT) detection model and then attempts to predict the
-    text inside each area using Keras' implementation of a Convolutional Recurrent Neural
-    Network (CRNN) for text recognition. Once words are predicted, an algorithm attempts to
-    sort them into likely groupings based on locations within the original image.
-    """
+    description = ProcessorDescription(
+        title="Extract text from images",
+        category="Conversion",
+        tags=["extract", "transcribe", "external service"],
+        description="Use optical character recognition (OCR) to detect and read text in images. Detected words are grouped by their position in the image and returned per image.",
+        references=[
+            "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
+            "[Paddle OCR model](https://github.com/PaddlePaddle/PaddleOCR#readme)",
+        ],
+        warnings=[
+            "Images are sent to a self-hosted DMI Service Manager running the OCR server, which must be enabled.",
+        ],
+        icon="language",
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI
     # a derived table
     output = Table(extension="ndjson")
-    icon = "language"
 
     # image datasets (image archives or image-downloader output), when the OCR server is enabled
     compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.eb_ocr_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
-
-    references = [
-        "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
-        "[Paddle OCR model](https://github.com/PaddlePaddle/PaddleOCR#readme)"
-        #"[Keras OCR model]( https://keras-ocr.readthedocs.io/en/latest/)",
-        #"[CRAFT text detection model](https://github.com/clovaai/CRAFT-pytorch)",
-        #"[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
-    ]
 
     config = {
         "dmi-service-manager.ea_ocr-intro-1": {

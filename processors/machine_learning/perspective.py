@@ -6,7 +6,7 @@ import json
 from googleapiclient.errors import HttpError
 
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from googleapiclient import discovery
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
@@ -17,25 +17,32 @@ class Perspective(BasicProcessor):
 	Score items with toxicity and other scores through Google Jigsaw's Perspective API.
 	"""
 	type = "perspective"  # job type ID
-	category = "Machine learning"  # category
-	title = "Toxicity scores"  # title displayed in UI
-	description = ("Use the Perspective API to score text with attributes on toxicity, "
-					"including 'toxicity', 'insult', and 'profanity'.")		# description displayed in UI
+	description = ProcessorDescription(
+		title="Score text toxicity with Perspective",
+		category="Machine learning",
+		tags=["classify", "api key required", "external service", "annotate"],
+		description="Use Google Jigsaw's Perspective API to score the 'body' text of each item on attributes such as toxicity, severe toxicity, identity attack, insult, profanity, and threat. Each attribute is returned as a value between 0 and 1.",
+		references=[
+			"[Perspective API documentation](https://developers.perspectiveapi.com/s/about-the-api)",
+			"[Rieder, Bernhard, and Yarden Skop. 2021. 'The fabrics of machine moderation: Studying the technical, "
+			"normative, and organizational structure of Perspective API.' Big Data & Society, 8(2).]"
+			"(https://doi.org/10.1177/20539517211046181)",
+		],
+		warnings=[
+			"Text is sent to Google's Perspective API, an external service, to be scored.",
+		],
+		info=[
+			"Enable 'toxicity scores' annotations to write the attribute scores back to the parent dataset.",
+		],
+		icon="hand-middle-finger",
+	)
 	extension = "ndjson"  # extension of result file, used internally and in UI
-	icon = "hand-middle-finger"
 
 	# a derived table
 	output = Table(extension="ndjson")
 
 	# top-level text datasets (scores text columns via the Perspective API)
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
-
-	references = [
-		"[Perspective API documentation](https://developers.perspectiveapi.com/s/about-the-api)",
-		"[Rieder, Bernhard, and Yarden Skop. 2021. 'The fabrics of machine moderation: Studying the technical, "
-		"normative, and organizational structure of Perspective API.' Big Data & Society, 8(2).]"
-		"(https://doi.org/10.1177/20539517211046181)"
-	]
 
 	config = {
 		"api.google.api_key": {

@@ -15,7 +15,7 @@ from svgwrite.text import Text
 from PIL import Image
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Render
@@ -33,11 +33,13 @@ class ImageCategoryWallGenerator(BasicProcessor):
     Create an image wall from the top images in the dataset
     """
     type = "image-category-wall"  # job type ID
-    category = "Visual"  # category
-    title = "Visualise images by category"  # title displayed in UI
-    description = "Combine images into a single image arranged by category"  # description displayed in UI
+    description = ProcessorDescription(
+        title="Visualise images by category",
+        category="Visual",
+        description="Arrange downloaded images into a single wall grouped by the values in a category column. Each category becomes a row, images are sorted within it, and numeric categories are grouped into ranges. Runs on datasets that pair images with a category, such as image classification results.",
+        icon="panorama",
+    )
     extension = "svg"  # extension of result file, used internally and in UI
-    icon = "panorama"
 
     # a rendered image, no column table
     output = Render()

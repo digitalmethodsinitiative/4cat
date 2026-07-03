@@ -6,7 +6,7 @@ Only supports bit based hashes currently (e.g., 101010101110110011)
 import networkx as nx
 import numpy as np
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Network
 from common.lib.exceptions import ProcessorException
@@ -24,13 +24,20 @@ class HashSimilarityNetworker(BasicProcessor):
     Compare hashes and generate a network based on similarity
     """
     type = "hash-similarity-network"
-    category = "Networks"
-    title = "Hash similarity network"
-    description = "Calculate similarity of hashes and create a GEXF network file. Can identify near duplicate hashes."
+    description = ProcessorDescription(
+        title="Hash similarity network",
+        category="Networks",
+        tags=["similarity", "network"],
+        description="Compare bit hashes and create a network linking similar items. Each pair of hashes is compared bit by bit, and an edge is added when they are at least as similar as the chosen threshold. Useful for finding near-duplicate images or videos.",
+        warnings=[
+            "Only bit hashes are supported, such as those produced by the video hasher.",
+            "Every pair of hashes is compared, so this can be slow on large datasets.",
+        ],
+        icon="circle-nodes",
+    )
     extension = "gexf"
     # a graph file, no column table
     output = Network()
-    icon = "circle-nodes"
 
     # Runs on the video hasher's output (like the other video-hash networks); any
     # dataset of bit-hash rows would work.

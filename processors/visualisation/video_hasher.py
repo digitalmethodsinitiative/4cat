@@ -14,7 +14,7 @@ import numpy as np
 from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.outputs import Network, MediaArchive, Table, Delegated
@@ -32,13 +32,19 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     Run processor pipeline to create video hashes
     """
     type = "preset-video-hashes"  # job type ID
-    category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Create video hashes to identify near duplicate videos"  # title displayed in UI
-    description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only. This process can take a long time depending on video length, amount, and frames per second."
+    description = ProcessorDescription(
+        title="Find near-duplicate videos with hashes",
+        category="Visual",
+        tags=["similarity", "needs ffmpeg", "network"],
+        description="Run the full pipeline to detect near-duplicate videos: extract frames, build a 64-bit hash per video, and produce a similarity network and matrix. Two videos are linked when their hashes are at least the chosen percentage similar. Only the video content is used.",
+        warnings=[
+            "This can take a very long time depending on the number of videos, their length, and the frames per second used.",
+        ],
+        icon="square-binary",
+    )
     extension = "gexf"
     # a preset; its output is its last step's
     output = Delegated()
-    icon = "square-binary"
 
     # video datasets, when ffmpeg is available
     compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)})
@@ -132,9 +138,15 @@ class VideoHasher(BasicProcessor):
     "scene" changes) and have lead to unwanted collision in tests.
     """
     type = "video-hasher-1"  # job type ID
-    category = "Visual"  # category
-    title = "Create video collages"  # title displayed in UI
-    description = "Creates collages from video frames. Can be used to create video hashes to detect similar videos."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Create video collages",
+        category="Visual",
+        tags=["similarity", "needs ffmpeg"],
+        description="Sample frames from each video with ffmpeg and combine them into a single collage image, then derive a 64-bit hash from the collage. These hashes can be compared to find near-duplicate videos. Optionally save each video's hash back to the source dataset as an annotation.",
+        warnings=[
+            "For short videos, a higher frame rate reduces false matches but takes longer to process.",
+        ],
+    )
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image" # media type of the result
     # a zip archive of image files (video-frame collages)
@@ -340,19 +352,21 @@ class VideoHashNetwork(BasicProcessor):
     This creates a network graph of the video hashes similarity
     """
     type = "video-hash-network"  # job type ID
-    category = "Visual"  # category
-    title = "Create Video hashes network"  # title displayed in UI
-    description = "Creates hashes network to identify duplicate or similar videos."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Create video hash network",
+        category="Visual",
+        tags=["similarity", "network"],
+        description="Build a network of videos linked by the similarity of their hashes. Each video is a node, and an edge is drawn between two videos when their hashes are at least the chosen percentage similar. Run this on the output of 'Create video collages'.",
+        references=[
+            "[Video Hash](https://github.com/akamhy/videohash#readme)",
+        ],
+    )
     extension = "gexf"  # extension of result file, used internally and in UI
     # a graph file, no column table
     output = Network()
 
     # Allow on video hasher
     compatibility = Compatibility(types={"video-hasher-1"})
-
-    references = [
-        "[Video Hash](https://github.com/akamhy/videohash#readme)",
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -456,19 +470,21 @@ class VideoHashSimilarities(BasicProcessor):
     This creates a network graph of the video hashes similarity
     """
     type = "video-hash-similarity-matrix"  # job type ID
-    category = "Visual"  # category
-    title = "Calculates hashes and similarity groups"  # title displayed in UI
-    description = "Creates CSV with hashes and groups videos above similarity value."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Group videos by hash similarity",
+        category="Visual",
+        tags=["similarity", "grouping"],
+        description="Compare video hashes and assign each video to a similarity group. Videos are grouped when their hashes are at least the chosen percentage similar, and groups can chain together when videos overlap. Run this on the output of 'Create video collages'.",
+        references=[
+            "[Video Hash](https://github.com/akamhy/videohash#readme)",
+        ],
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()
 
     # Allow on video hasher
     compatibility = Compatibility(types={"video-hasher-1"})
-
-    references = [
-        "[Video Hash](https://github.com/akamhy/videohash#readme)",
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

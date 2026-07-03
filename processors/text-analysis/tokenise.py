@@ -16,7 +16,7 @@ from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Archive
 
@@ -31,27 +31,32 @@ class Tokenise(BasicProcessor):
     Tokenize posts
     """
     type = "tokenise-posts"  # job type ID
-    category = "Text analysis"  # category
-    title = "Tokenise"  # title displayed in UI
-    description = "Splits item texts into separate tokens. This data can then be used for text analysis. " \
-                  "The output is a list of lists, each list representing all item tokens or " \
-                  "tokens per sentence."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Tokenise text",
+        category="Text analysis",
+        tags=["clean text", "extract"],
+        description="Split item texts into separate tokens (words) for use in later text analysis. Optionally stem "
+                    "or lemmatise tokens, remove stop words, and group tokens per item or per sentence and per "
+                    "timeframe. The output is a list of lists, each list holding the tokens for one item or sentence.",
+        info=[
+            "The TweetTokenizer works well for social media text; use the language-specific options for other text.",
+        ],
+        references=[
+            "[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
+            "[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
+            "[Words in stopwords-iso word list](https://github.com/stopwords-iso/stopwords-iso/blob/master/stopwords-iso.json)",
+            "[Words in Google Books word list](https://github.com/hackerb9/gwordlist)",
+            "[Words in cracklib word list](https://github.com/cracklib/cracklib/tree/master/words)",
+            "[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)",
+        ],
+        icon="pallet",
+    )
     extension = "zip"  # extension of result file, used internally and in UI
-    icon = "pallet"
 
     # a zip archive of data files
     output = Archive()
 
     compatibility = Compatibility(extensions={"csv", "ndjson"}, preferred_followups=["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller", ])
-
-    references = [
-        "[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
-        "[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
-        "[Words in stopwords-iso word list](https://github.com/stopwords-iso/stopwords-iso/blob/master/stopwords-iso.json)",
-        "[Words in Google Books word list](https://github.com/hackerb9/gwordlist)",
-        "[Words in cracklib word list](https://github.com/cracklib/cracklib/tree/master/words)",
-        "[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)"
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

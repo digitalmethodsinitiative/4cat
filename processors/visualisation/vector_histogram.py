@@ -10,7 +10,7 @@ from svgwrite.shapes import Line
 from svgwrite.path import Path as SVGPath
 from svgwrite.text import Text
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.helpers import UserInput, pad_interval, get_4cat_canvas
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Render
@@ -25,11 +25,14 @@ class SVGHistogramRenderer(BasicProcessor):
 	Generate activity histogram
 	"""
 	type = "histogram"  # job type ID
-	category = "Visual"  # category
-	title = "Histogram"  # title displayed in UI
-	description = "Generates a histogram from time frequencies."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Histogram",
+		category="Visual",
+		tags=["time-series", "chart"],
+		description="Generate a bar chart showing how a value changes over time, using an over-time frequency analysis as input. Each interval becomes one bar, sized by its value. Intervals without a date, such as \"unknown_date\", are dropped.",
+		icon="square-poll-vertical",
+	)
 	extension = "svg"
-	icon = "square-poll-vertical"
 
 	# a rendered image, no column table
 	output = Render()

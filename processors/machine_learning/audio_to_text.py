@@ -6,7 +6,7 @@ import json
 import openai
 from requests.exceptions import ConnectionError
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
@@ -25,26 +25,31 @@ class AudioToText(BasicProcessor):
     Convert audio to text with Whisper / GPT models, locally or through the OpenAI API
     """
     type = "audio-to-text"  # job type ID
-    category = "Audio"  # category
-    title = "Audio to text"  # title displayed in UI
-    description = ("Detect speech and other sounds in audio and convert to text with either OpenAI's Whisper or "
-                   " GPT models (GPT only via API).")  # description displayed in UI
+    description = ProcessorDescription(
+        title="Transcribe audio to text",
+        category="Audio",
+        tags=["transcribe", "external service"],
+        description="Transcribe speech in audio files to text with OpenAI's Whisper or GPT models. Run Whisper locally through the DMI Service Manager, or send the audio to the OpenAI API, which can also translate to English or separate speakers.",
+        warnings=[
+            "Using an OpenAI model sends your audio to OpenAI, a paid external service that bills the owner of the API key.",
+            "The local Whisper models run through the DMI Service Manager and need a GPU to run at a reasonable speed.",
+        ],
+        references=[
+            "[OpenAI Whisper blog](https://openai.com/research/whisper)",
+            "[OpenAI speech to text](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper"
+            "/transcribe.py#LL374C3-L374C3)",
+            "[Whisper paper: Robust Speech Recognition via Large-Scale Weak Supervision](https://arxiv.org/abs/2212.04356)",
+            "[OpenAI Whisper statistics & code](https://github.com/openai/whisper#whisper)",
+            "[How to use prompts](https://platform.openai.com/docs/guides/speech-to-text/prompting)",
+        ],
+        icon="closed-captioning",
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI
     # a derived table
     output = Table(extension="ndjson")
-    icon = "closed-captioning"
 
     # Allow on audio datasets
     compatibility = Compatibility(extensions={"zip"}, media_types={"audio"}, type_prefixes={"audio-extractor"})
-
-    references = [
-        "[OpenAI Whisper blog](https://openai.com/research/whisper)",
-        "[OpenAI speech to text](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper"
-        "/transcribe.py#LL374C3-L374C3)",
-        "[Whisper paper: Robust Speech Recognition via Large-Scale Weak Supervision](https://arxiv.org/abs/2212.04356)",
-        "[OpenAI Whisper statistics & code](https://github.com/openai/whisper#whisper)",
-        "[How to use prompts](https://platform.openai.com/docs/guides/speech-to-text/prompting)",
-    ]
 
     config = {
         "dmi-service-manager.bb_whisper-intro-1": {

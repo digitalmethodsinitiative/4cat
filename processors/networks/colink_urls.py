@@ -7,7 +7,7 @@ import multiprocessing
 
 import psutil
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Network
 from common.lib.exceptions import ProcessorInterruptedException
@@ -29,14 +29,16 @@ class URLCoLinker(BasicProcessor):
 	Generate URL co-link network
 	"""
 	type = "url-network"  # job type ID
-	category = "Networks"  # category
-	title = "URL co-occurence network"  # title displayed in UI
-	description = "Create a GEXF network file comprised of URLs appearing together (in a post or thread). " \
-				  "Edges are weighted by amount of co-links."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Create URL co-link network",
+		category="Networks",
+		tags=["urls", "network"],
+		description="Build a network of URLs that appear together in the same post or thread. Each URL is a node, and edges connect URLs that co-occur. Choose whether to use full URLs or only domain names, and whether to count co-occurrence per post or per thread.",
+		icon="circle-nodes",
+	)
 	extension = "gexf"  # extension of result file, used internally and in UI
 	# a graph file, no column table
 	output = Network()
-	icon = "circle-nodes"
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

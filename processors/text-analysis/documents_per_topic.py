@@ -2,7 +2,7 @@
 Extracts topics per model and top associated words
 """
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
@@ -21,13 +21,14 @@ class TopicModelWordExtractor(BasicProcessor):
     Extracts topics per model and top associated words
     """
     type = "document_count"  # job type ID
-    category = "Text analysis"  # category
-    title = "Count documents per topic"  # title displayed in UI
-    description = ("Uses the LDA model to predict to which topic each item or sentence belongs and counts as belonging "
-                   "to whichever topic has the highest probability.")  # description displayed in UI
+    description = ProcessorDescription(
+        title="Count documents per topic",
+        category="Text analysis",
+        tags=["counts", "grouping"],
+        description="Assign each item or sentence to the topic model topic it fits best and count how many documents fall under each topic per time interval. Each document is placed in the topic with the highest probability, and documents that fit two topics equally are skipped. The result also lists the top five words for each topic.",
+        icon="file-circle-question",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
-    icon = "file-circle-question"
-
 
     # a derived table
     output = Table()

@@ -1,7 +1,7 @@
 """
 Google Vision API co-label network
 """
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Network
 from common.lib.helpers import UserInput
@@ -20,15 +20,16 @@ class VisionTagNetworker(BasicProcessor):
     Google Vision API co-label network
     """
     type = "vision-label-network"  # job type ID
-    category = "Networks"  # category
-    title = "Google Vision co-Label network"  # title displayed in UI
-    description = "Create a GEXF network file comprised of all annotations returned by the" \
-                  "Google Vision API. Labels returned by the API are nodes. Labels occurring on the same image form" \
-                  "edges."
+    description = ProcessorDescription(
+        title="Google Vision co-label network",
+        category="Networks",
+        tags=["network"],
+        description="Create a network from annotations returned by the Google Vision API. Labels returned by the API are nodes. An edge connects two labels when they occur on the same image, weighted by how often they co-occur.",
+        icon="circle-nodes",
+    )
     extension = "gexf"  # extension of result file, used internally and in UI
     # a graph file, no column table
     output = Network()
-    icon = "circle-nodes"
 
     # Allow processor to run on Google Vision API data
     compatibility = Compatibility(types={"google-vision-api"})
