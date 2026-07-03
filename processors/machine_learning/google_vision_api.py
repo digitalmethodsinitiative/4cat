@@ -42,9 +42,6 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             "This is a paid service. Google bills the owner of the API key you provide, which requires billing and the Vision API to be enabled.",
             "Images are sent to Google, an external service, to be analysed.",
         ],
-        info=[
-            "Follow up with 'Convert Vision results to CSV' for a flat table and to write labels as annotations.",
-        ],
         icon="eye",
     )
     extension = "ndjson"  # extension of result file, used internally and in UI

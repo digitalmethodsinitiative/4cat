@@ -25,7 +25,7 @@ class ThreadSplitter(BasicProcessor):
 	description = ProcessorDescription(
 		title="Split by thread",
 		category="Conversion",
-		description="Split the dataset into one file per thread, keeping only the posts in each thread. The result is a ZIP archive containing a separate CSV file for every thread.",
+		description="Split the dataset into one file per thread, keeping only the posts in each thread.",
 		icon="scissors",
 	)
 	extension = "zip"  # extension of result file, used internally and in UI

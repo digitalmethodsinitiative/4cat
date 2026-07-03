@@ -44,10 +44,6 @@ class ClarifaiAPIFetcher(BasicProcessor):
             "selected model adds to the number of requests made.",
             "Images are sent to Clarifai, an external service, to be analysed.",
         ],
-        info=[
-            "Follow up with 'Convert Clarifai results to CSV' for a flat table, or 'Clarifai bipartite network' to "
-            "link images to the labels they share.",
-        ],
         icon="eye",
     )
     extension = "ndjson"  # extension of result file, used internally and in UI

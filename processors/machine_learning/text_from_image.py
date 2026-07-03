@@ -38,9 +38,6 @@ class ImageTextDetector(BasicProcessor):
         warnings=[
             "Images are sent to a self-hosted DMI Service Manager running the OCR server, which must be enabled.",
         ],
-        info=[
-            "Follow up with 'Image text wall' to view all extracted text together.",
-        ],
         icon="language",
     )
     extension = "ndjson"  # extension of result file, used internally and in UI

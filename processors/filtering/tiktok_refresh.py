@@ -21,7 +21,7 @@ class UpdateTikTok(BasicProcessor):
     description = ProcessorDescription(
         title="Recollect TikTok data",
         category="Filtering",
-        tags=["filter", "refresh"],
+        tags=["filter"],
         description="Re-query the TikTok URLs in the dataset to refresh their metadata, such as video URLs or like counts.",
         warnings=[
             "This re-fetches every item from TikTok, so it can be slow on large datasets.",

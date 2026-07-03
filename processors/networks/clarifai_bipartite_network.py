@@ -20,7 +20,7 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
     """
     type = "clarifai-bipartite-network"  # job type ID
     description = ProcessorDescription(
-        title="Create Clarifai co-label network",
+        title="Create Clarifai bipartite network",
         category="Networks",
         tags=["network"],
         description="Build a bipartite network from Clarifai image annotations. Image file names and Clarifai labels are the nodes, and an edge connects a file name to a label when Clarifai assigned that label to that image. Use the minimum confidence option to drop low-confidence labels.",

@@ -28,14 +28,14 @@ class TopicModelWordExtractor(BasicProcessor):
         category="Text analysis",
         tags=["classify"],
         description="Use Latent Dirichlet Allocation to predict which topics each item or sentence belongs to. "
-                    "Write a CSV file where each row is one document. If tokens are grouped per item and only one "
+                    "Produce a table where each row is one document. If tokens are grouped per item and only one "
                     "column is used, there is one row per item, otherwise an item spans several rows, one per "
                     "sentence or column used.",
+        icon="table-cells",
     )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()
-    code = "table-cells"
 
     # Allow processor on topic models
     compatibility = Compatibility(types={"topic-modeller"})

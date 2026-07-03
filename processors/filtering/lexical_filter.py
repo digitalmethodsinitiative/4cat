@@ -28,9 +28,6 @@ class LexicalFilter(BaseFilter):
         references=[
             "[Regex101](https://regex101.com/)",
         ],
-        info=[
-            "Produces a new dataset with the matching items; the original dataset is left unchanged.",
-        ],
         warnings=[
             ("With the regular-expression option the word list is read as a single Python regular expression, so a "
              "malformed expression may match nothing."),

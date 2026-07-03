@@ -27,9 +27,6 @@ class TopImageCounter(BasicProcessor):
         category="Metrics",
         tags=["urls", "rank"],
         description="Extract all image URLs from the dataset and rank them by how often they occur. Optionally save the extracted URLs back to the source dataset as annotations.",
-        info=[
-            "Follow up with 'Download images' to fetch the ranked images.",
-        ],
         icon="arrow-up-1-9",
     )
     extension = "csv"  # extension of result file, used internally and in UI

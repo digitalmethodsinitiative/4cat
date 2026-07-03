@@ -31,9 +31,6 @@ class CategorizeImagesCLIP(BasicProcessor):
         warnings=[
             "This runs the BLIP-2 model through the DMI Service Manager, which must be set up with a GPU by an administrator.",
         ],
-        info=[
-            "Follow up with 'Create image wall with captions' to view the captions alongside their images.",
-        ],
         references=[
             "[OpenAI CLIP blog](https://openai.com/research/clip)",
             "[BLIP-2 paper: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models](https://arxiv.org/abs/2301.12597)",

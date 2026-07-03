@@ -33,9 +33,6 @@ class AudioExtractor(BasicProcessor):
         category="Audio",
         tags=["extract", "needs ffmpeg"],
         description="Extract the audio track from each video and save the results as WAV files in a ZIP archive. Uses ffmpeg to convert audio to 16 kHz.",
-        info=[
-            "Follow up with 'Convert audio to text' to transcribe the extracted audio.",
-        ],
         icon="closed-captioning",
     )
     extension = "zip"  # extension of result file, used internally and in UI

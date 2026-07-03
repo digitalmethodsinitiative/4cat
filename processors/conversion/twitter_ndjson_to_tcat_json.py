@@ -22,9 +22,6 @@ class ConvertNDJSONToJSON(BasicProcessor):
         category="Conversion",
         tags=["convert format"],
         description="Convert a Twitter/X (API v2) dataset to the JSON format that DMI-TCAT's import-jsondump.php can read. The result can then be uploaded to a TCAT server.",
-        info=[
-            "Follow up with 'Upload to DMI-TCAT' to send the converted file to a TCAT server.",
-        ],
         icon="square-js",
     )
     extension = "json"  # extension of result file, used internally and in UI

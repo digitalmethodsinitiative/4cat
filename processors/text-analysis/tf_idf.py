@@ -32,7 +32,7 @@ class TfIdf(BasicProcessor):
 		title="Calculate tf-idf",
 		category="Text analysis",
 		tags=["rank", "counts"],
-		description="Calculate the TF-IDF (term frequency-inverse document frequency) value of tokenised text, a "
+		description="Calculate the tf-idf (term frequency-inverse document frequency) value of tokenised text, a "
 					"measure of how distinctive each word is to a document. Choose between the scikit-learn and gensim "
 					"libraries and return the top-scoring words per timeframe. Works better with more documents.",
 		info=[

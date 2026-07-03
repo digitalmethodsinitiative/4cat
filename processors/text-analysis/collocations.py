@@ -24,9 +24,6 @@ class GetCollocations(BasicProcessor):
 		category="Text analysis",
 		tags=["extract", "counts"],
 		description="Find pairs or triplets of words that appear close together in a set of tokens, along with how often each combination occurs. A window size sets how near words must be to count as co-words. Results can be limited to combinations containing a required word, filtered by a minimum frequency, and optionally saved as annotations.",
-		info=[
-			"Follow up with 'Co-word network' or 'Word cloud' to visualise the results.",
-		],
 		icon="timeline",
 	)
 	extension = "csv"  # extension of result file, used internally and in UI

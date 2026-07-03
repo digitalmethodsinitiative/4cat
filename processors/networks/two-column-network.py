@@ -29,7 +29,7 @@ class ColumnNetworker(BasicProcessor):
         tags=["network"],
         description="Create a network of linked values between two chosen columns (for example 'author' and 'subreddit'). Nodes and edges are weighted by frequency. Optionally make the network dynamic over time and detect communities.",
         references=[
-            "Utilises [Networkx](https://networkx.org/)'.",
+            "Utilises [Networkx](https://networkx.org/).",
             "Networkx built-in [Louvain](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html#networkx.algorithms.community.louvain.louvain_communities) and [greedy modularity](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.modularity_max.greedy_modularity_communities.html#networkx.algorithms.community.modularity_max.greedy_modularity_communities) community detection algorithms.",
         ],
         icon="circle-nodes",

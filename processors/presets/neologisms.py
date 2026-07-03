@@ -23,7 +23,7 @@ class NeologismExtractor(ProcessorPreset):
             "This assumes the data is in English; for other languages start with the Tokenise posts processor and use a different word list.",
         ],
         references=[
-            "Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'",
+            "Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).",
         ],
         icon="comment-medical",
     )

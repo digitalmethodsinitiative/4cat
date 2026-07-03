@@ -19,9 +19,6 @@ class TopHashtags(ProcessorPreset):
         category="Combined processors",  # 'Combined processors' are always listed first in the UI
         tags=["hashtags", "counts", "rank"],
         description="Count how often each hashtag occurs in the dataset and rank them from most to least frequent.",
-        info=[
-            "Runs on any dataset that has a hashtag-like column, such as 'hashtags' or 'tags'.",
-        ],
         icon="hashtag",
     )
     extension = "csv"
