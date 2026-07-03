@@ -3,6 +3,7 @@ Generate co-word network of word collocations
 """
 
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Delegated
 
@@ -17,13 +18,14 @@ class CowordNetworker(ProcessorPreset):
     Generate co-word network
     """
     type = "preset-coword-network"  # job type ID
-    category = "Networks"  # category
-    title = "Co-word network"  # title displayed in UI
-    description = "Create a GEXF network file of word co-occurences. Edges denote " \
-                  "words that appear close to each other. Edges and nodes are weighted by the " \
-                  "amount of co-word occurrences."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Co-word network",
+        category="Networks",
+        tags=["network"],
+        description="Create a network of word co-occurrences. Edges connect words that appear close to each other. Edges and nodes are weighted by how often the words co-occur.",
+        icon="circle-nodes",
+    )
     extension = "gexf"  # extension of result file, used internally and in UI
-    icon = "circle-nodes"
 
     # a preset; its output is its last step's
     output = Delegated()

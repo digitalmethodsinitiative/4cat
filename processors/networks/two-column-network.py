@@ -4,7 +4,7 @@ Generate network of values from two columns
 from dateutil.relativedelta import relativedelta
 from functools import partial
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Network
 from common.lib.helpers import UserInput, get_interval_descriptor
@@ -23,21 +23,23 @@ class ColumnNetworker(BasicProcessor):
     Generate network of values from two columns
     """
     type = "column-network"
-    category = "Networks"
-    title = "Custom network"
-    description = "Create a GEXF network file comprised of linked values between a custom set of columns " \
-                  "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
+    description = ProcessorDescription(
+        title="Custom network",
+        category="Networks",
+        tags=["network"],
+        description="Create a network of linked values between two chosen columns (for example 'author' and 'subreddit'). Nodes and edges are weighted by frequency. Optionally make the network dynamic over time and detect communities.",
+        references=[
+            "Utilises [Networkx](https://networkx.org/)'.",
+            "Networkx built-in [Louvain](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html#networkx.algorithms.community.louvain.louvain_communities) and [greedy modularity](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.modularity_max.greedy_modularity_communities.html#networkx.algorithms.community.modularity_max.greedy_modularity_communities) community detection algorithms.",
+        ],
+        icon="circle-nodes",
+    )
     extension = "gexf"
     # a graph file, no column table
     output = Network()
-    icon = "circle-nodes"
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})
-
-    references = [
-        "Utilises [Networkx](https://networkx.org/)' built-in [Louvain](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html#networkx.algorithms.community.louvain.louvain_communities) and [greedy modularity](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.modularity_max.greedy_modularity_communities.html#networkx.algorithms.community.modularity_max.greedy_modularity_communities) community detection algorithms."
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

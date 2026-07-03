@@ -2,6 +2,7 @@
 Generate bipartite user-hashtag graph of posts
 """
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.user_input import UserInput
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Delegated
@@ -18,13 +19,16 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     Generate bipartite user-hashtag graph of posts
     """
     type = "preset-bipartite-user-tag-network"  # job type ID
-    category = "Networks"  # category
-    title = "Author-tag Network"  # title displayed in UI
-    description = "Produces a bipartite graph based on co-occurence of (hash)tags and authors. If someone wrote a post with a certain tag, there will be a link between that person and the tag. The more often they appear together, the stronger the link. Tag nodes are weighed on how often they occur. User nodes are weighed on how many posts they've made."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Author-tag network",
+        category="Networks",
+        tags=["network", "authors", "hashtags"],
+        description="Create a bipartite network of authors and the (hash)tags they use, based on co-occurrence. An author and a tag are linked when the author wrote a post with that tag, and the link grows stronger the more often they appear together. Tag nodes are weighted by how often they occur, and author nodes by how many posts they made.",
+        icon="circle-nodes",
+    )
     extension = "gexf"  # extension of result file, used internally and in UI
     # a preset; its output is its last step's
     output = Delegated()
-    icon = "circle-nodes"
 
     # datasets with at least one tag-like column
     compatibility = Compatibility(requires_any_columns={"tags", "hashtags", "groups"})
