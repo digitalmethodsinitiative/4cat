@@ -9,7 +9,7 @@ import urllib.request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
@@ -32,14 +32,26 @@ class YouTubeMetadata(BasicProcessor):
 	"""
 
 	type = "youtube-metadata"  # job type ID
-	category = "Metrics"  # category
-	title = "Fetch YouTube metadata from URLs"  # title displayed in UI
-	description = ("Collect metadata from YouTube videos, channels, and playlists that are linked to in the dataset. "
-				   "Uses the YouTube API.")  # description displayed in UI
+	description = ProcessorDescription(
+		title="Fetch YouTube metadata",
+		category="Metrics",
+		tags=["urls", "external service", "api key required"],
+		description="Collect metadata from YouTube videos, channels, and playlists linked to in the dataset, using the YouTube Data API. Return one row per link with details such as title, view count, and upload date, and optionally save these as annotations on the source dataset.",
+		references=[
+			"[YouTube v3 API documentation](https://developers.google.com/youtube/v3)",
+			"[4chan’s YouTube: A Fringe Perspective on YouTube’s Great Purge of 2019 - OILab.eu](https://oilab.eu/4chans-youtube-a-fringe-perspective-on-youtubes-great-purge-of-2019/)"
+		],
+		warnings=[
+			"This requires a YouTube Data API key and is subject to that key's daily quota; large datasets may hit the limit before all links are retrieved.",
+		],
+		info=[
+			"Run 'Extract URLs' first if your YouTube links are inside text columns rather than a dedicated URL column.",
+		],
+		icon="brand-youtube",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a derived table
 	output = Table()
-	icon = "brand-youtube"
 
 	# collector output or extract-urls-filter output, as csv/ndjson (may contain youtube links)
 	compatibility = Compatibility(is_collector=True, types={"extract-urls-filter"}, extensions={"csv", "ndjson"}, preferred_followups=["youtube-thumbnails"])
@@ -52,11 +64,6 @@ class YouTubeMetadata(BasicProcessor):
 	invalid_api_key = False
 
 	client = None
-
-	references = [
-		"[YouTube v3 API documentation](https://developers.google.com/youtube/v3)",
-		"[4chan’s YouTube: A Fringe Perspective on YouTube’s Great Purge of 2019 - OILab.eu](https://oilab.eu/4chans-youtube-a-fringe-perspective-on-youtubes-great-purge-of-2019/)"
-	]
 
 	config = {
 		"api.youtube.key": {

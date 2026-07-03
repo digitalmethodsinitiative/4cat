@@ -4,7 +4,7 @@ Get regular and 'debate' thread metadata
 import datetime
 import time
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -27,11 +27,14 @@ class DebateMetrics(BasicProcessor):
 
 	"""
 	type = "debate_metrics"  # job type ID
-	category = "Thread metrics" # category
-	title = "Debate metrics"  # title displayed in UI
-	description = "Returns a csv with meta-metrics per thread."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Debate metrics",
+		category="Thread metrics",
+		tags=["counts"],
+		description="Calculate debate metrics for each thread in the dataset, such as the number of posts, the number of images, and the length of the opening post.",
+		icon="circle-info",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
-	icon = "circle-info"
 
 	# a derived table
 	output = Table()
