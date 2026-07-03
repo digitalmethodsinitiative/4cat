@@ -40,7 +40,9 @@ body.slideout-open {
     flex-grow: 1;
 }
 
-.slideout-header .slideout-header-title h1, .slideout-header .slideout-header-title h2 {
+.slideout-header h1, .slideout-header h2, .slideout-header h3, .slideout-header h4  {
+    font-family: Chivo, sans-serif;
+    font-weight: normal;
     margin: 0;
     line-height: 1;
 }

@@ -45,8 +45,8 @@ set: main_header = True for a header at the top of the analyiss tree (e.g. on th
 
 <section class="card-content status">
     <dl class="badge-list dataset-status">
-        <div class="status-badge-annotated status-{% if not dataset.is_finished %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
-            <dt>{% if not dataset.is_finished %}Processing{% elif dataset.num_rows %}Completed{% else %}No
+        <div class="status-badge-annotated status-{% if not dataset.is_finished() %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
+            <dt>{% if not dataset.is_finished() %}Processing{% elif dataset.num_rows %}Completed{% else %}No
                 results{% endif %}{% if dataset.num_rows %} ({{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %}){% endif %}</dt>
             <dd>{{ dataset.get_status() or "Processor finished." }}</dd>
         </div>

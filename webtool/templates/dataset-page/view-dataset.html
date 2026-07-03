@@ -6,8 +6,10 @@
 
 {% block body %}
     <div class="dataset-container"
-         x-data="{ slideoutActive: false, selectedProcessorType: null, selectedDatasetType: null, selectedDatasetLabel: null, processorSearch: '', noProcessorResults() { const q = this.processorSearch.toLowerCase().trim(); return q && ![...document.querySelectorAll('#processor-grid .processor-card')].some(c => c.dataset.search.includes(q)); } }"
-         x-effect="document.body.classList.toggle('slideout-open', slideoutActive)">
+         x-data="{ slideoutActive: false, selectedProcessorType: null, selectedDatasetType: null, selectedDatasetLabel: null, processorSearch: '', pendingScrollKey: null, noProcessorResults() { const q = this.processorSearch.toLowerCase().trim(); return q && ![...document.querySelectorAll('#processor-grid .processor-card')].some(c => c.dataset.search.includes(q)); } }"
+         x-effect="document.body.classList.toggle('slideout-open', slideoutActive)"
+         @processor-queued.document="slideoutActive = false; selectedProcessorType = null; pendingScrollKey = $event.detail.key"
+         @htmx:after:settle.document="if (pendingScrollKey) { const el = document.getElementById('child-' + pendingScrollKey); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); pendingScrollKey = null; } }">
         <section class="dark dataset-metadata" data-dataset-key="{{ dataset.key }}">
             <nav>
                 <ul>
@@ -73,7 +75,7 @@
         </section>
 
         <section class="analysis-results center-stage">
-            <ul class="tree">
+            <ul class="tree" id="dataset-tree">
                 <li>
                     <div class="big-button-wrap">
                         <button class="big-processor-button"
@@ -90,7 +92,7 @@
                                 </span>
                                 Run processor
                             </em>
-                            <span class="byline">Try our new Confusion Matrix processor!</span>
+                            <span class="byline">{{ dataset.get_available_processors(config=__config)|length }} processors available</span>
                         </button>
                     </div>
                 </li>

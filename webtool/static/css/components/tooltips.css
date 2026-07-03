@@ -10,7 +10,7 @@
     max-width: 25rem;
     border: var(--stroke-light) solid var(--dark);
     border-bottom-width: var(--stroke-journey);
-    z-index: 10;
+    z-index: 99999;
     border-radius: var(--radius);
     margin: 0;
     text-align: center;

@@ -58,6 +58,12 @@
     outline-color: var(--button-bg-regular);
 }
 
+.module-card .button-like.emphasis {
+    outline-color: var(--fourcat-accent);
+    background-color: var(--fourcat-accent);
+    color: var(--bright);
+}
+
 .module-card .dropdown-action-button::before {;
     outline-color: var(--button-bg-regular);
     background-color: var(--button-bg-regular);

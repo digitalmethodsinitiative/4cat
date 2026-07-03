@@ -10,7 +10,7 @@
         {% include 'components/module-tags.html' %}
         <nav class="actions">
             <button
-                class="button-like"
+                class="button-like emphasis"
                 hx-get="{{ url_for('dataset.processor_options', key=dataset.key, processor=processor.type) }}"
                 hx-target="#processor-options"
                 hx-swap="innerHTML"

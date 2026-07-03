@@ -1,3 +1,12 @@
+#processor-options {
+    padding: var(--spacing-large);
+}
+
+#processor-options .processor-description {
+    font-size: 1rem;
+    margin-top: 0;
+}
+
 .processor-header .quick-links {
     flex-grow: 0;
 }
@@ -8,4 +17,14 @@
 
 fieldset {
     border: none;
+}
+
+#processor-options .processor-queue-button {
+    margin-top: var(--spacing-regular);
+}
+
+.notice {
+    background-color: var(--yellow-light);
+    color: var(--orange);
+    padding: var(--spacing-regular);
 }

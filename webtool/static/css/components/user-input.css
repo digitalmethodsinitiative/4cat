@@ -1,4 +1,147 @@
+.processor-option-wrap {
+    display: grid;
+    grid-template-columns: minmax(9rem, 20%) minmax(0, 1fr) auto;
+    column-gap: var(--spacing-regular);
+    row-gap: var(--spacing-small);
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
 
+/* rows with tall inputs align their label to the top of the input */
+.processor-option-wrap:has(textarea),
+.processor-option-wrap:has(.multichoice-wrapper),
+.processor-option-wrap:has(.multi-select-wrapper) {
+    align-items: start;
+}
+
+.processor-option-wrap:has(textarea) > label,
+.processor-option-wrap:has(.multichoice-wrapper) > label,
+.processor-option-wrap:has(.multi-select-wrapper) > label {
+    padding-top: var(--spacing-small);
+}
+
+.processor-option-wrap > label {
+    grid-column: 1;
+}
+
+.processor-option-wrap > label p {
+    margin: 0;
+}
+
+.processor-option-wrap > label.option-type-toggle,
+.processor-option-wrap > label.option-type-annotation {
+    grid-column: 2;
+    display: flex;
+    align-items: baseline;
+    column-gap: var(--spacing-small);
+}
+
+.processor-option-wrap > input,
+.processor-option-wrap > textarea,
+.processor-option-wrap > select,
+.processor-option-wrap > .multichoice-wrapper,
+.processor-option-wrap > .multi-select-wrapper,
+.processor-option-wrap > .daterange-wrapper,
+.processor-option-wrap > .annotation-explainer {
+    grid-column: 2;
+    min-width: 0;
+}
+
+.processor-option-wrap > .tooltip-trigger {
+    grid-column: 3;
+    align-self: start;
+}
+
+.processor-option-wrap input:not([type=checkbox]):not([type=hidden]),
+.processor-option-wrap textarea,
+.processor-option-wrap select {
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+    color: var(--semidark);
+    background: var(--panel-bg-0);
+    border: none;
+    border-bottom: var(--stroke) solid var(--panel-bg-2);
+    border-radius: 0;
+    padding: var(--spacing-small);
+}
+
+.processor-option-wrap input:not([type=checkbox]):focus,
+.processor-option-wrap textarea:focus,
+.processor-option-wrap select:focus {
+    outline: var(--stroke) solid var(--button-bg-regular);
+    outline-offset: calc(-1 * var(--stroke-light));
+}
+
+.processor-option-wrap textarea {
+    min-height: 8em;
+    resize: vertical;
+}
+
+.processor-option-wrap .daterange-wrapper {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-small);
+}
+
+.processor-option-wrap .daterange-wrapper input {
+    width: auto;
+    flex: 1 1 auto;
+}
+
+.processor-option-wrap input.invalid,
+.processor-option-wrap input:user-invalid,
+.processor-option-wrap textarea.invalid,
+.processor-option-wrap textarea:user-invalid {
+    background: var(--red-light);
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.processor-option-wrap .multichoice-wrapper {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: var(--spacing-small);
+}
+
+.processor-option-wrap .multichoice-wrapper label {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-small);
+    background: var(--panel-bg-0);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: calc(var(--radius) / 2);
+    padding: var(--spacing-small);
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.processor-option-wrap .multichoice-wrapper label:has(input:checked) {
+    background: var(--button-bg-regular);
+    color: var(--bright);
+}
+
+.processor-options-form {
+    display: flex;
+    flex-direction: column;
+}
+
+fieldset.processor-options {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--spacing-large);
+}
+
+.processor-options-form .processor-queue-button {
+    margin: 0 auto;
+}
 
 input[type=search] {
     font-family: Roboto, serif;

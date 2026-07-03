@@ -12,7 +12,6 @@
             {% if option_settings.to_parent %}parent{% else %}top{% endif %} dataset{% if option_settings.hide_in_explorer %}<span class="hidden-annotation-notice"> (hidden in the Explorer, data for computational processing)</span>{% endif %}
         {% endif %}
     </label>
-    {% if option_settings.type in ("multi", "annotations") and "tooltip" in option_settings %}{% include 'components/processor-tooltip.html' %}{% endif %}
 
     {% if option_settings.type == "string" %}
         <input{% if option_settings.min or option_settings.max %} class="numeric"{% endif %} name="option-{{ option }}" value="{{ option_settings.default }}">
@@ -62,7 +61,9 @@
             <input name="option-{{ option }}-max" type="hidden" value="-1">
         </div>
     {% endif %}
-    {% if "tooltip" in option_settings and option_settings.type not in ("multi", "annotations") %}{% include 'components/processor-tooltip.html' %}{% endif %}
+    {% if "tooltip" in option_settings %}
+        <button class="button-like" x-tooltip="{{ option_settings.tooltip }}">?</button>
+    {% endif %}
     {% if option_settings.type in ("annotation", "annotations") %}
         <div class="annotation-explainer {% if option_settings.type == "annotations" %}after-multi{% endif %}"><a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets#annotations" target="__blank">What are annotations?</a></div>
     {% endif %}
