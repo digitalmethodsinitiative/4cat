@@ -14,10 +14,14 @@ button.no-style {
     color: var(--button-bg-regular);
     background: transparent;
 
-    outline: var(--stroke) solid var(--button-bg-regular);
+    border-width: var(--stroke);
     border-radius: var(--radius);
     border-color: var(--button-bg-regular);
-    border-style: none;
+    border-style: solid;
+}
+
+.dark .button-like {
+    border-color: var(--button-grey);
 }
 
 a.button-like, button {
@@ -63,11 +67,9 @@ a.button-like, .button-like button, button.button-like, .plain-page button, inpu
     height: 1.25em;
 }
 
-.button-like:hover, .with-dropdown ul li:hover, .with-dropdown:hover .dropdown-action-button::before, input[type=submit]:hover, .plain-page button:hover {
-    color: var(--button-grey);
+.button-like:hover, .with-dropdown ul li:hover, .with-dropdown:hover .dropdown-action-button::before, input[type=submit]:hover, .plain-page button:hover, .with-dropdown:hover .button-like {
     background: var(--button-bg-regular);
-    outline-color: var(--button-bg-regular);
-    border-color: var(--button-bg-regular);
+    color: var(--button-grey);
     cursor: pointer;
 }
 
@@ -86,23 +88,19 @@ a.button-like, .button-like button, button.button-like, .plain-page button, inpu
     font-family: 'Font Awesome 6 Free', monospace;
     font-weight: 900;
 
-    color: var(--button-grey);
-    background: var(--button-bg-regular);
-
-    outline: var(--stroke) solid var(--button-bg-regular);
     border-top-right-radius: var(--radius);
     border-bottom-right-radius: var(--radius);
-    border-color: var(--button-bg-regular);
+    border: var(--stroke) solid var(--button-grey);
 
     padding: 8px 8px;
     position: absolute;
     right: 0;
-    top: calc(-2.5em - var(--stroke));
+    top: calc(-3em + var(--stroke) - 0.01px); /** 0.01px because of a potential subpixel rounding error */
     height: 1.25em;
     z-index: var(--z-button);
 }
 
-.with-dropdown ul:hover {
+.with-dropdown:hover ul {
     z-index: var(--z-button-dropdown);
 }
 
@@ -110,24 +108,24 @@ a.button-like, .button-like button, button.button-like, .plain-page button, inpu
     position: absolute;
     right: 0;
     display: block;
-    margin-top: calc(2.5em + var(--stroke));
+    margin-top: calc(2.5em + (var(--stroke) * 3));
     border-radius: var(--radius);
     border-top-right-radius: 0;
     width: fit-content;
     min-width: calc(100% + var(--radius));
-    top: 0;
+    top: calc(var(--stroke) * -1);
 }
 
 .with-dropdown ul li {
     display: none;
     background: var(--button-bg-regular);
-    color: var(--button-grey);
     font-variant: small-caps;
     text-transform: lowercase;
     white-space: nowrap;
     width: 100%;
     box-sizing: border-box;
     padding: 8px 18px;
+    border: var(--stroke) solid var(--button-grey);
 }
 
 .with-dropdown ul li:not(:last-child) {
@@ -153,11 +151,8 @@ a.button-like, .button-like button, button.button-like, .plain-page button, inpu
 
 .with-dropdown:hover .dropdown-action-button::before {
     border-bottom-right-radius: 0;
-    height: calc(1.2em - var(--stroke));
-}
-
-.with-dropdown:hover ul {
-    outline: var(--stroke) solid var(--button-grey);
+    background: var(--button-grey);
+    color: var(--button-bg-regular);
 }
 
 .with-dropdown:hover ul li {

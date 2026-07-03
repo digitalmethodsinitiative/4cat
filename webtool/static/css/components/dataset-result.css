@@ -16,12 +16,12 @@
     margin-top: var(--spacing-regular);
 }
 
-.dataset-metadata .button-like {
-    color: var(--bright);
+.dataset-metadata > nav li {
+    margin-right: var(--spacing-small);
 }
 
-.dataset-metadata .button-like:hover, .dataset-metadata .dropdown-action-button::before, .with-dropdown:hover .dropdown-action-button::before {
-    outline-color: var(--bright);
+.dataset-metadata .button-like {
+    color: var(--bright);
 }
 
 .dataset-metadata .badge-list, .dataset-metadata p.notice {
@@ -48,10 +48,6 @@
 .dataset-metadata h1 {
     font-family: Chivo, sans-serif;
     font-weight: normal;
-}
-
-.dataset-fetch .button-like {
-    outline-color: var(--button-grey);
 }
 
 .dataset-metadata p.notice {

@@ -28,14 +28,25 @@
 }
 
 .module-actions li {
-    background: var(--panel-bg-1);
+    background: var(--button-grey);
     color: var(--semidark);
     border-bottom-color: var(--semidark);
     border-bottom: var(--stroke) solid var(--semidark);
     height: calc(var(--font-normal) + 2 * var(--spacing-small));
 }
 
+.dark .module-actions li {
+    background: var(--brighten-12);
+    color: var(--button-grey);
+    border-bottom-color: var(--button-grey);
+}
+
 .module-actions li:hover {
+    color: var(--button-grey);
+    background: var(--button-bg-regular);
+}
+
+.dark .module-actions li:hover {
     color: var(--button-bg-regular);
     background: var(--button-grey);
 }
@@ -52,11 +63,6 @@
 }
 
 /** colours for dropdown button in module cards **/
-.module-card .button-like {
-    color: var(--button-bg-regular);
-    background-color: transparent;
-    outline-color: var(--button-bg-regular);
-}
 
 .module-card .button-like.emphasis {
     outline-color: var(--fourcat-accent);
@@ -65,18 +71,7 @@
 }
 
 .module-card .dropdown-action-button::before {;
-    outline-color: var(--button-bg-regular);
-    background-color: var(--button-bg-regular);
-}
-
-.module-card .button-like:hover, .module-card .with-dropdown ul li:hover, .module-card .with-dropdown:hover .dropdown-action-button::before {
-    color: var(--panel-bg-0);
-    background: var(--button-bg-regular);
-    outline-color: var(--button-bg-regular);
-}
-
-.module-card .with-dropdown:hover ul {
-    outline-color: var(--button-bg-regular);
+    border-color: var(--button-bg-regular);
 }
 
 .module-card .with-dropdown ul li {
