@@ -1,7 +1,18 @@
 <form action="{{ url_for('dataset.queue_processor_interactive', key=dataset.key, processor=processor.type) }}"
-      method="POST" class="processor-options-form">
+      method="POST" class="processor-options-form"
+      hx-post="{{ url_for('dataset.queue_processor_component', key=dataset.key) }}"
+      {% if dataset.key_parent %}
+      hx-target="#child-{{ dataset.key }}"
+      hx-swap="outerHTML"
+      {% else %}
+      hx-target="#dataset-tree"
+      hx-swap="beforeend"
+      {% endif %}
+      hx-indicator="#processor-options-spinner">
 
-    <p class="processor-description">{{ processor.description|markdown|safe }}</p>
+    <p class="processor-description">{{ processor.description|safe }}</p>
+
+    <div id="processor-options-notice"></div>
 
     <input type="hidden" name="key" value="{{ dataset.key }}">
     <input type="hidden" name="processor" value="{{ processor.type }}">
@@ -25,7 +36,7 @@
         </fieldset>
     {% endif %}
 
-    <button class="button-like emphasis processor-queue-button">
+    <button type="submit" class="button-like emphasis processor-queue-button">
         <i class="fa fa-play" aria-hidden="true"></i> Run processor
     </button>
 </form>

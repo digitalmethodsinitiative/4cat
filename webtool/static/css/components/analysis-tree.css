@@ -276,6 +276,11 @@ aside.run-child-processor button:hover {
     color: var(--bright);
 }
 
+/** any badge list in a processor card that is not the last one **/
+.analysis-results .module-card .badge-list:not(:last-child) {
+    border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
 /** 'run new processor' button at bottom **/
 .big-button-wrap {
     position: relative;

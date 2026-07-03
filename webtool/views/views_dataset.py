@@ -8,7 +8,7 @@ import json_stream
 import mimetypes
 from pathlib import Path
 from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, flash,
-                   get_flashed_messages, url_for, stream_with_context, g)
+                   get_flashed_messages, url_for, stream_with_context, g, make_response)
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import Pagination, error, setting_required
@@ -651,10 +651,26 @@ def processor_grid(key):
 
     processors_available = dataset.get_available_processors(config=g.config)
 
+    own_processor = dataset.get_own_processor()
+    preferred_ids = list(own_processor.compatibility.preferred_followups) \
+        if own_processor and own_processor.compatibility else []
+
+    preferred_processors = {
+        processor_type: processors_available[processor_type]
+        for processor_type in preferred_ids
+        if processor_type in processors_available
+    }
+    other_processors = {
+        processor_type: processor
+        for processor_type, processor in processors_available.items()
+        if processor_type not in preferred_processors
+    }
+
     return render_template(
         "components/processor-grid.html",
         dataset=dataset,
-        processors=processors_available,
+        processors=other_processors,
+        preferred_processors=preferred_processors,
     )
 
 @component.route('/results/<string:key>/processor-options/<string:processor>/')
@@ -683,6 +699,132 @@ def processor_options(key, processor):
         dataset=dataset,
         processor=available_processors[processor],
     )
+
+@component.route('/results/<string:key>/processor-metadata/<string:processor>/')
+@login_required
+def processor_metadata(key, processor):
+    """
+    Get the metadata header for a processor.
+
+    :param str key:  Dataset key to show processor metadata for
+    :param str processor:  ID of the processor to show metadata for
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    available_processors = dataset.get_available_processors(config=g.config)
+    if processor not in available_processors:
+        return error(404, error="This processor is not available for this dataset.")
+
+    return render_template(
+        "components/processor-metadata.html",
+        dataset=dataset,
+        processor=available_processors[processor],
+    )
+
+@component.route('/results/<string:key>/child-dataset/')
+@login_required
+def child_dataset_component(key):
+    """
+    Render a single child dataset as a partial
+
+    Used by htmx to refresh an in-progress analysis in the dataset tree until
+    it is finished; the component polls this endpoint and replaces itself with
+    the re-rendered state (see child-dataset.html).
+
+    :param str key:  Dataset key to render
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    return render_template(
+        "dataset-page/child-dataset.html",
+        dataset=dataset,
+        top_parent=dataset.get_genealogy()[0],
+        processors=g.modules.processors,
+    )
+
+@component.route('/results/<string:key>/queue-processor/', methods=["POST"])
+@login_required
+def queue_processor_component(key):
+    """
+    Queue a processor and return the updated dataset tree fragment
+
+    htmx-facing counterpart to `queue_processor_interactive`. On success the
+    response is a rendered child-dataset component: the new analysis itself
+    when the processor ran on the top-level dataset, or the re-rendered parent
+    (whose subtree now includes the new analysis) when it ran on a child. The
+    options form sets a matching hx-target/hx-swap for either case.
+
+    Failures are retargeted into the options form's notice area via response
+    headers, so the slideout stays open and shows what went wrong; only a
+    successful queue emits the `processor-queued` event that collapses it.
+
+    :param str key:  Key of dataset to queue the processor for
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    result = queue_processor(key)
+
+    if not result.is_json:
+        # permission/validation error() response from the API function
+        return result
+
+    status = result.json.get("status")
+    if status == "success":
+        if dataset.key_parent:
+            # processor ran on a child: re-render that child so its subtree
+            # includes the new analysis
+            subject = dataset
+        else:
+            # processor ran on the top-level dataset: render the new analysis
+            # to be appended to the tree
+            subject = DataSet(key=result.json["key"], db=g.db, modules=g.modules)
+
+        response = make_response(render_template(
+            "dataset-page/child-dataset.html",
+            dataset=subject,
+            top_parent=dataset.get_genealogy()[0],
+            processors=g.modules.processors,
+        ))
+        # note: the vendored htmx build only implements the plain HX-Trigger
+        # header, not HX-Trigger-After-Settle/-After-Swap, and dispatches it
+        # before the swap happens. The client-side listener closes the
+        # processor panel immediately (which doesn't depend on the new
+        # content existing yet) and defers scrolling the new analysis into
+        # view until htmx's own htmx:after:settle event fires.
+        response.headers["HX-Trigger"] = json.dumps(
+            {"processor-queued": {"key": result.json["key"]}}
+        )
+        return response
+
+    # not queued: show the message (and any extra form fields for the
+    # "extra-form" status) inside the options form instead
+    notice = render_template(
+        "components/form-notice.html",
+        message=result.json.get("message", "The processor could not be queued."),
+        needs_confirmation=(status == "confirm"),
+    )
+    if status == "extra-form":
+        notice += result.json.get("html", "")
+
+    response = make_response(notice)
+    response.headers["HX-Retarget"] = "#processor-options-notice"
+    response.headers["HX-Reswap"] = "innerHTML"
+    return response
 
 @component.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
 @login_required

@@ -11,3 +11,34 @@
 .slide-to {
     transform: translateY(0);
 }
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--blue);
+    pointer-events: none;
+}
+
+.spinner .spinner-icon {
+    font-size: 2.5em;
+    animation: spin 0.8s linear infinite;
+}
+
+.htmx-indicator {
+    opacity: 0;
+    transition: opacity 0.2s ease-in;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}

@@ -6,6 +6,7 @@
     --green-light: #CDEDDE;
     --green: #026C39;
     --yellow-light: #FDE094;
+    --orange: #ff9300;
     --yellow: #8C741D;
     --red-light: #F6C5C5;
     --red: #A63F3F;
@@ -28,6 +29,23 @@
     --panel-bg-1: hsl(0, 0%, 84%);
     --panel-bg-2: hsl(0, 0%, 76%);
     --panel-bg-3: hsl(0, 0%, 50%);
+
+    /* module category tags */
+    --tag1: #9351a7;
+    --tag2: #59b05a;
+    --tag3: #d381d1;
+    --tag4: #95a548;
+    --tag5: #6074cf;
+    --tag6: #c8a039;
+    --tag7: #8286b5;
+    --tag8: #c3503f;
+    --tag9: #519cb4;
+    --tag10: #c6477b;
+    --tag11: #6fb89c;
+    --tag12: #d98f5f;
+    --tag13: #54784b;
+    --tag14: #ba7c8b;
+    --tag15: #8f6f43;
 
     --max-width: 68rem; /** viewport width **/
 

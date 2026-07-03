@@ -17,6 +17,14 @@
     margin: 0;
 }
 
+.processor-grid-section + .processor-grid-section {
+    margin-top: var(--spacing-large);
+}
+
+.processor-grid-header {
+    margin: 0 0 var(--spacing-regular) 0;
+}
+
 .no-results {
     padding: var(--spacing-large);
     text-align: center;

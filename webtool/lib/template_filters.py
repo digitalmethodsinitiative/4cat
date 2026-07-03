@@ -501,7 +501,7 @@ def _jinja2_filter_idify(value):
 	"""
 	value = str(value).lower()
 
-	value = re.sub(r"\s+", "-", "")
+	value = re.sub(r"\s+", "-", value)
 	value = re.sub(r"[^a-z0-9-]", "", value)
 
 	return value

@@ -160,6 +160,7 @@ Invocation (the plain `docker compose` command uses `docker-compose.yml`):
 - Define reusable Jinja2 components when patterns emerge, but avoid over-engineering for future reuse.
 - Views are organized by concern in `webtool/views/`. API endpoints are in `api_tool.py` and `api_standalone.py`.
 - Static assets go in `webtool/static/`; templates in `webtool/templates/`.
+- The project uses htmx `4.0.0-beta*`.
 
 ## Testing Expectations
 - Run tests with `pytest` from the repo root. Config is in `pytest.ini`.
