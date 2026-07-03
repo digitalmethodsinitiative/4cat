@@ -2,6 +2,7 @@
 Annotate top images
 """
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Delegated
 
@@ -13,22 +14,27 @@ class AnnotateImages(ProcessorPreset):
     Run processor pipeline to annotate images
     """
     type = "preset-annotate-images"  # job type ID
-    category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Annotate images with Google Vision"  # title displayed in UI
-    description = "Use the Google Vision API to extract labels detected in the most-linked images from the dataset. Note that " \
-                  "this is a paid service and will count towards your API credit."
+    description = ProcessorDescription(
+        title="Annotate images with Google Vision",
+        category="Combined processors",  # 'Combined processors' are always listed first in the UI.
+        tags=["classify", "caption", "api key required", "external service"],
+        description="Download the most-linked images from the dataset and use the Google Vision API to detect labels, text, faces, landmarks, logos, and other features in them. The results are converted to a CSV file.",
+        references=[
+            "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",
+            "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)",
+        ],
+        warnings=[
+            "This is a paid service. Google bills the owner of the API key you provide.",
+            "Images are sent to Google Vision, an external service, to be analysed.",
+        ],
+        icon="tags",
+    )
     extension = "csv"
     # a preset; its output is its last step's
     output = Delegated()
-    icon = "tags"
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
-
-    references = [
-        "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",
-        "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)"
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

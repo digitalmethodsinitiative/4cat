@@ -3,6 +3,7 @@ Create scene-by-scene timelines
 """
 
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.outputs import Delegated
 
@@ -12,13 +13,14 @@ class VideoSceneTimelineCreator(ProcessorPreset):
     Run processor pipeline to create video scene timelines
     """
     type = "preset-scene-timelines"  # job type ID
-    category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Create scene-by-scene timelines"  # title displayed in UI
-    description = "Creates a 'timeline' for each video, a horizontal collage of sequential frames. Each 'scene' in " \
-                  "the video is visualised as a single frame. Scenes are detected algorithmically. The timelines " \
-                  "for all videos are then stacked vertically and rendered as a single SVG file."
+    description = ProcessorDescription(
+        title="Create scene-by-scene timelines",
+        category="Visual",
+        tags=["needs ffmpeg"],
+        description="Build a horizontal timeline for each video, showing one frame per detected scene. Scenes are detected automatically, and the per-video timelines are stacked into a single SVG file.",
+        icon="film",
+    )
     extension = "svg"
-    icon = "film"
 
     # a preset; its output is its last step's
     output = Delegated()
