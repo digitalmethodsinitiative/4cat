@@ -8,16 +8,12 @@
     overflow: hidden;
 }
 
-/* top-level slideout: pinned to the viewport, starting below the
-   (dynamic-height, sticky) site header and covering down to the bottom
-   of the viewport, regardless of page scroll position */
 .slideout-root {
     position: fixed;
-    top: var(--site-header-height, 0px);
+    top: var(--site-header-height);
     z-index: var(--z-slideout);
 }
 
-/* set while a slideout is active, so the page behind it cannot scroll */
 body.slideout-open {
     overflow: hidden;
 }
@@ -51,9 +47,13 @@ body.slideout-open {
 
 .slideout-header ul {
     display: flex;
-    column-gap: 20px;
+    column-gap: var(--spacing-regular);
     flex-grow: 1;
     align-items: center;
+}
+
+.slideout-header.narrow ul {
+    column-gap: var(--spacing-small);
 }
 
 .slideout-contents {
@@ -73,4 +73,15 @@ body.slideout-open {
     overflow-y: scroll;
     overscroll-behavior: contain;
     padding: var(--spacing-regular);
+}
+
+/* wraps a .slideout-body swap target so a loading spinner sibling can be
+   overlaid on it; must carry the flex sizing itself since it, not the body,
+   is now the flex child of the slideout column */
+.slideout-body-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }

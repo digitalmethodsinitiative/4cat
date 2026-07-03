@@ -6,7 +6,7 @@
 
 {% block body %}
     <div class="dataset-container"
-         x-data="{ slideoutActive: false, selectedProcessor: null, selectedDatasetType: null, selectedDatasetLabel: null, processorSearch: '', noProcessorResults() { const q = this.processorSearch.toLowerCase().trim(); return q && ![...document.querySelectorAll('#processor-grid .processor-card')].some(c => c.dataset.search.includes(q)); } }"
+         x-data="{ slideoutActive: false, selectedProcessorType: null, selectedDatasetType: null, selectedDatasetLabel: null, processorSearch: '', noProcessorResults() { const q = this.processorSearch.toLowerCase().trim(); return q && ![...document.querySelectorAll('#processor-grid .processor-card')].some(c => c.dataset.search.includes(q)); } }"
          x-effect="document.body.classList.toggle('slideout-open', slideoutActive)">
         <section class="dark dataset-metadata" data-dataset-key="{{ dataset.key }}">
             <nav>
@@ -80,6 +80,7 @@
                             hx-get="{{ url_for('dataset.processor_grid', key=dataset.key) }}"
                             hx-target="#processor-grid"
                             hx-swap="innerHTML"
+                            hx-indicator="#processor-grid-spinner"
                             hx-trigger="click"
                             @click="slideoutActive = true; selectedDatasetType = '{{ dataset.type }}'; selectedDatasetLabel = '{{ processors[dataset.type].title }}';"
                         >
@@ -119,7 +120,7 @@
                 </div>
                 <div class="slideout-header-controls">
                     <ul>
-                        <template x-if="!selectedProcessor">
+                        <template x-if="!selectedProcessorType">
                             <li class="search-box">
                                 <input type="search" x-model="processorSearch"
                                        placeholder="Search processors…"
@@ -127,16 +128,19 @@
                             </li>
                         </template>
                         <li>
-                            <button class="emphasis button-like" @click="slideoutActive = false; selectedProcessor = null"><i class="fa-solid fa-xmark"></i></button>
+                            <button class="emphasis button-like" @click="slideoutActive = false; selectedProcessorType = null"><i class="fa-solid fa-xmark"></i></button>
                         </li>
                     </ul>
                 </div>
             </div>
             <div class="processor-panel-contents slideout-contents">
-                <div id="processor-grid" class="slideout-body">
+                <div class="slideout-body-wrap">
+                    <div id="processor-grid" class="slideout-body">
+                    </div>
+                    {% with spinner_id = "processor-grid-spinner" %}{% include "components/spinner.html" %}{% endwith %}
                 </div>
                 <div class="processor-options slideout"
-                     x-show="selectedProcessor"
+                     x-show="selectedProcessorType"
                      x-transition:enter="slide-enter"
                      x-transition:enter-start="slide-from"
                      x-transition:enter-end="slide-to"
@@ -144,22 +148,16 @@
                      x-transition:leave-start="slide-to"
                      x-transition:leave-end="slide-from">
                     <div class="slideout-header narrow">
-                        <div class="slideout-header-title">
-                            {% include 'components/module-icon.html' %}
-                            <h2><span x-text="selectedProcessor?.label"></span> options</h2>
-                            <nav class="quick-links">
-                                <ul class="module-actions processor-actions">
-                                    <li><a :href="'/processor-catalogue/' + (selectedProcessor?.type ?? '')"><i class="fa-solid fa-circle-info"></i></a></li>
-                                    <li><a :href="selectedProcessor?.repo" target="_blank"><i class="fa-brands fa-github"></i></a></li>
-                                </ul>
-                            </nav>
-                        </div>
+                        <div id="processor-metadata" class="slideout-header-title"></div>
                         <div class="slideout-header-controls">
-                            <button class="button-like" @click="selectedProcessor = null">
+                            <button class="button-like" @click="selectedProcessorType = null">
                                 <i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
-                    <div id="processor-options" class="slideout-body"></div>
+                    <div class="slideout-body-wrap">
+                        <div id="processor-options" class="slideout-body"></div>
+                        {% with spinner_id = "processor-options-spinner" %}{% include "components/spinner.html" %}{% endwith %}
+                    </div>
                 </div>
             </div>
         </div>

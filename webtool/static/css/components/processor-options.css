@@ -1,0 +1,11 @@
+.processor-header .quick-links {
+    flex-grow: 0;
+}
+
+.processor-header .actions {
+    margin-left: auto;
+}
+
+fieldset {
+    border: none;
+}

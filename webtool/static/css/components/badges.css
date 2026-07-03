@@ -155,3 +155,27 @@
     color: var(--yellow-light);
     border: var(--stroke) solid var(--yellow-light);
 }
+
+/* Tags for modules */
+.module-tag {
+    text-transform: uppercase;
+    background-color: var(--tag1);
+    color: var(--bright);
+    cursor: pointer;
+}
+
+.module-tag.tag-text-analysis        { background-color: var(--tag1); }
+.module-tag.tag-visual,
+.module-tag.tag-visualisation         { background-color: var(--tag2); }
+.module-tag.tag-networks              { background-color: var(--tag3); }
+.module-tag.tag-machine-learning      { background-color: var(--tag4); }
+.module-tag.tag-filtering             { background-color: var(--tag5); }
+.module-tag.tag-metrics,
+.module-tag.tag-thread-metrics        { background-color: var(--tag6); }
+.module-tag.tag-conversion            { background-color: var(--tag7); }
+.module-tag.tag-twitter-analysis,
+.module-tag.tag-username              { background-color: var(--tag8); }
+.module-tag.tag-statistics            { background-color: var(--tag9); }
+.module-tag.tag-audio                 { background-color: var(--tag10); }
+.module-tag.tag-cross-platform        { background-color: var(--tag3); }
+.module-tag.tag-combined-processors   { background-color: var(--tag9); }

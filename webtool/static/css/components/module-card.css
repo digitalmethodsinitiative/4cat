@@ -83,11 +83,6 @@
     padding: var(--spacing-small) var(--spacing-regular);
 }
 
-/** any badge list in a processor card that is not the last one **/
-.module-card .badge-list:not(:last-child) {
-    border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
-}
-
 .module-card .badge-list dd {
     border: var(--stroke) solid var(--button-grey);
     box-sizing: content-box;

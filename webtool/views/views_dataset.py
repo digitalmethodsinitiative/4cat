@@ -651,10 +651,26 @@ def processor_grid(key):
 
     processors_available = dataset.get_available_processors(config=g.config)
 
+    own_processor = dataset.get_own_processor()
+    preferred_ids = list(own_processor.compatibility.preferred_followups) \
+        if own_processor and own_processor.compatibility else []
+
+    preferred_processors = {
+        processor_type: processors_available[processor_type]
+        for processor_type in preferred_ids
+        if processor_type in processors_available
+    }
+    other_processors = {
+        processor_type: processor
+        for processor_type, processor in processors_available.items()
+        if processor_type not in preferred_processors
+    }
+
     return render_template(
         "components/processor-grid.html",
         dataset=dataset,
-        processors=processors_available,
+        processors=other_processors,
+        preferred_processors=preferred_processors,
     )
 
 @component.route('/results/<string:key>/processor-options/<string:processor>/')
@@ -680,6 +696,33 @@ def processor_options(key, processor):
 
     return render_template(
         "components/processor-options.html",
+        dataset=dataset,
+        processor=available_processors[processor],
+    )
+
+@component.route('/results/<string:key>/processor-metadata/<string:processor>/')
+@login_required
+def processor_metadata(key, processor):
+    """
+    Get the metadata header for a processor.
+
+    :param str key:  Dataset key to show processor metadata for
+    :param str processor:  ID of the processor to show metadata for
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    available_processors = dataset.get_available_processors(config=g.config)
+    if processor not in available_processors:
+        return error(404, error="This processor is not available for this dataset.")
+
+    return render_template(
+        "components/processor-metadata.html",
         dataset=dataset,
         processor=available_processors[processor],
     )

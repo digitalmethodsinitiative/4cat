@@ -5,14 +5,18 @@
     {% include 'components/module-icon.html' %}
     <h3>{{ processor.title }}</h3>
         {% include 'components/processor-card-actions.html' %}
+        {# todo: change to tag list #}
+        {% set tags = processor.category %}
+        {% include 'components/module-tags.html' %}
         <nav class="actions">
             <button
                 class="button-like"
                 hx-get="{{ url_for('dataset.processor_options', key=dataset.key, processor=processor.type) }}"
                 hx-target="#processor-options"
                 hx-swap="innerHTML"
-                hx-trigger="click"
-                @click='selectedProcessor = { type: {{ processor.type|tojson }}, label: {{ processor.title|tojson }}, repo: {{ processor.get_repo_link(__config)|tojson }} }'>Select</button>
+                hx-indicator="#processor-options-spinner"
+                @click='selectedProcessorType = "{{ processor.type }}";
+                    htmx.ajax("GET", "{{ url_for('dataset.processor_metadata', key=dataset.key, processor=processor.type) }}", "#processor-metadata")'>Select</button>
         </nav>
     </header>
     <section class="card-content">
