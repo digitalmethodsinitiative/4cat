@@ -5,7 +5,7 @@ import csv
 from nltk.tokenize import sent_tokenize, word_tokenize
 
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -20,11 +20,16 @@ class SplitSentences(BasicProcessor):
     Split sentences
     """
     type = "sentence-split"  # job type ID
-    category = "Text analysis"  # category
-    title = "Split text into sentences"  # title displayed in UI
-    description = "Split a body of posts into discrete sentences. Output file has one row per sentence, containing the sentence and item ID."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Split text into sentences",
+        category="Text analysis",
+        tags=["extract"],
+        description="Split the text in a chosen column into separate sentences. The output has one row per sentence, "
+                    "with the sentence and its item ID. Sentences shorter than a chosen number of words can be "
+                    "dropped.",
+        icon="arrows-left-right-to-line",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
-    icon = "arrows-left-right-to-line"
 
     # a derived table
     output = Table()
