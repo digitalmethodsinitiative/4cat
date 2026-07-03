@@ -4,7 +4,7 @@ set: lite_header = True for a header included on another page as a clickable ent
 set: main_header = True for a header at the top of the analyiss tree (e.g. on the dataset
                         result page)
 #}
-<header class="card-header dataset-header">
+<header class="card-header dataset-header{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}">
     {% if dataset.get_own_processor().icon %}{% set icon = dataset.get_own_processor().icon %}{% endif %}
     {% include 'components/module-icon.html' %}
     <{% if main_header %}h1{% else %}h3{% endif %}>
