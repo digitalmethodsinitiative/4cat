@@ -70,7 +70,7 @@ a.button-like, .button-like button, button.button-like, .plain-page button, inpu
 
 .dropdown-action-button::before {
     content: '\f078';  /* downwards caret */
-    font-family: 'Font Awesome 6 Free', monospace;
+    font-family: 'Font Awesome 7 Free', monospace;
     font-weight: 900;
 
     border-top-right-radius: var(--radius);

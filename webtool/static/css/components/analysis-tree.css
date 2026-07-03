@@ -98,7 +98,7 @@
 
 .journey-marker {
     /** big circle before each dataset **/
-    font-family: 'Font Awesome 6 Free', monospace;
+    font-family: 'Font Awesome 7 Free', monospace;
     font-weight: 900;
     background: var(--dark);
     color: var(--bright);
