@@ -11,7 +11,7 @@ import oslex
 
 from packaging import version
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility, ExecutableSibling
 from common.lib.outputs import Render
 from common.lib.exceptions import ProcessorInterruptedException
@@ -31,15 +31,20 @@ class VideoStack(BasicProcessor):
     Use ffmpeg to render multiple videos into one combined video in which they are overlaid.
     """
     type = "video-stack"  # job type ID
-    category = "Visual"  # category
-    title = "Stack videos"  # title displayed in UI
-    description = "Create a video stack from the videos in the dataset. Videos are layered on top of each other " \
-                  "transparently to help visualise similarities. Does not work well with more than a dozen or so " \
-                  "videos. Videos are stacked by length, i.e. the longest video is at the 'bottom' of the stack."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Stack videos",
+        category="Visual",
+        tags=["similarity"],
+        description="Layer the videos in the dataset on top of each other transparently into a single combined video to reveal similarities. Videos are ordered by length, with the longest at the bottom of the stack.",
+        warnings=[
+            "This works best with a dozen or fewer videos; more than that becomes hard to read.",
+            "Requires ffmpeg and ffprobe to be installed on the server.",
+        ],
+        icon="layer-group",
+    )
     extension = "mp4"  # extension of result file, used internally and in UI
     # a rendered video, no column table
     output = Render("mp4", media="video")
-    icon = "layer-group"
 
     # Allow on video datasets when ffmpeg and ffprobe are available
     compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})

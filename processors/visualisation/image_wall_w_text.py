@@ -16,7 +16,7 @@ from svgwrite.text import Text
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Render
@@ -32,11 +32,13 @@ class ImageTextWallGenerator(BasicProcessor):
     Image wall with text generator
     """
     type = "image-text-wall"  # job type ID
-    category = "Visual"  # category
-    title = "Image wall with captions"  # title displayed in UI
-    description = "Combine images into a single image including text"  # description displayed in UI
+    description = ProcessorDescription(
+        title="Image wall with captions",
+        category="Visual",
+        description="Combine downloaded images and their captions into a single wall-like image. Each image is tiled and labelled with its caption text below it. Works with datasets that pair images and captions, such as generated images with prompts or images with their extracted text.",
+        icon="panorama",
+    )
     extension = "svg"  # extension of result file, used internally and in UI
-    icon = "panorama"
 
     # a rendered image, no column table
     output = Render()

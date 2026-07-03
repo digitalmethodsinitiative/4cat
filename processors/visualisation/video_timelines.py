@@ -13,7 +13,7 @@ from svgwrite.image import Image as ImageElement
 
 from ural import is_url
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Render
 from common.lib.exceptions import ProcessorInterruptedException
@@ -34,14 +34,15 @@ class VideoTimelines(BasicProcessor):
     Takes a set of folders containing video frames and renders them as a horizontal collage per video
     """
     type = "video-timelines"  # job type ID
-    category = "Visual"  # category
-    title = "Create video timelines"  # title displayed in UI
-    description = "For each video for which frames were extracted, create a video timeline (i.e. a horizontal " \
-                  "collage of sequential frames). Timelines are then vertically stacked."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Create video timelines",
+        category="Visual",
+        description="Arrange extracted video frames into a timeline for each video, laying the frames out in sequence as a horizontal strip. The per-video timelines are stacked vertically into a single image, with each video labelled underneath.",
+        icon="photo-film",
+    )
     extension = "svg"  # extension of result file, used internally and in UI
     # a rendered image, no column table
     output = Render()
-    icon = "photo-film"
 
     # Compatible with extracted video frames (or anything that stores related
     # images in separate folders within a zip archive).

@@ -7,7 +7,7 @@ https://ffmpeg.org/
 import shutil
 import oslex
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.outputs import MediaArchive
 from common.lib.exceptions import ProcessorInterruptedException
@@ -27,14 +27,17 @@ class VideoFrames(BasicProcessor):
 	Uses ffmpeg to extract a certain number of frames per second at different sizes and saves them in an archive.
 	"""
 	type = "video-frames"  # job type ID
-	category = "Visual"  # category
-	title = "Extract frames from videos"  # title displayed in UI
-	description = "Extract frames from videos"  # description displayed in UI
+	description = ProcessorDescription(
+		title="Extract frames from videos",
+		category="Visual",
+		tags=["extract", "needs ffmpeg"],
+		description="Use ffmpeg to extract still frames from each video and save them as images in an archive. You can set how many frames to capture per second and resize them to a fixed dimension. Use a frame interval of 0 to capture only the first frame of each video.",
+		icon="photo-film",
+	)
 	extension = "zip"  # extension of result file, used internally and in UI
 	media_type = "image"  # the extracted frames are images; set so the map and runtime agree
 	# a zip archive of image files
 	output = MediaArchive(media="image")
-	icon = "photo-film"
 
 	# Allow on video datasets when ffmpeg is available
 	compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"] + VideoDownloaderPlus.followups)
