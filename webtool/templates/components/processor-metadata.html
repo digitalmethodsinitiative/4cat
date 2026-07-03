@@ -1,0 +1,20 @@
+<div class="processor-metadata-text">
+    <ul>
+        {% if processor.icon %}
+            {% set icon = processor.icon %}
+            <li>
+                {% include 'components/module-icon.html' %}
+            </li>
+        {% endif %}
+        <li>
+            <h2>{{ processor.title }}</h2>
+        </li>
+        <li>
+            {% include 'components/processor-card-actions.html' %}
+        </li>
+        <li>
+            {% set tags = processor.category %}
+            {% include 'components/module-tags.html' %}
+        </li>
+    </ul>
+</div>
