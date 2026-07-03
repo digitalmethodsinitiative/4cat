@@ -33,7 +33,7 @@ class ConvertText(BasicProcessor):
         warnings=[
             "Reading a single JSON file will use a lot of memory for large datasets. You may wish to download the dataset as a CSV or NDJSON instead."
         ],
-        icon="arrow-turn-to-dots",
+        icon="arrows-turn-to-dots",
     )
     extension = "csv"
 
