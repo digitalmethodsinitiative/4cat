@@ -9,7 +9,7 @@ import csv
 from pathlib import Path
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
@@ -29,25 +29,31 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     Request tags and labels from the Google Vision API for a given set of images
     """
     type = "google-vision-api"  # job type ID
-    category = "Machine learning"  # category
-    title = "Google Vision analysis"  # title displayed in UI
-    description = "Use the Google Vision API to annotate images with tags and labels identified via machine learning. " \
-                  "One request will be made per image per annotation type. Note that this is not a free service and " \
-                  "requests will be credited by Google to the owner of the API token you provide. Requires billing " \
-                  "and Google Vision API enabled (this may take a few minutes)."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Label images with Google Vision",
+        category="Machine learning",
+        tags=["classify", "api key required", "external service"],
+        description="Use the Google Vision API to detect labels, text, faces, landmarks, logos, and other features in images. One request is made per image for each feature type you select.",
+        references=[
+            "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",
+            "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)",
+        ],
+        warnings=[
+            "This is a paid service. Google bills the owner of the API key you provide, which requires billing and the Vision API to be enabled.",
+            "Images are sent to Google, an external service, to be analysed.",
+        ],
+        info=[
+            "Follow up with 'Convert Vision results to CSV' for a flat table and to write labels as annotations.",
+        ],
+        icon="eye",
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI
-    icon = "eye"
 
     # a derived table
     output = Table(extension="ndjson")
 
     # Allow on image sets
     compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-google-vision-to-csv", "vision-bipartite-network", "vision-label-network"])
-
-    references = [
-        "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",
-        "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)"
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
