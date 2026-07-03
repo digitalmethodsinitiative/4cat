@@ -129,6 +129,12 @@
     bottom: 0;
 }
 
+.in-progress .journey-marker.end::after {
+    top: 100%;
+    width: calc(100% + (2 * var(--stroke-journey)));
+    left: calc(var(--stroke-journey) * -1);
+}
+
 .journey-marker .status-indicator {
     /** coloured dot in middle of journey indicator **/
     position: absolute;
@@ -146,7 +152,13 @@
 }
 
 .in-progress > article > div > .journey-marker {
-    animation: status-pulse 1.25s infinite alternate;
+    animation: pulse-colour 1.25s infinite alternate;
+    border: var(--stroke-journey) solid var(--semidark);
+}
+
+.in-progress > article > div > .journey-marker > * {
+    animation: status-spin 1.25s infinite alternate;
+    color: var(--bright);
 }
 
 @keyframes status-pulse {
@@ -169,9 +181,22 @@
 @keyframes status-spin {
     from {
         transform:rotate(0deg);
+        color: var(--bright);
     }
     to {
         transform:rotate(360deg);
+        color: var(--fourcat-accent);
+    }
+}
+
+@keyframes pulse-colour {
+    from {
+        border-color: var(--semidark);
+        background: var(--semidark);
+    }
+    to {
+        border-color: var(--fourcat-accent);
+        background: var(--bright);
     }
 }
 

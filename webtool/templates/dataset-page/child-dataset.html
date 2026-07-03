@@ -35,7 +35,7 @@
             {% endif %}
             <button class="journey-marker{% if not has_processors %} end{% endif %}">
             {% if not dataset.is_finished() %}
-                &#62193; {# spinner #}
+                <span class="spinner">&#63009;</span> {# spinner #}
             {% elif not dataset.num_rows %}
                 &#62796; {# skull #}
             {% else %}
