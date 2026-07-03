@@ -54,9 +54,9 @@
     CATALOGUE = (data.processors || []).slice().sort((a, b) => (a.title || a.type).localeCompare(b.title || b.type));
     CATALOGUE.forEach(p => { TITLE[p.type] = p.title || p.type; });
 
-    populateCategories();
+    populateTags();
     document.getElementById("pc-search").addEventListener("input", renderCatalogue);
-    document.getElementById("pc-category").addEventListener("change", renderCatalogue);
+    document.getElementById("pc-tag").addEventListener("change", renderCatalogue);
 
     // Remember the empty-state markup (before anything overwrites it) so back/forward can
     // restore it when the visitor navigates back past every processor they opened.
@@ -81,14 +81,16 @@
     renderCatalogue();
   }
 
-  // Fill the category dropdown with the categories actually present in the catalogue.
-  function populateCategories() {
-    const categories = [...new Set(CATALOGUE.map(p => p.category || "(uncategorised)"))].sort();
-    const select = document.getElementById("pc-category");
-    categories.forEach(category => {
+  // Fill the tag dropdown with every tag present in the catalogue. Tags are the new way
+  // to filter (a superset of categories -- a processor's first tag is its category), so
+  // this lists them all, alphabetically.
+  function populateTags() {
+    const tags = [...new Set(CATALOGUE.flatMap(p => p.tags || []))].sort();
+    const select = document.getElementById("pc-tag");
+    tags.forEach(tag => {
       const option = document.createElement("option");
-      option.value = category;
-      option.textContent = category;
+      option.value = tag;
+      option.textContent = tag;
       select.appendChild(option);
     });
   }
@@ -100,12 +102,12 @@
   // "N of M" count and re-attaches the click handler that opens a card's detail.
   function renderCatalogue() {
     const query = document.getElementById("pc-search").value.trim().toLowerCase();
-    const category = document.getElementById("pc-category").value;
+    const tag = document.getElementById("pc-tag").value;
 
     let items = CATALOGUE;
-    if (category) items = items.filter(p => (p.category || "(uncategorised)") === category);
+    if (tag) items = items.filter(p => (p.tags || []).includes(tag));
     if (query) items = items.filter(p =>
-      `${p.type} ${p.title || ""} ${p.category || ""} ${p.description || ""}`.toLowerCase().includes(query));
+      `${p.type} ${p.title || ""} ${(p.tags || []).join(" ")} ${p.description || ""}`.toLowerCase().includes(query));
 
     const groups = {};
     items.forEach(p => { const c = p.category || "(uncategorised)"; (groups[c] = groups[c] || []).push(p); });
@@ -128,9 +130,12 @@
       p.is_filter ? '<span class="inline-label property-badge pc-filter">filter</span>' : "",
       p.has_override ? '<span class="inline-label property-badge pc-approx">override</span>' : ""
     ].join("");
+    // the first tag is the category (already the group heading), so show only the rest
+    const tags = (p.tags || []).slice(1).map(t => `<span class="pc-tag">${esc(t)}</span>`).join("");
     return `<button class="pc-card" data-type="${esc(p.type)}">
       <div class="pc-card-head"><h4>${esc(p.title || p.type)}</h4><span class="pc-badges">${badges}</span></div>
       <p class="pc-desc">${esc(p.description || "")}</p>
+      ${tags ? `<div class="pc-tags">${tags}</div>` : ""}
     </button>`;
   }
 
@@ -296,9 +301,31 @@
     return next || '<p class="pc-muted">Nothing runs on this output.</p>';
   }
 
-  // Assemble the whole detail pane for one processor: heading and badges, a short
-  // metadata list (type / category / what it produces / description), then the three
-  // blocks. "Produces" is left out when the output shape didn't pin down a format.
+  // Render a references-style string: turn any [text](url) markdown links into anchors,
+  // escaping everything else. Plain citations (no link) pass through unchanged.
+  function mdLinks(s) {
+    let out = "", last = 0, re = /\[([^\]]+)\]\(([^)]+)\)/g, m;
+    while ((m = re.exec(s))) {
+      out += esc(s.slice(last, m.index));
+      out += `<a href="${esc(m[2])}" target="_blank" rel="noopener">${esc(m[1])}</a>`;
+      last = m.index + m[0].length;
+    }
+    return out + esc(s.slice(last));
+  }
+
+  // Info / warning notice boxes, styled like the run-processor card: warnings (pitfalls)
+  // in yellow, info (helpful extras) in blue. One box per item, matching the design mockup.
+  function noticeBoxes(items, kind) {
+    if (!items || !items.length) return "";
+    const icon = kind === "warning" ? "triangle-exclamation" : "circle-info";
+    return items.map(t =>
+      `<p class="pc-notice pc-notice-${kind}"><i class="fa fa-${icon}" aria-hidden="true"></i><span>${esc(t)}</span></p>`
+    ).join("");
+  }
+
+  // Assemble the whole detail pane for one processor: a card (icon + title + badges/tags,
+  // description, warning then info boxes, and a footer of what it produces + references),
+  // then a compact type/category line and the three collapsible blocks.
   function detailHtml(info) {
     const shape = info.output_shape || {};
 
@@ -314,14 +341,29 @@
       : '<p class="pc-muted">No declared compatibility (defaults to top-level datasets).</p>';
     const produces = [shape.extension, shape.media_type].filter(v => v && v !== "unknown").join(" · ");
 
+    // the first tag is the category (shown below), so chip only the rest next to the title
+    const tags = (info.tags || []).slice(1).map(t => `<span class="pc-tag">${esc(t)}</span>`).join("");
+    const icon = info.icon ? `<i class="fa fa-fw fa-${esc(info.icon)}" aria-hidden="true"></i> ` : "";
+    const references = (info.references || []).length
+      ? `<div class="pc-refs">${info.references.map(r => `<span>${mdLinks(r)}</span>`).join("")}</div>` : "";
+    const foot = (produces || references)
+      ? `<div class="pc-detail-foot">${produces ? `<span class="pc-produces"><i class="fa fa-table" aria-hidden="true"></i> ${esc(produces)}</span>` : "<span></span>"}${references}</div>`
+      : "";
+
     return `
-      <h2><span>${esc(info.title || info.type)}</span></h2>
-      <p class="pc-badges">${badges}</p>
-      <dl class="metadata-wrapper">
+      <div class="pc-detail-card">
+        <header class="pc-detail-head">
+          <h2>${icon}<span>${esc(info.title || info.type)}</span></h2>
+          <span class="pc-badges">${badges}${tags}</span>
+        </header>
+        ${info.description ? `<p class="pc-detail-desc">${esc(info.description)}</p>` : ""}
+        ${noticeBoxes(info.warnings, "warning")}
+        ${noticeBoxes(info.info, "info")}
+        ${foot}
+      </div>
+      <dl class="metadata-wrapper pc-meta">
         <div class="fullwidth"><dt>Type</dt><dd><code>${esc(info.type)}</code></dd></div>
         ${info.category ? `<div class="fullwidth"><dt>Category</dt><dd>${esc(info.category)}</dd></div>` : ""}
-        ${produces ? `<div class="fullwidth"><dt>Produces</dt><dd>${esc(produces)}</dd></div>` : ""}
-        ${info.description ? `<div class="fullwidth"><dt>About</dt><dd>${esc(info.description)}</dd></div>` : ""}
       </dl>
       ${section("How to run", true, howToRunHtml(info))}
       ${section("What can run on this", false, followupsHtml(info))}

@@ -82,3 +82,33 @@ summary.pc-sub:hover { color: #485ba6; }
 .pc-muted { color: #888; }
 .pc-spec { background: #f6f7f9; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px;
     font-size: .8em; white-space: pre-wrap; overflow: auto; }
+
+/* --- processor detail "card" -- mirrors the run-processor card treatment --- */
+.pc-detail-card { margin-bottom: 12px; }
+.pc-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.pc-detail-head h2 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.pc-detail-desc { margin: 8px 0 10px; color: #333; line-height: 1.5; }
+
+/* info / warning notice boxes (blue = helpful extra, yellow = pitfall) */
+.pc-notice { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; padding: 9px 13px;
+    border-radius: 6px; font-size: .9em; line-height: 1.45; }
+.pc-notice i { margin-top: 2px; flex: none; }
+.pc-notice span { min-width: 0; }
+.pc-notice-info { background: #e8f1fc; color: #1d3f7a; }
+.pc-notice-info i { color: #2563eb; }
+.pc-notice-warning { background: #fbf3d3; color: #6f5210; }
+.pc-notice-warning i { color: #c08a1e; }
+
+/* footer: what it produces + references */
+.pc-detail-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    flex-wrap: wrap; margin-top: 12px; padding-top: 8px; border-top: 1px solid #eee;
+    font-size: .85em; color: #555; }
+.pc-produces { font-family: monospace; }
+.pc-refs { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: flex-end; }
+.pc-refs a { color: #485ba6; text-decoration: underline; }
+.pc-meta { margin: 4px 0 8px; }
+
+/* tag chips (browse cards + detail) */
+.pc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.pc-tag { font-size: .75em; padding: 2px 8px; border-radius: 10px;
+    background: #eef1f7; color: #3b4a6b; border: 1px solid #dfe3ee; }
