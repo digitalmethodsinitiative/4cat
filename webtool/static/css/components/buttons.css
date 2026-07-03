@@ -43,21 +43,6 @@ a.button-like, .button-like button, button.button-like, .plain-page button, inpu
     padding: 8px 18px;
 }
 
-.button-like.emphasis, button.emphasis{
-    color: var(--button-grey);
-    background: var(--button-bg-regular);
-
-    outline: var(--stroke) solid var(--button-bg-regular);
-    border-radius: var(--radius);
-    border-color: var(--button-bg-regular);
-}
-
-.button-like.emphasis:hover, button.emphasis:hover {
-    color: var(--button-bg-regular);
-    background: transparent;
-    border-bottom: none;
-}
-
 .action-button-wrap {
     display: flex;
     column-gap: 1em;
