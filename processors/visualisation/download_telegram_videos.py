@@ -16,7 +16,7 @@ from collections import Counter
 from telethon import TelegramClient
 from telethon.errors import FloodError, BadRequestError
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.exceptions import ProcessorInterruptedException
 from datasources.telegram.search_telegram import SearchTelegram
 from processors.visualisation.download_videos import VideoDownloaderPlus
@@ -39,17 +39,25 @@ class TelegramVideoDownloader(BasicProcessor):
     Also serves as the base class for `TelegramImageDownloader`.
     """
     type = "video-downloader-telegram"  # job type ID
-    category = "Visual"  # category
-    title = "Download Telegram videos"  # title displayed in UI
-    description = "Download videos and store in a ZIP file. Downloads through the Telegram API might take a while. " \
-                  "Note that not always all videos can be retrieved. A JSON metadata file is included in the output " \
-                  "archive."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Download Telegram videos",
+        category="Visual",
+        tags=["download media", "external service"],
+        description="Download the videos attached to Telegram messages and store them in a ZIP file.",
+        info=[
+            "A JSON metadata file recording the download outcome per message is included in the archive."
+        ],
+        warnings=[
+            "Videos are fetched through the Telegram API, so this can take a long time and some videos may fail to download.",
+            "Channels with 'Restrict Saving Content' enabled will refuse the download; those videos cannot be retrieved.",
+        ],
+        icon="film",
+    )
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "video"  # media type of the result
     # a zip archive of media files
     output = MediaArchive(media="video")
     flawless = True
-    icon = "film"
 
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also checks the

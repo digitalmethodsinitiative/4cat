@@ -4,7 +4,7 @@ Generate descriptive statistics for numerical columns in the dataset.
 
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -21,13 +21,16 @@ class DescriptiveStatistics(BasicProcessor):
     Generate descriptive statistics for numerical columns.
     """
     type = "descriptive_statistics"  # job type ID
-    category = "Statistics"  # category
-    title = "Descriptive statistics"  # title displayed in UI
-    description = "Calculate descriptive statistics (mean, median, std dev, etc.) for numerical columns."
+    description = ProcessorDescription(
+        title="Calculate descriptive statistics",
+        category="Statistics",
+        tags=["counts"],
+        description="Calculate descriptive statistics for selected numerical columns, including count, mean, standard deviation, minimum, maximum, range, quartiles, interquartile range, variance, median, and mode. Rows with missing or non-numeric values can be skipped or treated as an error.",
+        icon="table-columns",
+    )
     extension = "csv"  # extension of result file, used internally in UI
     # a derived table
     output = Table()
-    icon = "table-columns"
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

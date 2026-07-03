@@ -4,7 +4,7 @@ Generate MAE, MSE, R2, and RMSE scores for numerical values in two columns.
 
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -22,11 +22,14 @@ class RegressionEvaluation(BasicProcessor):
     Generate MAE, MSE, R2, and RMSE scores for numerical predictions.
     """
     type = "regression_evaluation"  # job type ID
-    category = "Statistics"  # category
-    title = "Regression evaluation"  # title displayed in UI
-    description = "Calculate regression metrics (MAE, MSE, R2, RMSE) between two numerical columns."
+    description = ProcessorDescription(
+        title="Evaluate regression predictions",
+        category="Statistics",
+        tags=["counts"],
+        description="Compare true and predicted numerical values in two columns and report regression error metrics. Calculates mean absolute error, mean squared error, root mean squared error, and R-squared, according to which metrics are selected. Rows with missing or non-numeric values can be skipped or treated as an error.",
+        icon="table-columns",
+    )
     extension = "csv"  # extension of result file, used internally in UI
-    icon = "table-columns"
 
     # a derived table
     output = Table()

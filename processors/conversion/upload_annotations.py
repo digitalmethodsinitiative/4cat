@@ -6,7 +6,7 @@ import io
 
 from flask import g
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, DataSetException
@@ -24,15 +24,20 @@ class UploadAnnotations(BasicProcessor):
 	Upload annotations for a dataset
 	"""
 	type = "upload-annotations"  # job type ID
-	category = "Conversion"  # category
-	title = "Upload annotations"  # title displayed in UI
-	description = ("Upload annotations for this dataset via a CSV file or by pasting text data. "
-				   "The first column should contain item IDs; subsequent columns become annotation fields. "
-				   "For CSV file uploads, comma is used as the separator. For text input, a custom separator can be specified.")
+	description = ProcessorDescription(
+		title="Upload annotations",
+		category="Conversion",
+		tags=["annotate"],
+		description="Add annotations to the dataset from a CSV file or pasted text. The first column holds item IDs matching items in the dataset, and each further column becomes an annotation field.",
+		warnings=[
+			"Only rows whose item ID matches an item in the dataset are used; other rows are skipped.",
+			"At most 20 new annotation fields per upload are allowed, and field names must not clash with existing ones.",
+		],
+		icon="tags",
+	)
 	extension = "csv"
 	# a derived table
 	output = Table()
-	icon = "tags"
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

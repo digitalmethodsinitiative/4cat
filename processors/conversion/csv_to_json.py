@@ -3,7 +3,7 @@ Convert a CSV file to JSON
 """
 import json
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import File
 
@@ -17,13 +17,17 @@ class ConvertCSVToJSON(BasicProcessor):
 	Convert a CSV file to JSON
 	"""
 	type = "convert-csv"  # job type ID
-	category = "Conversion"  # category
-	title = "Convert to JSON"  # title displayed in UI
-	description = "Change a CSV file to a JSON file"  # description displayed in UI
+	description = ProcessorDescription(
+		title="Convert to JSON",
+		category="Conversion",
+		tags=["convert format"],
+		description="Convert a CSV file to a JSON file, writing one JSON list with one object per row.",
+		warnings=["This processor will read the entire CSV file and write it to a single JSON file. This may take a long time and use a lot of memory for large datasets."],
+		icon="square-js",
+	)
 	extension = "json"  # extension of result file, used internally and in UI
 	# a single json file
 	output = File("json")
-	icon = "square-js"
 
 	# Allow on CSV datasets
 	compatibility = Compatibility(extensions={"csv"})

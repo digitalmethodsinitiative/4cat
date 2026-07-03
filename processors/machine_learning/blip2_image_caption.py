@@ -4,7 +4,7 @@ OpenAI CLIP categorize images
 import json
 
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, DsmConnectionError
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -23,22 +23,27 @@ class CategorizeImagesCLIP(BasicProcessor):
     Caption Images with OpenAI BLIP2
     """
     type = "image-captions"  # job type ID
-    category = "Visual"  # category
-    title = "Generate image captions using OpenAI's BLIP2 model"  # title displayed in UI
-    description = "The BLIP2 model uses a pretrained image encoder combined with an LLM to generate image captions. The model can also be prompted and uses the image plus prompt to generate text responses."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Caption images with BLIP-2",
+        category="Visual",
+        tags=["caption", "external service"],
+        description="Generate a caption for each image with the BLIP-2 model, which combines an image encoder with a language model. You can also supply a prompt to get a text response about each image instead of a plain caption.",
+        warnings=[
+            "This runs the BLIP-2 model through the DMI Service Manager, which must be set up with a GPU by an administrator.",
+        ],
+        references=[
+            "[OpenAI CLIP blog](https://openai.com/research/clip)",
+            "[BLIP-2 paper: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models](https://arxiv.org/abs/2301.12597)",
+            "[BLIP-2 documentation](https://huggingface.co/docs/transformers/main/model_doc/blip-2)",
+        ],
+        icon="eye",
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI
     # a derived table
     output = Table(extension="ndjson")
-    icon = "eye"
 
     # image datasets (image archives or image-downloader output), when BLIP2 is enabled
     compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.fc_blip2_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-text-wall"])
-
-    references = [
-        "[OpenAI CLIP blog](https://openai.com/research/clip)",
-        "[BLIP-2 paper: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models](https://arxiv.org/abs/2301.12597)",
-        "[BLIP-2 documentation](https://huggingface.co/docs/transformers/main/model_doc/blip-2)",
-        ]
 
     config = {
         "dmi-service-manager.fb_blip2-intro-1": {

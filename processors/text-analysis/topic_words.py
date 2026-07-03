@@ -3,7 +3,7 @@ Extracts topics per model and top associated words
 """
 
 from common.lib.helpers import UserInput
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
@@ -21,13 +21,15 @@ class TopicModelWordExtractor(BasicProcessor):
     Extracts topics per model and top associated words
     """
     type = "topic-model-words"  # job type ID
-    category = "Text analysis"  # category
-    title = "Top words per topic"  # title displayed in UI
-    description = "Creates a CSV file with the top tokens (words) per topic in the generated topic model, and their associated weights."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Top words per topic",
+        category="Text analysis",
+        description="Extract the top tokens (words) per topic from a topic model, along with their weights. Use the 'Tokens per topic' option to set how many words are kept for each topic.",
+        icon="ranking-star",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
     # a derived table
     output = Table()
-    icon = "ranking-star"
 
     # Allow processor on topic models
     compatibility = Compatibility(types={"topic-modeller"}, preferred_followups=["wordcloud"])

@@ -10,7 +10,7 @@ from backend.lib.preset import ProcessorPreset
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.helpers import UserInput
 from processors.visualisation.download_videos import VideoDownloaderPlus
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import MediaArchive, Table
@@ -22,14 +22,20 @@ class TikTokVideoDownloader(ProcessorPreset):
     This is a Preset that runs the VideoDownloaderPlus with set parameters
     """
     type = "video-downloader-tiktok"  # job type ID
-    category = "Visual"  # category
-    title = "Download TikTok videos"  # title displayed in UI
-    description = "Downloads full videos for TikTok"
+    description = ProcessorDescription(
+        title="Download TikTok videos",
+        category="Visual",
+        tags=["download media"],
+        description="Download the full videos for TikTok posts and store them in a zip archive. Retrieves fresh video URLs before downloading, so it also works on older datasets whose links have expired.",
+        info=[
+            "A JSON metadata file recording the download outcome per post is included in the archive."
+        ],
+        icon="film",
+    )
     extension = "zip"
     media_type = "video"
     # its pipeline downloads the videos into a zip archive
     output = MediaArchive(media="video")
-    icon = "film"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it also accepts
     # tiktok uploads, which depends on the dataset label and can't be declared statically
@@ -124,9 +130,12 @@ class TikTokVideoMetadata(BasicProcessor):
     requests to download videos. Otherwise all videos would be sent to YT-DLP (not currently asynchronous).
     """
     type = "tiktok-video-downloader-metadata"  # job type ID
-    category = "Visual"  # category
-    title = "TikTok Video URLs Updater"  # title displayed in UI
-    description = "Retrieves updated video URLs from TikTok"
+    description = ProcessorDescription(
+        title="Update TikTok video URLs",
+        category="Visual",
+        tags=["internal"],
+        description="Retrieve fresh video download URLs from TikTok for a set of post IDs. Used internally as a step before downloading TikTok videos.",
+    )
     extension = "csv"
     media_type = "text"
     # a derived table

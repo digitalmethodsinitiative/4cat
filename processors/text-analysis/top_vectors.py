@@ -6,7 +6,7 @@ import csv
 import json
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -20,14 +20,17 @@ class VectorRanker(BasicProcessor):
 	Rank vectors over time
 	"""
 	type = "vector-ranker"  # job type ID
-	category = "Metrics" # category
-	title = "Extract top words"  # title displayed in UI
-	description = "Ranks most used tokens per token set (overall or per timeframe). " \
-				  "Limited to 100 most-used tokens."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Extract top words",
+		category="Metrics",
+		tags=["rank", "counts"],
+		description="Rank the most-used tokens per token set, either overall or per timeframe. Return up to 100 of the "
+					"most-used tokens.",
+		icon="ranking-star",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
 	# a ranking table (date/item/value), so ranking visualisations can run on it
 	output = Table(columns={"date", "item", "value"})
-	icon = "ranking-star"
 
 	# Allow processor on token vectors
 	compatibility = Compatibility(types={"vectorise-tokens"}, preferred_followups=["wordcloud"])

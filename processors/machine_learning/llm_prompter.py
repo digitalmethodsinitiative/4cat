@@ -19,7 +19,7 @@ from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
 from common.lib.llm.adapter import LLMAdapter
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -28,13 +28,25 @@ class LLMPrompter(BasicProcessor):
     Prompt various LLMs, locally or through APIs
     """
     type = "llm-prompter"  # job type ID
-    category = "Machine learning"  # category
-    title = "LLM prompting"  # title displayed in UI
-    description = ("Use LLMs to analyze a dataset per item, via APIs or locally. Suitable for a wide arrange of tasks like "
-                   "classification, entity extraction, or OCR. Supported APIs include OpenAI, Google, Anthropic, "
-                   "Mistral, and DeepSeek.")
+    description = ProcessorDescription(
+        title="Prompt a large language model",
+        category="Machine learning",
+        tags=["classify", "extract", "external service", "annotate"],
+        description="Run a prompt against a large language model for each item in a dataset, using a local model or a third-party API such as OpenAI, Google, Anthropic, Mistral, or DeepSeek. Insert column values into the prompt with brackets, attach images or other media, and optionally return structured JSON.",
+        references=[
+            "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307.13106)",
+            "[Karjus, Andres. 2023. 'Machine-assisted mixed methods: augmenting humanities and social sciences with artificial intelligence.' arXiv preprint arXiv:2309.14379.](https://arxiv.org/abs/2309.14379)",
+        ],
+        warnings=[
+            "Third-party API models send your data to an external provider and usually incur costs; consider anonymising your data or using a local model instead.",
+            "Test your prompt on a small sample first, as results depend heavily on the prompt and the chosen model.",
+        ],
+        info=[
+            "Batching several items per prompt can be faster but may reduce accuracy and needs a model that supports structured output.",
+        ],
+        icon="robot",
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
-    icon = "robot"
 
     # a derived table
     output = Table(extension="ndjson")
@@ -42,14 +54,6 @@ class LLMPrompter(BasicProcessor):
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it accepts csv/ndjson
     # tables, OR zip archives of image/video/audio media (_almost_ all zips but not)
     compatibility = Compatibility(extensions={"csv", "ndjson", "zip"})
-
-    references = [
-        "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307."
-        "13106)",
-        "[Karjus, Andres. 2023. 'Machine-assisted mixed methods: augmenting humanities and social sciences "
-        "with artificial intelligence.' arXiv preprint arXiv:2309.14379.]"
-        "(https://arxiv.org/abs/2309.14379)"
-    ]
 
     @classmethod
     def get_queue_id(cls, remote_id, details, dataset) -> str:

@@ -4,7 +4,7 @@ Filter posts by a given column
 import re
 import datetime
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.dataset import StatusType
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput, convert_to_int
@@ -21,10 +21,12 @@ class ColumnFilter(BaseFilter):
     Retain only posts where a given column matches a given value
     """
     type = "column-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Filter by value"  # title displayed in UI
-    description = ("A flexible and customizable filter that lets you retain items in selected column that match a "
-                   "custom requirement. This creates a new dataset.")
+    description = ProcessorDescription(
+        title="Filter by value",
+        category="Filtering",
+        tags=["filter"],
+        description="Retain items whose value in a chosen column matches a requirement, such as equals, contains, is before or after a date, is greater or less than a number, or is in the top or bottom results. Match against one or several comma-separated values. This creates a new dataset.",
+    )
 
     # top-level csv/ndjson datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
@@ -316,9 +318,12 @@ class ColumnProcessorFilter(ColumnFilter):
     Retain only posts where a given column matches a given value
     """
     type = "column-processor-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Filter by value"  # title displayed in UI
-    description = "A generic filter that checks whether a value in a selected column matches a custom requirement. "
+    description = ProcessorDescription(
+        title="Filter by value",
+        category="Filtering",
+        tags=["filter"],
+        description="Retain items whose value in a chosen column matches a requirement, such as equals, contains, is before or after a date, is greater or less than a number, or is in the top or bottom results. Match against one or several comma-separated values. This creates a new dataset.",
+    )
 
     # child (non-top-level) csv/ndjson datasets
     compatibility = Compatibility(child_only=True, extensions={"csv", "ndjson"})

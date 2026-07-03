@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
 from common.lib.helpers import UserInput, ellipsiate
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import File
 
@@ -29,22 +29,27 @@ class PixPlotGenerator(BasicProcessor):
     Create an PixPlot from the downloaded images in the dataset
     """
     type = "pix-plot"  # job type ID
-    category = "Visual"  # category
-    title = "Create PixPlot visualisation"  # title displayed in UI
-    description = "Put all images from an archive into a PixPlot visualisation: an explorable map of images " \
-                  "algorithmically grouped by similarity."
+    description = ProcessorDescription(
+        title="Create PixPlot visualisation",
+        category="Visual",
+        tags=["similarity", "web page", "external service"],
+        description="Arrange the images in an archive into a PixPlot: an explorable map where images are grouped by visual similarity. Use the neighbours and minimum distance options to control how tightly images cluster.",
+        references=[
+            "[PixPlot](https://pixplot.io/)",
+            "[Parameter documentation](https://pixplot.io/docs/api/parameters.html)",
+        ],
+        warnings=[
+            "The visualisation is built by a self-hosted DMI Service Manager, which must have PixPlot enabled.",
+            "At least 12 images are needed, and large numbers of images can make the processor run for a long time.",
+        ],
+        icon="images",
+    )
     extension = "html"  # extension of result file, used internally and in UI
     # a single html file
     output = File("html")
-    icon = "images"
 
     # image datasets (image archives or image-downloader output), when PixPlot is enabled
     compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.db_pixplot_enabled", "dmi-service-manager.ab_server_address"})
-
-    references = [
-        "[PixPlot](https://pixplot.io/)",
-        "[Parameter documentation](https://pixplot.io/docs/api/parameters.html)"
-    ]
 
     # PixPlot requires a minimum number of photos to be created
     # This is currently due to the clustering algorithm which creates 12 clusters

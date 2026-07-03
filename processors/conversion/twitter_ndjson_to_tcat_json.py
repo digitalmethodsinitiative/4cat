@@ -3,7 +3,7 @@ Convert a Twitter NDJSON file to be importable by TCAT's import-jsondump.php
 """
 import json
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import File
 
@@ -17,13 +17,16 @@ class ConvertNDJSONToJSON(BasicProcessor):
     Convert a Twitter NDJSON file to be importable by TCAT's import-jsondump.php
     """
     type = "convert-ndjson-for-tcat"  # job type ID
-    category = "Conversion"  # category
-    title = "Convert to TCAT JSON"  # title displayed in UI
-    description = "Convert a Twitter dataset to a TCAT-compatible format. This file can then be uploaded to TCAT."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Convert to TCAT JSON",
+        category="Conversion",
+        tags=["convert format"],
+        description="Convert a Twitter/X (API v2) dataset to the JSON format that DMI-TCAT's import-jsondump.php can read. The result can then be uploaded to a TCAT server.",
+        icon="square-js",
+    )
     extension = "json"  # extension of result file, used internally and in UI
     # a single json file
     output = File("json")
-    icon = "square-js"
 
     # Allow processor on Twitter/X (API v2) datasets
     compatibility = Compatibility(types={"twitterv2-search"}, preferred_followups=["tcat-auto-upload"])
