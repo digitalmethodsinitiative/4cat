@@ -47,19 +47,27 @@ class ProcessorDescription:
     info: typing.List[str] = field(default_factory=list)
     warnings: typing.List[str] = field(default_factory=list)
     icon: str = ""
-    tags: typing.List[str] = field(default_factory=list)
 
     def __post_init__(self):
-        # `category` is kept as the first entry of `tags`, so 4CAT can move to
-        # tags (which allow several per processor and can be filtered on) while
-        # `category` keeps working. Derive whichever is missing; when both are
-        # given, make sure the category leads the tag list.
+        # Normalise casing so processors don't have to: categories always start
+        # with a capital, tags are always lower-case. This keeps the two
+        # consistent however a processor happens to spell them.
+        if self.category:
+            self.category = self.category[0].upper() + self.category[1:]
+        self.tags = [tag.lower() for tag in self.tags]
+
+        # `category` is kept as the first entry of `tags` (as its lower-case
+        # tag form), so 4CAT can move to tags (which allow several per processor
+        # and can be filtered on) while `category` keeps working. Derive
+        # whichever is missing; when both are given, make sure the category
+        # leads the tag list.
+        category_tag = self.category.lower()
         if self.category and not self.tags:
-            self.tags = [self.category]
+            self.tags = [category_tag]
         elif self.tags and not self.category:
-            self.category = self.tags[0]
+            self.category = self.tags[0][0].upper() + self.tags[0][1:]
         elif self.category and self.tags:
-            self.tags = [self.category] + [tag for tag in self.tags if tag != self.category]
+            self.tags = [category_tag] + [tag for tag in self.tags if tag != category_tag]
 
 
 class _DescriptionField:
@@ -151,7 +159,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     warnings = _DescriptionField("warnings")
     tags = _DescriptionField("tags")
     icon = _DescriptionField("icon")
-    tags = _DescriptionField("tags")
 
     #: Extension of the file created by the processor
     extension = "csv"
@@ -1230,11 +1237,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 references=list(cls.__dict__.get("references", inherited.references)),
                 info=list(cls.__dict__.get("info", inherited.info)),
                 warnings=list(cls.__dict__.get("warnings", inherited.warnings)),
-                tags=list(cls.__dict__.get("tags", [])),
-                icon=cls.__dict__.get("icon", inherited.icon),
                 # tags default to this class's category (see __post_init__), so
                 # don't inherit them — re-derive from the resolved category
-                tags=list(cls.__dict__.get("tags", ())),
+                tags=list(cls.__dict__.get("tags", [])),
+                icon=cls.__dict__.get("icon", inherited.icon),   
             )
 
         # remove raw attributes so the inherited descriptors govern access
