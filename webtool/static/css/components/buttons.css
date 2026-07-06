@@ -38,6 +38,44 @@ a.button-like, button {
     text-transform: uppercase;
 }
 
+.button-secondary {
+    background: var(--button-grey);
+    color: var(--semidark);
+    border-bottom-color: var(--semidark);
+    border-bottom: var(--stroke) solid var(--semidark);
+    height: calc(var(--font-normal) + 2 * var(--spacing-small));
+    min-width: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+}
+
+.dark .button-secondary {
+    background: var(--brighten-12);
+    color: var(--button-grey);
+    border-bottom-color: var(--button-grey);
+}
+
+.button-secondary:hover {
+    color: var(--button-grey);
+    background: var(--button-bg-regular);
+}
+
+.dark .button-secondary:hover {
+    color: var(--button-bg-regular);
+    background: var(--button-grey);
+}
+
+.button-secondary a, .button-secondary span {
+    padding: var(--spacing-small);
+    display: block;
+    animation: 200ms;
+    height: var(--font-normal);
+}
+
+.button-secondary span {
+
+}
+
 a.button-like, .button-like button, button.button-like, .plain-page button, input[type=submit] {
     padding: 8px 18px;
 }
