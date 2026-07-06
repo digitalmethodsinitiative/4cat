@@ -180,7 +180,6 @@ with app.app_context():
     import webtool.views.api_standalone  # noqa: E402
     import webtool.views.api_tool  # noqa: E402
     import webtool.views.api_processor_map  # noqa: E402
-    import webtool.views.views_processor_map  # noqa: E402
 
     app.register_blueprint(webtool.views.views_restart.component)
     app.register_blueprint(webtool.views.views_admin.component)
@@ -192,8 +191,6 @@ with app.app_context():
     app.register_blueprint(webtool.views.views_explorer.component)
     app.register_blueprint(webtool.views.api_standalone.component)
     app.register_blueprint(webtool.views.api_tool.component)
-    app.register_blueprint(webtool.views.api_processor_map.component)
-    app.register_blueprint(webtool.views.views_processor_map.component)
 
     @app.before_request
     def before_request():
