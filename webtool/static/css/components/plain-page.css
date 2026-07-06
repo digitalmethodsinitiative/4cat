@@ -1,13 +1,8 @@
-.plain-page #main-content a {
-    color: var(--fourcat-accent);
-    text-decoration: underline;
-}
-
 .plain-page #main-content {
     max-width: var(--max-width);
     margin: 0 auto;
     border-bottom: 1px solid var(--button-grey);
-    padding-bottom: 2em;
+    padding: var(--spacing-regular);
     font-size: var(--font-normal);
 }
 
@@ -18,4 +13,15 @@
 .plain-page h2, .plain-page h3, .plain-page h4, .plain-page h5 {
     font-family: Chivo, sans-serif;
     font-size: var(--font-h0);
+}
+
+.plain-page #main-content p a {
+    color: var(--fourcat-accent);
+    text-decoration: none;
+    border-bottom: 2px solid;
+}
+
+.plain-page #main-content p a:hover,
+.plain-page #main-content p a:active {
+    border-bottom: 3px solid;
 }
