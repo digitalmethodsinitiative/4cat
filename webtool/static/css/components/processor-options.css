@@ -1,5 +1,7 @@
 #processor-options {
     padding: var(--spacing-large);
+    max-width: var(--max-width);
+    margin: 0 auto;
 }
 
 #processor-options .processor-description {

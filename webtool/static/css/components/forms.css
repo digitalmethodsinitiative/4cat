@@ -1,32 +1,11 @@
-.form-element {
-    display: grid;
-    grid-template-columns: 34% 66%;
-    align-items: center;
-    margin-bottom: var(--spacing-regular);
-}
-
-.form-element > label {
-    padding-right: var(--spacing-regular);
-    font-weight: bold;
-}
-
-.form-element :first-child:not(:last-child) {
-    text-align: right;
-}
-
-.form-element :last-child:not(:first-child) {
-    width: max-content;
-}
-
-.form-element :first-child:last-child {
-    width: 100%;
-}
-
-.form-element input {
-    background: var(--panel-bg-0);
+/* General form settings */
+.userinput-form {
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--form-gap);
     border: 0;
-    border-bottom: var(--stroke) solid var(--panel-bg-2);
-    padding: var(--spacing-small);
+    padding: 0;
+    margin: 0;
 }
 
 .submit-container {
@@ -37,4 +16,236 @@
 .form-footer {
     text-align: center;
     margin: var(--spacing-regular) auto;
+}
+
+.form-element {
+    display: grid;
+    grid-template-columns: minmax(9rem, 20%) minmax(0, 1fr) var(--tooltip-button-width);
+    column-gap: var(--spacing-regular);
+    row-gap: var(--spacing-small);
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Specific user-inputs */
+.form-element:has(textarea),
+.form-element:has(.multichoice-wrapper),
+.form-element:has(.multi-select-wrapper) {
+    align-items: start;
+}
+
+.form-element:has(textarea) > label,
+.form-element:has(.multichoice-wrapper) > label,
+.form-element:has(.multi-select-wrapper) > label {
+    padding-top: var(--spacing-small);
+}
+
+.form-element > label {
+    grid-column: 1;
+    font-weight: bold;
+}
+
+.form-element > label p {
+    margin: 0;
+}
+
+.form-element > label.option-type-toggle,
+.form-element > label.option-type-annotation {
+    grid-column: 2;
+    display: flex;
+    align-items: baseline;
+    column-gap: var(--spacing-small);
+}
+
+.form-element > input,
+.form-element > textarea,
+.form-element > select,
+.form-element > .multichoice-wrapper,
+.form-element > .multi-select-wrapper,
+.form-element > .daterange-wrapper,
+.form-element > .annotation-explainer {
+    grid-column: 2;
+    min-width: 0;
+}
+
+.form-element input:not([type=checkbox]):not([type=hidden]),
+.form-element textarea,
+.form-element select {
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+    color: var(--semidark);
+    background: var(--panel-bg-0);
+    border: none;
+    border-bottom: var(--stroke) solid var(--panel-bg-2);
+    border-radius: 0;
+    padding: var(--spacing-small);
+}
+
+.form-element input:not([type=checkbox]):focus,
+.form-element textarea:focus,
+.form-element select:focus {
+    outline: var(--stroke) solid var(--button-bg-regular);
+    outline-offset: calc(-1 * var(--stroke-light));
+}
+
+.form-element input[type=checkbox] {
+    background-color: red;
+}
+
+.form-element option, .form-element optgroup {
+    font-family: Chivo, sans-serif;
+    font-size: var(--font-body);
+}
+
+.form-element textarea {
+    min-height: 8em;
+    resize: vertical;
+}
+
+.form-element .daterange-wrapper {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-small);
+}
+
+.form-element .daterange-wrapper input {
+    width: auto;
+    flex: 1 1 auto;
+}
+
+.form-element input.invalid,
+.form-element input:user-invalid,
+.form-element textarea.invalid,
+.form-element textarea:user-invalid {
+    background: var(--red-light);
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.form-element .multichoice-wrapper {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: var(--spacing-small);
+}
+
+.form-element .multichoice-wrapper label {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-small);
+    background: var(--panel-bg-0);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: calc(var(--radius) / 2);
+    padding: var(--spacing-small);
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.form-element .multichoice-wrapper label:has(input:checked) {
+    background: var(--button-bg-regular);
+    color: var(--bright);
+}
+
+/* Structural (non-input) form option elements */
+.form-divider {
+    border: 0;
+    border-top: var(--stroke) solid var(--panel-bg-2);
+    margin: var(--spacing-regular) 0;
+}
+
+.form-intro p {
+    margin: 0 0 var(--spacing-small) 0;
+}
+
+/* Extra input fields requested by the server after initial validation */
+.datasource-extra-input {
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--spacing-large);
+    margin-bottom: var(--spacing-large);
+}
+
+.flash-once {
+    animation: flash-once 0.5s linear 1;
+}
+
+@keyframes flash-once {
+    0% {
+        background-color: var(--yellow-light);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.form-options-form {
+    display: flex;
+    flex-direction: column;
+}
+
+fieldset.form-options {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--spacing-large);
+}
+
+input[type=search] {
+    font-family: Roboto, serif;
+    border: none;
+    background-color: transparent;
+    color: var(--gray);
+    border-bottom: var(--stroke) solid var(--semidark);
+    line-height: 1.5rem;
+}
+
+input[type=search]:active,
+input[type=search]:focus {
+    outline: none;
+    border-bottom: var(--stroke-heavy) solid var(--semidark);
+}
+
+.search-box {
+    position: relative;
+}
+
+.search-box::before {
+    content: "\f002";
+    font-family: "Font Awesome 7 Free";
+    font-weight: 900;
+    position: absolute;
+    left: var(--spacing-small);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--semidark);
+    pointer-events: none;
+}
+
+.search-box input[type="search"] {
+    padding-left: calc(var(--spacing-small) * 2 + 1em);
+}
+
+/* Specific forms */
+#datasource-form {
+    margin-top: var(--spacing-regular);
+}
+
+#datasource-form .submit-container {
+}
+
+#datasource-form #datasource-form-submit {
+
+    margin: var(--spacing-large) auto 0;
+}
+
+
+
+#datasource-form-submit {
+    margin-top: 1rem;
 }

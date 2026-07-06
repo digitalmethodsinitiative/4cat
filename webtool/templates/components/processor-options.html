@@ -1,5 +1,6 @@
 <form action="{{ url_for('dataset.queue_processor_interactive', key=dataset.key, processor=processor.type) }}"
       method="POST" class="processor-options-form"
+      x-data="userinputForm"
       hx-post="{{ url_for('dataset.queue_processor_component', key=dataset.key) }}"
       {% if dataset.key_parent %}
       hx-target="#child-{{ dataset.key }}"
@@ -10,6 +11,7 @@
       {% endif %}
       hx-indicator="#processor-options-spinner">
 
+    <h2>{{ processor.title }}</h2>
     <p class="processor-description">{{ processor.description|safe }}</p>
 
     <div id="processor-options-notice"></div>
@@ -19,10 +21,10 @@
 
     {% set processor_options = processor.get_options(dataset, __config) %}
     {% if processor_options %}
-        <fieldset class="processor-options">
-            {% for option in processor_options %}{% if not processor_options[option].delegated %}
-                {% include "components/processor-option.html" %}
-            {% endif %}{% endfor %}
+        <fieldset class="processor-options userinput-form">
+            {% with options=processor_options %}
+                {% include "components/form-options.html" %}
+            {% endwith %}
 
             {% if __user_config("ui.option_email") in ["both", "processor_only"] and __user_config("mail.server") %}
                 <div class="form-element combo-checkbox-input">
@@ -36,7 +38,7 @@
         </fieldset>
     {% endif %}
 
-    <button type="submit" class="button-like processor-queue-button">
+    <button type="submit" class="button-like processor-queue-button submit-container">
         <i class="fa fa-play" aria-hidden="true"></i> Run processor
     </button>
 </form>

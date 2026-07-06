@@ -5,6 +5,7 @@
 
     <script src="{{ url_for("static", filename="js/lib/htmx.min.js") }}"></script>
     <script defer src="{{ url_for("static", filename="js/alpine.tooltip.js") }}"></script>
+    <script defer src="{{ url_for("static", filename="js/alpine.form.js") }}"></script>
     <script defer src="{{ url_for("static", filename="js/lib/alpine.min.js") }}"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,12 +44,13 @@
         <nav class="main-navigation">
             <ul>
                 {% if __user_config("privileges.can_create_dataset") %}
-                    <li class="emphasis"><a class="button-like" href="#">Create Dataset</a></li>
+                    <li class="emphasis"><a class="button-like" href="{{ url_for("dataset.create_dataset") }}">Create Dataset</a></li>
                 {% endif %}
                 <li><a href="{{ url_for("dataset.show_results") }}">My Datasets</a></li>
+                <li><a href="{{ url_for("misc.module_catalog") }}">Module catalog</a></li>
                 <li><a href="{{ url_for("misc.show_about") }}">About</a></li>
                 {% if __user_cp_access %}
-                    <li><a href="{{ url_for("admin.frontpage") }}">Control panel</a></li>
+                    <li><a href="{{ url_for("admin.frontpage") }}">Control Panel</a></li>
                 {% endif %}
             </ul>
         </nav>

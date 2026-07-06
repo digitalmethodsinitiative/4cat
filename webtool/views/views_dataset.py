@@ -11,8 +11,8 @@ from flask import (Blueprint, current_app, render_template, request, redirect, s
                    get_flashed_messages, url_for, stream_with_context, g, make_response)
 from flask_login import login_required, current_user
 
-from webtool.lib.helpers import Pagination, error, setting_required
-from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
+from webtool.lib.helpers import Pagination, error, setting_required, common_dataset_options
+from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor, datasource_form
 
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
@@ -34,6 +34,34 @@ def create_dataset():
                        "datasources.enabled", {})}
 
     return render_template('create-dataset.html', datasources=datasources)
+
+
+@component.route('/create-dataset/datasource-form/')
+@login_required
+@setting_required("privileges.can_create_dataset")
+def datasource_form_component():
+    """
+    Get the query form for a data source as an HTML fragment
+
+    htmx-facing counterpart to the JSON `toolapi.datasource_form` endpoint.
+    Returns the rendered dataset parameter options for the data source
+    selected in the create-dataset form, plus the form's notice area and
+    submit button.
+    """
+    datasource_id = request.args.get("datasource", "")
+    if not datasource_id:
+        # no data source selected (e.g. the placeholder option)
+        return ""
+
+    result = datasource_form(datasource_id)
+    if not result.is_json or result.status_code != 200:
+        message = result.json.get("message", "This data source is not available.") \
+            if result.is_json else "This data source is not available."
+        return render_template("components/form-notice.html", message=message)
+
+    return render_template("components/datasource-form.html", options_html=result.json["html"],
+                           datasource_id=datasource_id,
+                           common_options=common_dataset_options(g.config, current_user))
 
 
 @component.route('/results/', defaults={'page': 1})

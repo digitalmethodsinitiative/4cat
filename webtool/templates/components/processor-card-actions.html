@@ -1,10 +1,10 @@
 <nav class="quick-links">
     <ul class="module-actions processor-actions">
-        <li>
-            <a href="/processor-catalogue/{{ processor.type }}"><i class="fa-solid fa-circle-info"></i></a>
+        <li class="button-secondary">
+            <a href="/processor-catalogue/{{ processor.type }}" x-tooltip="More information about this processor"><i class="fa-solid fa-circle-info"></i></a>
         </li>
-        <li>
-            <a href="{{ processor.get_repo_link(__config) }}" target="_blank"><i class="fa-brands fa-github"></i></a>
+        <li class="button-secondary">
+            <a href="{{ processor.get_repo_link(__config) }}" target="_blank" x-tooltip="View processor code"><i class="fa-brands fa-github"></i></a>
         </li>
     </ul>
 </nav>

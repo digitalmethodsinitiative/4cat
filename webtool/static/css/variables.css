@@ -70,6 +70,8 @@
     --card-height: calc(var(--font-h1) * 10);
 
     --slideout-header-height: 3rem;
+    --form-gap: 2rem;
+    --tooltip-button-width: 2rem;
 
     --stroke-light: calc(var(--font-base) * 0.1);
     --stroke: calc(var(--stroke-light) * 2);

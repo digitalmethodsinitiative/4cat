@@ -9,7 +9,6 @@
         <section class="dark result-list dataset-metadata">
             <h1><span>Datasets</span></h1>
 
-
             <nav class="tabs">
                 <form action="{{ url_for("dataset.show_results") }}" method="GET">
                     <input type="hidden" name="depth" value="{{ depth }}">
@@ -42,12 +41,7 @@
                             </li>
                         {% endif %}
                         <li>
-                            <select name="datasource" aria-label="Data source">
-                                <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data
-                                    sources
-                                </option>
-                                {% include 'components/datasource-select.html' %}
-                            </select>
+                            {% include 'components/user-inputs/datasource-select.html' %}
                         </li>
                         <li><label><input type="checkbox" name="hide_empty" {% if filter.hide_empty %}
                                           checked="checked"{% endif %}> Hide empty datasets</label></li>
