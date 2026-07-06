@@ -13,6 +13,8 @@ from flask_login import current_user
 from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
 
+from common.lib.user_input import UserInput
+
 csv.field_size_limit(1024 * 1024 * 1024)
 
 class Pagination(object):
@@ -91,6 +93,86 @@ def error(code=200, **kwargs):
 	response = jsonify(kwargs)
 	response.status_code = code
 	return response
+
+
+def common_dataset_options(config, user=None):
+	"""
+	Standard dataset creation options shown for every data source
+
+	These are the controls that are not data source-specific but are offered
+	whenever a dataset is created: pseudonymisation, privacy, e-mail
+	notification and the dataset label. They are returned as a `UserInput`
+	options dict so they can be rendered through the same user-input
+	components as data source options (see `components/form-options.html`).
+
+	Which options are offered depends on the instance configuration.
+
+	Note the `name` overrides: unlike data source options these are read
+	directly by `toolapi.queue_dataset` under their bare names (not
+	`option-`-prefixed), which keeps them out of the data source's
+	`UserInput.parse_all` whitelist and avoids colliding with option names.
+
+	:param config:  Configuration reader (e.g. `g.config`)
+	:param user:  The current user, used to pre-fill the e-mail address
+	:return dict:  Option name -> settings, ready for `form-options.html`
+	"""
+	options = {}
+
+	if config.get("ui.offer_hashing"):
+		options["pseudonymise-info"] = {
+			"type": UserInput.OPTION_INFO,
+			"help": "4CAT can remove information it identifies as relating to an item's author, or "
+					"replace it with a [hashed](https://techterms.com/definition/hash) value. Other "
+					"personal information may persist; it is your responsibility to further anonymise "
+					"data where appropriate."
+		}
+		options["pseudonymise"] = {
+			"type": UserInput.OPTION_CHOICE,
+			"name": "pseudonymise",
+			"help": "Pseudonymise",
+			"default": "pseudonymise",
+			"options": {
+				"anonymise": "Replace author information with 'REDACTED'",
+				"pseudonymise": "Replace author information with hashed values",
+				"none": "Leave author information as-is",
+			}
+		}
+
+	if config.get("ui.offer_private"):
+		options["make-private"] = {
+			"type": UserInput.OPTION_TOGGLE,
+			"name": "make-private",
+			"help": "Make dataset private",
+			"default": True,
+			"tooltip": "This will only hide your dataset from other users. It will NOT encrypt your "
+					   "data and server administrators will still be able to view it. If you are working "
+					   "with sensitive data, you should consider running your own 4CAT instance."
+		}
+
+	if config.get("ui.option_email") in ("both", "datasources_only") and config.get("mail.server"):
+		options["email-complete"] = {
+			"type": UserInput.OPTION_TOGGLE,
+			"name": "email-complete",
+			"help": "Receive e-mail on completion",
+			"default": False,
+		}
+		options["email-user"] = {
+			"type": UserInput.OPTION_TEXT,
+			"name": "email-user",
+			"help": "E-mail address",
+			"default": user.get_name() if user and user.is_authenticated else "",
+			"requires": "email-complete==true",
+			"tooltip": "This will only function if your username is your e-mail address."
+		}
+
+	options["label"] = {
+		"type": UserInput.OPTION_TEXT,
+		"name": "label",
+		"help": "Dataset name",
+		"tooltip": "A name will be generated automatically if you do not provide one.",
+	}
+
+	return options
 
 
 def pad_interval(intervals, first_interval=None, last_interval=None):
