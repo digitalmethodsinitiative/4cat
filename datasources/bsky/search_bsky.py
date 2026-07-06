@@ -30,8 +30,6 @@ class SearchBluesky(Search):
     extension = "ndjson"  # extension of result file, used internally and in UI
     # the tag column the co-tag and hashtag networks look for
     output = Datasource(columns={"tags"})
-    is_local = False  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
     icon = "brand-bluesky"
 
     config = {

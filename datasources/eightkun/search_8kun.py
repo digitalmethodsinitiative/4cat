@@ -21,8 +21,6 @@ class Search8Kun(Search4Chan):
     sphinx_index = "8kun"
     title = "8kun search"
     prefix = "8kun"
-    is_local = True  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
 
     config = {
         "eightkun-search.autoscrape": {

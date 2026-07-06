@@ -17,8 +17,6 @@ class SearchMedia(BasicProcessor):
     title = "Upload Media"  # title displayed in UI
     description = "Upload your own audio, video, or image files to be used as a dataset"  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
-    is_local = False  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
     icon = "images"
 
     # A top-level archive of uploaded media; one upload is a single media type, but

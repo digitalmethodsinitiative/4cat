@@ -290,12 +290,6 @@ def datasource_form(datasource_id):
 
 	# Status labels to display in query form
 	labels = []
-	is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
-	is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
-
-	labels.append(is_local)
-	if is_static:
-		labels.append("static")
 	status = worker_class.get_status()
 	if status:
 		labels.append(status)

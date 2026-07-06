@@ -21,8 +21,6 @@ class Search8Chan(Search4Chan):
     sphinx_index = "8chan"
     title = "8chan search"
     prefix = "8chan"
-    is_local = True  # Whether this datasource is locally scraped
-    is_static = True  # Whether this datasource is still updated
 
     config = {
         "eightchan-search.autoscrape": {

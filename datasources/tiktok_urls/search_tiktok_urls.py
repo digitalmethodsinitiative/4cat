@@ -36,8 +36,6 @@ class SearchTikTokByID(Search):
     extension = "ndjson"  # extension of result file, used internally and in UI
     # the tag column the co-tag and hashtag networks look for
     output = Datasource(columns={"hashtags"})
-    is_local = False  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
     icon = "brand-tiktok"
 
     # not available as a processor for existing datasets

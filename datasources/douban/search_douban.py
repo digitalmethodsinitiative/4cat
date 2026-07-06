@@ -26,8 +26,6 @@ class SearchDouban(Search):
     description = "Scrapes group posts from Douban for a given set of groups"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
     output = Datasource()
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
     icon = "comment"
 
     # not available as a processor for existing datasets

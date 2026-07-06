@@ -25,8 +25,7 @@ class SearchImportFromFourcat(BasicProcessor):
     category = "Search"  # category
     title = "Import 4CAT dataset and analyses"  # title displayed in UI
     description = "Import a dataset from another 4CAT server or from a zip file (exported from a 4CAT server)"  # description displayed in UI
-    is_local = False  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
+
     # a top-level import; extension, media and columns are copied from whatever dataset
     # is imported, so none of them are known ahead of the run
     output = Output(extension=None, media=None, columns=None, position="top", collector=True)

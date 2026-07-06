@@ -36,8 +36,6 @@ class SearchTelegram(Search):
     description = "Scrapes messages from open Telegram groups via its API."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     output = Datasource()
-    is_local = False  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
     icon = "brand-telegram"
 
     # cache

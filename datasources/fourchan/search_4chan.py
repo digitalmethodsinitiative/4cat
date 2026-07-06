@@ -25,8 +25,6 @@ class Search4Chan(SearchWithScope):
     title = "4chan search"
     sphinx_index = "4chan"  # sphinx index name; this should match the index name in sphinx.conf
     prefix = "4chan"  # table identifier for this datasource; see below for usage
-    is_local = True  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
 
     # Columns to return in csv
     return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_4chan',

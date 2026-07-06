@@ -20,8 +20,6 @@ class SearchVK(Search):
     title = "VK"
     extension = "ndjson"
     output = Datasource()
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
     icon = "brand-vk"
 
     previous_request = 0
