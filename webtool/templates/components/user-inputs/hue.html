@@ -1,0 +1,7 @@
+{% set hue_id = uniqid() %}
+<div>
+    <input type="range" min="0" max="360" step="1" name="{{ field_name }}" id="forminput-{{ option }}" data-default="{{ settings.original_default }}"
+           class="hue-picker" value="{{ settings.default }}" data-saturation="{% if settings.saturation %}{{ settings.saturation }}{% else %}77{% endif %}"
+           data-value="{% if settings.value %}{{ settings.value }}{% else %}46{% endif %}" data-update-background="#colour-example-{{ hue_id }}">
+    <span class="colour-example" id="colour-example-{{ hue_id }}"></span>
+</div>

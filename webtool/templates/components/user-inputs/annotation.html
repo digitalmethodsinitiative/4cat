@@ -1,0 +1,19 @@
+<label class="option-type-{{ settings.type }}">
+    {% if settings.type == "annotation" %}
+        <input type="checkbox" name="{{ field_name }}"{% if settings.default %} checked{% endif %}>
+        Add <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> {{ settings.label }}</span> as annotations
+    {%- else %}
+        Add the following values as <span class="property-badge annotation-label"><i class="fa-solid fa-tag"></i> annotations</span>
+    {%- endif %}
+    to the {% if settings.to_parent %}parent{% else %}top{% endif %} dataset{% if settings.hide_in_explorer %}<span class="hidden-annotation-notice"> (hidden in the Explorer, data for computational processing)</span>{% endif %}
+</label>
+{% if settings.type == "annotations" %}
+<div class="multichoice-wrapper inline">
+    <select name="{{ field_name }}" multiple="multiple">
+    {% for choice in settings.options %}
+        <option value="{{ choice }}"{% if settings.default and choice in settings.default %} selected="selected"{% endif %}>{{ settings.options[choice]|truncate(30, True, "...", 0) }}</option>
+    {% endfor %}
+    </select>
+</div>
+{% endif %}
+<div class="annotation-explainer{% if settings.type == "annotations" %} after-multi{% endif %}"><a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets#annotations" target="__blank">What are annotations?</a></div>
