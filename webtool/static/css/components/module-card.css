@@ -27,37 +27,6 @@
     column-gap: var(--spacing-regular);
 }
 
-.module-actions li {
-    background: var(--button-grey);
-    color: var(--semidark);
-    border-bottom-color: var(--semidark);
-    border-bottom: var(--stroke) solid var(--semidark);
-    height: calc(var(--font-normal) + 2 * var(--spacing-small));
-}
-
-.dark .module-actions li {
-    background: var(--brighten-12);
-    color: var(--button-grey);
-    border-bottom-color: var(--button-grey);
-}
-
-.module-actions li:hover {
-    color: var(--button-grey);
-    background: var(--button-bg-regular);
-}
-
-.dark .module-actions li:hover {
-    color: var(--button-bg-regular);
-    background: var(--button-grey);
-}
-
-.module-actions li a {
-    padding: var(--spacing-small);
-    display: block;
-    animation: 200ms;
-    height: var(--font-normal);
-}
-
 .module-actions .button-like {
     outline-color: var(--button-grey);
 }
