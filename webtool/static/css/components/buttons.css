@@ -8,8 +8,7 @@ button.no-style {
 }
 
 .button-like, input[type=submit], .plain-page button {
-    font-variant: small-caps;
-    text-transform: lowercase;
+    text-transform: uppercase;
 
     color: var(--button-bg-regular);
     background: transparent;
@@ -104,8 +103,7 @@ a.button-like, .button-like button, button.button-like, .plain-page button, inpu
 .with-dropdown ul li {
     display: none;
     background: var(--button-bg-regular);
-    font-variant: small-caps;
-    text-transform: lowercase;
+    text-transform: uppercase;
     white-space: nowrap;
     width: 100%;
     box-sizing: border-box;
