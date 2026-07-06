@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+
+{% block title %}Data sources & processors{% endblock %}
+{% block body_class %}plain-page module-catalog{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "datasources" %}{% endblock %}
+
+{% block body %}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/module-catalog.css') }}">
+
+<article id="pc-page" data-initial-processor="{{ module_type|default('', true) }}">
+    <section id="pc-detail">
+        <div id="pc-detail-body">
+            <p class="pc-placeholder">Select a data source or processor below to see how to run it and what it unlocks.</p>
+        </div>
+    </section>
+
+    <nav class="view-controls block" id="pc-controls">
+        <h2 class="pc-browse-title">Browse data sources & processors</h2>
+        <form onsubmit="return false">
+            <ul>
+                <li><input id="pc-search" aria-label="Search data sources & processors" placeholder="Search data sources & processors…" autocomplete="off" spellcheck="false"></li>
+                <li>
+                    <select id="pc-tag" aria-label="Filter by tag">
+                        <option value="">All tags</option>
+                    </select>
+                </li>
+                <li><span id="pc-count" class="pc-count"></span></li>
+            </ul>
+        </form>
+    </nav>
+
+    <section id="pc-catalogue">
+        <p class="banner" id="pc-loading">Loading modules…</p>
+    </section>
+</article>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/module-catalog.js') }}"></script>
+{% endblock %}

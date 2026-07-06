@@ -140,6 +140,17 @@ def favicon():
     """
     return redirect(url_for('static', filename='img/favicon/favicon.ico'))
 
+@component.route("/module-catalog")
+@component.route("/module-catalog/<module_type>")
+@login_required
+def module_catalog(module_type=None):
+    """Render the module catalog.
+
+    With a processor type in the path, the page opens with that processor's detail
+    already loaded, so a direct link lands on it instead of the visitor having to
+    find and click it.
+    """
+    return render_template("module-catalog.html", module_type=module_type)
 
 @component.route('/data-overview/')
 @component.route('/data-overview/<string:datasource>')
@@ -180,45 +191,12 @@ def data_overview(datasource=None):
 
         # Status labels to display in query form
         labels = []
-        is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
-        is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
-        labels.append(is_local)
-
-        if is_static:
-            labels.append("static")
-
         if hasattr(worker_class, "is_from_zeeschuimer"):
             labels.append("zeeschuimer")
 
         # Get example keys for the datasource
         if datasource_id not in ["upload"]:  # ignore upload as keys are variable
             example_keys = get_datasource_example_keys(db=g.db, modules=g.modules, dataset_type=datasource_id + "-search")
-
-        # Get daily post counts for local datasource to display in a graph
-        if is_local == "local":
-
-            total_counts = g.db.fetchall("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (database_db_id,))
-
-            if total_counts:
-                
-                total_counts = {d["board"]: d["post_count"] for d in total_counts}
-                
-                boards = set(total_counts.keys())
-                
-                # Fetch date counts per board from the database
-                db_counts = g.db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (database_db_id,))
-
-                # Get the first and last days for padding
-                all_dates = [datetime.strptime(row["date"], "%Y-%m-%d").timestamp() for row in db_counts]
-                first_date = datetime.fromtimestamp(min(all_dates))
-                
-                # Format the dates in a regular dictionary to be used by Highcharts
-                daily_counts = {"first_date": (first_date.year, first_date.month, first_date.day)}
-                for board in boards:
-                    daily_counts[board] = {row["date"]: row["count"] for row in db_counts if row["board"] == board}
-                    # Then make sure the empty dates are filled with 0
-                    # and each board has the same amount of values.
-                    daily_counts[board] = [v for k, v in pad_interval(daily_counts[board], first_interval=first_date)[1].items()]
 
         references = worker_class.references if hasattr(worker_class, "references") else None        
 
