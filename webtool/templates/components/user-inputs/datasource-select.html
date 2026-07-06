@@ -1,0 +1,27 @@
+<div class="form-element" x-data='{
+        datasource: "",
+        names: { {% for datasource in datasources %}{{ datasource|tojson }}: {{ datasources[datasource].name|tojson }}{{ "," if not loop.last }}{% endfor %} },
+        get infoText() { return this.datasource ? `Show ${this.names[this.datasource]} info` : ""; }
+    }'>
+    <label for="datasource-select">Data source</label>
+    <div>
+        {# on change (htmx's default trigger for selects), load the query
+           options for the selected data source into the create-dataset form #}
+        <select name="datasource" id="datasource-select" aria-label="Data sources" x-model="datasource"
+                hx-get="{{ url_for('dataset.datasource_form_component') }}"
+                hx-target="#datasource-form" hx-include="this">
+            <option value="" disabled selected>Select data source</option>
+            {% for datasource in datasources %}
+                <option value="{{ datasource }}">{{ datasources[datasource].name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <ul>
+        <li
+                class="button-secondary"
+                aria-label="Data source info"
+                :class="{ disabled: !datasource }"
+                x-tooltip="Data source info"
+                x-init="$nextTick(() => { const upd = () => { const id = $el.getAttribute('aria-describedby'); if (id) document.getElementById(id).textContent = infoText || 'Data source info'; }; upd(); $watch('datasource', upd); })"
+        ><a :href="datasource ? '{{ url_for('misc.module_catalog') }}/' + datasource : null"><i class="fa-solid fa-circle-info"></i></a></li></ul>
+</div>
