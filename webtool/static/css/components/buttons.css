@@ -65,6 +65,13 @@ a.button-like, button {
     background: var(--button-grey);
 }
 
+.button-secondary.disabled,
+.button-secondary.disabled:hover {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+}
+
 .button-secondary a, .button-secondary span {
     padding: var(--spacing-small);
     display: block;
