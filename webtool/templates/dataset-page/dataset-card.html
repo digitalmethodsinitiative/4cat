@@ -18,22 +18,30 @@ set: main_header = True for a header at the top of the analyiss tree (e.g. on th
             <ul class="module-actions dataset-actions">
                 {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or
             dataset.is_accessible_by(current_user, "owner")) %}
-                    <li><a href="#"><i class="fa fa-fw fa-edit" aria-hidden="true"></i>
-                        <span class="sr-only is-icon-tooltip">Edit dataset label</span></a></li>
+                    <li class="button-secondary">
+                        <a href="#" x-tooltip="Edit dataset label">
+                            <i class="fa fa-fw fa-edit" aria-hidden="true"></i>
+                        </a>
+                    </li>
                 {% endif %}
-                <li><a href="#"><i class="fa fa-fw fa-mortar-board" aria-hidden="true"></i>
-                    <span class="sr-only is-icon-tooltip">Processor references</span></a>
+                <li class="button-secondary">
+                    <a href="#" x-tooltip="View documentation & references">
+                        <i class="fa fa-fw fa-mortar-board" aria-hidden="true"></i>
+                    </a>
                 </li>
                 {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
-                    <li><a href="{{ url_for('dataset.view_log', key=dataset.key) }}"><i
-                            class="fa fa-fw fa-clipboard-list"
-                            aria-hidden="true"></i>
-                        <span class="sr-only is-icon-tooltip">View dataset log</span></a></li>
+                <li class="button-secondary">
+                    <a href="{{ url_for('dataset.view_log', key=dataset.key) }}" x-tooltip="View dataset log">
+                        <i class="fa fa-fw fa-clipboard-list"
+                        aria-hidden="true"></i>
+                    </a>
+                </li>
                 {% endif %}
-                <li>
-                    <a href="{{ dataset.get_version_url(" backend/processors/" + dataset.get_own_processor().filepath) }}"><i
-                            class="fab fa-fw fa-github" aria-hidden="true"></i>
-                        <span class="sr-only is-icon-tooltip">View processor source code</span></a>
+                <li class="button-secondary">
+                    <a href="{{ dataset.get_version_url(" backend/processors/" + dataset.get_own_processor().filepath) }}"
+                        x-tooltip="View processor code">
+                        <i class="fab fa-fw fa-github" aria-hidden="true"></i>
+                    </a>
                 </li>
             </ul>
         </nav>
