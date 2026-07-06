@@ -1,6 +1,3 @@
-{# Loading spinner, shown via htmx's `htmx-indicator` mechanism while a request
-   targeting the adjacent swap target is in flight. Pass `spinner_id` to make it
-   addressable from an `hx-indicator` attribute. #}
 <div {% if spinner_id %}id="{{ spinner_id }}"{% endif %} class="spinner htmx-indicator" role="status" aria-label="Loading">
     <i class="fa-solid fa-circle-notch spinner-icon" aria-hidden="true"></i>
 </div>
