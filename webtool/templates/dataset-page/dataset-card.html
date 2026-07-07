@@ -4,6 +4,7 @@ set: lite_header = True for a header included on another page as a clickable ent
 set: main_header = True for a header at the top of the analyiss tree (e.g. on the dataset
                         result page)
 #}
+{% set deprecated = (dataset.type not in processors) %}
 <header class="card-header dataset-header{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}">
     {% if dataset.get_own_processor().icon %}{% set icon = dataset.get_own_processor().icon %}{% endif %}
     {% include 'components/module-icon.html' %}
@@ -37,12 +38,14 @@ set: main_header = True for a header at the top of the analyiss tree (e.g. on th
                     </a>
                 </li>
                 {% endif %}
+                {% if not deprecated %}
                 <li class="button-secondary">
                     <a href="{{ dataset.get_version_url(" backend/processors/" + dataset.get_own_processor().filepath) }}"
                         x-tooltip="View processor code">
                         <i class="fab fa-fw fa-github" aria-hidden="true"></i>
                     </a>
                 </li>
+                {% endif %}
             </ul>
         </nav>
     {% endif %}

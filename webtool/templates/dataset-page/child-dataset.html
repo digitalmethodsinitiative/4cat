@@ -27,7 +27,7 @@
                             hx-swap="innerHTML"
                             hx-indicator="#processor-grid-spinner"
                             hx-trigger="click"
-                            @click="slideoutActive = true; selectedDatasetType = '{{ dataset.type }}'; selectedDatasetLabel = '{{ processors[dataset.type].title }}';"
+                            @click="slideoutActive = true; selectedDatasetType = '{{ dataset.type }}'; selectedDatasetLabel = '{{ processors[dataset.type].title if dataset.type in processors else dataset.type }}';"
                         >
                     <i class="fa-solid fa-star-of-life" aria-hidden="true"></i> <span class="sr-only">Run processor on this dataset</span>
                 </button>
