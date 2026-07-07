@@ -70,7 +70,7 @@ class DebateMetrics(BasicProcessor):
 			"subject": threads[thread_id]["subject"],
 			"num_posts": threads[thread_id]["count"],
 			"num_images": threads[thread_id]["images"],
-			"op_replies": threads[thread_id]["op_length"]
+			"op_length": threads[thread_id]["op_length"]
 		} for thread_id in threads]
 
 		if not results:
