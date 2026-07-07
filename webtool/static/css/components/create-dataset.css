@@ -1,0 +1,14 @@
+#query-form, #datasource-form {
+    margin-top: var(--spacing-large);
+}
+
+#datasource-form .submit-container {
+}
+
+#datasource-form #datasource-form-submit {
+    margin: var(--spacing-large) auto 0;
+}
+
+#datasource-form-submit {
+    margin-top: 1rem;
+}
