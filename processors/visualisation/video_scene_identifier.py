@@ -9,8 +9,9 @@ import re
 
 from scenedetect import open_video, SceneManager, VideoOpenFailure, FrameTimecode
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -34,20 +35,25 @@ class VideoSceneDetector(BasicProcessor):
 	start and end times.
 	"""
 	type = "video-scene-detector"  # job type ID
-	category = "Visual"  # category
-	title = "Detect scenes in video"  # title displayed in UI
-	description = "Detect distinct 'scenes' in videos based on various parameters (e.g. change in color and " \
-				  "intensity or cuts and fades to black) and extract the scene metadata."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Detect scenes in video",
+		category="Visual",
+		tags=["extract"],
+		description="Detect distinct scenes in videos and record their boundaries as a table. Scenes are found with an ffmpeg threshold filter or one of PySceneDetect's content, adaptive, or threshold detectors, based on changes in colour, intensity, or cuts and fades to black. Each row lists a scene's start and end frame, timecode, and duration.",
+		references=[
+			"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",
+			"[Detection Algorithms](https://scenedetect.com/projects/Manual/en/latest/api/detectors.html)",
+			"ffmpeg's scene/shot detection algorithm is based on [ShotDetect](https://github.com/johmathe/Shotdetect) (see [here](https://github.com/FFmpeg/FFmpeg/commit/7286814))",
+		],
+		icon="clapperboard",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	# Allow on video datasets
-	compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-scene-frames", "video-timelines"])
+	# a derived table
+	output = Table()
 
-	references = [
-		"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",
-		"[Detection Algorithms](https://scenedetect.com/projects/Manual/en/latest/api/detectors.html)",
-		"ffmpeg's scene/shot detection algorithm is based on [ShotDetect](https://github.com/johmathe/Shotdetect) (see [here](https://github.com/FFmpeg/FFmpeg/commit/7286814))"
-	]
+	# Allow on video datasets
+	compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, preferred_followups=["video-scene-frames", "video-timelines"])
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

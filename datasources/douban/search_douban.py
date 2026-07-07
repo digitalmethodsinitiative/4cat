@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from backend.lib.search import Search
 from common.lib.helpers import convert_to_int, strip_tags, UserInput
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.outputs import Datasource
 
 
 class SearchDouban(Search):
@@ -24,8 +25,8 @@ class SearchDouban(Search):
     title = "Douban Search"  # title displayed in UI
     description = "Scrapes group posts from Douban for a given set of groups"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
+    output = Datasource()
+    icon = "comment"
 
     # not available as a processor for existing datasets
     accepts = [None]

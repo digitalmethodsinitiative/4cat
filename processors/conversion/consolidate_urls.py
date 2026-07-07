@@ -7,8 +7,9 @@ from ural import is_url
 
 from processors.conversion.extract_urls import ExtractURLs
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput, split_urls
 
 __author__ = "Dale Wahl"
@@ -24,10 +25,19 @@ class ConsolidateURLs(BasicProcessor):
 
     """
     type = "consolidate-urls"  # job type ID
-    category = "Conversion"  # category
-    title = "Consolidate URLs"  # title displayed in UI
-    description = "Retain only the domain (and optionally path) of URLs; used for custom networks (e.g. author + domains)"
+    description = ProcessorDescription(
+        title="Consolidate URLs",
+        category="Conversion",
+        tags=["urls", "clean text"],
+        description="Reduce URLs in a column to a shorter form, keeping only the domain or applying per-site rules for Facebook, Instagram, YouTube, and other platforms. Optionally expand shortened URLs first. Useful for building networks that link authors to the domains they share.",
+        warnings=[
+            "Expanding shortened URLs is slow and not recommended for datasets larger than 10,000 items.",
+        ],
+        icon="globe",
+    )
     extension = "csv"
+    # a derived table
+    output = Table()
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

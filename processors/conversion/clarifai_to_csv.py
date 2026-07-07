@@ -3,8 +3,9 @@ Convert Clarifai annotations to CSV
 """
 import csv
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -23,10 +24,16 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
     information to allow 'flattening' the output to a simple CSV file.
     """
     type = "convert-clarifai-vision-to-csv"  # job type ID
-    category = "Conversion"  # category
-    title = "Convert Clarifai results to CSV"  # title displayed in UI
-    description = "Convert the Clarifai API output to a simplified CSV file."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Convert Clarifai results to CSV",
+        category="Conversion",
+        description="Convert the Clarifai API output to a simplified CSV file.",
+        icon="file-csv",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
+
+    # a derived table
+    output = Table()
 
     # Allow processor on Clarifai API output
     compatibility = Compatibility(types={"clarifai-api"})

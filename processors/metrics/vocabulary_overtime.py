@@ -3,8 +3,9 @@ Over-time trends
 """
 import re
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -18,17 +19,22 @@ class OvertimeAnalysis(BasicProcessor):
     Show overall activity levels for Telegram datasets
     """
     type = "overtime-vocabulary"  # job type ID
-    category = "Metrics"  # category
-    title = "Over-time word counts"  # title displayed in UI
-    description = "Determines the counts over time of particular set of words or phrases."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Count words over time",
+        category="Metrics",
+        tags=["counts", "time-series"],
+        description="Count how often a chosen set of words or phrases occurs in the dataset over time. Use the built-in OILab extreme speech lexicons or supply your own comma-separated word list, per year, month, week, or day.",
+        references=[
+            "[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
+        ],
+        icon="chart-line",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
+    # a ranking table (date/item/value), so ranking visualisations can run on it
+    output = Table(columns={"date", "item", "value"})
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
-
-    references = [
-        "[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

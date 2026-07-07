@@ -5,12 +5,13 @@ import os
 import json
 
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory, DsmConnectionError
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -23,21 +24,32 @@ class CategorizeImagesCLIP(BasicProcessor):
     Categorize Images with OpenAI CLIP
     """
     type = "image-to-categories"  # job type ID
-    category = "Visual"  # category
-    title = "Categorize images with CLIP"  # title displayed in UI
-    description = ("Provide a list of categories and classify images with OpenAI's CLIP models. This will estimate "
-                   "the likelihood an image belongs to a category (total of all category values will be 100%).")  # description displayed in UI
+    description = ProcessorDescription(
+        title="Categorize images with CLIP",
+        category="Visual",
+        tags=["classify", "external service"],
+        description="Classify images into your own list of categories with OpenAI's CLIP model. For each image it estimates the likelihood of each category, with the values across all categories adding up to 100%.",
+        warnings=[
+            "This runs the CLIP model through the DMI Service Manager, which must be set up with a GPU by an administrator.",
+        ],
+        info=[
+            "Categories can be plain words or phrases, including proper nouns and contrasts. Unique categories may work better such as 'animal' versus 'object' than 'animal' versus 'not animal'.",
+        ],
+        references=[
+            "[OpenAI CLIP blog](https://openai.com/research/clip)",
+            "[CLIP paper: Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/pdf/2103.00020.pdf)",
+            "[OpenAI CLIP code](https://github.com/openai/CLIP/#clip)",
+            "[Model comparison](https://arxiv.org/pdf/2103.00020.pdf#page=40&zoom=auto,-457,754)",
+        ],
+        icon="eye",
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI
 
-    # image datasets (image archives or image-downloader output), when CLIP is enabled
-    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.cc_clip_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-category-wall"])
+    # a derived table
+    output = Table(extension="ndjson")
 
-    references = [
-        "[OpenAI CLIP blog](https://openai.com/research/clip)",
-        "[CLIP paper: Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/pdf/2103.00020.pdf)",
-        "[OpenAI CLIP code](https://github.com/openai/CLIP/#clip)",
-        "[Model comparison](https://arxiv.org/pdf/2103.00020.pdf#page=40&zoom=auto,-457,754)",
-        ]
+    # image datasets (image archives or image-downloader output), when CLIP is enabled
+    compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, required_settings={"dmi-service-manager.cc_clip_enabled", "dmi-service-manager.ab_server_address"}, preferred_followups=["image-category-wall"])
 
     config = {
         "dmi-service-manager.cb_clip-intro-1": {

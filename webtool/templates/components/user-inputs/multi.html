@@ -1,0 +1,7 @@
+<div class="multichoice-wrapper{% if settings.inline %} inline{% endif %}">
+    <select name="{{ field_name }}" id="forminput-{{ option }}" multiple="multiple">
+    {% for choice in settings.options %}
+        <option value="{{ choice }}"{% if settings.default and choice in settings.default %} selected="selected"{% endif %}>{% if settings.inline %}{{ settings.options[choice]|truncate(30, True, "...", 0) }}{% else %}{{ settings.options[choice] }}{% endif %}</option>
+    {% endfor %}
+    </select>
+</div>

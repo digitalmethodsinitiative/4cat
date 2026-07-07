@@ -5,8 +5,9 @@ import json
 import pickle
 import itertools
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Archive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -18,10 +19,16 @@ class Vectorise(BasicProcessor):
 	Creates word vectors from tokens
 	"""
 	type = "vectorise-tokens"  # job type ID
-	category = "Text analysis"  # category
-	title = "Count words"  # title displayed in UI
-	description = "Counts how often a token appears in the dataset. This creates a bag of words."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Count words",
+		category="Text analysis",
+		tags=["counts"],
+		description="Count how often each token appears in the dataset, producing a bag of words per token set. The counts are sorted from most to least frequent.",
+		icon="list-ol",
+	)
 	extension = "zip"  # extension of result file, used internally and in UI
+	# a zip archive of data files
+	output = Archive()
 
 	# Allow processor on token sets
 	compatibility = Compatibility(types={"tokenise-posts"}, preferred_followups=["vector-ranker"])

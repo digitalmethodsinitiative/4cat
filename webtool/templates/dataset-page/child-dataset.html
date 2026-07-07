@@ -1,0 +1,58 @@
+{# while the dataset is queued/running, the component polls its own endpoint
+   and replaces itself with the re-rendered state; once finished, the rendered
+   markup no longer carries the trigger and polling stops #}
+<li id="child-{{ dataset.key }}"
+    class="{% if not dataset.is_finished() %}in-progress{% endif %}{% if dataset.get_children() %} with-children{% endif %}"
+    {% if not dataset.is_finished() %}
+    hx-get="{{ url_for('dataset.child_dataset_component', key=dataset.key) }}"
+    hx-trigger="every 3s [document.hasFocus()]"
+    hx-swap="outerHTML"
+    {% endif %}>
+    <article>
+        <aside class="subway-station">
+            <p class="timestamp">
+                <span class="date">{{ dataset.timestamp|datetime(fmt="%d %b")|safe }}</span>
+                <span class="time">{{ dataset.timestamp|datetime(fmt="%H:%M")|safe }}</span>
+            </p>
+            {# todo: make this based on last visit, not just the timestamp #}
+            {% if dataset.timestamp_finished and dataset.timestamp_finished > (__now - 3600) %}<p class="new-notice">New!</p>{% endif %}
+        </aside>
+        <div class="module-card">
+            {% set has_processors = dataset.is_finished() and (dataset.get_children() or (dataset.num_rows > 0 and current_user.is_authenticated and dataset.get_available_processors(config=__config, exclude_hidden=True))) %}
+            {% if has_processors %}
+            <aside class="run-child-processor">
+                <button class="no-style run-processor-button hint--right" x-tooltip:side="Run processor"
+                    hx-get="{{ url_for('dataset.processor_grid', key=dataset.key) }}"
+                            hx-target="#processor-grid"
+                            hx-swap="innerHTML"
+                            hx-indicator="#processor-grid-spinner"
+                            hx-trigger="click"
+                            @click="slideoutActive = true; selectedDatasetType = '{{ dataset.type }}'; selectedDatasetLabel = '{{ processors[dataset.type].title if dataset.type in processors else dataset.type }}';"
+                        >
+                    <i class="fa-solid fa-star-of-life" aria-hidden="true"></i> <span class="sr-only">Run processor on this dataset</span>
+                </button>
+            </aside>
+            {% endif %}
+            <button class="journey-marker{% if not has_processors %} end{% endif %}">
+            {% if not dataset.is_finished() %}
+                <span class="spinner">&#63009;</span> {# spinner #}
+            {% elif not dataset.num_rows %}
+                &#62796; {# skull #}
+            {% else %}
+                <span class="status-indicator status-good"></span>
+            {% endif %}
+            </button>
+            {% include "dataset-page/dataset-card.html" %}
+        </div>
+    </article>
+    <div class="run-hint">
+        <p>Run a processor on this dataset...</p>
+    </div>
+{% if dataset.get_children() %}
+    <ul class="sub tree">
+    {% for child in dataset.get_children() %}
+        {% with dataset=child %}{% include "dataset-page/child-dataset.html" %}{% endwith %}
+    {% endfor %}
+    </ul>
+{% endif %}
+</li>

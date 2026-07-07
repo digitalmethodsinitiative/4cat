@@ -2,8 +2,9 @@
 Retrieves metadata on annotations for this dataset.
 """
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 from datetime import datetime
 
@@ -12,11 +13,19 @@ class AnnotationMetadata(BasicProcessor):
 	Download annotation metadata from this dataset
 	"""
 	type = "annotation-metadata"  # job type ID
-	category = "Conversion"  # category
-	title = "Export annotations"  # title displayed in UI
-	description = ("Download annotations and their metadata for this dataset. "
-				   "Includes annotation author, timestamp, type, etc.") # description displayed in UI
+	description = ProcessorDescription(
+		title="Export annotations",
+		category="Conversion",
+		tags=["convert format", "annotate"],
+		description="Export the annotations made on this dataset along with their metadata, such as the annotation author, timestamp, and type.",
+		info=[
+			"Only datasets that have annotations can be processed.",
+		],
+		icon="circle-info",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a derived table
+	output = Table()
 
 	# coarse map spec (accepts any dataset); is_compatible_with (below) is the runtime
 	# truth -- it requires the dataset to actually have annotations (annotation_fields)

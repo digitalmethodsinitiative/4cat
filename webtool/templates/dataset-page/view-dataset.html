@@ -1,0 +1,167 @@
+{% extends "layout.html" %}
+
+{% block title %}{% if dataset.query %}Dataset: {{ dataset.get_label() }}{% else %}Dataset{% endif %}{% endblock %}
+{% block body_class %}result-page{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
+
+{% block body %}
+    <div class="dataset-container"
+         x-data="{ slideoutActive: false, selectedProcessorType: null, selectedDatasetType: null, selectedDatasetLabel: null, processorSearch: '', pendingScrollKey: null, noProcessorResults() { const q = this.processorSearch.toLowerCase().trim(); return q && ![...document.querySelectorAll('#processor-grid .processor-card')].some(c => c.dataset.search.includes(q)); } }"
+         x-effect="document.body.classList.toggle('slideout-open', slideoutActive)"
+         @processor-queued.document="slideoutActive = false; selectedProcessorType = null; pendingScrollKey = $event.detail.key"
+         @htmx:after:settle.document="if (pendingScrollKey) { const el = document.getElementById('child-' + pendingScrollKey); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); pendingScrollKey = null; } }">
+        <section class="dark dataset-metadata" data-dataset-key="{{ dataset.key }}">
+            <nav>
+                <ul>
+                {% if current_user.is_authenticated and current_user.can_access_dataset(dataset) %}
+                    <li><a class="button-like" href="{{ url_for("toolapi.toggle_favourite", key=dataset.key) }}?redirect">{% if is_favourite %}Un-f{% else %}F{% endif %}avourite</a></li>
+                {% endif %}
+                {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
+                    <li><a class="button-like" href="{{ url_for('toolapi.toggle_private', key=dataset.key) }}?redirect">Make public</a></li>
+                {% endif %}
+                    <li><a class="button-like" href="{{ url_for('dataset.show_result', key=dataset.key) }}">Permalink</a>
+                    </li>
+                    {% if __user_config("privileges.admin.can_manipulate_all_datasets") or
+                    dataset.is_accessible_by(current_user, "owner") %}
+                    <li><a class="button-like" href="{{ url_for('toolapi.add_dataset_owner') }}">
+                        Manage access
+                        {% if dataset.get_owners(None)|length > 1 %}
+                        (<i class="fa fa-users" aria-hidden="true"></i> {{ dataset.get_owners(None)|length }})
+                        {% endif %}
+                    </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            {% with icon="database", main_header=True %}
+                {% include "dataset-page/dataset-card.html" %}
+            {% endwith %}
+
+            {% if dataset.is_expiring(config=__config) %}
+                <p class="notice">
+                    <i class="fa fa-warning" aria-hidden="true"></i> <strong>Note:</strong> this dataset will no longer be
+                    available
+                    after {{ dataset.is_expiring(config=__config)|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You
+                    can
+                    <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+                </p>
+            {% endif %}
+
+            {% if merge_sources %}
+                <p class="notice">
+                    <i class="fa fa-arrows-to-dot" aria-hidden="true"></i> This dataset is a merger of
+                    {% for source in merge_sources %}
+                        {% if source is string %}
+                            {{ source }}{% else %}
+                            <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% endif %}
+                    {% if
+                loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
+                    {% endfor %}.
+                </p>
+            {% elif "copied_from" in dataset.parameters %}
+                <p class="notice">
+
+                    <i class="fa fa-filter" aria-hidden="true"></i>
+                    This dataset was generated from
+                    {% if copy_source is string %}
+                        <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                    {% else %}
+                        the dataset '
+                        <a href="{{ url_for('dataset.show_result', key=copy_source.key) }}">{{ copy_source.get_label() }}</a>'.
+                    {% endif %}
+                </p>
+            {% endif %}
+        </section>
+
+        <section class="analysis-results center-stage">
+            <ul class="tree" id="dataset-tree">
+                <li>
+                    <div class="big-button-wrap">
+                        <button class="big-processor-button"
+                            hx-get="{{ url_for('dataset.processor_grid', key=dataset.key) }}"
+                            hx-target="#processor-grid"
+                            hx-swap="innerHTML"
+                            hx-indicator="#processor-grid-spinner"
+                            hx-trigger="click"
+                            @click="slideoutActive = true; selectedDatasetType = '{{ dataset.type }}'; selectedDatasetLabel = '{{ processors[dataset.type].title if dataset.type in processors else dataset.type }}';"
+                        >
+                            <em>
+                                <span class="run-processor-button inline">
+                                    <i class="fa-solid fa-star-of-life" aria-hidden="true"></i>
+                                </span>
+                                Run processor
+                            </em>
+                            <span class="byline">{{ dataset.get_available_processors(config=__config)|length }} processors available</span>
+                        </button>
+                    </div>
+                </li>
+                {% for child in dataset.get_children() %}
+                    {% with top_parent=dataset, dataset=child %}{% include "dataset-page/child-dataset.html" %}{% endwith %}
+                {% endfor %}
+            </ul>
+        </section>
+
+        <div class="processor-panel slideout slideout-root"
+             x-show="slideoutActive"
+             x-transition:enter="slide-enter"
+             x-transition:enter-start="slide-from"
+             x-transition:enter-end="slide-to"
+             x-transition:leave="slide-enter"
+             x-transition:leave-start="slide-to"
+             x-transition:leave-end="slide-from"
+        >
+            {# todo: add processor breadcrumb component #}
+            <div class="processor-panel-header slideout-header">
+                <div class="slideout-header-title">
+                    <ul x-show="selectedDatasetLabel">
+                        <li>
+                            <h1>Processors for <span x-text="selectedDatasetLabel"></span></h1>
+                        </li>
+                    </ul>
+                </div>
+                <div class="slideout-header-controls">
+                    <ul>
+                        <template x-if="!selectedProcessorType">
+                            <li class="search-box">
+                                <input type="search" x-model="processorSearch"
+                                       placeholder="Search processors…"
+                                       aria-label="Search processors by title, description or category">
+                            </li>
+                        </template>
+                        <li>
+                            <button class="button-like" @click="slideoutActive = false; selectedProcessorType = null"><i class="fa-solid fa-xmark"></i></button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="processor-panel-contents slideout-contents">
+                <div class="slideout-body-wrap">
+                    <div id="processor-grid" class="slideout-body">
+                    </div>
+                    {% with spinner_id = "processor-grid-spinner" %}{% include "components/spinner.html" %}{% endwith %}
+                </div>
+                <div class="processor-options slideout"
+                     x-show="selectedProcessorType"
+                     x-transition:enter="slide-enter"
+                     x-transition:enter-start="slide-from"
+                     x-transition:enter-end="slide-to"
+                     x-transition:leave="slide-enter"
+                     x-transition:leave-start="slide-to"
+                     x-transition:leave-end="slide-from">
+                    <div class="slideout-header narrow">
+                        <div id="processor-metadata" class="slideout-header-title"></div>
+                        <div class="slideout-header-controls">
+                            <button class="button-like" @click="selectedProcessorType = null">
+                                <i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <div class="slideout-body-wrap">
+                        <div id="processor-options" class="slideout-body"></div>
+                        {% with spinner_id = "processor-options-spinner" %}{% include "components/spinner.html" %}{% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

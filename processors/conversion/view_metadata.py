@@ -6,8 +6,9 @@ Designed to work with any processor that has a 'map_metadata' method
 import json
 import zipfile
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -23,10 +24,15 @@ class ViewMetadata(BasicProcessor):
 	Reformats the .metadata.json file and calculates some basic analytics
 	"""
 	type = "metadata-viewer"  # job type ID
-	category = "Conversion"  # category
-	title = "View media metadata"  # title displayed in UI
-	description = "Reformats the .metadata.json file and calculates analytics"  # description displayed in UI
+	description = ProcessorDescription(
+		title="View media metadata",
+		category="Conversion",
+		description="Read the .metadata.json file produced by an image or video downloader and turn it into a flat table, with one row per downloaded item. Optionally include items whose download failed.",
+		icon="circle-info",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a derived table
+	output = Table()
 
 	# Allow on downloaded media datasets
 	compatibility = Compatibility(type_prefixes={"video-downloader", "image-downloader"})

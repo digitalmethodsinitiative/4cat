@@ -2,7 +2,9 @@
 Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 from processors.metrics.count_posts import CountPosts
 
 
@@ -11,10 +13,17 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	Run processor pipeline to extract neologisms
 	"""
 	type = "preset-histogram"  # job type ID
-	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-	title = "Histogram"  # title displayed in UI
-	description = "Create a histogram that shows the number of items over time."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Create a histogram of items over time",
+		category="Combined processors",
+		tags=["time-series", "chart", "counts"],
+		description="Count items per day, week, month, or year and render the totals as a bar chart in an SVG file.",
+		icon="square-poll-vertical",
+	)
 	extension = "svg"
+
+	# a preset; its output is its last step's
+	output = Delegated()
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

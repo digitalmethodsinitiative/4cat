@@ -13,6 +13,7 @@ from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
 from common.lib.item_mapping import MappedItem
+from common.lib.outputs import Datasource
 
 from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
 
@@ -26,7 +27,9 @@ class SearchWithinTCATBins(Search):
     """
     type = "dmi-tcat-search"  # job ID
     extension = "ndjson"
+    output = Datasource()
     title = "TCAT Search (HTTP)"
+    icon = "brand-twitter"
 
     # TCAT has a few fields that do not exist in APIv2
     additional_TCAT_fields = ["to_user_name", "filter_level", "favorite_count", "truncated", "from_user_favourites_count", "from_user_lang", "from_user_utcoffset",

@@ -1,0 +1,89 @@
+:root {
+    --fourcat-accent: #303DD0;
+
+    --blue-light: #CAE1F2;
+    --blue: #4A6782;
+    --green-light: #CDEDDE;
+    --green: #026C39;
+    --yellow-light: #FFF5BF;
+    --orange: #ff9300;
+    --yellow: #8C741D;
+    --red-light: #F6C5C5;
+    --red: #A63F3F;
+
+    --bright: #FFFFFF;
+    --dark: #161616;
+    --semidark: #333333;
+    --text-grey: #565656;
+    --text-grey-40: #56565666;
+    --text-grey-80: #565656CC;
+    --stroke-panel: var(--dark);
+    --stroke-thick: #C8C8C8;
+    --stroke-bright: #939393;
+    --button-grey: #E4E4E4;
+    --button-bg-regular: #525252;
+
+    --brighten-12: #FFFFFF1E;
+
+    --panel-bg-0: hsl(0, 0%, 92%);
+    --panel-bg-1: hsl(0, 0%, 84%);
+    --panel-bg-2: hsl(0, 0%, 76%);
+    --panel-bg-3: hsl(0, 0%, 50%);
+
+    /* module category tags */
+    --tag1: #9351a7;
+    --tag2: #59b05a;
+    --tag3: #d381d1;
+    --tag4: #95a548;
+    --tag5: #6074cf;
+    --tag6: #c8a039;
+    --tag7: #8286b5;
+    --tag8: #c3503f;
+    --tag9: #519cb4;
+    --tag10: #c6477b;
+    --tag11: #6fb89c;
+    --tag12: #d98f5f;
+    --tag13: #54784b;
+    --tag14: #ba7c8b;
+    --tag15: #8f6f43;
+
+    --max-width: 68rem; /** viewport width **/
+
+    --font-base: 0.625rem; /** the alpha and the omega **/
+
+    --font-normal: calc(var(--font-base) / 3 * 4);
+    --font-body: calc(var(--font-base) / 6 * 7);
+    --font-big: calc(6 * var(--font-normal));
+    --font-h0: calc(var(--font-base) / 4 * 10);
+    --font-h1: calc(var(--font-base) / 4 * 7);
+    --font-h2: calc(2 * var(--font-normal));
+    --font-h3: calc(1.5 * var(--font-normal));
+    --font-h4: calc(1.25 * var(--font-normal));
+
+    --spacing-tiny: calc(var(--font-base) / 3);
+    --spacing-smaller: calc(var(--spacing-tiny) / 2 * 3);
+    --spacing-small: calc(var(--spacing-tiny) * 2);
+    --spacing-regular: calc(var(--spacing-tiny) * 4);
+    --spacing-large: calc(var(--spacing-tiny) * 8);
+    --spacing-xlarge: calc(var(--spacing-tiny) * 12);
+
+    --card-height: calc(var(--font-h1) * 10);
+
+    --slideout-header-height: 3rem;
+    --form-gap: 2rem;
+    --tooltip-button-width: 2rem;
+
+    --stroke-light: calc(var(--font-base) * 0.1);
+    --stroke: calc(var(--stroke-light) * 2);
+    --stroke-heavy: calc(var(--stroke-light) * 4);
+    --stroke-journey: calc(var(--stroke-light) * 3);
+    --radius: calc(var(--font-base) / 6 * 5);
+    --double-radius: calc(2 * var(--radius));
+
+    --z-journey-marker: 1;
+    --z-run-hint: 2;
+    --z-button: 10;
+    --z-button-dropdown: 15;
+    --z-footer-header: 1000;
+    --z-slideout: 1001
+}

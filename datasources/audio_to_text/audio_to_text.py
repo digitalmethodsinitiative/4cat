@@ -8,6 +8,7 @@ of their processors and skip those two datasource only methods).
 
 from datasources.media_import.import_media import SearchMedia
 from processors.machine_learning.audio_to_text import AudioToText
+from common.lib.outputs import MediaArchive
 
 
 class AudioUploadToText(SearchMedia):
@@ -15,6 +16,10 @@ class AudioUploadToText(SearchMedia):
     category = "Search"  # category
     title = "Convert speech to text"  # title displayed in UI
     description = "Upload your own audio and use OpenAI's Whisper or GPT models to create transcripts"  # description displayed in UI
+    icon = "closed-captioning"
+
+    # only audio is accepted here, so the output media is narrower than SearchMedia's
+    output = MediaArchive(media="audio", collector=True, position="top")
 
     # reuse the AudioToText processor's compatibility -- this datasource runs it on uploaded audio
     compatibility = AudioToText.compatibility

@@ -6,10 +6,11 @@ import random
 import json
 from urllib.parse import urlparse
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_last_line
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import File
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -23,10 +24,20 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     File to  be imported by TCAT's import-jsondump.php
     """
     type = "tcat-auto-upload"  # job type ID
-    category = "Conversion"  # category
-    title = "Upload to DMI-TCAT"  # title displayed in UI
-    description = "Send a TCAT-ready JSON file to a particular DMI-TCAT server."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Upload to DMI-TCAT",
+        category="Conversion",
+        tags=["external service"],
+        description="Send a TCAT-ready JSON file to a configured DMI-TCAT server, where it is imported as a new tweet bin. The result is an HTML page that redirects to the dataset on the TCAT server.",
+        warnings=[
+            "The dataset is sent to an external DMI-TCAT server, which must be configured in the settings.",
+            "Tweets larger than 40 KB are dropped, because TCAT rejects them on import.",
+        ],
+        icon="brand-twitter",
+    )
     extension = "html"  # extension of result file, used internally and in UI
+    # a single html file
+    output = File("html")
 
     # the TCAT converter's output, when a TCAT server is configured
     compatibility = Compatibility(types={"convert-ndjson-for-tcat"}, required_settings={"tcat-auto-upload.server_url", "tcat-auto-upload.token", "tcat-auto-upload.username", "tcat-auto-upload.password"})

@@ -5,8 +5,9 @@ import csv
 import json
 import pickle
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput
 
 __author__ = "Dale Wahl"
@@ -19,10 +20,17 @@ class VectoriseByCategory(BasicProcessor):
 	Creates word vectors from tokens and organises them by category.
 	"""
 	type = "vectorise-tokens-by-category"  # job type ID
-	category = "Text analysis"  # category
-	title = "Count words by category"  # title displayed in UI
-	description = "Counts all tokens per category."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Count words by category",
+		category="Text analysis",
+		tags=["counts", "grouping"],
+		description="Count how often each token appears within each category, using a chosen column of the parent dataset as the category. Optionally split multi-value categories by comma, separate counts per time interval, and filter by word or number of occurrences.",
+		icon="list-ol",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	# a ranking table (date/item/value), so ranking visualisations can run on it
+	output = Table(columns={"date", "item", "value"})
 
 	# Allow processor on token sets
 	compatibility = Compatibility(

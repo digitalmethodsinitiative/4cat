@@ -11,10 +11,11 @@ from PIL import Image, UnidentifiedImageError
 from requests.structures import CaseInsensitiveDict
 
 from common.lib.helpers import UserInput, url_to_filename
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.exceptions import ProcessorInterruptedException, FourcatException
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -34,16 +35,24 @@ class ImageDownloader(BasicProcessor):
     """
 
     type = "image-downloader"  # job type ID
-    category = "Visual"  # category
-    title = "Download images"  # title displayed in UI
-    description = (
-        "Download images and store in a a ZIP file. May take a while to complete as images are retrieved "
-        "externally. Note that not always all images can be saved. For imgur galleries, only the first "
-        "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file "
-        "is included in the output archive."
-    )  # description displayed in UI
+    description = ProcessorDescription(
+        title="Download images",
+        category="Visual",
+        tags=["download media", "urls"],
+        description="Extract image URLs from a chosen column and download the images into a ZIP file. For Imgur galleries only the first image is saved, and for animated GIFs only the first frame.",
+        info=[
+            "A JSON metadata file recording the download outcome per image is included in the archive."
+        ],
+        warnings=[
+            "Images are retrieved from external servers, so this can take a long time and some images may fail to download.",
+        ],
+        icon="images",
+    )
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "image"  # media type of the dataset
+
+    # a zip archive of media files
+    output = MediaArchive(media="image")
 
     # Shared list -- other download_* processors reuse this as ImageDownloader.followups
     # (and preferred_followups below reuses it), so it stays a named attribute.

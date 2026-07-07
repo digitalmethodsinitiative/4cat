@@ -1,0 +1,11 @@
+{# Inline form feedback, rendered into a form's notice area (e.g. when
+   queueing a processor fails or needs confirmation). When confirmation is
+   needed, the checkbox is submitted along with the form on retry. #}
+<p class="notice" role="alert">
+    <i class="fa fa-warning" aria-hidden="true"></i> {{ message }}
+</p>
+{% if needs_confirmation %}
+    <label class="notice">
+        <input type="checkbox" name="frontend-confirm" value="1"> Yes, proceed
+    </label>
+{% endif %}

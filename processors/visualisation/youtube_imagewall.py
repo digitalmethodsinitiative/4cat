@@ -9,8 +9,9 @@ import math
 from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 from common.lib.helpers import UserInput, convert_to_int
 
 __author__ = "Sal Hagen"
@@ -28,10 +29,15 @@ class YouTubeImageWall(BasicProcessor):
     """
 
     type = "youtube-imagewall"  # job type ID
-    category = "Visualisation"  # category
-    title = "YouTube thumbnails image wall"  # title displayed in UI
-    description = "Make an image wall from YouTube video thumbnails."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Make image wall from YouTube thumbnails",
+        category="Visual",
+        description="Arrange downloaded YouTube video thumbnails into a single grid image. Optionally overlay each thumbnail with a colour for its video category and add a category legend.",
+        icon="panorama",
+    )
     extension = "png"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render("png")
 
     # Allow processor on YouTube thumbnail sets
     compatibility = Compatibility(types={"youtube-thumbnails"})

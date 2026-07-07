@@ -2,7 +2,9 @@
 Extract neologisms
 """
 from backend.lib.preset import ProcessorPreset
+from backend.lib.processor import ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Delegated
 
 from common.lib.helpers import UserInput
 
@@ -12,17 +14,25 @@ class NeologismExtractor(ProcessorPreset):
     Run processor pipeline to extract neologisms
     """
     type = "preset-neologisms"  # job type ID
-    category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
-    title = "Extract neologisms"  # title displayed in UI
-    description = ("Retrieve uncommon terms by deleting all words that appears in dictionary lists. Assumes English-"
-                   "language data. Uses stopwords-iso as a stopword filter.")
+    description = ProcessorDescription(
+        title="Extract neologisms",
+        category="Combined processors",
+        tags=["extract", "clean text"],
+        description="Find uncommon terms by removing every word that appears in dictionary and stopword lists. Uses a Google Books English word list and the stopwords-iso English list as filters.",
+        warnings=[
+            "This assumes the data is in English; for other languages start with the Tokenise posts processor and use a different word list.",
+        ],
+        references=[
+            "Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).",
+        ],
+        icon="comment-medical",
+    )
     extension = "csv"
+    # a preset; its output is its last step's
+    output = Delegated()
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})
-
-    references = [
-        "Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

@@ -11,8 +11,9 @@ import re
 from packaging import version
 
 from common.lib.helpers import UserInput, get_ffmpeg_version, convert_to_int
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility, ExecutableSibling
+from common.lib.outputs import Render
 from common.lib.exceptions import ProcessorInterruptedException, MediaSignatureException
 
 __author__ = "Stijn Peeters"
@@ -30,13 +31,23 @@ class VideoWallGenerator(BasicProcessor):
     or a collage of images and videos combined.
     """
     type = "video-wall"  # job type ID
-    category = "Visual"  # category
-    title = "Video wall"  # title displayed in UI
-    description = "Put all videos in a single combined video, side by side. Videos can be sorted and resized."
+    description = ProcessorDescription(
+        title="Create video wall",
+        category="Visual",
+        description="Combine the videos in the dataset into a single grid, playing side by side. Videos can be sorted by length or at random, resized to a chosen tile size, and arranged to a chosen aspect ratio.",
+        warnings=[
+            "Rendering can be slow and heavy for large datasets or long videos; set a length limit to keep run times reasonable.",
+            "Requires ffmpeg and ffprobe to be installed on the server.",
+        ],
+        icon="panorama",
+    )
     extension = "mp4"  # extension of result file, used internally and in UI
 
+    # a rendered video, no column table
+    output = Render("mp4", media="video")
+
     # Allow on video datasets when ffmpeg and ffprobe are available
-    compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
 
     # videos will be arranged and resized to fit these image wall dimensions
     # note that video aspect ratio may not allow for a precise fit

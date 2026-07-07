@@ -4,8 +4,9 @@ Generate accuracy, F1, recall, and precision scores for labels in two columns.
 
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, andify
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, cohen_kappa_score
@@ -21,12 +22,20 @@ class ClassificationEvaluation(BasicProcessor):
     Generate accuracy, F1, recall, and precision scores for labels in two columns.
     """
     type = "classification_evaluation"  # job type ID
-    category = "Statistics"  # category
-    title = "Classification evaluation"  # title displayed in UI
-    description = ("Use calculate evaluation metrics (accuracy, precision, recall, F1, "
-                   "and Cohen's Kappa) with labels from two columns. Produces overall and per-label metrics. "
-                   "Also supports multi-label values.")
+    description = ProcessorDescription(
+        title="Evaluate classification labels",
+        category="Statistics",
+        tags=["counts", "classify"],
+        description="Compare true and predicted labels in two columns and calculate accuracy, precision, recall, F1, and Cohen's Kappa. Produces overall and per-label metrics, and supports multiple labels per cell.",
+        info=[
+            "For multiple labels per cell, enable the multi-label option and separate the labels with commas.",
+        ],
+        icon="table-columns",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
+
+    # a derived table
+    output = Table()
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

@@ -5,6 +5,8 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from sklearn.cluster import KMeans
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility, ExecutableSibling
+from common.lib.outputs import Render
+from backend.lib.processor import ProcessorDescription
 import colorsys
 import copy
 
@@ -25,13 +27,19 @@ class ImageWallGenerator(VideoWallGenerator):
     images just as well as videos!
     """
     type = "image-wall"
-    category = "Visual"
-    title = "Image wall"
-    description = "Put all images in a single combined image, side by side. Images can be sorted and resized."
+    description = ProcessorDescription(
+        title="Image wall",
+        category="Visual",
+        tags=["needs ffmpeg"],
+        description="Combine all images into a single wall, placed side by side. Images can be sorted by dominant or average colour and resized to a set height. Uses ffmpeg to assemble the wall, and can take the first frame of each video when run on a video dataset.",
+        icon="panorama",
+    )
     extension = "png"
+    # a rendered image, no column table
+    output = Render("png")
 
     # Allow on image/video datasets when ffmpeg and ffprobe are available
-    compatibility = Compatibility(media_types={"video", "image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
+    compatibility = Compatibility(extensions={"zip"}, media_types={"video", "image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, required_settings={("video-downloader.ffmpeg_path", ExecutableSibling("ffmpeg", "ffprobe"))})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

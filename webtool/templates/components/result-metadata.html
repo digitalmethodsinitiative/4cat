@@ -1,69 +1,64 @@
+{% from "components/parameter.html" import format_parameter %}
+
 {% if dataset.is_private %}
-    <i class="fa fa-lock tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-private"></i> <span class="sr-only">This dataset is private and can only be viewed by your user and instance maintainers</span>
-    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-private">This dataset is private and can only be viewed by your user and instance maintainers</span>
+    {# Special case: dataset is private #}
+    {% call format_parameter(dataset, "Private", "This dataset is private and can only be viewed by your user and instance maintainers") %}
+        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+    {% endcall %}
 {% endif %}
 
 {% if dataset.is_expiring(config=__config) %}
-    <i class="fa fa-trash tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-expires"></i> <span class="sr-only">This dataset will be deleted automatically in the future</span>
-    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-expires">This dataset will be deleted on {{ dataset.is_expiring(config=__config)|datetime|safe }}</span>
+    {# Special case: dataset expires #}
+    {% call format_parameter(dataset, "Expires", "This dataset will automatically be deleted at this date") %}
+        {{ dataset.is_expiring(config=__config)|datetime|safe }}
+    {% endcall %}
 {% endif %}
 
+{# Special case: dataset is anonymised/pseudonymised #}
 {% if "pseudonymise" in dataset.parameters and (dataset.parameters.pseudonymise == True or dataset.parameters.pseudonymise == "pseudonymise") %}
-    <i class="fa fa-user-secret tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-pseudonymised"></i> <span class="sr-only">Author data has been pseudonymised</span>
-    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-pseudonymised">Author data has been pseudonymised</span>
+    {% call format_parameter(dataset, "Pseudonymised", "Author data has been pseudonymised") %}
+        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+    {% endcall %}
 {% elif "pseudonymise" in dataset.parameters and dataset.parameters.pseudonymise == "anonymise" %}
-    <i class="fa fa-ghost tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-anonymised"></i> <span class="sr-only">Author data has been anonymised</span>
-    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-anonymised">Author data has been anonymised</span>
+    {% call format_parameter(dataset, "Anonymised", "Author data has been anonymised") %}
+        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+    {% endcall %}
 {% endif %}
 
-{% for parameter in dataset.parameters %}
-    {% if parameter == "body_match" and dataset.parameters[parameter] %}
-        <span class="inline-label property-badge copy-to-clipboard tooltip-trigger" data-clipboard-value="{{ dataset.parameters.body_match }}" aria-controls="tooltip-clipboard">body</span>
-        <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters.body_match }}</span>
-    {% elif parameter == "subject_match" and dataset.parameters[parameter] %}
-        <span class="inline-label property-badge copy-to-clipboard tooltip-trigger" data-clipboard-value="{{ dataset.parameters.subject_match }}" aria-controls="tooltip-clipboard">subject</span>
-        <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters.subject_match }}</span>
-    {% elif parameter == "country_name" and dataset.parameters[parameter] != "all" %}
-        {# unused? or specific to 4chan data source? #}
-        <span class="inline-label property-badge">country</span>
-        <span class="inline-query">{{ dataset.parameters.country_name|join(', ') }}</span>
-    {% elif parameter.startswith("mapping-") %}
-        {# CSV column mapping #}
-        <span class="inline-label property-badge">{{ parameter|replace("mapping-", "column: ") }}</span>
-        <span class="inline-query has-more" data-max-length="75">
-        {% if dataset.parameters[parameter].startswith("__4cat") %}
-            <i>[{{ dataset.parameters[parameter]|replace("__4cat_", "")|replace("_", " ") }}]</i>
-        {% else %}
-            {{ dataset.parameters[parameter]|string }}
-        {% endif %}
-        </span>
-    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "next", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label", "expires-after", "email-complete", "original_timestamp", "session_id") %}
-        {# standard parameters, except those blacklisted #}
+{% for parameter in dataset.parameters if parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "next", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label", "expires-after", "email-complete", "original_timestamp", "session_id") and parameter[0:4] != "api_" %}
+    {% if parameter.startswith("mapping-") %}
+        {# Special case: CSV column mapping #}
+        {% set label %}{{ parameter|replace("mapping-", "column: ") }}{% endset %}
+        {% call format_parameter(dataset, label) %}
+            {% if dataset.parameters[parameter].startswith("__4cat") %}
+                <i>[{{ dataset.parameters[parameter]|replace("__4cat_", "")|replace("_", " ") }}]</i>
+            {% else %}
+                {{ dataset.parameters[parameter]|string }}
+            {% endif %}
+        {% endcall %}
+    {% elif dataset.parameters[parameter] %}
+        {# standard parameters, differentiate between booleans (get a checkmark) and other #}
         {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
-        <span class="inline-label property-badge copy-to-clipboard tooltip-trigger" data-clipboard-value="{{ dataset.parameters[parameter]|string }}" aria-controls="tooltip-clipboard">{{ parameter }}</span>
-        <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters[parameter]|string }}</span>
+            {% call format_parameter(dataset, parameter) %}
+                {{ dataset.parameters[parameter]|string }}
+            {% endcall %}
         {% elif dataset.parameters[parameter] %}
-        <span class="property-badge"><i class="fa fa-check" aria-hidden="true"></i> {{ parameter }}</span>
+            {% call format_parameter(dataset, parameter) %}
+                <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+            {% endcall %}
         {% endif %}
     {% endif %}
 {% endfor %}
 
-{% if dataset.parameters.search_scope == "full-threads" %}
-    <span class="property-badge second-tier">full thread</span>
-{% endif %}
-{% if dataset.parameters.search_scope == "random-sample" %}
-    <span class="property-badge second-tier">random sample={{ dataset.parameters.random_amount }}</span>
-{% endif %}
-{% if dataset.parameters.search_scope == "dense-threads" %}
-    <span class="property-badge second-tier">dense threads ({{ dataset.parameters.scope_density }}%/&gt; {{ dataset.parameters.scope_length }})</span>
-{% endif %}
-
 {% if (dataset.parameters.min_date and dataset.parameters.min_date > 0) or (dataset.parameters.max_date and dataset.parameters.max_date > 0) %}
     {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
-        <span class="property-badge">From</span>
-        <span class="inline-query">{{ dataset.parameters.min_date|datetime|safe }}</span>
-    {% endif %}{% if dataset.parameters.max_date and dataset.parameters.max_date > 0 %}
-    <span class="property-badge">Until</span>
-    <span class="inline-query">{{ dataset.parameters.max_date|datetime|safe }}</span>
-{% endif %}
+        {% call format_parameter(dataset, "From") %}
+            {{ dataset.parameters.min_date|datetime|safe }}
+        {% endcall %}
+    {% endif %}
+    {% if dataset.parameters.max_date and dataset.parameters.max_date > 0 %}
+        {% call format_parameter(dataset, "Until") %}
+            {{ dataset.parameters.max_date|datetime|safe }}
+        {% endcall %}
+    {% endif %}
 {% endif %}

@@ -1,0 +1,41 @@
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--brighten-12);
+    color: var(--bright);
+    align-content: center;
+    padding: var(--spacing-regular);
+    box-sizing: border-box;
+}
+
+.card-header h3, .card-header h1 {
+    font-family: Chivo, sans-serif;
+    font-weight: normal;
+    font-size: var(--font-h1);
+    flex-grow: 0;
+    padding: 0 var(--spacing-regular);
+    margin: 0;
+}
+
+.card-header nav {
+    position: relative;
+    align-items: center;
+    display: flex;
+    flex-grow: 1;
+    justify-content: space-between;
+}
+
+.card-header nav ul.dataset-fetch {
+    text-align: right;
+    column-gap: 0;
+    position: relative;
+}
+
+.card-header nav.actions {
+    justify-content: end;
+}
+
+.card-header > i {
+    font-size: calc(var(--font-h1) * 1.5);
+}

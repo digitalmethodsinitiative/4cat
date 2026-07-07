@@ -1,0 +1,89 @@
+.slideout {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background-color: var(--bright);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.slideout-root {
+    position: fixed;
+    top: var(--site-header-height);
+    z-index: var(--z-slideout);
+}
+
+body.slideout-open {
+    overflow: hidden;
+}
+
+.slideout-header {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-regular);
+    background: var(--panel-bg-0);
+    border-bottom: var(--stroke) solid var(--panel-bg-1);
+}
+
+.slideout-header.narrow {
+    padding: var(--spacing-small);
+    padding-left: var(--spacing-regular);
+    padding-right: var(--spacing-regular);
+}
+
+.slideout-header .slideout-header-title {
+    flex-grow: 1;
+}
+
+.slideout-header h1, .slideout-header h2, .slideout-header h3, .slideout-header h4  {
+    font-family: Chivo, sans-serif;
+    font-weight: normal;
+    margin: 0;
+    line-height: 1;
+}
+
+.slideout-header ul {
+    display: flex;
+    column-gap: var(--spacing-regular);
+    flex-grow: 1;
+    align-items: center;
+}
+
+.slideout-header.narrow ul {
+    column-gap: var(--spacing-small);
+}
+
+.slideout-contents {
+    position: relative;   /* nested .slideout resolves inset:0 against this,
+                             so it lands below this slideout's header */
+    flex: 1 1 auto;
+    min-height: 0;        /* allow shrinking below content height, so
+                             .slideout-body scrolls instead of overflowing */
+    overflow: hidden;     /* clips a nested slideout parked off-screen */
+    display: flex;
+    flex-direction: column;
+}
+
+.slideout-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: scroll;
+    overscroll-behavior: contain;
+    padding: var(--spacing-regular);
+}
+
+/* wraps a .slideout-body swap target so a loading spinner sibling can be
+   overlaid on it; must carry the flex sizing itself since it, not the body,
+   is now the flex child of the slideout column */
+.slideout-body-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}

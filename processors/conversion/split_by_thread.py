@@ -3,8 +3,9 @@ Split results by thread
 """
 import csv
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Archive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -21,10 +22,16 @@ class ThreadSplitter(BasicProcessor):
 	containing only the posts in that thread.
 	"""
 	type = "split-threads"  # job type ID
-	category = "Conversion" # category
-	title = "Split by thread"  # title displayed in UI
-	description = "Split the dataset per thread. The result is a ZIP archive containing separate CSV files."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Split by thread",
+		category="Conversion",
+		description="Split the dataset into one file per thread, keeping only the posts in each thread.",
+		icon="scissors",
+	)
 	extension = "zip"  # extension of result file, used internally and in UI
+
+	# a zip archive of data files
+	output = Archive()
 
 	# datasets with a thread structure (4chan/8chan, reddit, breitbart)
 	compatibility = Compatibility(datasources={"fourchan", "eightchan", "reddit", "breitbart"})

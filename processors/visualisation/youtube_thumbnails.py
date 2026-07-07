@@ -6,8 +6,9 @@ import urllib.request
 
 from apiclient.discovery import build
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_yt_compatible_ids, UserInput
 
@@ -25,10 +26,19 @@ class YouTubeThumbnails(BasicProcessor):
 	"""
 
 	type = "youtube-thumbnails"  # job type ID
-	category = "Cross-platform"  # category
-	title = "Download YouTube thumbnails"  # title displayed in UI
-	description = "Downloads the thumbnails of YouTube videos and stores it in a zip archive."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Download YouTube thumbnails",
+		category="Cross-platform",
+		tags=["download media", "api key required", "external service"],
+		description="Download the thumbnail image of each YouTube video in the dataset through the YouTube Data API.",
+		warnings=[
+			"This uses the YouTube Data API, which requires an API key and counts against your daily quota.",
+		],
+		icon="images",
+	)
 	extension = "zip"  # extension of result file, used internally and in UI
+	# a zip archive of media files
+	output = MediaArchive(media="image")
 	media_type = "image"  # media type of the result
 
 	# Allow processor on YouTube metadata sets

@@ -5,10 +5,11 @@ import shutil
 import json
 import datetime
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Archive
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -22,11 +23,18 @@ class ExportDatasets(BasicProcessor):
 	Export a dataset and all its children to a ZIP file
 	"""
 	type = "export-datasets"  # job type ID
-	category = "Conversion"  # category
-	title = "Export dataset and processor results"  # title displayed in UI
-	description = ("Creates a ZIP file containing the dataset and all processor results. This can also be uploaded to "
-				   "another 4CAT instance. Filters are not included. Results expire after one day.")  # description displayed in UI
+	description = ProcessorDescription(
+		title="Export dataset and processor results",
+		category="Conversion",
+		description="Create a ZIP file containing the dataset and all of its processor results. The ZIP can be uploaded to another 4CAT instance. Filters are not included.",
+		warnings=[
+			"This dataset expires after one day. You will need to run this processor again to get a new export file.",
+		],
+		icon="file-export",
+	)
 	extension = "zip"  # extension of result file, used internally and in UI
+	# a zip archive of data files
+	output = Archive()
 
 	# coarse map spec; is_compatible_with (below) is the runtime truth -- it also checks
 	# the requesting user owns the dataset (is_accessible_by), which is per-user, not shape

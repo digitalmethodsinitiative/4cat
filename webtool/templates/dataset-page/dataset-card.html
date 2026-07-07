@@ -1,0 +1,100 @@
+{#
+set: lite_header = True for a header included on another page as a clickable entry point
+                        into the dataset (e.g. dataset overview page)
+set: main_header = True for a header at the top of the analyiss tree (e.g. on the dataset
+                        result page)
+#}
+{% set deprecated = (dataset.type not in processors) %}
+<header class="card-header dataset-header{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}">
+    {% if dataset.get_own_processor().icon %}{% set icon = dataset.get_own_processor().icon %}{% endif %}
+    {% include 'components/module-icon.html' %}
+    <{% if main_header %}h1{% else %}h3{% endif %}>
+        {% if lite_header %}<a href="{{ url_for("dataset.show_result", key=dataset.key) }}">{% endif %}
+        {% if dataset.get_label(default=None) %}{{ dataset.get_label() }}{% else %}{{ processors[dataset.type].title if
+        not deprecated else "(Deprecated analysis) " + dataset.type }}{% endif %}
+        {% if lite_header %}</a>{% endif %}
+    </{% if main_header %}h1{% else %}h3{% endif %}>
+    {% if not lite_header %}
+        <nav class="quick-links">
+            <ul class="module-actions dataset-actions">
+                {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or
+            dataset.is_accessible_by(current_user, "owner")) %}
+                    <li class="button-secondary">
+                        <a href="#" x-tooltip="Edit dataset label">
+                            <i class="fa fa-fw fa-edit" aria-hidden="true"></i>
+                        </a>
+                    </li>
+                {% endif %}
+                <li class="button-secondary">
+                    <a href="#" x-tooltip="View documentation & references">
+                        <i class="fa fa-fw fa-mortar-board" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
+                <li class="button-secondary">
+                    <a href="{{ url_for('dataset.view_log', key=dataset.key) }}" x-tooltip="View dataset log">
+                        <i class="fa fa-fw fa-clipboard-list"
+                        aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% endif %}
+                {% if not deprecated %}
+                <li class="button-secondary">
+                    <a href="{{ dataset.get_version_url(" backend/processors/" + dataset.get_own_processor().filepath) }}"
+                        x-tooltip="View processor code">
+                        <i class="fab fa-fw fa-github" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+    <nav class="actions">
+        {% include "dataset-page/dropdown-button.html" %}
+    </nav>
+</header>
+
+<section class="card-content status">
+    <dl class="badge-list dataset-status">
+        <div class="status-badge-annotated status-{% if not dataset.is_finished() %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
+            <dt>{% if not dataset.is_finished() %}Processing{% elif dataset.num_rows %}Completed{% else %}No
+                results{% endif %}{% if dataset.num_rows %} ({{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %}){% endif %}</dt>
+            <dd>{{ dataset.get_status() or "Processor finished." }}</dd>
+        </div>
+    </dl>
+
+    {% if main_header %}
+    <dl class="badge-list">
+        {% if __user_config("ui.show_datasource") and dataset.parameters.datasource %}
+            <div>
+                <dt>Created from</dt>
+                <dd>
+                    {% if dataset.parameters.datasource in datasources %}
+                        <a href="{{ url_for("misc.data_overview", datasource=dataset.parameters.datasource) }}">
+                    {% endif %}
+                    {{ dataset.parameters.datasource }}
+                    {% if dataset.parameters.datasource in datasources %}
+                        </a>
+                    {% endif %}
+                </dd>
+            </div>
+        {% endif %}
+
+        <div>
+            <dt>Created</dt>
+            <dd>
+                {% if dataset.parameters.original_timestamp %}
+                    <i class="fa fa-file-import tooltip-trigger" aria-hidden="true"
+                       aria-controls="tooltip-{{ dataset.key }}-imported" x-tooltip="This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}."></i>
+                {% endif %}
+                {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
+            </dd>
+        </div>
+    </dl>
+        {% endif %}
+    {% if dataset.parameters|visible_parameters %}
+        <dl class="badge-list parameters with-overflow">
+            {% include "dataset-page/dataset-parameters.html" %}
+        </dl>
+    {% endif %}
+</section>

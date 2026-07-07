@@ -1,0 +1,64 @@
+{% from "components/parameter.html" import format_parameter %}
+
+{% if not dataset.key_parent and dataset.is_private %}
+    {# Special case: dataset is private #}
+    {% call format_parameter(dataset, "Private", "This dataset is private and can only be viewed by your user and instance maintainers") %}
+        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+    {% endcall %}
+{% endif %}
+
+{% if dataset.key_parent and dataset.is_expiring(config=__config) %}
+    {# Special case: dataset expires #}
+    {% call format_parameter(dataset, "Expires", "This dataset will automatically be deleted at this date") %}
+        {{ dataset.is_expiring(config=__config)|datetime|safe }}
+    {% endcall %}
+{% endif %}
+
+{# Special case: dataset is anonymised/pseudonymised #}
+{% if "pseudonymise" in dataset.parameters and (dataset.parameters.pseudonymise == True or dataset.parameters.pseudonymise == "pseudonymise") %}
+    {% call format_parameter(dataset, "Pseudonymised", "Author data has been pseudonymised") %}
+        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+    {% endcall %}
+{% elif "pseudonymise" in dataset.parameters and dataset.parameters.pseudonymise == "anonymise" %}
+    {% call format_parameter(dataset, "Anonymised", "Author data has been anonymised") %}
+        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+    {% endcall %}
+{% endif %}
+
+{% for parameter in dataset.parameters|visible_parameters if parameter not in ("min_date", "max_date") %}
+    {% if parameter.startswith("mapping-") %}
+        {# Special case: CSV column mapping #}
+        {% set label %}{{ parameter|replace("mapping-", "column: ") }}{% endset %}
+        {% call format_parameter(dataset, label) %}
+            {% if dataset.parameters[parameter].startswith("__4cat") %}
+                <i>[{{ dataset.parameters[parameter]|replace("__4cat_", "")|replace("_", " ") }}]</i>
+            {% else %}
+                {{ dataset.parameters[parameter]|string }}
+            {% endif %}
+        {% endcall %}
+    {% elif dataset.parameters[parameter] %}
+        {# standard parameters, differentiate between booleans (get a checkmark) and other #}
+        {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
+            {% call format_parameter(dataset, parameter) %}
+                {{ dataset.parameters[parameter]|string }}
+            {% endcall %}
+        {% elif dataset.parameters[parameter] %}
+            {% call format_parameter(dataset, parameter) %}
+                <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+            {% endcall %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+{% if (dataset.parameters.min_date and dataset.parameters.min_date > 0) or (dataset.parameters.max_date and dataset.parameters.max_date > 0) %}
+    {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
+        {% call format_parameter(dataset, "From") %}
+            {{ dataset.parameters.min_date|datetime|safe }}
+        {% endcall %}
+    {% endif %}
+    {% if dataset.parameters.max_date and dataset.parameters.max_date > 0 %}
+        {% call format_parameter(dataset, "Until") %}
+            {{ dataset.parameters.max_date|datetime|safe }}
+        {% endcall %}
+    {% endif %}
+{% endif %}

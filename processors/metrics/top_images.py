@@ -4,9 +4,10 @@ Extract most-used images from corpus
 import re
 
 from collections import Counter, OrderedDict
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -21,10 +22,16 @@ class TopImageCounter(BasicProcessor):
     Collects all images used in a data set, and sorts by most-used.
     """
     type = "top-images"  # job type ID
-    category = "Metrics"  # category
-    title = "Rank image URLs"  # title displayed in UI
-    description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Rank image URLs",
+        category="Metrics",
+        tags=["urls", "rank"],
+        description="Extract all image URLs from the dataset and rank them by how often they occur. Optionally save the extracted URLs back to the source dataset as annotations.",
+        icon="arrow-up-1-9",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
+    # a ranking table (date/item/value), so ranking visualisations can run on it
+    output = Table(columns={"date", "item", "value"})
 
     # top-level csv/ndjson datasets, except Telegram (which has its own image logic)
     compatibility = Compatibility(top_dataset_only=True, excluded_types={"telegram-search"}, extensions={"csv", "ndjson"}, preferred_followups=["image-downloader"])

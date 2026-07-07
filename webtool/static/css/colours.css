@@ -1,0 +1,22 @@
+/** --------------------- *
+      Colour definitions
+  * --------------------- */
+:root {
+    --accent: #CE411A;
+    --highlight: #FF5121;
+    --accent-alternate: #8EE51D;
+    --accent-okay: #26b018;
+    --accent-okay-light: #bee0ba;
+    --accent-warning: #ffcf13;
+    --accent-error: #ff2231;
+    --gray-dark: #DFDFDF;
+    --gray-darker: #6C6C6C;
+    --gray: #E9E9E9;
+    --gray-light: #EEE;
+    --contrast-bright: #F5F5F5;
+    --contrast-dark: #21202E;
+    --always-white: #FFF;
+    --text: #37373C;
+    --warning: var(--accent);
+
+}

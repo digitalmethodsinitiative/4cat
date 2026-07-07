@@ -1,24 +1,22 @@
 {% set navigation = namespace(current="") %}{% block breadcrumbs %}{% endblock %}{% block subbreadcrumbs %}{% endblock %}
 <!DOCTYPE html>
 <head>
-	<title>{% block title %}{{ __user_config("4cat.name_long") }}{% endblock %} &bull; {{ __user_config("4cat.name") }}</title>
+    <title>{% block title %}{{ __user_config("4cat.name_long") }}{% endblock %} &bull; {{ __user_config("4cat.name") }}</title>
 
-	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
-    <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
+    <script src="{{ url_for("static", filename="js/lib/htmx.min.js") }}"></script>
+    <script defer src="{{ url_for("static", filename="js/alpine.tooltip.js") }}"></script>
+    <script defer src="{{ url_for("static", filename="js/alpine.form.js") }}"></script>
+    <script defer src="{{ url_for("static", filename="js/lib/alpine.min.js") }}"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/fourcat-new.css')}}">
     <link href="{{ url_for("static", filename="fontawesome/css/fontawesome.css") }}" rel="stylesheet">
     <link href="{{ url_for("static", filename="fontawesome/css/regular.css") }}" rel="stylesheet">
     <link href="{{ url_for("static", filename="fontawesome/css/solid.css") }}" rel="stylesheet">
     <link href="{{ url_for("static", filename="fontawesome/css/brands.css") }}" rel="stylesheet">
-
-	<script type="text/javascript" src="{{url_for('static', filename='js/lib/jquery-3.6.3.min.js')}}"></script>
-    <script type="text/javascript" src="{{url_for('static', filename='js/lib/jquery-ui.min.js')}}"></script>
-	<script type="text/javascript" src="{{url_for('static', filename='js/lib/svg-pan-zoom.min.js')}}"></script>
-    <script type="text/javascript" src="{{url_for('static', filename='js/lib/zip.min.js')}}"></script>
-	<script type="text/javascript" src="{{url_for('static', filename='js/fourcat.js')}}"></script>
-
-    {% if navigation.current == "about" %}
-    <script type="text/javascript" src="{{url_for('static', filename='js/lib/bsky-embed.es.js')}}"></script>
-    {% endif %}
 
 	<!-- favicons -->
 	<link rel="shortcut icon" href="{{url_for('static', filename='img/favicon/favicon.ico')}}">
@@ -31,70 +29,84 @@
 
 	<meta charset='UTF-8'>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 </head>
-<body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}" data-url-root="{{ url_for("misc.show_frontpage") }}">
-	<h1>
-        <img src="{{ url_for("static", filename="img/4cat-heads.svg") }}">
-        <span><a href="{{ url_for('misc.show_frontpage') }}">{% block site_header %}{{ __user_config("4cat.name_long") }}{% endblock %}</a></span>
-    </h1>
-	<nav class="main-nav">
-		<ul>
-            {% if __user_config("privileges.can_create_dataset") %}
-			    <li{% if navigation.current == "create-dataset" %} class="current"{% endif %}><a href="{{ url_for('dataset.create_dataset') }}">Create dataset</a></li>
-            {% endif %}
-			<li{% if navigation.current == "dataset" %} class="current"{% endif %}><a href="{{ url_for('dataset.show_results') }}">Datasets</a></li>
-            <li{% if navigation.current == "datasources" %} class="current"{% endif %}><a href="{{ url_for('misc.data_overview') }}">Data sources</a></li>
-            {% if current_user.is_authenticated and not current_user.is_special and __user_config("privileges.can_create_api_token") %}
-                <li{% if navigation.current == "api-access" %} class="current"{% endif %}><a href="{{ url_for('user.show_access_tokens') }}">API Access</a></li>
-            {% endif %}
-            {% if __user_cp_access %}
-                <li{% if navigation.current == "control-panel" %} class="current"{% endif %}><a href="{{ url_for('admin.frontpage') }}">Control Panel</a></li>
-            {% endif %}
-            <li{% if navigation.current == "about" %} class="current"{% endif %}><a href="{{ url_for('misc.show_about') }}">About</a></li>
-            {% for page in __user_config("ui.nav_pages") %}
-            <li{% if navigation.current == page %} class="current"{% endif %}>
-                <a href="{{ url_for("misc.show_page", page=page) }}">{{ page|title }}</a>
-            </li>
-            {% endfor %}
-		</ul>
-    {% block subnavigation %}
-    {% endblock %}
-    {% for notification in __notifications %}
-        <div class="site-announcement">
-            {{ notification.notification|markdown|safe }}
-            {% if notification.notification_long %}
-                (<a href="{{ url_for("user.view_notification", notification_id=notification.id) }}">read more...</a>)
-            {% endif %}
-            {% if notification.allow_dismiss %}
-                <a href="{{ url_for("user.dismiss_notification", notification_id=notification.id) }}"><i class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Dismiss notification</span></a>
-            {% endif %}
+<body class="{% block body_class %}{% endblock %}"
+      x-data="{ slideoutActive: false }"
+      x-effect="document.body.style.overflow = slideoutActive ? 'clip' : ''"
+>
+<section id="header-container">
+<header id="site-header">
+    <section class="header-orientation">
+        <div class="site-title">
+            <a href="/">4CAT</a>
         </div>
-    {% endfor %}
-	</nav>
 
+        <nav class="main-navigation">
+            <ul>
+                {% if __user_config("privileges.can_create_dataset") %}
+                    <li class="emphasis"><a class="button-like" href="{{ url_for("dataset.create_dataset") }}">Create Dataset</a></li>
+                {% endif %}
+                <li><a href="{{ url_for("dataset.show_results") }}">My Datasets</a></li>
+                <li><a href="{{ url_for("misc.module_catalog") }}">Module catalog</a></li>
+                <li><a href="{{ url_for("misc.show_about") }}">About</a></li>
+                {% if __user_cp_access %}
+                    <li><a href="{{ url_for("admin.frontpage") }}">Control Panel</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+
+        <div class="user-panel">
+            <ul>
+		        {% if current_user.is_authenticated %}
+                    <li><a href="#">{{ current_user.get_name() }}</a></li>
+                    {% if not current_user.is_special %}
+                        <li><a href="{{ url_for("user.logout") }}">Log out</a></li>
+                    {% endif %}
+                {% else %}
+                    <li><a href="{{ url_for("user.show_login") }}">Log in</a></li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <nav class="breadcrumbs">
+            <ol itemscope itemtype="https://schema.org/BreadcrumbList">
+                <li itemprop="itemListElement" itemscope
+                        itemtype="https://schema.org/ListItem">
+                    <a itemprop="item" href="{{ url_for('misc.show_frontpage') }}">
+                        <span itemprop="name">Home</span></a>
+                    <meta itemprop="position" content="1"/>
+                </li>
+            {% for breadcrumb in breadcrumbs %}
+                <li itemprop="itemListElement" itemscope
+                        itemtype="https://schema.org/ListItem">
+                    <a itemprop="item" href="{{ breadcrumb.url }}">
+                        <span itemprop="name">{{ breadcrumb.label }}</span></a>
+                    <meta itemprop="position" content="1"/>
+                </li>
+            {% endfor %}
+            </ol>
+        </nav>
+    </section>
+</header>
+</section>
+
+<article id="main-content">
     {% block pre_body %}
     {% endblock %}
 
-	{% block body %}
+    {% block body %}
 		<p>Welcome.</p>
 	{% endblock %}
+</article>
 
-    <p role="tooltip" class="multiple" id="tooltip-clipboard" aria-hidden="true">Click to copy this value to the clipboard</p>
-
-	<footer class="fixed-footer">
-	<nav>
-		<ul class="flat">
-		{% if current_user.is_authenticated %}
-			<li>Logged in {% if not current_user.is_special %} as {{ current_user.get_name() }} (<a href="{{ url_for('user.logout') }}">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
-		{% endif %}
-		  <li><a href="{{ url_for('misc.show_page', page='citing') }}">How to cite</a></li>
-		  <li><a href="{{ url_for('misc.show_page', page='issues') }}">Help &amp; Bug Reports</a></li>
-		{% if current_user.is_authenticated %}
-          <li><abbr title="Version">v</abbr>{{ __version }}</li>
-        {% endif %}
-		  <li><a href="https://www.oilab.eu">OILab</a>, 2018 &ndash; {{ __datenow.year }}</li>
-		</ul>
-	</nav>
-	</footer>
+<script>
+    // keep --site-header-height in sync with the sticky site header, so
+    // overlays (e.g. slideout menus) can position themselves below it
+    const headerContainer = document.getElementById('header-container');
+    if (headerContainer) {
+        new ResizeObserver(() => {
+            document.documentElement.style.setProperty('--site-header-height', headerContainer.offsetHeight + 'px');
+        }).observe(headerContainer);
+    }
+</script>
 </body>

@@ -1,0 +1,44 @@
+<form action="{{ url_for('dataset.queue_processor_interactive', key=dataset.key, processor=processor.type) }}"
+      method="POST" class="processor-options-form"
+      x-data="userinputForm"
+      hx-post="{{ url_for('dataset.queue_processor_component', key=dataset.key) }}"
+      {% if dataset.key_parent %}
+      hx-target="#child-{{ dataset.key }}"
+      hx-swap="outerHTML"
+      {% else %}
+      hx-target="#dataset-tree"
+      hx-swap="beforeend"
+      {% endif %}
+      hx-indicator="#processor-options-spinner">
+
+    <h2>{{ processor.title }}</h2>
+    <p class="processor-description">{{ processor.description|safe }}</p>
+
+    <div id="processor-options-notice"></div>
+
+    <input type="hidden" name="key" value="{{ dataset.key }}">
+    <input type="hidden" name="processor" value="{{ processor.type }}">
+
+    {% set processor_options = processor.get_options(dataset, __config) %}
+    {% if processor_options %}
+        <fieldset class="processor-options userinput-form">
+            {% with options=processor_options %}
+                {% include "components/form-options.html" %}
+            {% endwith %}
+
+            {% if __user_config("ui.option_email") in ["both", "processor_only"] and __user_config("mail.server") %}
+                <div class="form-element combo-checkbox-input">
+                    <label>
+                        <input type="checkbox" name="email-complete" id="data-email-complete">
+                        Receive email on completion:
+                    </label>
+                    <input id="data-email-user" type="email" name="email-user" value="{{ current_user.get_name() }}">
+                </div>
+            {% endif %}
+        </fieldset>
+    {% endif %}
+
+    <button type="submit" class="button-like processor-queue-button submit-container">
+        <i class="fa fa-play" aria-hidden="true"></i> Run processor
+    </button>
+</form>

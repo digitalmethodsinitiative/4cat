@@ -9,6 +9,7 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
+from common.lib.outputs import Datasource
 
 
 class SearchVK(Search):
@@ -18,8 +19,8 @@ class SearchVK(Search):
     type = "vk-search"  # job ID
     title = "VK"
     extension = "ndjson"
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
+    output = Datasource()
+    icon = "brand-vk"
 
     previous_request = 0
     import_issues = True

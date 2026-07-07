@@ -2,8 +2,9 @@
 Change a dataset item to an annotation
 """
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import NoOutput
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -17,12 +18,17 @@ class ItemToAnnotation(BasicProcessor):
 	Change a dataset item to an annotation
     """
     type = "item-to-annotation"  # job type ID
-    category = "Conversion"  # category
     filter = True  # to indicate we're filtering the top dataset
-    title = "Convert items to annotations"  # title displayed in UI
-    description = ("Convert a regular dataset item to an annotation. This will show it as a separate value in the "
-                   "Explorer. Item values must be numbers or strings.")  # description displayed in UI
+    description = ProcessorDescription(
+        title="Convert items to annotations",
+        category="Conversion",
+        tags=["annotate", "convert format"],
+        description="Convert values from selected columns into annotations on the parent dataset, shown as separate values in the Explorer. Only values that are numbers or strings are converted.",
+        icon="tags",
+    )
     extension = "csv"
+    # writes annotations to its parent, no result file of its own
+    output = NoOutput()
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

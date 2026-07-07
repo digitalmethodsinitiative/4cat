@@ -1,0 +1,4 @@
+<label class="option-type-toggle">
+    <input type="checkbox" name="{{ field_name }}" id="forminput-{{ option }}"{% if settings.default %} checked{% endif %}>
+    {{ settings.help|markdown(True)|safe }}
+</label>

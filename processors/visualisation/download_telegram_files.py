@@ -13,8 +13,10 @@ import re
 from telethon import utils as telethon_utils
 
 from common.lib.helpers import UserInput
+from backend.lib.processor import ProcessorDescription
 from processors.visualisation.download_telegram_videos import TelegramVideoDownloader
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -33,14 +35,23 @@ class TelegramFileDownloader(TelegramVideoDownloader):
     that key off "video" or "image" will not pick this up.
     """
     type = "file-downloader-telegram"  # job type ID
-    category = "Visual"
-    title = "Download Telegram files"
-    description = ("Download audio, documents, stickers, and other non-video / non-photo file "
-                   "attachments and store in a ZIP file. Note that not every channel allows "
-                   "downloads; if 'chat_noforwards' is set in the source dataset, the channel "
-                   "owner has asked clients not to save its content and Telegram will refuse "
-                   "the file fetch.")
+    description = ProcessorDescription(
+        title="Download Telegram files",
+        category="Visual",
+        tags=["download media", "external service"],
+        description="Download the audio, documents, stickers, and other non-video, non-photo file attachments of Telegram messages and store them in a ZIP file.",
+        info=[
+            "A JSON metadata file recording the download outcome per message is included in the archive."
+        ],
+        warnings=[
+            "Files are fetched through the Telegram API, so this can take a long time and some files may fail to download.",
+            "Channels with 'Restrict Saving Content' enabled will refuse the download; those files cannot be retrieved.",
+        ],
+        icon="file",
+    )
     extension = "zip"
+    # a zip archive of media files
+    output = MediaArchive(media="file")
     media_type = "file"
 
     # coarse map spec; is_compatible_with (below) is the runtime truth (Telegram API creds).

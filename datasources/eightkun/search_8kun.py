@@ -4,6 +4,7 @@
 from datasources.fourchan.search_4chan import Search4Chan
 
 from common.lib.helpers import UserInput
+from common.lib.outputs import Datasource
 
 
 class Search8Kun(Search4Chan):
@@ -16,11 +17,10 @@ class Search8Kun(Search4Chan):
     most methods are inherited from there.
     """
     type = "eightkun-search"
+    output = Datasource()
     sphinx_index = "8kun"
     title = "8kun search"
     prefix = "8kun"
-    is_local = True  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
 
     config = {
         "eightkun-search.autoscrape": {

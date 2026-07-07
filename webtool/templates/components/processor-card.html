@@ -1,0 +1,51 @@
+<div class="module-card processor-card"
+     data-search="{{ (processor.title ~ ' ' ~ processor.description ~ ' ' ~ processor.category)|lower }}"
+     x-show="!processorSearch.trim() || $el.dataset.search.includes(processorSearch.toLowerCase().trim())">
+    <header class="card-header processor-header">{% if processor.icon %}{% set icon = processor.icon %}{% endif %}
+    {% include 'components/module-icon.html' %}
+    <h3>{{ processor.title }}</h3>
+        {% include 'components/processor-card-actions.html' %}
+        {# todo: change to tag list #}
+        {% set tags = processor.category %}
+        {% include 'components/module-tags.html' %}
+        <nav class="actions">
+            <button
+                class="button-like"
+                hx-get="{{ url_for('dataset.processor_options', key=dataset.key, processor=processor.type) }}"
+                hx-target="#processor-options"
+                hx-swap="innerHTML"
+                hx-indicator="#processor-options-spinner"
+                @click='selectedProcessorType = "{{ processor.type }}";
+                    htmx.ajax("GET", "{{ url_for('dataset.processor_metadata', key=dataset.key, processor=processor.type) }}", "#processor-metadata")'>Select</button>
+        </nav>
+    </header>
+    <section class="card-content">
+        <div class="processor-card-content">
+            <div class="card-description">
+                {{ processor.description }}
+            </div>
+            {% for warning in processor.warnings %}
+            <p class="processor-notice notice-warning"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> <span>{{ warning }}</span></p>
+            {% endfor %}
+            {% for info in processor.info %}
+            <p class="processor-notice notice-info"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> <span>{{ info }}</span></p>
+            {% endfor %}
+            <dl class="badge-list output-hints">
+                <div><dt>Output</dt><dd>{{ processor.extension }}</dd></div>
+                {% if processor.compatibility %}
+                <div class="followup-hints">
+                    <dt>Follow-ups</dt>
+                    {% if processor.compatibility.preferred_followups %}
+                        {% for followup in (processor.compatibility.preferred_followups|list)[:3] %}
+                            <a href="/processor-catalogue/{{ followup }}"><dd>{{ followup }}</dd></a>
+                        {% endfor %}
+                    {% endif %}
+                    <ul>
+                        <li class="button-secondary"><a href="/processor-catalogue/{{ processor.type }}">See all</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </section>
+</div>

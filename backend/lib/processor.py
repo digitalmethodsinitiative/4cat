@@ -1,6 +1,7 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+from dataclasses import dataclass, field
 import traceback
 import inspect as py_inspect
 import zipfile
@@ -30,6 +31,58 @@ csv.field_size_limit(1024 * 1024 * 1024)
 # Shared instance for the legacy default `compatibility`
 _DEFAULT_COMPATIBILITY = Compatibility(top_dataset_only=True)
 
+@dataclass
+class ProcessorDescription:
+    """
+    A processor's user-facing description: the information shown about it in
+    the web interface. A processor can declare one of these directly (as its
+    `description` attribute) or declare the individual attributes; either way
+    the result is available via `Processor.get_description()`.
+    """
+    title: str
+    description: str
+    category: str = ""
+    tags: typing.List[str] = field(default_factory=list)
+    references: typing.List[str] = field(default_factory=list)
+    info: typing.List[str] = field(default_factory=list)
+    warnings: typing.List[str] = field(default_factory=list)
+    icon: str = ""
+
+    def __post_init__(self):
+        # Normalise casing so processors don't have to: categories always start
+        # with a capital, tags are always lower-case. This keeps the two
+        # consistent however a processor happens to spell them.
+        if self.category:
+            self.category = self.category[0].upper() + self.category[1:]
+        self.tags = [tag.lower() for tag in self.tags]
+
+        # `category` is kept as the first entry of `tags` (as its lower-case
+        # tag form), so 4CAT can move to tags (which allow several per processor
+        # and can be filtered on) while `category` keeps working. Derive
+        # whichever is missing; when both are given, make sure the category
+        # leads the tag list.
+        category_tag = self.category.lower()
+        if self.category and not self.tags:
+            self.tags = [category_tag]
+        elif self.tags and not self.category:
+            self.category = self.tags[0][0].upper() + self.tags[0][1:]
+        elif self.category and self.tags:
+            self.tags = [category_tag] + [tag for tag in self.tags if tag != category_tag]
+
+
+class _DescriptionField:
+    """
+    Exposes one ProcessorDescription field as an attribute on the processor,
+    e.g. `Processor.title`. A plain `property` only runs on instance access;
+    this descriptor also runs on class access (`owner` is the class in both
+    cases), so `Processor.title` and `self.title` both return the value from
+    the processor's ProcessorDescription.
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def __get__(self, obj, owner):
+        return getattr(owner._processor_description, self.name)
 
 class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     """
@@ -81,11 +134,31 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: The file that is being processed
     source_file = None
 
-    #: Processor description, which will be displayed in the web interface
-    description = "No description available"
+    #: The processor's user-facing description (title, category, description
+    #: text and references) as a single object. A processor may set this
+    #: directly, or set the individual attributes below; both are normalised
+    #: into `_processor_description` when the class is defined.
+    _processor_description = ProcessorDescription(
+        title="", 
+        category="Other", 
+        description="No description available", 
+        references=[],
+        info=[],
+        warnings=[],
+        icon=""
+        )
 
-    #: Category identifier, used to group processors in the web interface
-    category = "Other"
+    #: Title, category, description text and references, read from the
+    #: processor's ProcessorDescription. Defined as descriptors so that both
+    #: `Processor.title` and `self.title` resolve to the stored value.
+    title = _DescriptionField("title")
+    category = _DescriptionField("category")
+    description = _DescriptionField("description")
+    references = _DescriptionField("references")
+    info = _DescriptionField("info")
+    warnings = _DescriptionField("warnings")
+    tags = _DescriptionField("tags")
+    icon = _DescriptionField("icon")
 
     #: Extension of the file created by the processor
     extension = "csv"
@@ -992,6 +1065,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 pass
 
     @classmethod
+    def get_repo_link(cls, config):
+        """
+        Get a link to the processor's source code repository
+
+        :param ConfigManager config:  Configuration reader
+        :return str:  URL to the processor's source code repository
+        """
+        repo_url = config.get("4cat.github_url")
+        path = cls.filepath.replace("\\", "/").lstrip("/")
+        return f"{repo_url.rstrip('/')}/blob/master/{path}"
+
+    @classmethod
     def is_compatible_with(cls, module=None, config=None):
         """
         Determine whether this processor can run on a given module.
@@ -1133,6 +1218,58 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if cls.compatibility is not None and processor_type in cls.compatibility.excluded_followups:
             return True
         return False
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Normalise a processor's description when its class is defined.
+
+        A processor may declare its description either as a ProcessorDescription
+        object (assigned to `description`) or as the individual attributes
+        (title, category, description, references, info, warnings, icon, tags).
+        Either way it is folded into a single `_processor_description` object
+        here, and the raw attributes are removed so the descriptors on
+        BasicProcessor provide access to them.
+        """
+        super().__init_subclass__(**kwargs)
+
+        # the description inherited from the nearest ancestor (cls has none yet)
+        inherited = getattr(cls, "_processor_description", None)
+
+        # read the raw class-body value, bypassing the descriptor
+        declared = cls.__dict__.get("description")
+        if isinstance(declared, ProcessorDescription):
+            description = declared
+        else:
+            # build from the flat attributes, falling back to inherited values
+            # so a legacy subclass keeps anything an ancestor set
+            description = ProcessorDescription(
+                title=cls.__dict__.get("title", inherited.title),
+                category=cls.__dict__.get("category", inherited.category),
+                description=cls.__dict__.get("description", inherited.description),
+                references=list(cls.__dict__.get("references", inherited.references)),
+                info=list(cls.__dict__.get("info", inherited.info)),
+                warnings=list(cls.__dict__.get("warnings", inherited.warnings)),
+                # tags default to this class's category (see __post_init__), so
+                # don't inherit them — re-derive from the resolved category
+                tags=list(cls.__dict__.get("tags", [])),
+                icon=cls.__dict__.get("icon", inherited.icon),   
+            )
+
+        # remove raw attributes so the inherited descriptors govern access
+        for name in ("title", "category", "description", "references", "info", "warnings", "tags", "icon"):
+            if name in cls.__dict__:
+                delattr(cls, name)
+
+        cls._processor_description = description
+
+    @classmethod
+    def get_description(cls):
+        """
+        Get the processor's user-facing description
+
+        :return ProcessorDescription:  Description of this processor
+        """
+        return cls._processor_description
 
     @abc.abstractmethod
     def process(self):

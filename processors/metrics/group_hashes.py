@@ -2,8 +2,9 @@ import csv
 import json
 import imagehash
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, normalize_crhash_components
 
@@ -17,10 +18,16 @@ class HashGrouper(BasicProcessor):
     Group hashes
     """
     type = "image-hash-grouper"  # job type ID
-    category = "Conversion"  # category
-    title = "Group similar hashes"  # title displayed in UI
-    description = "Calculate groups of similar hashes from a CSV file."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Group similar hashes",
+        category="Conversion",
+        tags=["similarity", "grouping"],
+        description="Group image hashes into clusters of visually similar images, based on a similarity threshold you set. Runs on the output of the image hasher and rewrites the 'group' column with the new clusters.",
+        icon="hashtag",
+    )
     extension = "csv"
+    # a derived table
+    output = Table()
 
     # Allow processor on image-hasher output (could also work on any CSV with the right fields)
     compatibility = Compatibility(types={"image-hasher"})

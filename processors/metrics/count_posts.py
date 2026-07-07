@@ -3,8 +3,9 @@ Collapse post bodies into one long string
 """
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -17,10 +18,19 @@ class CountPosts(BasicProcessor):
     """
 
     type = "count-posts"  # job type ID
-    category = "Metrics"  # category
-    title = "Count items per date"  # title displayed in UI
-    description = "Counts how many items are in the dataset per date (or overall)."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Count items per date",
+        category="Metrics",
+        tags=["counts", "time-series"],
+        description="Count how many items are in the dataset, grouped by date or counted overall.",
+        info=[
+            "Enable 'Include dates with zero items' to keep the timeline continuous when some dates have no data.",
+        ],
+        icon="list-ol",
+    )
     extension = "csv"  # extension of result file, used internally and in UI
+    # a ranking table (date/item/value), so ranking visualisations can run on it
+    output = Table(columns={"date", "item", "value"})
 
     # Allow on top-level CSV/NDJSON datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"}, preferred_followups=["histogram"])

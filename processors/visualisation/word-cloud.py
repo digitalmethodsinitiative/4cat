@@ -5,8 +5,9 @@ Make word clouds of columns with text and values
 
 from wordcloud import WordCloud
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -20,10 +21,18 @@ class MakeWordCloud(BasicProcessor):
 	Generate activity histogram
 	"""
 	type = "wordcloud"  # job type ID
-	category = "Visual"  # category
-	title = "Word cloud"  # title displayed in UI
-	description = "Generates a word cloud with words sized on occurrence."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Create word cloud",
+		category="Visual",
+		description="Draw a word cloud from a word column and a count column, sizing each word by its count. Optionally lower-case the words and limit how many are shown.",
+		info=[
+			"This works best on the output of a word frequency processor, such as tf-idf, collocations, or word counts.",
+		],
+		icon="cloud",
+	)
 	extension = "svg"
+	# a rendered image, no column table
+	output = Render()
 
 	# Allow processor on rankable items
 	compatibility = Compatibility(types={

@@ -4,10 +4,11 @@ Generate ranking per post attribute
 import colorsys
 import csv
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.helpers import UserInput, get_4cat_canvas
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 
 from svgwrite.shapes import Rect
 from svgwrite.path import Path
@@ -34,20 +35,22 @@ class RankFlowRenderer(BasicProcessor):
     """
 
     type = "render-rankflow"  # job type ID
-    category = "Visual"  # category
-    title = "RankFlow diagram"  # title displayed in UI
-    description = (
-        "Create a diagram showing changes in prevalence over time for ranked lists (following "
-        "Bernhard Rieder's RankFlow."
-    )  # description displayed in UI
+    description = ProcessorDescription(
+        title="RankFlow diagram",
+        category="Visual",
+        tags=["rank", "time-series", "chart"],
+        description="Create an interactive RankFlow diagram showing how the rank and prevalence of items change over time. Each period is drawn as a column of ranked boxes, connected by flows to the same items in adjacent periods. Boxes can be coloured and sized by value or by change between periods.",
+        references=[
+            "[Rieder, B. RankFlow. *The Politics of Systems*](https://labs.polsys.net/tools/rankflow/)",
+        ],
+        icon="shuffle",
+    )
     extension = "svg"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render()
 
     # rankable datasets, including multi-column rankings (e.g. top vectors per interval)
     compatibility = Compatibility(rankable=True)
-
-    references = [
-        "[Rieder, B. RankFlow. *The Politics of Systems*](https://labs.polsys.net/tools/rankflow/)"
-    ]
 
     # 25-colour palette via https://medialab.github.io/iwanthue/
     palette = [

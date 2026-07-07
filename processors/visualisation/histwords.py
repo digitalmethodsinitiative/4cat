@@ -11,8 +11,9 @@ from sklearn.decomposition import PCA, TruncatedSVD
 
 from gensim.models import KeyedVectors
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas, convert_to_float
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -37,21 +38,27 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     dimensions, plots them, and highlights given words and their neighbours.
     """
     type = "histwords-vectspace"  # job type ID
-    category = "Visual"  # category
-    title = "Chart diachronic nearest neighbours"  # title displayed in UI
-    description = "Visualise nearest neighbours of a given query across all models and show the closest neighbours per model in one combined graph. Based on the 'HistWords' algorithm by Hamilton et al."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Chart diachronic nearest neighbours",
+        category="Visual",
+        tags=["chart", "similarity", "time-series"],
+        description="Chart how the nearest neighbours of a query word shift across a set of word embedding models. Reduces the word vectors to two dimensions with t-SNE, PCA, or truncated SVD, plots the neighbours per model, and links each query word's positions across models. Based on the 'HistWords' algorithm by Hamilton et al.",
+        references=[
+            "HistWords: [Hamilton, W. L., Leskovec, J., & Jurafsky, D. (2016). Diachronic word embeddings reveal statistical laws of semantic change. *arXiv preprint** arXiv:1605.09096.](https://arxiv.org/pdf/1605.09096.pdf)",
+            "HistWords: [William L. Hamilton, Jure Leskovec, and Dan Jurafsky. HistWords: Word Embeddings for Historical Text](https://nlp.stanford.edu/projects/histwords/)",
+            "t-SNE: [Maaten, L. V. D., & Hinton, G. (2008). Visualizing data using t-SNE. *Journal of machine learning research*, 9(Nov), 2579-2605.](https://www.jmlr.org/papers/v9/vandermaaten08a.html)",
+            "PCA: [Joliffe, I. T., & Morgan, B. J. T. (1992). Principal component analysis and exploratory factor analysis. *Statistical methods in medical research*, 1(1), 69-95.](https://journals.sagepub.com/doi/abs/10.1177/096228029200100105)",
+            "Truncated SVD: [Manning, C. D., Raghavan, P., & Schütze, H. (2008). Matrix decompositions and latent semantic indexing. *Introduction to information retrieval*, 403-417.](http://nlp.stanford.edu/IR-book/pdf/18lsi.pdf)",
+        ],
+        icon="diagram-project",
+    )
     extension = "svg"  # extension of result file, used internally and in UI
+
+    # a rendered image, no column table
+    output = Render()
 
     # Allow processor on word embedding models
     compatibility = Compatibility(types={"generate-embeddings"})
-
-    references = [
-        "HistWords: [Hamilton, W. L., Leskovec, J., & Jurafsky, D. (2016). Diachronic word embeddings reveal statistical laws of semantic change. *arXiv preprint** arXiv:1605.09096.](https://arxiv.org/pdf/1605.09096.pdf)",
-        "HistWords: [William L. Hamilton, Jure Leskovec, and Dan Jurafsky. HistWords: Word Embeddings for Historical Text](https://nlp.stanford.edu/projects/histwords/)",
-        "t-SNE: [Maaten, L. V. D., & Hinton, G. (2008). Visualizing data using t-SNE. *Journal of machine learning research*, 9(Nov), 2579-2605.](https://www.jmlr.org/papers/v9/vandermaaten08a.html)",
-        "PCA: [Joliffe, I. T., & Morgan, B. J. T. (1992). Principal component analysis and exploratory factor analysis. *Statistical methods in medical research*, 1(1), 69-95.](https://journals.sagepub.com/doi/abs/10.1177/096228029200100105)",
-        "Truncated SVD: [Manning, C. D., Raghavan, P., & Schütze, H. (2008). Matrix decompositions and latent semantic indexing. *Introduction to information retrieval*, 403-417.](http://nlp.stanford.edu/IR-book/pdf/18lsi.pdf)"
-    ]
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

@@ -4,6 +4,7 @@ Twitter APIv2 hashtag statistics
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -20,6 +21,9 @@ class TwitterIdenticalTweets(TwitterStatsBase):
     title = "Identical tweet frequency"  # title displayed in UI
     description = "Groups tweets by text and counts the number of times they have been (re)tweeted indentically."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    # a derived table
+    output = Table()
 
     # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
     compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})

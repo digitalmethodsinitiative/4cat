@@ -1,0 +1,12 @@
+.result-list > ol > li {
+    margin-bottom: var(--spacing-regular);
+}
+
+.result-list h1 {
+    color: var(--bright);
+    font-size: var(--font-h0);
+}
+
+.result-list nav.tabs {
+    margin: var(--spacing-regular) auto;
+}

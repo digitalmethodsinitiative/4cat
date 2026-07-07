@@ -1,8 +1,9 @@
 """
 Google Vision API co-label network
 """
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Network
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -19,12 +20,16 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
     Google Vision API co-label network
     """
     type = "vision-bipartite-network"  # job type ID
-    category = "Networks"  # category
-    title = "Google Vision bipartite annotation network"  # title displayed in UI
-    description = "Create a GEXF network file comprised of all annotations returned by the Google Vision API. Labels " \
-                  "returned by the API, and image file names, are nodes. Edges are created between file names and " \
-                  "labels if the label occurs for the image with that file name."
+    description = ProcessorDescription(
+        title="Google Vision bipartite annotation network",
+        category="Networks",
+        tags=["network"],
+        description="Create a network from annotations returned by the Google Vision API. Image file names and the labels returned for them are nodes. An edge connects a file name to a label when that label occurs for that image.",
+        icon="circle-nodes",
+    )
     extension = "gexf"  # extension of result file, used internally and in UI
+    # a graph file, no column table
+    output = Network()
 
     # Allow processor to run on Google Vision API data
     compatibility = Compatibility(types={"google-vision-api"})

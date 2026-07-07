@@ -11,6 +11,7 @@ import pymysql
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
+from common.lib.outputs import Datasource
 from backend.lib.database_mysql import MySQLDatabase
 
 
@@ -23,7 +24,9 @@ class SearchWithinTCATBinsV2(Search):
     """
     type = "dmi-tcatv2-search"  # job ID
     extension = "csv"
+    output = Datasource()
     title = "TCAT Search (SQL)"
+    icon = "brand-twitter"
 
     config = {
         "dmi-tcatv2-search.database_instances": {

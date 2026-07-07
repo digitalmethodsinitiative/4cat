@@ -5,8 +5,9 @@ import re
 import csv
 
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -20,11 +21,24 @@ class ConvertText(BasicProcessor):
     Retain only posts matching a given lexicon
     """
     type = "convert-text"  # job type ID
-    category = "Conversion"  # category
-    title = "Replace text"  # title displayed in UI
-    description = ("Find text in selected fields, replace parts of it, and write to a new dataset. Converted texts can "
-                   "also be added to the original dataset as annotations.")  # description displayed in UI
+    description = ProcessorDescription(
+        title="Replace text",
+        category="Conversion",
+        tags=["clean text"],
+        description="Find text in selected columns, replace matching parts, and write the result to a new dataset.",
+        info=[
+            "Matches can be plain text or a regular expression.", 
+            "Replaced text can also be added back to the original dataset as annotations."
+        ],
+        warnings=[
+            "Reading a single JSON file will use a lot of memory for large datasets. You may wish to download the dataset as a CSV or NDJSON instead."
+        ],
+        icon="arrows-turn-to-dots",
+    )
     extension = "csv"
+
+    # a derived table
+    output = Table()
 
     # Allow on CSV/NDJSON datasets
     compatibility = Compatibility(extensions={"csv", "ndjson"})

@@ -6,10 +6,11 @@ import emoji
 import jieba
 import re
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from common.lib.exceptions import QueryParametersException
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Render
 
 from nltk.tokenize import word_tokenize, TweetTokenizer
 
@@ -194,19 +195,26 @@ class MakeWordtree(BasicProcessor):
     """
 
     type = "word-trees"  # job type ID
-    category = "Visual"  # category
-    title = "Word tree"  # title displayed in UI
-    description = "Generates a word tree for a given query, a \"graphical version of the traditional 'keyword-in-context' method\" (Wattenberg & Viégas, 2008)."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Word tree",
+        category="Visual",
+        description="Build a word tree around a search phrase, a graphical version of the keyword-in-context method (Wattenberg & Viégas, 2008). Words that follow or precede the phrase branch out into a tree, sized by how often they occur. You can set the phrase, window size, tokeniser, and how many branches to show per level.",
+        references=[
+            "Wattenberg, M., & Viégas, F. B. (2008). [The Word Tree, an Interactive Visual Concordance](https://doi.org/10.1109/TVCG.2008.172). IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228.",
+            "[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
+            "[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
+        ],
+        info=[
+            "Use a wildcard in the root phrase (for example 'politic*') to match several words at once, at the cost of a slower run.",
+        ],
+        icon="tree",
+    )
     extension = "svg"  # extension of result file, used internally and in UI
+    # a rendered image, no column table
+    output = Render()
 
     # any csv or ndjson dataset
     compatibility = Compatibility(extensions={"csv", "ndjson"})
-
-    references = [
-        "Wattenberg, M., & Viégas, F. B. (2008). [The Word Tree, an Interactive Visual Concordance](https://doi.org/10.1109/TVCG.2008.172). IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228.",
-        "[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
-        "[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
-    ]
 
     # can be changed
     FONT_SIZE = 14  # in px

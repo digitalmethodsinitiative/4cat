@@ -1,0 +1,28 @@
+{% set section_visible = "!processorSearch.trim() || [...$el.querySelectorAll('.processor-card')].some(c => c.dataset.search.includes(processorSearch.toLowerCase().trim()))" %}
+{% if preferred_processors %}
+    <div class="processor-grid-section" x-show="{{ section_visible }}">
+        <h2 class="processor-grid-header">Special follow-ups</h2>
+        <div class="module-grid">
+            {% for processor_id, processor in preferred_processors.items() %}
+                {% include "components/processor-card.html" %}
+            {% endfor %}
+        </div>
+    </div>
+    <div class="processor-grid-section" x-show="{{ section_visible }}">
+        <h2 class="processor-grid-header">All processors</h2>
+        <div class="module-grid">
+            {% for processor_id, processor in processors.items() %}
+                {% include "components/processor-card.html" %}
+            {% endfor %}
+        </div>
+    </div>
+{% else %}
+    <div class="module-grid">
+        {% for processor_id, processor in processors.items() %}
+            {% include "components/processor-card.html" %}
+        {% endfor %}
+    </div>
+{% endif %}
+<p class="no-results" style="display: none" x-show="noProcessorResults()">
+    No processors match <strong x-text="processorSearch"></strong>.
+</p>

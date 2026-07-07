@@ -1,0 +1,21 @@
+{# Options form for the selected data source, swapped into the create-dataset
+   page (via htmx) when a data source is selected. `options_html` contains the
+   pre-rendered form options (see dataset.datasource_form_component). #}
+<fieldset class="query-options userinput-form" data-datasource="{{ datasource_id }}">
+    {{ options_html|safe }}
+
+    {# Common dataset options (pseudonymisation, privacy, e-mail, label),
+       rendered through the same user-input components as the data source's own
+       options. See webtool.lib.helpers.common_dataset_options. #}
+    {% with options=common_options %}
+        {% include "components/form-options.html" %}
+    {% endwith %}
+</fieldset>
+
+<div id="query-form-notice"></div>
+
+<div class="submit-container">
+    <button type="submit" class="button-like" id="datasource-form-submit">
+        <i class="fa fa-play" aria-hidden="true"></i> Create dataset
+    </button>
+</div>

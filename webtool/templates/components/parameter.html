@@ -1,0 +1,8 @@
+{% macro format_parameter(dataset, label, tooltip=None) %}
+<div{% if tooltip %} x-tooltip="{{ tooltip }}"{% endif %}>
+    <dt class="copy-to-clipboard">{{ label|replace('-', ' ')|replace('_', ' ') }}</dt>
+    <dd class="has-more" data-max-length="75">
+        {{ caller() }}
+    </dd>
+</div>
+{% endmacro %}

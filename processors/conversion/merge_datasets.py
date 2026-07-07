@@ -4,12 +4,13 @@ Merge one dataset with another (creating a new dataset)
 import csv
 import json
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, DataSetException
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Filter
 import ural
 
 __author__ = "Stijn Peeters"
@@ -25,10 +26,18 @@ class DatasetMerger(BasicProcessor):
     Merge two datasets
     """
     type = "merge-datasets"  # job type ID
-    category = "Conversion"  # category
-    title = "Merge datasets"  # title displayed in UI
-    description = "Merge this dataset with other datasets of the same format. A new dataset is " \
-                  "created containing a combination of items from the original datasets."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Merge datasets",
+        category="Conversion",
+        tags=["combine data"],
+        description="Combine this dataset with other datasets of the same format into a new dataset. Provide the URLs of the datasets to merge, and choose whether to keep or remove items that share an item ID across datasets.",
+        warnings=[
+            "All datasets must have the same format and columns, or the merge fails.",
+        ],
+        icon="arrows-to-dot",
+    )
+    # keeps the (primary parent's) shape; the merged datasets share its format
+    output = Filter()
 
     # a collector's csv or ndjson output
     compatibility = Compatibility(is_collector=True, extensions={"csv", "ndjson"})

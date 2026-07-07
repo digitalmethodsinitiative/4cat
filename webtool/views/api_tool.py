@@ -290,17 +290,11 @@ def datasource_form(datasource_id):
 
 	# Status labels to display in query form
 	labels = []
-	is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
-	is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
-
-	labels.append(is_local)
-	if is_static:
-		labels.append("static")
 	status = worker_class.get_status()
 	if status:
 		labels.append(status)
 
-	form = render_template("components/create-dataset-option.html", options=worker_options, labels=labels)
+	form = render_template("components/form-options.html", options=worker_options)
 	html = render_template_string(form, datasource_id=datasource_id, datasource=datasource)
 
 	return jsonify({
@@ -462,17 +456,21 @@ def queue_dataset():
 			# ask the user for more input by returning a HTML snippet
 			# containing form fields to be added to the form before it is
 			# re-submitted
-			form = render_template("components/create-dataset-option.html", options=e.config)
+			form = render_template("components/form-options.html", options=e.config)
 			return jsonify({"status": "extra-form", "html": form})
 
 		except QueryParametersException as e:
 			# parameters need amending
-			return jsonify({"status": "error", "message": "Cannot create a dataset with these parameters. %s" % e})
+			message = "Cannot create a dataset with these parameters. %s" % e
+			return jsonify({"status": "error", "message": message,
+							"html": render_template("components/form-notice.html", message=message)})
 
 		except QueryNeedsExplicitConfirmationException as e:
 			# parameters are OK, but we need to be sure the user wants this
 			# (because it will e.g. take a long time)
-			return jsonify({"status": "confirm", "message": str(e)})
+			return jsonify({"status": "confirm", "message": str(e),
+							"html": render_template("components/form-notice.html", message=str(e),
+													needs_confirmation=True)})
 
 	else:
 		raise NotImplementedError("Data sources MUST sanitise input values with validate_query")
@@ -538,7 +536,8 @@ def queue_dataset():
 	new_job = Job.get_by_remote_ID(dataset.key, g.db)
 	dataset.link_job(new_job)
 
-	return jsonify({"status": "success", "message": "", "key": dataset.key})
+	return jsonify({"status": "success", "message": "", "key": dataset.key,
+					"url": url_for("dataset.show_result", key=dataset.key)})
 
 
 @component.route('/api/check-query/')
@@ -1235,17 +1234,12 @@ def queue_processor(key=None, processor=None):
 		# ask the user for more input by returning a HTML snippet
 		# containing form fields to be added to the form before it is
 		# re-submitted
-		form = "\n".join(
-			[
-				render_template(
-					"components/processor-option.html",
-					option_override={k: v},
-					option=k,
-					dataset=dataset,
-					processor=processor_worker,
-				)
-				for k, v in e.config.items()
-			]
+		form = render_template(
+			"components/form-options.html",
+			options=e.config,
+			delegated=True,
+			dataset=dataset,
+			processor=processor_worker,
 		)
 		return jsonify({"status": "extra-form", "html": form})
 
