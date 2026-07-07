@@ -273,26 +273,3 @@ input[type=search]:focus {
 .search-box input[type="search"] {
     padding-left: calc(var(--spacing-small) * 2 + 1em);
 }
-
-/* Info, warning and validation boxes */
-.notice {
-    padding: var(--spacing-regular);
-}
-.notice-info {
-    background: var(--blue-light);
-    color: var(--blue);
-}
-.notice-info i {
-    color: var(--blue);
-}
-.notice-warning {
-    background: var(--yellow-light);
-    color: var(--yellow)
-}
-.notice-warning i {
-    color: var(--yellow);
-}
-.notice-success {
-    background: var(--green-light);
-    color: var(--green);
-}

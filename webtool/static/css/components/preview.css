@@ -1,0 +1,110 @@
+[x-cloak] { display: none !important; }
+
+/* Preview body embedded in a processor-preview box (components/preview.html).
+   The header/controls live on .processor-preview-box; see
+   components/processor-preview-tree.css. */
+.dataset-preview-body {
+    max-height: 60vh;
+    overflow: auto;
+    padding: var(--spacing-regular);
+}
+
+.dataset-preview-body .preview-content {
+    overflow-x: auto;
+}
+
+.dataset-preview-body pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.dataset-preview-body .image-preview-container img,
+.dataset-preview-body .image-preview-container video {
+    max-width: 100%;
+    height: auto;
+}
+
+/* iframe-based previews (arbitrary HTML, interactive GEXF) fill the body */
+.dataset-preview-body:has(.dataset-preview-frame) {
+    padding: 0;
+}
+
+.dataset-preview-frame {
+    display: block;
+    width: 100%;
+    height: 60vh;
+    border: none;
+}
+
+/* Media archive carousel */
+.media-carousel {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: var(--spacing-regular);
+}
+
+.media-carousel-track {
+    min-width: 0;
+    text-align: center;
+}
+
+.media-carousel-slide {
+    margin: 0;
+}
+
+.media-carousel-slide .media-image,
+.media-carousel-slide .media-video {
+    max-width: 100%;
+    max-height: 50vh;
+    height: auto;
+    object-fit: contain;
+}
+
+.media-carousel-slide .media-audio {
+    width: 100%;
+}
+
+.media-carousel-caption {
+    margin-top: var(--spacing-small);
+    font-size: var(--font-normal);
+    color: var(--text-grey);
+    overflow-wrap: anywhere;
+}
+
+.media-carousel-nav {
+    flex: 0 0 auto;
+}
+
+.media-carousel-status {
+    grid-column: 2;
+    margin: var(--spacing-small) 0 0;
+    text-align: center;
+    color: var(--text-grey);
+}
+
+.dataset-preview--big .media-carousel-slide .media-image,
+.dataset-preview--big .media-carousel-slide .media-video {
+    max-height: 80vh;
+}
+
+/* Full-screen "pop out" mode */
+.dataset-preview--big {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    border: none;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.dataset-preview--big .dataset-preview-body {
+    flex: 1 1 auto;
+    max-height: none;
+}
+
+.dataset-preview--big .dataset-preview-frame {
+    height: 100%;
+}

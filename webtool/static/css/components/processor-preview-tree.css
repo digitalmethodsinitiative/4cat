@@ -1,0 +1,103 @@
+.processor-preview-tree {
+    flex: 0 0 auto;
+    max-height: 50vh;
+    overflow: scroll;
+    padding: var(--spacing-regular);
+    background: var(--semidark);
+    border-bottom: var(--stroke) solid var(--panel-bg-1);
+    color: var(--bright);
+    font-size: var(--font-normal);
+}
+
+.processor-preview-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.processor-preview-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-small);
+}
+
+.processor-preview-tree .processor-preview-box {
+    padding: var(--spacing-tiny) var(--spacing-regular);
+    border: var(--stroke) solid var(--bright);
+}
+
+.processor-preview-tree .processor-preview-children {
+    margin-left: var(--spacing-regular);
+    padding-left: var(--spacing-regular);
+    border-left: var(--stroke-heavy) solid var(--panel-bg-2);
+}
+
+/* header row: title stretches, caret + pop-out controls sit on the right */
+.processor-preview-box-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    column-gap: var(--spacing-small);
+}
+
+.processor-preview-box-header .processor-preview-label {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.processor-preview-controls {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-tiny);
+}
+
+.processor-preview-control {
+    padding: 0 var(--spacing-tiny);
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.processor-preview-label {
+    display: block;
+    padding: var(--spacing-tiny) 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+}
+
+.processor-preview-label.is-current {
+    font-weight: bold;
+}
+
+.processor-preview-new-hint {
+    background-color: var(--bright);
+    color: var(--dark);
+}
+
+.processor-preview-new-hint i {
+    color: var(--fourcat-accent);
+}
+
+/* the preview loads inside the box, beneath the title */
+.processor-preview-box .dataset-preview-body {
+    margin-top: var(--spacing-small);
+}
+
+.processor-preview-box.dataset-preview--big {
+    padding: 0;
+    border: none;
+}
+
+.processor-preview-box.dataset-preview--big .processor-preview-box-header {
+    padding: var(--spacing-small) var(--spacing-regular);
+    background: var(--panel-bg-0);
+}
+
+.processor-preview-box.dataset-preview--big .dataset-preview-body {
+    margin-top: 0;
+}

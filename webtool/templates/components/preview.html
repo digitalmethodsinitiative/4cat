@@ -1,0 +1,40 @@
+{#
+    Preview *body* for a dataset, embedded inside a processor-preview box.
+
+    Only the body is rendered here. The surrounding Alpine state (`open`, `big`,
+    `loaded`) and the toggle / pop-out controls live on the parent
+    .processor-preview-box (see processor-preview-tree-item.html), so this body
+    reads `open` / `loaded` from that ancestor scope.
+
+    Safe, structured data (CSV, JSON/NDJSON, images, GEXF metadata) is loaded as
+    an inline htmx fragment so it inherits the page theme. Arbitrary HTML and
+    interactive GEXF are sandboxed in an iframe instead.
+
+    The `_previewable` expression is mirrored in processor-preview-tree-item.html
+    (which decides whether to render the controls); keep the two in sync.
+
+    Expects:
+      dataset  the DataSet to preview (with `open` / `loaded` in an ancestor scope)
+#}
+{% set _processor = dataset.get_own_processor() %}
+{% set _ext = dataset.get_extension() %}
+{% set _media_archive = _ext == "zip" and dataset.get_media_type() in ("image", "video", "audio") %}
+{% set _previewable = dataset.is_finished() and dataset.num_rows and (
+        _media_archive
+        or _ext in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp", "mp4")
+        or (_processor and _processor.map_item)) %}
+{% if _previewable %}
+{% set _iframe = _ext in ("html", "gexf") %}
+{% set _preview_url = url_for('dataset.preview_items', key=dataset.key) %}
+<div class="dataset-preview-body" x-show="open" x-cloak>
+    {% if _iframe %}
+    <iframe class="dataset-preview-frame" title="Preview of {{ dataset.get_label() }}"
+            :src="loaded ? '{{ _preview_url }}' : ''"></iframe>
+    {% else %}
+    <div class="dataset-preview-content" hx-get="{{ _preview_url }}" hx-trigger="intersect once"
+         hx-swap="innerHTML">
+        {% with spinner_id = "" %}{% include "components/spinner.html" %}{% endwith %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}

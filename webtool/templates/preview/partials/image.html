@@ -1,0 +1,17 @@
+{# Image/video preview fragment. See csv.html partial for why the stylesheet
+   link is included. Zoom is a pure-CSS checkbox toggle, so no JS is needed. #}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fourcat-new.css') }}">
+<div class="preview-content image-preview {{ dataset.get_results_path().suffix[1:] }}-preview">
+    <div class="image-preview-container">
+        <input type="checkbox" name="image-zoom" class="image-zoom" id="image-zoom-{{ dataset.key }}">
+        <label for="image-zoom-{{ dataset.key }}">
+            {% if dataset.get_extension() == "mp4" %}
+                <video controls height="100%">
+                    <source src="{{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key) }}" type="video/mp4">
+                </video>
+            {% else %}
+                <img src="{{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key) }}" alt="">
+            {% endif %}
+        </label>
+    </div>
+</div>

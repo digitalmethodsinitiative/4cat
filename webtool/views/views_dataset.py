@@ -6,6 +6,8 @@ import csv
 import io
 import json_stream
 import mimetypes
+import zipfile
+from natsort import natsorted
 from pathlib import Path
 from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, flash,
                    get_flashed_messages, url_for, stream_with_context, g, make_response)
@@ -413,9 +415,6 @@ def preview_items(key):
     """
     Preview a dataset file
 
-    Simply passes the first 25 rows of a dataset's csv result file to the
-    template renderer.
-
     :param str key:  Dataset key
     :return:  HTML preview
     """
@@ -445,10 +444,37 @@ def preview_items(key):
                        hostname.endswith(".localhost")
         return render_template("preview/gexf.html", dataset=dataset, with_gephi_lite=(not in_localhost))
 
+    elif dataset.get_extension() == "zip" and dataset.get_media_type() in ("image", "video", "audio"):
+        # media archive (image/video/audio zip)
+        # show the first few items as a carousel; members are served on demand
+        # via the get_result endpoint's zip_member support, so nothing is
+        # extracted here beyond reading the archive's file listing
+        preview_media = 10
+        members = []
+        try:
+            with zipfile.ZipFile(dataset.get_results_path(), "r") as archive:
+                for info in natsorted(archive.infolist(), key=lambda f: f.filename):
+                    name = info.filename
+                    if info.is_dir() or name.rsplit("/", 1)[-1].startswith("."):
+                        # skip folders and dotfiles (e.g. .metadata.json)
+                        continue
+                    members.append(name)
+                    if len(members) >= preview_media:
+                        break
+        except zipfile.BadZipFile:
+            return render_template(
+                "components/error_message.html",
+                title="Preview not available",
+                message="This dataset's preview could not be generated. The archive may be corrupted.",
+            )
+
+        return render_template("preview/partials/media.html", dataset=dataset, members=members,
+                               max_items=preview_media)
+
     elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp", "mp4"):
         # image or video file
-        # just show image in an empty page
-        return render_template("preview/image.html", dataset=dataset)
+        # returned as a bare fragment for inline embedding
+        return render_template("preview/partials/image.html", dataset=dataset)
 
     elif dataset.get_extension() == "html":
         # just render the file!
@@ -488,7 +514,7 @@ def preview_items(key):
                 message="This dataset's preview could not be generated. The result file may be corrupted or in an unexpected format. An administrator has been notified.",
             )
 
-        return render_template("preview/csv.html", rows=rows, max_items=preview_size,
+        return render_template("preview/partials/csv.html", rows=rows, max_items=preview_size,
                                dataset=dataset)
 
     elif dataset.get_extension() == "json":
@@ -520,7 +546,7 @@ def preview_items(key):
             with datafile.open() as infile:
                 data = infile.read()
 
-        return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+        return render_template("preview/partials/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
 
     elif dataset.get_extension() == "ndjson":
         # mostly similar to JSON preview, but we don't have to stream the file
@@ -556,7 +582,7 @@ def preview_items(key):
                 message="This dataset's preview could not be generated. The result file may be corrupted or empty. An administrator has been notified.",
             )
 
-        return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+        return render_template("preview/partials/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
 
     else:
         return render_template(
@@ -699,6 +725,7 @@ def processor_grid(key):
         dataset=dataset,
         processors=other_processors,
         preferred_processors=preferred_processors,
+        genealogy=dataset.get_genealogy(),
     )
 
 @component.route('/results/<string:key>/processor-options/<string:processor>/')

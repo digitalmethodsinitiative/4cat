@@ -1,0 +1,22 @@
+/* Notices on info, warnings, and success */
+.notice {
+    padding: var(--spacing-regular);
+}
+.notice-info {
+    background: var(--blue-light);
+    color: var(--blue);
+}
+.notice-info i {
+    color: var(--blue);
+}
+.notice-warning {
+    background: var(--yellow-light);
+    color: var(--yellow)
+}
+.notice-warning i {
+    color: var(--yellow);
+}
+.notice-success {
+    background: var(--green-light);
+    color: var(--green);
+}

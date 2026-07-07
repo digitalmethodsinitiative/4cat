@@ -41,8 +41,7 @@ a.button-like, button {
 .button-secondary {
     background: var(--button-grey);
     color: var(--semidark);
-    border-bottom-color: var(--semidark);
-    border-bottom: var(--stroke) solid var(--semidark);
+    border-bottom: var(--stroke-heavy) solid var(--panel-bg-2);
     height: calc(var(--font-normal) + 2 * var(--spacing-small));
     min-width: 1.5rem;
     text-align: center;

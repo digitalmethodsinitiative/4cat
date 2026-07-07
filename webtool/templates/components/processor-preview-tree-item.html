@@ -1,0 +1,66 @@
+{# Recursive node for the processor preview lineage (see processor-preview-tree.html).
+   Walks the dataset genealogy (top parent -> selected dataset) linearly by
+   index, nesting each dataset under the previous. The final node is the dataset
+   the user is about to run a processor on: it carries the preview controls that
+   used to live in preview.html's header (a caret toggles a lazy preview *inside*
+   the box, beneath the title; a pop-out button blows it up full-screen) and is
+   always followed by the "Adding new processor" box.
+
+   The `_previewable` extension check mirrors the one in preview.html; keep the
+   two in sync.
+
+   Expects:
+     genealogy  list of DataSets from top parent to the selected dataset
+     index      position in `genealogy` currently being rendered
+#}
+{% set dataset = genealogy[index] %}
+{% set is_last = index == (genealogy|length - 1) %}
+{% set _processor = dataset.get_own_processor() %}
+{% set _ext = dataset.get_extension() %}
+{% set _media_archive = _ext == "zip" and dataset.get_media_type() in ("image", "video", "audio") %}
+{% set _previewable = is_last and dataset.is_finished() and dataset.num_rows and (
+        _media_archive
+        or _ext in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp", "mp4")
+        or (_processor and _processor.map_item)) %}
+<li class="processor-preview-item">
+    <div class="processor-preview-box"
+         {% if _previewable %}x-data="{ open: false, big: false, loaded: false }"
+         :class="{ 'dataset-preview--big': big }"
+         @keydown.escape.window="big = false"{% endif %}>
+        <div class="processor-preview-box-header">
+            <span class="processor-preview-label{% if is_last %} is-current{% endif %}">{{ _processor.title if _processor else dataset.get_label() }}</span>
+            {% if _previewable %}
+            <span class="processor-preview-controls">
+                <button type="button" class="processor-preview-control"
+                        @click="open = !open; loaded = loaded || open"
+                        :aria-expanded="open ? 'true' : 'false'">
+                    <i class="fa fa-fw" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+                    <span class="sr-only">Toggle preview</span>
+                </button>
+                <button type="button" class="processor-preview-control"
+                        @click="big = !big; open = true; loaded = true"
+                        :aria-pressed="big ? 'true' : 'false'">
+                    <i class="fa fa-fw" :class="big ? 'fa-compress' : 'fa-expand'" aria-hidden="true"></i>
+                    <span class="sr-only">Toggle full-screen preview</span>
+                </button>
+            </span>
+            {% endif %}
+        </div>
+        {% if _previewable %}
+            {% include 'components/preview.html' %}
+        {% endif %}
+    </div>
+    <ul class="processor-preview-children">
+        {% if not is_last %}
+            {% with index = index + 1 %}{% include "components/processor-preview-tree-item.html" %}{% endwith %}
+        {% else %}
+        <li class="processor-preview-item processor-preview-new-hint">
+            <div class="processor-preview-box">
+                <span class="processor-preview-label">
+                    <i class="fa-solid fa-star-of-life" aria-hidden="true"></i> Adding new processor
+                </span>
+            </div>
+        </li>
+        {% endif %}
+    </ul>
+</li>

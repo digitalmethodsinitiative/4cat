@@ -26,3 +26,8 @@
 <p class="no-results" style="display: none" x-show="noProcessorResults()">
     No processors match <strong x-text="processorSearch"></strong>.
 </p>
+
+{# replace the lineage preview at the top of the slideout for the selected dataset #}
+{% with oob = True %}
+    {% include "components/processor-preview-tree.html" %}
+{% endwith %}
