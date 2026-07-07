@@ -168,7 +168,7 @@ def data_overview(datasource=None):
     if datasource:
 
         datasource_id = datasource
-        worker_class = g.modules.workers.get(datasource_id + "-search")
+        worker_class = g.modules.get_datasource_worker(datasource_id)
         # Database IDs may be different from the Datasource ID (e.g. the datasource "4chan" became "fourchan" but the database ID remained "4chan")
         database_db_id = worker_class.prefix if hasattr(worker_class, "prefix") else datasource_id
 
@@ -192,7 +192,7 @@ def data_overview(datasource=None):
 
         # Get example keys for the datasource
         if datasource_id not in ["upload"]:  # ignore upload as keys are variable
-            example_keys = get_datasource_example_keys(db=g.db, modules=g.modules, dataset_type=datasource_id + "-search")
+            example_keys = get_datasource_example_keys(db=g.db, modules=g.modules, dataset_type=worker_class.type)
 
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":
@@ -227,10 +227,11 @@ def data_overview(datasource=None):
 @component.route('/get-boards/<string:datasource>/')
 @login_required
 def getboards(datasource):
-    if datasource not in g.config.get("datasources.enabled"):
+    worker = g.modules.get_datasource_worker(datasource)
+    if not worker or datasource not in g.config.get("datasources.enabled"):
         result = False
     else:
-        result = g.config.get(datasource + "-search.boards", False)
+        result = g.config.get(worker.type + ".boards", False)
 
     return jsonify(result)
 

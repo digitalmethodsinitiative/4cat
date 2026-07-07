@@ -191,7 +191,7 @@ class WorkerManager:
 		sources.
 		"""
 		for datasource in self.modules.datasources:
-			if datasource + "-search" not in self.modules.workers and datasource + "-import" not in self.modules.workers:
+			if self.modules.get_datasource_worker(datasource) is None:
 				self.log.error(f"No search worker defined for data source {datasource} or its modules are missing. "
 				               f"Datasets cannot be created for it.")
 

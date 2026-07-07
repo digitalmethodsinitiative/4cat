@@ -114,7 +114,7 @@ class DatasourceMetrics(BasicWorker):
             if datasource_id not in enabled_datasources:
                 continue
 
-            datasource = self.modules.workers.get(datasource_id + "-search")
+            datasource = self.modules.get_datasource_worker(datasource_id)
             if not datasource:
                 continue
 
@@ -127,14 +127,7 @@ class DatasourceMetrics(BasicWorker):
             # Only update local datasources
             if is_local:
 
-                # Some translating..
-                settings_id = datasource_id
-                if datasource_id == "4chan":
-                    settings_id = "fourchan"
-                elif datasource_id == "8chan":
-                    settings_id = "eightchan"
-
-                boards = [b for b in self.config.get(settings_id + "-search.boards", [])]
+                boards = [b for b in self.config.get(datasource.type + ".boards", [])]
 
                 # If a datasource is static (so not updated) and it
                 # is already present in the metrics table, we don't

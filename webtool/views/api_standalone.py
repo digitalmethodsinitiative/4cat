@@ -132,7 +132,7 @@ def get_standalone_processors():
 
 	for processor_type, processor in g.modules.processors.items():
 		# Skip datasources as they do not conform to /api/process/<processor>/ API
-		if issubclass(processor, Search) or processor_type.endswith("-search"):
+		if issubclass(processor, Search) or processor.is_from_collector():
 			# ALMOST all datasources are subclasses of Search, almost.
 			continue
 

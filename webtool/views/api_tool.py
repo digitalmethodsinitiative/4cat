@@ -40,13 +40,8 @@ def _get_search_class(modules, datasource_id):
 	Abstracts the ModuleCollector convention where worker keys append a suffix
 	to the datasource ID. Most use `-search`, some (e.g. twitter-import) use
 	`-import`. Returns None if no matching worker is found.
-
-	TODO: ModuleCollector should expose this directly.
 	"""
-	return (
-		modules.workers.get(f"{datasource_id}-search")
-		or modules.workers.get(f"{datasource_id}-import")
-	)
+	return modules.get_datasource_worker(datasource_id)
 
 @component.route("/api/")
 @api_ratelimit
@@ -192,17 +187,12 @@ def get_processor_options(processor_type, dataset_id=None):
 	Get processor options
 
 	Optionally returns the options for a specific dataset as datasets may have
-	different options for the same processor type. Converts datasources to processor types
-	if the processor type is a datasource.
+	different options for the same processor type.
 
 	:param processor_type:  Processor type, as specified in processor class `type` attribute
 	:param dataset_id:  Dataset ID, as specified in the dataset class `key` attribute
 	:return: A JSON object with the `status`, `processor`, `dataset`, and `options` for the processor.
 	"""
-	if processor_type in g.modules.datasources:
-		# Datasources were poorly named
-		processor_type = processor_type + "-search"
-
 	if processor_type not in g.modules.processors:
 		return error(404, message="Processor '%s' does not exist" % processor_type)
 	
@@ -246,6 +236,42 @@ def get_processor_options(processor_type, dataset_id=None):
 		"message": "'type' defines form type (for frontend), 'help' provides help title text, 'tooltip' additional help information, 'default' the default value, 'choices' the possible choices for the field, 'min' is minimum (for numeric), 'max' is maximum (for numeric), 'coerce_type' the data type the value will be coerced to, and 'requires' denotes if field is only relevant given another option's value."
 	})
 
+@component.route("/api/datasource-options/<string:datasource_id>/")
+@login_required
+@current_app.openapi.endpoint("tool")
+def get_datasource_options(datasource_id):
+	"""
+	Get the dataset parameter options for a data source
+
+	Returns the options accepted when creating a new dataset for a data source,
+	i.e. the parameters of its collector or importer worker. This is the data
+	source counterpart to `/api/processor-options/`.
+
+	:param datasource_id:  Data source ID (the `DATASOURCE` attribute)
+	:return: A JSON object with the `status`, `datasource`, and `options`.
+
+	:return-error 404: If the data source does not exist or has no worker.
+	"""
+	if datasource_id not in g.modules.datasources:
+		return error(404, message="Data source '%s' does not exist" % datasource_id)
+
+	worker = g.modules.get_datasource_worker(datasource_id)
+	if not worker:
+		return error(404, message="Data source '%s' has no worker" % datasource_id)
+
+	worker_options = worker.get_options(None, g.config)
+
+	for option_name, option in worker_options.items():
+		if "coerce_type" in option:
+			# stringify so the value type can be JSONified, as in get_processor_options
+			option["coerce_type"] = str(option["coerce_type"])
+
+	return jsonify({
+		"status": "success",
+		"datasource": datasource_id,
+		"options": worker_options,
+	})
+
 @component.route("/api/datasource-form/<string:datasource_id>/")
 @login_required
 @setting_required("privileges.can_create_dataset")
@@ -279,7 +305,7 @@ def datasource_form(datasource_id):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = g.modules.datasources[datasource_id]
-	worker_class = g.modules.workers.get(datasource_id + "-search")
+	worker_class = g.modules.get_datasource_worker(datasource_id)
 
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
@@ -355,13 +381,7 @@ def import_dataset():
 	if not platform or platform not in g.modules.datasources or platform not in g.config.get('datasources.enabled'):
 		return error(404, message=f"Unknown platform or source format '{platform}'")
 
-	worker_types = (f"{platform}-import", f"{platform}-search")
-	worker = None
-	for worker_type in worker_types:
-		worker = g.modules.workers.get(worker_type)
-		if worker:
-			break
-
+	worker = g.modules.get_datasource_worker(platform)
 	if not worker:
 		return error(404, message="Unknown platform or source format")
 
@@ -437,11 +457,11 @@ def queue_dataset():
 	if datasource_id not in g.modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	search_worker_id = datasource_id + "-search"
-	if search_worker_id not in g.modules.workers:
+	search_worker = g.modules.get_datasource_worker(datasource_id)
+	if not search_worker:
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
-	search_worker = g.modules.workers[search_worker_id]
+	search_worker_id = search_worker.type
 
 	# handle confirmation outside of parameter parsing, since it is not data
 	# source specific
@@ -1052,7 +1072,7 @@ def check_search_queue():
 
 	:return-schema: {type=array,properties={jobtype={type=string}, count={type=integer}},items={type=string}}
 	"""
-	unfinished_jobs = g.db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
+	unfinished_jobs = g.db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE (jobtype LIKE '%-search' OR jobtype LIKE '%-import') GROUP BY jobtype ORDER BY count DESC;")
 
 	for i, job in enumerate(unfinished_jobs):
 		processor = g.modules.processors.get(job["jobtype"])
