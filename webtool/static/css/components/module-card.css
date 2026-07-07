@@ -88,3 +88,27 @@
     column-gap: var(--spacing-small);
     margin-left: auto;
 }
+
+/* processor info / warning notice boxes (mirrored in the processor catalogue):
+   blue = helpful extra, yellow = pitfall. Inset to line up with the description. */
+.module-card .processor-notice {
+    display: flex;
+    gap: var(--spacing-small);
+    align-items: flex-start;
+    margin: var(--spacing-small) var(--spacing-regular);
+    padding: var(--spacing-small) var(--spacing-regular);
+    border-radius: var(--radius);
+    font-size: var(--font-body);
+    line-height: 1.4;
+    color: var(--semidark);
+}
+
+.module-card .processor-notice i {
+    margin-top: 0.15em;
+    flex: none;
+}
+
+.module-card .processor-notice.notice-info { background: var(--blue-light); }
+.module-card .processor-notice.notice-info i { color: var(--blue); }
+.module-card .processor-notice.notice-warning { background: var(--yellow-light); }
+.module-card .processor-notice.notice-warning i { color: var(--yellow); }
