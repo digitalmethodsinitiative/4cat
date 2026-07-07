@@ -262,21 +262,38 @@ class ModuleCollector:
                               sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}
         self.datasources = sorted_datasources
 
+    def get_datasource_worker(self, datasource_id):
+        """
+        Find the collector or importer worker for a datasource
+
+        A datasource is served by a single worker that collects or imports its
+        items. By convention that worker's type is the datasource ID followed
+        by `-search` (a collector, e.g. `tiktok-search`) or `-import` (an
+        importer, e.g. `twitter-import`). Both suffixes are tried, `-search`
+        first.
+
+        :param str datasource_id:  Datasource ID, e.g. `twitter`
+        :return:  The worker class for the datasource, or None if it has none
+        """
+        for suffix in ("-search", "-import"):
+            worker = self.workers.get(datasource_id + suffix)
+            if worker:
+                return worker
+        return None
+
     def expand_datasources(self):
         """
         Expand datasource metadata
 
         Some datasource metadata can only be known after all workers have been
-        loaded, e.g. whether there is a search worker for the datasource. This
-        function takes care of populating those values.
+        loaded, e.g. whether there is a search or import worker for the
+        datasource. This function takes care of populating those values.
         """
         for datasource_id in self.datasources:
-            worker = self.workers.get("%s-search" % datasource_id)
+            worker = self.get_datasource_worker(datasource_id)
             self.datasources[datasource_id]["has_worker"] = bool(worker)
-            self.datasources[datasource_id]["has_options"] = self.datasources[datasource_id]["has_worker"] and \
-                                                             bool(self.workers[
-                                                                      "%s-search" % datasource_id].get_options(
-                                                                 config=self.config))
+            self.datasources[datasource_id]["has_options"] = bool(worker) and \
+                                                             bool(worker.get_options(config=self.config))
             self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_zeeschuimer") and worker.is_from_zeeschuimer
 
     def load_datasource_explorer_templates(self, datasource_id, datasource_path):
