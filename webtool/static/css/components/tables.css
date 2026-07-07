@@ -1,0 +1,17 @@
+table {
+    padding: var(--spacing-small);
+    border: var(--stroke-light) solid var(--dark);
+    border-radius: var(--radius);
+    border-bottom-width: var(--stroke-journey);
+}
+
+table th {
+    border: none;
+    text-transform: uppercase;
+    padding-bottom: var(--spacing-small);
+}
+
+table td {
+    padding: var(--spacing-small);
+    border: var(--stroke-light) solid var(--dark);
+}
