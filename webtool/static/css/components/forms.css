@@ -28,6 +28,12 @@
     box-sizing: border-box;
 }
 
+/* Text in form */
+.userinput-form h3 {
+    margin-top: .5rem;
+    margin-bottom: 0;
+}
+
 /* Specific user-inputs */
 .form-element:has(textarea),
 .form-element:has(.multichoice-wrapper),
@@ -78,9 +84,29 @@
     color: var(--semidark);
     background: var(--panel-bg-0);
     border: none;
-    border-bottom: var(--stroke) solid var(--panel-bg-2);
+    border-bottom: var(--stroke-heavy) solid var(--panel-bg-2);
     border-radius: 0;
     padding: var(--spacing-small);
+}
+
+.form-element select {
+    -moz-appearance:none;
+    -webkit-appearance:none;
+    appearance:none;
+    /* unfortunately dropdown glyphs don't have a reliable css pseudo class.. */
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="%23333333" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter"><polyline points="2,5 8,11 14,5"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-small) center;
+    padding-right: calc(var(--spacing-small) + 16px);
+}
+
+.form-element select:open {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="%23333333" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" transform="matrix(1,0,0,-1,0,0)"><polyline points="2,5 8,11 14,5"></polyline></svg>');
+}
+
+.form-element select:focus {
+    outline: none;
+    border-bottom: var(--stroke-heavy) solid var(--fourcat-accent);
 }
 
 .form-element input:not([type=checkbox]):focus,
@@ -91,7 +117,24 @@
 }
 
 .form-element input[type=checkbox] {
-    background-color: red;
+  box-sizing: border-box;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0;
+  padding: 0;
+  border: var(--stroke) solid var(--button-bg-regular);
+  border-radius: var(--small-radius);
+  appearance: none;
+  background-color: var(--bright);
+  outline: none;
+  transition: outline 0.1s;
+}
+
+.form-element input[type=checkbox]:checked {
+  background-color: var(--button-bg-regular);
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink"><polyline points="2,7 7,12 14,3"></polyline></svg>');
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .form-element option, .form-element optgroup {
@@ -231,21 +274,25 @@ input[type=search]:focus {
     padding-left: calc(var(--spacing-small) * 2 + 1em);
 }
 
-/* Specific forms */
-#datasource-form {
-    margin-top: var(--spacing-regular);
+/* Info, warning and validation boxes */
+.notice {
+    padding: var(--spacing-regular);
 }
-
-#datasource-form .submit-container {
+.notice-info {
+    background: var(--blue-light);
+    color: var(--blue);
 }
-
-#datasource-form #datasource-form-submit {
-
-    margin: var(--spacing-large) auto 0;
+.notice-info i {
+    color: var(--blue);
 }
-
-
-
-#datasource-form-submit {
-    margin-top: 1rem;
+.notice-warning {
+    background: var(--yellow-light);
+    color: var(--yellow)
+}
+.notice-warning i {
+    color: var(--yellow);
+}
+.notice-success {
+    background: var(--green-light);
+    color: var(--green);
 }

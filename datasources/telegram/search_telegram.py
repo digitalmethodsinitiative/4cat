@@ -159,7 +159,7 @@ class SearchTelegram(Search):
             },
             "save-session": {
                 "type": UserInput.OPTION_TOGGLE,
-                "help": "Save session:",
+                "help": "Save session",
                 "default": False
             },
             "resolve-entities-intro": {

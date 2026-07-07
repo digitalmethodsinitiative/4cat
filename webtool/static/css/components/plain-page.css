@@ -15,6 +15,10 @@
     font-size: var(--font-h0);
 }
 
+.plain-page #main-content p {
+    line-height: 1.25rem;
+}
+
 .plain-page #main-content p a {
     color: var(--fourcat-accent);
     text-decoration: none;

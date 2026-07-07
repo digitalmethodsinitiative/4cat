@@ -23,9 +23,7 @@
     <div class="form-element{% if delegated %} delegated-option{% endif %}{% if settings.cache %} cacheable{% endif %}"
         {%- if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}
         {%- if settings.requires %} x-show='met({{ settings.requires|tojson }})'{% endif %}>
-        {% if settings.type == "toggle" %}
-            {% include "components/user-inputs/toggle.html" %}
-        {% elif settings.type in ("annotation", "annotations") %}
+        {% if settings.type in ("annotation", "annotations") %}
             {% include "components/user-inputs/annotation.html" %}
         {% else %}
             <label for="forminput-{{ option }}">{{ settings.help|markdown(True)|safe }}</label>
@@ -33,8 +31,6 @@
         {% endif %}
         {% if settings.tooltip %}
             <ul><li class="button-secondary" aria-label="Option info" x-tooltip="{{ settings.tooltip }}"><span><i class="fa-solid fa-circle-info"></i></span></li></ul>
-        {% else %}
-            <span class="pad-right"></span>
         {% endif %}
     </div>
 {% endif %}
