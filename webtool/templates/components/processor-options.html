@@ -13,7 +13,12 @@
 
     <h2>{{ processor.title }}</h2>
     <p class="processor-description">{{ processor.description|safe }}</p>
-
+    {% for warning in processor.warnings %}
+    <p class="processor-notice notice notice-warning"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> <span>{{ warning }}</span></p>
+    {% endfor %}
+    {% for info in processor.info %}
+    <p class="processor-notice notice notice-info"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> <span>{{ info }}</span></p>
+    {% endfor %}
     <div id="processor-options-notice"></div>
 
     <input type="hidden" name="key" value="{{ dataset.key }}">

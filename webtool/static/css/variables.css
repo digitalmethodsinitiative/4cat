@@ -6,8 +6,8 @@
     --green-light: #CDEDDE;
     --green: #026C39;
     --yellow-light: #FFF5BF;
-    --orange: #ff9300;
     --yellow: #8C741D;
+    --orange: #ff9300;
     --red-light: #F6C5C5;
     --red: #A63F3F;
 
@@ -70,7 +70,7 @@
     --card-height: calc(var(--font-h1) * 10);
 
     --slideout-header-height: 3rem;
-    --form-gap: 2rem;
+    --form-gap: 1.5rem;
     --tooltip-button-width: 2rem;
 
     --stroke-light: calc(var(--font-base) * 0.1);
@@ -79,6 +79,7 @@
     --stroke-journey: calc(var(--stroke-light) * 3);
     --radius: calc(var(--font-base) / 6 * 5);
     --double-radius: calc(2 * var(--radius));
+    --small-radius: calc(var(--font-base) / 6 * 2);
 
     --z-journey-marker: 1;
     --z-run-hint: 2;

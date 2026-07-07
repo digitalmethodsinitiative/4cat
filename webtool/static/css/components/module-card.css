@@ -107,8 +107,3 @@
     margin-top: 0.15em;
     flex: none;
 }
-
-.module-card .processor-notice.notice-info { background: var(--blue-light); }
-.module-card .processor-notice.notice-info i { color: var(--blue); }
-.module-card .processor-notice.notice-warning { background: var(--yellow-light); }
-.module-card .processor-notice.notice-warning i { color: var(--yellow); }

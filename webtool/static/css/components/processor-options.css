@@ -24,9 +24,3 @@ fieldset {
 #processor-options .processor-queue-button {
     margin-top: var(--spacing-regular);
 }
-
-.notice {
-    background-color: var(--yellow-light);
-    color: var(--orange);
-    padding: var(--spacing-regular);
-}
