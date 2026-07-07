@@ -111,9 +111,6 @@
              x-transition:leave-start="slide-to"
              x-transition:leave-end="slide-from"
         >
-            {% with genealogy = dataset.get_genealogy() %}
-                {% include 'components/processor-preview-tree.html' %}
-            {% endwith %}
             <div class="processor-panel-header slideout-header">
                 <div class="slideout-header-title">
                     <ul x-show="selectedDatasetLabel">
@@ -137,6 +134,9 @@
                     </ul>
                 </div>
             </div>
+            {% with genealogy = dataset.get_genealogy() %}
+                {% include 'components/processor-preview-tree.html' %}
+            {% endwith %}
             <div class="processor-panel-contents slideout-contents">
                 <div class="slideout-body-wrap">
                     <div id="processor-grid" class="slideout-body">
