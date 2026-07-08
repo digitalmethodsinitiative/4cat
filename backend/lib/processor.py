@@ -198,8 +198,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # Add source dataset to cleanup list to remove disposable files
             self.for_cleanup.append(self.source_dataset)
 
-        # get parameters
-        # if possible, fill defaults where parameters are not provided
+        # build the single runtime view of this dataset's parameters: every
+        # stored parameter, plus the declared default for any option that was
+        # not stored. Worker code should read options from self.parameters
+        # only, and not re-read them from the dataset mid-run — stored
+        # parameters may change during a run (e.g. sensitive options are
+        # deleted below), but this dictionary stays complete and stable.
         given_parameters = self.dataset.parameters.copy()
         all_parameters = self.get_options(self.source_dataset, config=self.config)
         self.parameters = {

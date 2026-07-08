@@ -212,7 +212,7 @@ class SearchTumblr(Search):
 		"""
 
 		# ready our parameters
-		parameters = self.dataset.get_parameters()
+		parameters = self.parameters
 		queries = re.split(",|\n", parameters.get("query", ""))
 		get_notes = parameters.get("get_notes", False)
 		get_reblogs = parameters.get("get_reblogs", False)

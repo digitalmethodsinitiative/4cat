@@ -308,7 +308,7 @@ class SearchTelegram(Search):
             return []
 
         # ready our parameters
-        parameters = self.dataset.get_parameters()
+        parameters = self.parameters
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         max_items = convert_to_int(parameters.get("items", 10), 10)
 

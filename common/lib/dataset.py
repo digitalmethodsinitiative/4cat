@@ -1552,6 +1552,8 @@ class DataSet(FourcatModule):
             data={"parameters": json.dumps(self.parameters)},
             where={"key": self.key},
         )
+        # keep data["parameters"] consistent, since get_parameters() reads it
+        self.data["parameters"] = json.dumps(self.parameters)
         return datasource
 
     def reserve_result_file(self, parameters=None, extension="csv"):
@@ -1866,7 +1868,11 @@ class DataSet(FourcatModule):
         )
 
         if instant:
+            # keep both in-memory stores consistent with the database:
+            # get_parameters() reads data["parameters"], so updating only
+            # self.parameters would leave it returning the deleted value
             self.parameters = parameters
+            self.data["parameters"] = json.dumps(parameters)
 
         return updated > 0
 
