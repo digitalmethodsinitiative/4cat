@@ -1876,6 +1876,30 @@ class DataSet(FourcatModule):
 
         return updated > 0
 
+    def remove_sensitive_parameters(self, config):
+        """
+        Delete stored values of options marked as sensitive
+
+        Workers can mark an option as "sensitive" in their option definitions.
+        This is used for values such as API keys, which should spend as little
+        time in the database as possible. This method deletes those values
+        from the stored parameters. It is called as soon as a dataset starts
+        running (the worker keeps the values in memory for the run), and
+        periodically for datasets that were created but never picked up by a
+        worker.
+
+        :param config:  Configuration reader, used to determine the worker's
+          options. Which options exist (and which are sensitive) can depend on
+          the configuration.
+        """
+        producer = self.get_producer_processor()
+        if not producer:
+            return
+
+        for option, settings in producer.get_options(self.get_parent(), config=config).items():
+            if settings.get("sensitive"):
+                self.delete_parameter(option)
+
     def get_version_url(self, file):
         """
         Get a versioned github URL for the version this dataset was processed with

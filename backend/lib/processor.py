@@ -202,8 +202,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         # stored parameter, plus the declared default for any option that was
         # not stored. Worker code should read options from self.parameters
         # only, and not re-read them from the dataset mid-run — stored
-        # parameters may change during a run (e.g. sensitive options are
-        # deleted below), but this dictionary stays complete and stable.
+        # parameters may change during a run, but this dictionary stays
+        # complete and stable.
         given_parameters = self.dataset.parameters.copy()
         all_parameters = self.get_options(self.source_dataset, config=self.config)
         self.parameters = {
@@ -211,13 +211,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             for param in [*all_parameters.keys(), *given_parameters.keys()]
         }
 
-        # now the parameters have been loaded into memory, clear any sensitive
-        # ones. This has a side-effect that a processor may not run again
-        # without starting from scratch, but this is the price of progress
-        options = self.get_options(self.dataset.get_parent(), config=self.config)
-        for option, option_settings in options.items():
-            if option_settings.get("sensitive"):
-                self.dataset.delete_parameter(option)
+        # the values of sensitive options (e.g. API keys) stay available in
+        # self.parameters for the duration of this run, but are removed from
+        # the stored dataset record right away, so they spend as little time
+        # in the database as possible. The deliberate trade-off is that a run
+        # that is interrupted and retried later no longer has these values.
+        try:
+            self.dataset.remove_sensitive_parameters(config=self.config)
+        except Exception as e:
+            # failing to remove these values should not fail the dataset
+            self.log.warning(f"Could not remove sensitive parameters of dataset {self.dataset.key}: {e}")
 
         if self.interrupted:
             self.dataset.log("Processing interrupted, trying again later")
@@ -227,7 +230,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             try:
                 self.process()
                 self.after_process()
-                
+
                 # processors should usually finish their jobs by themselves, but if
                 # the worker finished without errors, the job can be finished in
                 # any case

@@ -35,7 +35,12 @@ class ThingExpirer(BasicWorker):
     type = "expire-datasets"
     max_workers = 1
 
-    expiry_notification_after_days = 7    
+    expiry_notification_after_days = 7
+
+    # datasets that have not finished after this many seconds are considered
+    # abandoned: their sensitive option values (e.g. API keys) are removed,
+    # which normally happens as soon as a dataset starts running
+    abandoned_dataset_age = 7 * 86400
 
     @classmethod
     def ensure_job(cls, config=None):
@@ -57,6 +62,7 @@ class ThingExpirer(BasicWorker):
         self.expire_datasets()
         self.expire_users()
         self.expire_notifications()
+        self.expire_sensitive_parameters()
 
         self.job.finish()
 
@@ -114,6 +120,46 @@ class ThingExpirer(BasicWorker):
 
             finally:
                 self.db.commit()
+
+    def expire_sensitive_parameters(self):
+        """
+        Remove sensitive option values from abandoned datasets
+
+        Sensitive option values (e.g. API keys) are removed from a dataset's
+        stored parameters as soon as it starts running. A dataset that is
+        created but never picked up by a worker - for example because the
+        backend was stopped for good before it could run - would keep those
+        values forever, so remove them here once the dataset is old enough to
+        be considered abandoned.
+        """
+        cutoff = int(time.time()) - self.abandoned_dataset_age
+        abandoned = self.db.fetchall(
+            "SELECT * FROM datasets WHERE is_finished = FALSE AND timestamp < %s",
+            (cutoff,))
+
+        wrappers = {}
+        for dataset_data in abandoned:
+            if self.interrupted:
+                raise WorkerInterruptedException("Interrupted while cleaning up abandoned datasets")
+
+            try:
+                # which options exist (and which are sensitive) can depend on
+                # the dataset owner's configuration context
+                if dataset_data["creator"] not in wrappers:
+                    wrappers[dataset_data["creator"]] = ConfigWrapper(
+                        self.config, user=User.get_by_name(self.db, dataset_data["creator"])
+                    )
+
+                dataset = DataSet(data=dataset_data, db=self.db, modules=self.modules, check_owners=False)
+                dataset.remove_sensitive_parameters(config=wrappers[dataset_data["creator"]])
+
+            except DataSetNotFoundException:
+                # deleted in the meantime
+                continue
+
+            except Exception as e:
+                # cleaning up must not crash the worker; try again next run
+                self.log.warning(f"Could not remove sensitive parameters of dataset {dataset_data['key']}: {e}")
 
     def expire_users(self):
         """
