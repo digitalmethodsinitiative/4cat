@@ -109,7 +109,13 @@ class UserInput:
                 # ignored
                 continue
 
-            elif settings.get("type") == UserInput.OPTION_DATERANGE:
+            if settings.get("requires") and not UserInput.requirements_met(settings["requires"], parsed_input):
+                # the option's condition is not met, so the user never saw it:
+                # leave it out instead of storing a default for it. This holds
+                # whether or not the (hidden) form field was submitted.
+                continue
+
+            if settings.get("type") == UserInput.OPTION_DATERANGE:
                 # special case, since it combines two inputs
                 option_min = option + "-min"
                 option_max = option + "-max"
@@ -235,6 +241,43 @@ class UserInput:
         return parsed_input
 
     @staticmethod
+    def requirements_met(requires, other_input):
+        """
+        Check whether an option's "requires" condition is satisfied
+
+        `requires` may be:
+          - a single string:          "field==value"
+          - an &&-joined string:      "field1==v1 && field2==v2"  (all must be true)
+          - a ||-joined string:       "field1==v1 || field2==v2"  (any must be true)
+          - a list/tuple of strings:  every requirement must be true
+
+        :param requires:  The option's "requires" setting
+        :param dict other_input:  Values to check the condition against; a
+          condition that refers to a field missing from this dictionary is
+          not met
+        :return bool:  True if the condition is satisfied
+        """
+        if isinstance(requires, (list, tuple)):
+            # a list always means: every requirement must be satisfied
+            req_list = list(requires)
+            combine_and = True
+        elif "||" in requires:
+            # pipe-separated alternatives: any one is sufficient
+            req_list = [r.strip() for r in requires.split("||")]
+            combine_and = False
+        elif "&&" in requires:
+            # ampersand-separated conditions: all must hold
+            req_list = [r.strip() for r in requires.split("&&")]
+            combine_and = True
+        else:
+            # single requirement string
+            req_list = [requires]
+            combine_and = True
+
+        results = [UserInput._requirement_met(r, other_input) for r in req_list]
+        return all(results) if combine_and else any(results)
+
+    @staticmethod
     def _requirement_met(req, other_input):
         """
         Evaluate a single requirement expression against already-parsed input.
@@ -337,42 +380,9 @@ class UserInput:
         :return:  Validated and parsed input
         """
         # short-circuit if there is a requirement for the field to be parsed
-        # and the requirement isn't met.
-        # 'requires' may be:
-        #   - a single string:          "field==value"
-        #   - an &&-joined string:      "field1==v1 && field2==v2"  (all must be true)
-        #   - a ||-joined string:       "field1==v1 || field2==v2"  (any must be true)
-        #   - a list/tuple of strings:  AND semantics (all must be true)
-        if settings.get("requires"):
-            reqs = settings["requires"]
-
-            # normalise to a list of individual requirement strings plus a flag
-            # indicating whether they combine with AND (True) or OR (False)
-            if isinstance(reqs, (list, tuple)):
-                # a list always uses AND semantics: every requirement must be satisfied
-                req_list = list(reqs)
-                combine_and = True
-            elif "||" in reqs:
-                # pipe-separated alternatives: any one is sufficient (OR)
-                req_list = [r.strip() for r in reqs.split("||")]
-                combine_and = False
-            elif "&&" in reqs:
-                # ampersand-separated conditions: all must hold (AND)
-                req_list = [r.strip() for r in reqs.split("&&")]
-                combine_and = True
-            else:
-                # single requirement string — original behaviour
-                req_list = [reqs]
-                combine_and = True
-
-            results = [UserInput._requirement_met(r, other_input) for r in req_list]
-
-            if combine_and and not all(results):
-                # AND mode: every requirement must be satisfied
-                raise RequirementsNotMetException()
-            elif not combine_and and not any(results):
-                # OR mode: at least one requirement must be satisfied
-                raise RequirementsNotMetException()
+        # and the requirement isn't met
+        if settings.get("requires") and not UserInput.requirements_met(settings["requires"], other_input):
+            raise RequirementsNotMetException()
 
         input_type = settings.get("type", "")
         if input_type in UserInput.OPTIONS_COSMETIC:
