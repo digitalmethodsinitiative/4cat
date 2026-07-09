@@ -400,6 +400,91 @@ def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dat
         logger.info("All datasources passed successfully.")
 
 
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_validate_query_declarations(logger, fourcat_modules):
+    """
+    validate_query is always called on the class, never on an instance, so
+    any worker that defines its own must make it a @staticmethod. A plain
+    method happens to work when called on the class, but binds the query
+    dictionary to `self` as soon as it is called on an instance, so enforce
+    the decorator here.
+    """
+    import inspect
+    from backend.lib.processor import BasicProcessor
+
+    offenders = []
+    for name, worker in fourcat_modules.processors.items():
+        if worker.validate_query is BasicProcessor.validate_query:
+            # inherits the store-as-is default; nothing declared to check
+            continue
+
+        declaration = inspect.getattr_static(worker, "validate_query")
+        if not isinstance(declaration, staticmethod):
+            offenders.append(name)
+
+    assert not offenders, (
+        "These workers define validate_query without @staticmethod; it is called on the "
+        f"class, so it must be a static method: {sorted(set(offenders))}"
+    )
+
+
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_option_declarations(logger, fourcat_modules, mock_dataset, mock_basic_config):
+    """
+    Option defaults are stored and filled in exactly as declared - they skip
+    the type parsing that user input gets - so a wrongly typed default shows
+    up as a confusing runtime value instead of an error. Check the
+    declarations themselves: toggles need a True/False default, a choice
+    default must be one of the choices, text options with a min/max are
+    treated as numbers so their default must be a number, and multi-choice
+    defaults must be lists.
+    """
+    from common.lib.helpers import UserInput
+
+    problems = []
+    for name, worker in fourcat_modules.processors.items():
+        try:
+            options = worker.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
+        except Exception:
+            # get_options failures are already reported by test_processors
+            continue
+
+        for option, settings in (options or {}).items():
+            if not isinstance(settings, dict):
+                problems.append((name, option, "option settings are not a dictionary"))
+                continue
+
+            option_type = settings.get("type")
+            default = settings.get("default")
+
+            if option_type in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
+                if "default" in settings and not isinstance(default, bool):
+                    problems.append((name, option, f"toggle default should be True or False, not {default!r}"))
+
+            elif option_type == UserInput.OPTION_CHOICE:
+                choices = settings.get("options", {})
+                if isinstance(choices, dict) and choices and all(isinstance(choice, dict) for choice in choices.values()):
+                    # choices grouped into categories: the real values are the inner keys
+                    choices = [value for group in choices.values() for value in group]
+                if "default" in settings and choices and default not in choices:
+                    problems.append((name, option, f"default {default!r} is not one of the choices"))
+
+            elif option_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
+                if ("min" in settings or "max" in settings) and "default" in settings \
+                        and not isinstance(default, (int, float)):
+                    problems.append((name, option, f"option has a min/max so its value is treated as a number, but the default is {default!r}"))
+
+            elif option_type in (UserInput.OPTION_MULTI, UserInput.OPTION_MULTI_SELECT):
+                if "default" in settings and default is not None and not isinstance(default, (list, tuple)):
+                    problems.append((name, option, f"default for a multiple-choice option should be a list, not {default!r}"))
+
+    if problems:
+        report = "\n".join(f"{name} / {option}: {problem}" for name, option, problem in sorted(problems))
+        pytest.fail(f"{len(problems)} option declaration(s) have defaults that do not match their type:\n{report}")
+    else:
+        logger.info("All option declarations look consistent.")
+
+
 def test_dataset_finish_raises_on_double_finish(mock_dataset):
     """
     Regression guard for common/lib/dataset.py:986.
