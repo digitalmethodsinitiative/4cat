@@ -9,6 +9,7 @@ from common.lib.dataset import StatusType
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput, convert_to_int
 from common.lib.compatibility import Compatibility
+from common.lib.exceptions import QueryParametersException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -128,6 +129,40 @@ class ColumnFilter(BaseFilter):
         }
         
         return options
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check that the value to compare with fits the chosen match type
+
+        Numerical and date comparisons can only work if the value to compare
+        with is a number or a date. Checking this here means the user gets
+        immediate feedback in the form, instead of a dataset that fails while
+        running. The value fields are only part of the input when the chosen
+        match type actually uses them, so they can be checked directly.
+
+        :param dict query:  Parsed user input
+        :param request:  Flask request the input arrived in
+        :param config:  Configuration reader
+        :return dict:  The parameters to store
+        """
+        if query.get("match-style") in ("value-less-than", "value-greater-than"):
+            try:
+                [float(value) for value in query.get("match-value", "").split(",")]
+            except ValueError:
+                raise QueryParametersException("Comparing as a number requires the value to compare with to be "
+                                               f"a number; '{query.get('match-value')}' is not.")
+
+        if query.get("match-style") in ("date-after", "date-before"):
+            match_date = query.get("match-date", "").strip()
+            if not re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", match_date):
+                try:
+                    int(match_date)
+                except ValueError:
+                    raise QueryParametersException("Comparing by date requires the value to compare with to be a "
+                                                   "date, either as YYYY-MM-DD hh:mm:ss or as a unix timestamp.")
+
+        return query
 
     def filter_items(self):
         """
