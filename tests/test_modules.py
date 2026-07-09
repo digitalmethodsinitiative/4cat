@@ -485,6 +485,39 @@ def test_option_declarations(logger, fourcat_modules, mock_dataset, mock_basic_c
         logger.info("All option declarations look consistent.")
 
 
+def test_parse_all_gated_options():
+    """
+    Options with a "requires" condition are only part of the parsed input when
+    their condition is met - whether or not the (hidden) form field was
+    submitted. This keeps the stored parameters honest: a missing key means
+    the user never saw the option, a present key means they chose a value or
+    its default applies. At run time, self.parameters fills every declared
+    option regardless (so plain reads are always safe); the stored honesty is
+    exposed to workers through BasicProcessor.option_given().
+    """
+    from common.lib.user_input import UserInput
+
+    options = {
+        "gate": {"type": UserInput.OPTION_TOGGLE, "default": False},
+        "gated": {"type": UserInput.OPTION_TEXT, "default": ",", "requires": "gate==true"},
+        "gated_toggle": {"type": UserInput.OPTION_TOGGLE, "default": True, "requires": "gate==true"},
+        "plain": {"type": UserInput.OPTION_TEXT, "default": "x"},
+    }
+
+    # gate off, gated fields not submitted: gated options are absent, not defaulted
+    parsed = UserInput.parse_all(options, {"option-plain": "y"})
+    assert parsed == {"gate": False, "plain": "y"}
+
+    # gate off, gated field submitted anyway (e.g. hidden field still posts):
+    # still absent
+    parsed = UserInput.parse_all(options, {"option-gated": ";"})
+    assert "gated" not in parsed and "gated_toggle" not in parsed
+
+    # gate on: gated options are parsed (submitted value) or defaulted (absent)
+    parsed = UserInput.parse_all(options, {"option-gate": "on", "option-gated": ";"})
+    assert parsed["gated"] == ";" and parsed["gated_toggle"] is False and parsed["gate"] is True
+
+
 def test_dataset_finish_raises_on_double_finish(mock_dataset):
     """
     Regression guard for common/lib/dataset.py:986.

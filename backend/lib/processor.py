@@ -200,12 +200,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         # build the single runtime view of this dataset's parameters: every
         # stored parameter, plus the declared default for any option that was
-        # not stored. Worker code should read options from self.parameters
-        # only, and not re-read them from the dataset mid-run — stored
-        # parameters may change during a run, but this dictionary stays
-        # complete and stable.
+        # not stored, so worker code can read any declared option without
+        # checking whether it exists. The stored parameters themselves are
+        # kept as self.given_parameters: they hold only the options that were
+        # actually part of the submission (see option_given()). Worker code
+        # should read options from self.parameters, and not re-read them from
+        # the dataset mid-run — stored parameters may change during a run,
+        # but these dictionaries stay stable.
         given_parameters = self.dataset.parameters.copy()
         all_parameters = self.get_options(self.source_dataset, config=self.config)
+        self.given_parameters = given_parameters
         self.parameters = {
             param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
             for param in [*all_parameters.keys(), *given_parameters.keys()]
@@ -437,6 +441,29 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                     send_email([owner], message, self.config)
                 except (SMTPException, ConnectionRefusedError, socket.timeout):
                     self.log.error("Error sending email to %s" % owner)
+
+    def option_given(self, option):
+        """
+        Check whether an option was actually part of this dataset's submission
+
+        `self.parameters` always contains every option this worker declares,
+        with defaults filled in for anything that was not stored. That is
+        convenient for reading values, but it cannot tell you whether the
+        option was really part of the submission. This method can: it checks
+        the parameters as they were stored when the dataset was created. For
+        datasets queued via the web interface, an option is only stored if
+        the user could see it when submitting (i.e. its `requires` condition
+        was met); for datasets queued by other code (e.g. presets), an option
+        is only stored if the calling code explicitly set it.
+
+        Note that a stored option may still hold its default value: a user
+        who saw an option and left it untouched still counts as having been
+        given it.
+
+        :param str option:  Option name, as used in `get_options()`
+        :return bool:  Whether the option was part of the stored parameters
+        """
+        return option in self.given_parameters
 
     def clean_up_on_error(self):
         try:
@@ -1087,7 +1114,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         marked `sensitive` are removed from the stored record when the dataset
         starts running. At run time, the worker reads all of this back through
         `self.parameters`, with declared option defaults filled in for any
-        missing keys.
+        missing keys; `option_given()` tells a worker whether an option was
+        really part of the stored submission.
 
         By default nothing is checked and the input is stored as-is. Search
         workers must define their own version: doing so is what makes a
