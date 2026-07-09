@@ -1892,13 +1892,19 @@ class DataSet(FourcatModule):
           options. Which options exist (and which are sensitive) can depend on
           the configuration.
         """
-        producer = self.get_producer_processor()
-        if not producer:
-            return
+        # check the options of both the processor that created this dataset
+        # and the processor matching its current type. These can differ after
+        # adopt_type() has rewritten the type. self.get_own_processor is purly
+        # defensive as the record is scrubbed before a type is ever adopted, 
+        # and the periodic cleanup only sees datasets that never ran - but 
+        # this should ensure check is correct for future callers.
+        for worker in {self.get_producer_processor(), self.get_own_processor()}:
+            if not worker:
+                continue
 
-        for option, settings in producer.get_options(self.get_parent(), config=config).items():
-            if settings.get("sensitive"):
-                self.delete_parameter(option)
+            for option, settings in worker.get_options(self.get_parent(), config=config).items():
+                if settings.get("sensitive"):
+                    self.delete_parameter(option)
 
     def get_version_url(self, file):
         """
