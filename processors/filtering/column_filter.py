@@ -60,7 +60,7 @@ class ColumnFilter(BaseFilter):
                     "top-top": "is in the top n results for this attribute",
                     "top-bottom": "is in the bottom n results for this attribute"
                 },
-                "default": "exact"
+                "default": "value-equals"
             },
             "strict-top": {
                 "type": UserInput.OPTION_TOGGLE,

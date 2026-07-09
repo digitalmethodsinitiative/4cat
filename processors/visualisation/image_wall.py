@@ -72,6 +72,8 @@ class ImageWallGenerator(VideoWallGenerator):
                 "kmeans-dominant": "Dominant K-means (precise, slow)",
                 "average-hsv": "Average colour (HSV; imprecise, fastest)",
             }
+            # add default (inherits options from video wall)
+            options["sort-mode"]["default"] = ""
         else:
             # add some caveats for running this directly on a video dataset
             options["sort-mode"]["tooltip"] = ("To sort by e.g. average colour, first extract frames as images and "

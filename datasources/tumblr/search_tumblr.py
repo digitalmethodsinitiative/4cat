@@ -931,6 +931,7 @@ class SearchTumblr(Search):
 
 		return self.client
 
+	@staticmethod
 	def validate_query(query, request, config):
 		"""
 		Validate custom data input

@@ -364,7 +364,7 @@ class Search4Chan(SearchWithScope):
                     "United Nations": "<span class='flag flag-t_un' title='United Nations'></span> United Nations",
                     "White Supremacist": "<span class='flag flag-t_wp' title='White Supremacist'></span> White Supremacist",
                 },
-                "default": ""
+                "default": []
             },
             "divider": {
                 "type": UserInput.OPTION_DIVIDER
@@ -839,6 +839,7 @@ class Search4Chan(SearchWithScope):
 
         return thread_sizes
 
+    @staticmethod
     def validate_query(query, request, config):
         """
         Validate input for a dataset query on the 4chan data source.

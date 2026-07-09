@@ -253,6 +253,7 @@ class SearchDouban(Search):
 
         return requests.get(url, **kwargs)
 
+    @staticmethod
     def validate_query(query, request, config):
         """
         Validate input for a dataset query on the Douban data source.
