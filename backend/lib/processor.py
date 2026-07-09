@@ -114,6 +114,15 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: evaluated from it.
     compatibility = None
 
+    #: Keys the framework injects into validate_query's input that are not
+    #: dataset parameters and must never be stored. validate_query may read
+    #: them, but get_validated_query strips them from the result. These are
+    #: only the transient queue-time signals that pass *through* validate_query;
+    #: functional keys added elsewhere (datasource, type, email-complete,
+    #: pseudonymise) and provenance keys (copied_from, producer_type) are not
+    #: listed here because they are meaningful and are added downstream of this.
+    TRANSIENT_QUERY_KEYS = ("frontend-confirm",)
+
     def work(self):
         """
         Process a dataset
@@ -1163,6 +1172,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if sanitised is None:
             raise ProcessorException(f"validate_query of {cls.type} returned nothing; it must return the "
                                      "dictionary of parameters to store with the dataset")
+
+        # drop framework-injected signals that validate_query may have read but
+        # that are not parameters; storing them would clutter the record
+        for key in cls.TRANSIENT_QUERY_KEYS:
+            sanitised.pop(key, None)
 
         if log:
             junk = [option for option, value in sanitised.items() if value is None and option not in query]
