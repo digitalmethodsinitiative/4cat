@@ -518,6 +518,50 @@ def test_parse_all_gated_options():
     assert parsed["gated"] == ";" and parsed["gated_toggle"] is False and parsed["gate"] is True
 
 
+def test_get_validated_query_flags_stored_none():
+    """
+    get_validated_query is the doorway between validate_query and the stored
+    dataset parameters. It warns when a validate_query stores None for an
+    option that was not part of the submission (the query.get() mistake in a
+    rebuilt dictionary), and refuses a validate_query that returns nothing.
+    """
+    from backend.lib.processor import BasicProcessor
+    from common.lib.exceptions import ProcessorException
+
+    class Rebuilder(BasicProcessor):
+        type = "rebuilder-test"
+
+        def process(self):
+            pass
+
+        @staticmethod
+        def validate_query(query, request, config):
+            return {"kept": query.get("kept"), "junk": query.get("junk")}
+
+    log = MagicMock()
+    result = Rebuilder.get_validated_query({"kept": "value"}, None, None, log=log)
+    assert result == {"kept": "value", "junk": None}
+    log.warning.assert_called_once()
+    assert "junk" in log.warning.call_args[0][0]
+
+    log = MagicMock()
+    Rebuilder.get_validated_query({"kept": "value", "junk": "given"}, None, None, log=log)
+    log.warning.assert_not_called()
+
+    class Forgetful(BasicProcessor):
+        type = "forgetful-test"
+
+        def process(self):
+            pass
+
+        @staticmethod
+        def validate_query(query, request, config):
+            pass
+
+    with pytest.raises(ProcessorException):
+        Forgetful.get_validated_query({}, None, None)
+
+
 def test_dataset_finish_raises_on_double_finish(mock_dataset):
     """
     Regression guard for common/lib/dataset.py:986.

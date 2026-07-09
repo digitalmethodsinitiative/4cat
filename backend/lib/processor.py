@@ -1117,6 +1117,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         missing keys; `option_given()` tells a worker whether an option was
         really part of the stored submission.
 
+        When rebuilding the returned dictionary instead of editing the given
+        one, copy optional keys only when they are present in the input: a
+        pattern like `"option": query.get("option")` stores a meaningless
+        None for options the user was never given. Keys you leave untouched
+        in an edited dictionary keep this property automatically.
+
         By default nothing is checked and the input is stored as-is. Search
         workers must define their own version: doing so is what makes a
         datasource queryable from the web interface.
@@ -1128,6 +1134,43 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         :return dict:  The parameters to store with the new dataset
         """
         return query
+
+    @classmethod
+    def get_validated_query(cls, query, request, config, log=None):
+        """
+        Run this worker's validate_query and check the result
+
+        Code that turns user input into a dataset should call this instead of
+        calling validate_query directly, so that the checks below apply no
+        matter where a dataset is created from. Future rules about
+        validate_query itself (for example, warning when a worker defines no
+        validation of its own) also belong here, so that they automatically
+        cover every place datasets are created.
+
+        Currently checked: a returned key that was not part of the submitted
+        input and holds None is almost always `query.get()` on an option the
+        user was never given, which stores a meaningless value in the dataset
+        record. Such keys are logged so the worker can be fixed.
+
+        :param dict query:  Parsed user input, as passed to validate_query
+        :param request:  Flask request the input arrived in
+        :param config:  Configuration reader, scoped to the queueing user
+        :param log:  Logger to report suspicious results to, if any
+        :return dict:  The parameters to store with the new dataset
+        """
+        sanitised = cls.validate_query(query, request, config)
+
+        if sanitised is None:
+            raise ProcessorException(f"validate_query of {cls.type} returned nothing; it must return the "
+                                     "dictionary of parameters to store with the dataset")
+
+        if log:
+            junk = [option for option, value in sanitised.items() if value is None and option not in query]
+            if junk:
+                log.warning(f"validate_query of {cls.type} stored None for options that were not part of the "
+                            f"submission ({', '.join(junk)}); such keys should only be stored when they are given")
+
+        return sanitised
 
     @classmethod
     def get_status(cls):

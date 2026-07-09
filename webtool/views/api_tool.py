@@ -463,7 +463,7 @@ def queue_dataset():
 
 		# then validate for this particular datasource
 		sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
-		sanitised_query = search_worker.validate_query(sanitised_query, request, g.config)
+		sanitised_query = search_worker.get_validated_query(sanitised_query, request, g.config, log=g.log)
 
 	except QueryNeedsFurtherInputException as e:
 		# ask the user for more input by returning a HTML snippet
@@ -1217,8 +1217,8 @@ def queue_processor(key=None, processor=None):
 
 		# by default this stores the input as-is; processors with something
 		# to check or confirm define their own validate_query
-		sanitised_query = processor_worker.validate_query(
-			sanitised_query, request, g.config
+		sanitised_query = processor_worker.get_validated_query(
+			sanitised_query, request, g.config, log=g.log
 		)
 
 	except QueryParametersException as e:
