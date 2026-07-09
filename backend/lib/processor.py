@@ -1058,6 +1058,49 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
         return copy.deepcopy(cls.options) if hasattr(cls, "options") else {}
 
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check and finalise user input before a dataset is created
+
+        The web tool calls this before creating a dataset for this worker.
+        `query` contains the values the user entered for the options from
+        `get_options()`: parsed, with defaults filled in for options the user
+        did not touch, plus `frontend-confirm` (True when the user has already
+        answered a confirmation pop-up for this submission). Options that were
+        hidden because their `requires` condition was not met are absent.
+
+        Implementations can check these values and:
+
+        - raise QueryParametersException("message") to reject the input; the
+          message is shown next to the form;
+        - raise QueryNeedsExplicitConfirmationException("question") to show an
+          OK/cancel pop-up; when the user accepts, the form is re-submitted
+          with `frontend-confirm` set, so only raise this when that key is not
+          set;
+        - raise QueryNeedsFurtherInputException(config={...}) to add extra
+          fields to the form (same format as get_options() values), after
+          which it is re-submitted.
+
+        Whatever this method returns is stored as the new dataset's
+        parameters. 4CAT adds a few keys of its own, and the values of options
+        marked `sensitive` are removed from the stored record when the dataset
+        starts running. At run time, the worker reads all of this back through
+        `self.parameters`, with declared option defaults filled in for any
+        missing keys.
+
+        By default nothing is checked and the input is stored as-is. Search
+        workers must define their own version: doing so is what makes a
+        datasource queryable from the web interface.
+
+        :param dict query:  Parsed user input for this worker's options
+        :param request:  Flask request the input arrived in, for e.g. access
+          to uploaded files
+        :param config:  Configuration reader, scoped to the queueing user
+        :return dict:  The parameters to store with the new dataset
+        """
+        return query
+
     @classmethod
     def get_status(cls):
         """
