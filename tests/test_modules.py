@@ -548,6 +548,21 @@ def test_get_validated_query_flags_stored_none():
     Rebuilder.get_validated_query({"kept": "value", "junk": "given"}, None, None, log=log)
     log.warning.assert_not_called()
 
+    # framework-injected transient keys are stripped from the stored result,
+    # even when validate_query returns them (e.g. a modify-in-place worker)
+    class PassThrough(BasicProcessor):
+        type = "passthrough-test"
+
+        def process(self):
+            pass
+
+        @staticmethod
+        def validate_query(query, request, config):
+            return query
+
+    result = PassThrough.get_validated_query({"kept": "value", "frontend-confirm": True}, None, None)
+    assert result == {"kept": "value"}
+
     class Forgetful(BasicProcessor):
         type = "forgetful-test"
 

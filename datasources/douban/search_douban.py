@@ -101,8 +101,8 @@ class SearchDouban(Search):
         """
         groups = query["groups"].split(",")
         max_topics = min(convert_to_int(query["amount"], 100), 500)
-        start = query["min_date"]
-        end = query["max_date"]
+        start = query.get("min_date")
+        end = query.get("max_date")
         strip = bool(query["strip"])
         topics_processed = 0
         posts_processed = 0
@@ -263,14 +263,10 @@ class SearchDouban(Search):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
-        filtered_query = {}
-
         # the dates need to make sense as a range to search within
         after, before = query.get("daterange")
         if before and after and before < after:
             raise QueryParametersException("Date range must start before it ends")
-
-        filtered_query["min_date"], filtered_query["max_date"] = (after, before)
 
         # normalize groups to just their IDs, even if a URL was provided, and
         # limit to 25
@@ -280,12 +276,16 @@ class SearchDouban(Search):
         if not any(groups):
             raise QueryParametersException("No valid groups were provided.")
 
-        filtered_query["groups"] = ",".join(groups)
-
+        # store the submitted parameters back, with groups normalised, the
+        # topic count clamped, and the date range replaced by the bounds set
+        query["groups"] = ",".join(groups)
         # max amount of topics is 200 because after that Douban starts throwing 429s
-        filtered_query["amount"] = max(min(convert_to_int(query["amount"], 10), 200), 1)
+        query["amount"] = max(min(convert_to_int(query["amount"], 10), 200), 1)
 
-        # strip HTML from posts?
-        filtered_query["strip"] = bool(query.get("strip", False))
+        if after:
+            query["min_date"] = after
+        if before:
+            query["max_date"] = before
+        del query["daterange"]
 
-        return filtered_query
+        return query

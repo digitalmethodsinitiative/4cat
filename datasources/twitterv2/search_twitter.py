@@ -608,12 +608,19 @@ class SearchWithTwitterAPIv2(Search):
         # if we made it this far, the query can be executed
         params = {
             "query": twitter_query,
-            "api_bearer_token": query.get("api_bearer_token"),
             "api_type": query.get("api_type", "all"),
             "query_type": query.get("query_type", "query"),
-            "min_date": after,
-            "max_date": before
         }
+
+        # the bearer token is only asked for when the server has no key of
+        # its own; only store it when it was given. Same for date bounds:
+        # only store those that were actually set
+        if "api_bearer_token" in query:
+            params["api_bearer_token"] = query["api_bearer_token"]
+        if after:
+            params["min_date"] = after
+        if before:
+            params["max_date"] = before
 
         # never query more tweets than allowed
         tweets_to_collect = convert_to_int(query.get("amount"), 10)

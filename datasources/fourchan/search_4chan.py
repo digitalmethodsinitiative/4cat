@@ -862,7 +862,12 @@ class Search4Chan(SearchWithScope):
                 and query.get("search_scope", "") != "match-ids":
             raise QueryParametersException("Please provide a message or subject search query")
 
-        query["min_date"], query["max_date"] = query["daterange"]
+        # only store date bounds that were actually set
+        after, before = query["daterange"]
+        if after:
+            query["min_date"] = after
+        if before:
+            query["max_date"] = before
 
         del query["daterange"]
         if query.get("search_scope") not in ("dense-threads",):
