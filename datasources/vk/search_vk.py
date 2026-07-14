@@ -340,11 +340,9 @@ class SearchVK(Search):
         if not query.get("query", None):
             raise QueryParametersException("Please provide a query.")
 
-        # the dates need to make sense as a range to search within
-        # but, on VK, you can also specify before *or* after only
+        # on VK you can also specify before *or* after only; a reversed date
+        # range is already rejected by parse_all()
         after, before = query.get("daterange")
-        if before and after and before < after:
-            raise QueryParametersException("Date range must start before it ends")
 
         # TODO: test username and password?
 

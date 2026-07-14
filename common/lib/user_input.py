@@ -134,7 +134,7 @@ class UserInput:
 
                     if before and after and after > before:
                         if not silently_correct:
-                            raise QueryParametersException("End of date range must be after beginning of date range.")
+                            raise QueryParametersException("The start of the date range must be before its end.")
                         else:
                             before = after
 

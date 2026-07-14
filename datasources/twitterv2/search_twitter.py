@@ -599,11 +599,9 @@ class SearchWithTwitterAPIv2(Search):
         else:
             twitter_query = query.get("query")
 
-        # the dates need to make sense as a range to search within
-        # but, on Twitter, you can also specify before *or* after only
+        # on Twitter you can also specify before *or* after only; a reversed
+        # date range is already rejected by parse_all()
         after, before = query.get("daterange")
-        if before and after and before < after:
-            raise QueryParametersException("Date range must start before it ends")
 
         # if we made it this far, the query can be executed
         params = {

@@ -151,10 +151,8 @@ class SearchBluesky(Search):
         # sanitize query
         sanitized_query = [q.strip() for q in query.get("query").replace("\n", ",").split(",") if q.strip()]
 
-        # the dates need to make sense as a range to search within
+        # a reversed date range is already rejected by parse_all()
         min_date, max_date = query.get("daterange")
-        if min_date and max_date and min_date > max_date:
-            raise QueryParametersException("The start date must be before the end date.")
 
         # Only check this if not already confirmed by the frontend
         posts_per_second = 55 # gathered from simply checking start/end times of logs

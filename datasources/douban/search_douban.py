@@ -263,10 +263,8 @@ class SearchDouban(Search):
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
-        # the dates need to make sense as a range to search within
+        # a reversed date range is already rejected by parse_all()
         after, before = query.get("daterange")
-        if before and after and before < after:
-            raise QueryParametersException("Date range must start before it ends")
 
         # normalize groups to just their IDs, even if a URL was provided, and
         # limit to 25
