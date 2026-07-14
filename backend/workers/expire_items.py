@@ -136,6 +136,7 @@ class ThingExpirer(BasicWorker):
         abandoned = self.db.fetchall(
             "SELECT * FROM datasets WHERE is_finished = FALSE AND timestamp < %s",
             (cutoff,))
+        self.log.info(f"Found {len(abandoned)} abandoned datasets; cleaning up sensitive parameters if present.")
 
         wrappers = {}
         for dataset_data in abandoned:
