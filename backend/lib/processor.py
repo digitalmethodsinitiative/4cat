@@ -361,6 +361,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                                     "Cannot find preset's source dataset for dataset %s" % self.dataset.key)
                                 break
 
+        # the follow-up datasets now hold their own copy of any sensitive
+        # values that were queued for them, so remove those values from this
+        # dataset's stored `next` chain, where they would otherwise remain
+        try:
+            self.dataset.remove_sensitive_parameters_from_next(config=self.config)
+        except Exception as e:
+            self.log.warning(f"Could not remove sensitive next parameters of dataset {self.dataset.key}: {e}")
+
         # see if we need to register the result somewhere
         if "copy_to" in self.parameters:
             # copy the results to an arbitrary place that was passed

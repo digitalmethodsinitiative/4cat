@@ -126,11 +126,14 @@ class ThingExpirer(BasicWorker):
         Remove sensitive option values from abandoned datasets
 
         Sensitive option values (e.g. API keys) are removed from a dataset's
-        stored parameters as soon as it starts running. A dataset that is
-        created but never picked up by a worker - for example because the
-        backend was stopped for good before it could run - would keep those
-        values forever, so remove them here once the dataset is old enough to
-        be considered abandoned.
+        stored parameters as soon as it starts running (top-level values), and
+        from its `next` chain once its follow-up datasets are created. A
+        dataset that is created but never picked up by a worker - for example
+        because the backend was stopped for good before it could run, or one
+        that keeps crashing before finishing - would keep those values forever,
+        so remove both here once the dataset is old enough to be considered
+        abandoned. An abandoned dataset never created its follow-ups, so
+        clearing its `next` chain is safe.
         """
         cutoff = int(time.time()) - self.abandoned_dataset_age
         abandoned = self.db.fetchall(
@@ -153,6 +156,7 @@ class ThingExpirer(BasicWorker):
 
                 dataset = DataSet(data=dataset_data, db=self.db, modules=self.modules, check_owners=False)
                 dataset.remove_sensitive_parameters(config=wrappers[dataset_data["creator"]])
+                dataset.remove_sensitive_parameters_from_next(config=wrappers[dataset_data["creator"]])
 
             except DataSetNotFoundException:
                 # deleted in the meantime

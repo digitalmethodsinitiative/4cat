@@ -1906,6 +1906,67 @@ class DataSet(FourcatModule):
                 if settings.get("sensitive"):
                     self.delete_parameter(option)
 
+    def remove_sensitive_parameters_from_next(self, config):
+        """
+        Remove sensitive option values from queued follow-up parameters
+
+        A dataset's parameters can contain a `next` chain: parameters for
+        follow-up processors that run once this dataset finishes. Those
+        parameters may hold sensitive values (e.g. an API key a follow-up
+        processor needs). Once the follow-up datasets have been created they
+        hold their own copy and remove it themselves when they run, so those
+        values are no longer needed here and can be removed from this dataset's
+        stored `next` chain, where they would otherwise remain indefinitely.
+
+        Call this *after* the follow-up datasets have been created (at the end
+        of after_process), not before, or the follow-ups will not receive the
+        values.
+
+        :param config:  Configuration reader, used to determine each follow-up
+          processor's options (which options are sensitive can depend on it).
+        """
+        if not isinstance(self.parameters.get("next"), list):
+            return
+
+        if self._remove_sensitive_from_next_steps(self.parameters["next"], config):
+            self.db.update("datasets", where={"key": self.key},
+                           data={"parameters": json.dumps(self.parameters)})
+            self.data["parameters"] = json.dumps(self.parameters)
+
+    def _remove_sensitive_from_next_steps(self, steps, config):
+        """
+        Recursively remove sensitive option values from a list of `next` steps.
+
+        :param list steps:  A list of `next` steps, each a dict with a `type`
+          and `parameters`.
+        :param config:  Configuration reader.
+        :return bool:  Whether anything was removed.
+        """
+        removed = False
+        for step in steps:
+            parameters = step.get("parameters")
+            if not isinstance(parameters, dict):
+                continue
+
+            processor = self.modules.processors.get(step.get("type")) if self.modules else None
+            if processor:
+                try:
+                    options = processor.get_options(config=config)
+                except Exception:
+                    # never let a follow-up's get_options failure block cleanup
+                    options = {}
+                for option, settings in options.items():
+                    if settings.get("sensitive") and option in parameters:
+                        del parameters[option]
+                        removed = True
+
+            # a step can itself queue further steps
+            if isinstance(parameters.get("next"), list):
+                if self._remove_sensitive_from_next_steps(parameters["next"], config):
+                    removed = True
+
+        return removed
+
     def get_version_url(self, file):
         """
         Get a versioned github URL for the version this dataset was processed with

@@ -577,6 +577,45 @@ def test_get_validated_query_flags_stored_none():
         Forgetful.get_validated_query({}, None, None)
 
 
+def test_remove_sensitive_parameters_from_next(mock_dataset):
+    """
+    Sensitive values queued for follow-up processors in a dataset's `next`
+    chain (e.g. an API key a follow-up needs) must be removed from the stored
+    record once the follow-up datasets exist and hold their own copy. Nested
+    chains are cleaned recursively; non-sensitive values are left in place.
+    """
+    fake_processor = MagicMock()
+    fake_processor.get_options.return_value = {
+        "api_key": {"sensitive": True},
+        "amount": {},
+    }
+    mock_dataset.modules = MagicMock()
+    mock_dataset.modules.processors = {"fake-proc": fake_processor}
+
+    mock_dataset.parameters = {
+        "next": [{
+            "type": "fake-proc",
+            "parameters": {
+                "api_key": "SECRET",
+                "amount": 5,
+                "next": [{
+                    "type": "fake-proc",
+                    "parameters": {"api_key": "ALSO_SECRET", "amount": 9},
+                }],
+            },
+        }],
+    }
+
+    mock_dataset.remove_sensitive_parameters_from_next(config=None)
+
+    top = mock_dataset.parameters["next"][0]["parameters"]
+    assert "api_key" not in top, "top-level sensitive key should be removed"
+    assert top["amount"] == 5, "non-sensitive key should be kept"
+    nested = top["next"][0]["parameters"]
+    assert "api_key" not in nested, "nested sensitive key should be removed"
+    assert nested["amount"] == 9, "nested non-sensitive key should be kept"
+
+
 def test_dataset_finish_raises_on_double_finish(mock_dataset):
     """
     Regression guard for common/lib/dataset.py:986.
