@@ -577,6 +577,60 @@ def test_get_validated_query_flags_stored_none():
         Forgetful.get_validated_query({}, None, None)
 
 
+def test_warn_unexpected_parameters():
+    """
+    Programmatically-queued datasets (preset pipelines, `next` chains) are not
+    validated like user queries, so a parameter meant for another processor or
+    misspelled is silently ignored. warn_unexpected_parameters logs a warning
+    for any key the target processor doesn't declare, while treating framework
+    keys and `_`-prefixed internal plumbing as expected. It never raises.
+    """
+    from backend.lib.processor import BasicProcessor
+
+    def config_with_dev_mode(enabled):
+        cfg = MagicMock()
+        cfg.get = MagicMock(side_effect=lambda key, default=None, **kw: enabled if key == "dev.mode" else default)
+        return cfg
+
+    dev_on = config_with_dev_mode(True)
+
+    processor = MagicMock()
+    processor.type = "tokenise-posts"
+    processor.get_options.return_value = {"docs_per": {}, "columns": {}}
+
+    # a key the processor doesn't declare is flagged; declared, framework, and
+    # underscore-prefixed keys are not
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        processor,
+        {"docs_per": "month", "columns": "body", "timeframe": "x",
+         "next": [], "attach_to": "k", "_internal": 1},
+        parent_dataset=None, config=dev_on, log=log)
+    log.warning.assert_called_once()
+    assert "timeframe" in log.warning.call_args[0][0]
+
+    # nothing unexpected -> no warning
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        processor, {"docs_per": "month"}, parent_dataset=None, config=dev_on, log=log)
+    log.warning.assert_not_called()
+
+    # dev mode off -> no warning, even for an unexpected key
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        processor, {"timeframe": "x"}, parent_dataset=None, config=config_with_dev_mode(False), log=log)
+    log.warning.assert_not_called()
+
+    # a processor whose get_options raises must not raise here
+    broken = MagicMock()
+    broken.type = "broken"
+    broken.get_options.side_effect = RuntimeError("boom")
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        broken, {"anything": 1}, parent_dataset=None, config=dev_on, log=log)
+    log.warning.assert_not_called()
+
+
 def test_remove_sensitive_parameters_from_next(mock_dataset):
     """
     Sensitive values queued for follow-up processors in a dataset's `next`

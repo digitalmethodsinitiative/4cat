@@ -123,6 +123,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: listed here because they are meaningful and are added downstream of this.
     TRANSIENT_QUERY_KEYS = ("frontend-confirm",)
 
+    #: Parameter keys the framework itself uses on a dataset (as opposed to a
+    #: processor's own options), so they are expected on a queued processor
+    #: even though no get_options() declares them. Used by
+    #: warn_unexpected_parameters(); keys starting with `_` (internal
+    #: cross-processor plumbing) are also treated as expected.
+    FRAMEWORK_PARAMETER_KEYS = ("next", "attach_to", "copy_to")
+
     def work(self):
         """
         Process a dataset
@@ -319,6 +326,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                         next_type, self.dataset.key))
 
             elif next_type in available_processors:
+                self.warn_unexpected_parameters(
+                    available_processors[next_type], next_parameters, self.dataset, self.config, self.log)
                 next_analysis = DataSet(
                     parameters=next_parameters,
                     type=next_type,
@@ -1193,6 +1202,53 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                             f"submission ({', '.join(junk)}); such keys should only be stored when they are given")
 
         return sanitised
+
+    @staticmethod
+    def warn_unexpected_parameters(processor, parameters, parent_dataset, config, log):
+        """
+        Warn when a processor is queued with parameters it does not use
+
+        Datasets created programmatically (preset pipelines and `next` chains)
+        are not validated the way user-submitted queries are, so a parameter
+        meant for a different processor - or simply misspelled - is silently
+        ignored at run time. This logs a warning for any parameter key the
+        target processor does not declare in get_options(), so such mistakes
+        are visible. It never raises: the value is developer-authored, and
+        dropping a stale key is better than breaking the chain.
+
+        Keys the framework itself uses (FRAMEWORK_PARAMETER_KEYS) and keys
+        starting with `_` (internal cross-processor plumbing, not user options)
+        are expected and not warned about.
+
+        This only runs when the `dev.mode` setting is enabled: the warnings are
+        a developer aid (a processor may legitimately read a parameter it does
+        not declare), so they are off by default and can be toggled live in the
+        control panel.
+
+        :param processor:  The processor class the dataset is queued for.
+        :param dict parameters:  The parameters the dataset is queued with.
+        :param parent_dataset:  The dataset the processor will run on, used to
+          resolve options whose availability depends on it.
+        :param config:  Configuration reader.
+        :param log:  Logger to warn to.
+        """
+        if not processor or not log:
+            return
+
+        if not config or not config.get("dev.mode", False):
+            return
+
+        try:
+            known = set(processor.get_options(parent_dataset, config=config))
+        except Exception:
+            # if the options can't be determined, don't guess at what's unexpected
+            return
+
+        for key in parameters:
+            if key in known or key in BasicProcessor.FRAMEWORK_PARAMETER_KEYS or key.startswith("_"):
+                continue
+            log.warning(f"Processor {processor.type} was queued with parameter '{key}', which it does not "
+                        "use; the value will be ignored.")
 
     @classmethod
     def get_status(cls):

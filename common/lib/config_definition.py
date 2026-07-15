@@ -339,6 +339,15 @@ config_definition = {
         "tooltip": "Slack callback URL to use for alerts",
         "global": True
     },
+    # developer options
+    "dev.mode": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Developer mode",
+        "tooltip": "Enables extra developer-facing diagnostics that are not needed for normal operation, e.g. additional "
+                   "logging useful when creating new data sources or processors.",
+        "global": True
+    },
     "mail.admin_email": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
