@@ -16,6 +16,7 @@ Use ``helper-scripts/create_test_jobs.py`` to enqueue one of each. Note that the
 backend daemon must also have ``FOURCAT_ENABLE_TEST_DATASOURCE`` set for the
 jobs to actually be picked up and run.
 """
+import datetime
 import os
 import time
 
@@ -80,6 +81,9 @@ if TEST_DATASOURCE_ENABLED:
             :param dict query:  Query parameters, expects a `mode` key
             :return:  Iterable of dummy items (complete mode) or None (forever)
             """
+            # set expiration date for the dataset
+            self.dataset.__setattr__("expires-after", (datetime.datetime.now() + datetime.timedelta(days=1)).timestamp())
+
             mode = query.get("mode", "complete")
 
             if mode == "crash":
