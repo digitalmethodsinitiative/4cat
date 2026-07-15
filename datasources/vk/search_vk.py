@@ -340,27 +340,22 @@ class SearchVK(Search):
         if not query.get("query", None):
             raise QueryParametersException("Please provide a query.")
 
-        # the dates need to make sense as a range to search within
-        # but, on VK, you can also specify before *or* after only
+        # on VK you can also specify before *or* after only; a reversed date
+        # range is already rejected by parse_all()
         after, before = query.get("daterange")
-        if before and after and before < after:
-            raise QueryParametersException("Date range must start before it ends")
 
         # TODO: test username and password?
 
-        # if we made it this far, the query can be executed
-        params = {
-            "query":  query.get("query"),
-            "query_type": query.get("query_type"),
-            "amount": query.get("amount"),
-            "include_comments": query.get("include_comments"),
-            "min_date": after,
-            "max_date": before,
-            "username": query.get("username"),
-            "password": query.get("password"),
-        }
+        # if we made it this far, the query can be executed; store the
+        # submitted parameters back, replacing the date range with the bounds
+        # that were actually set
+        if after:
+            query["min_date"] = after
+        if before:
+            query["max_date"] = before
+        del query["daterange"]
 
-        return params
+        return query
 
     @staticmethod
     def map_item(item):

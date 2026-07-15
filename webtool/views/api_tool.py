@@ -23,6 +23,7 @@ from common.lib.dataset import DataSet
 from common.lib.helpers import UserInput, call_api, get_software_commit, get_software_version, get_git_branch
 from common.lib.user import User
 from backend.lib.worker import BasicWorker
+from backend.lib.processor import BasicProcessor
 from common.lib.item_mapping import MissingMappedField
 
 component = Blueprint("toolapi", __name__)
@@ -447,35 +448,38 @@ def queue_dataset():
 	# source specific
 	has_confirm = bool(request.form.get("frontend-confirm", False))
 
-	if hasattr(search_worker, "validate_query"):
-		# queries are always validated, also if they have been validated before,
-		# just in case
-		try:
-			# first sanitise values
-			sanitised_query = UserInput.parse_all(search_worker.get_options(None, g.config), request.form, silently_correct=False)
+	if search_worker.validate_query is BasicProcessor.validate_query:
+		# a datasource is only queryable from here if its search worker
+		# defines its own validate_query; one that does not (e.g. the
+		# import-only/Zeeschuimer datasources) gets its data some other way
+		g.log.warning("Datasource '%s' has no validate_query method, so it cannot be queued via the web interface" % datasource_id)
+		return error(404, message="Datasource '%s' does not support queueing datasets via the web interface" % datasource_id)
 
-			# then validate for this particular datasource
-			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
-			sanitised_query = search_worker.validate_query(sanitised_query, request, g.config)
+	# queries are always validated, also if they have been validated before,
+	# just in case
+	try:
+		# first sanitise values
+		sanitised_query = UserInput.parse_all(search_worker.get_options(None, g.config), request.form, silently_correct=False)
 
-		except QueryNeedsFurtherInputException as e:
-			# ask the user for more input by returning a HTML snippet
-			# containing form fields to be added to the form before it is
-			# re-submitted
-			form = render_template("components/create-dataset-option.html", options=e.config)
-			return jsonify({"status": "extra-form", "html": form})
+		# then validate for this particular datasource
+		sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
+		sanitised_query = search_worker.get_validated_query(sanitised_query, request, g.config, log=g.log)
 
-		except QueryParametersException as e:
-			# parameters need amending
-			return jsonify({"status": "error", "message": "Cannot create a dataset with these parameters. %s" % e})
+	except QueryNeedsFurtherInputException as e:
+		# ask the user for more input by returning a HTML snippet
+		# containing form fields to be added to the form before it is
+		# re-submitted
+		form = render_template("components/create-dataset-option.html", options=e.config)
+		return jsonify({"status": "extra-form", "html": form})
 
-		except QueryNeedsExplicitConfirmationException as e:
-			# parameters are OK, but we need to be sure the user wants this
-			# (because it will e.g. take a long time)
-			return jsonify({"status": "confirm", "message": str(e)})
+	except QueryParametersException as e:
+		# parameters need amending
+		return jsonify({"status": "error", "message": "Cannot create a dataset with these parameters. %s" % e})
 
-	else:
-		raise NotImplementedError("Data sources MUST sanitise input values with validate_query")
+	except QueryNeedsExplicitConfirmationException as e:
+		# parameters are OK, but we need to be sure the user wants this
+		# (because it will e.g. take a long time)
+		return jsonify({"status": "confirm", "message": str(e)})
 
 	# parameters OK, front-end can submit for real
 	# why not just continue? because the initial validation is done with
@@ -1211,11 +1215,11 @@ def queue_processor(key=None, processor=None):
 
 		sanitised_query["frontend-confirm"] = bool(request.form.get("frontend-confirm", False))
 
-		if hasattr(processor_worker, "validate_query"):
-			# validate_query is optional for processors
-			sanitised_query = processor_worker.validate_query(
-				sanitised_query, request, g.config
-			)
+		# by default this stores the input as-is; processors with something
+		# to check or confirm define their own validate_query
+		sanitised_query = processor_worker.get_validated_query(
+			sanitised_query, request, g.config, log=g.log
+		)
 
 	except QueryParametersException as e:
 		# parameters need amending

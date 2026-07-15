@@ -406,6 +406,313 @@ def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dat
         logger.info("All datasources passed successfully.")
 
 
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_validate_query_declarations(logger, fourcat_modules):
+    """
+    validate_query is always called on the class, never on an instance, so
+    any worker that defines its own must make it a @staticmethod. A plain
+    method happens to work when called on the class, but binds the query
+    dictionary to `self` as soon as it is called on an instance, so enforce
+    the decorator here.
+    """
+    import inspect
+    from backend.lib.processor import BasicProcessor
+
+    offenders = []
+    for name, worker in fourcat_modules.processors.items():
+        if worker.validate_query is BasicProcessor.validate_query:
+            # inherits the store-as-is default; nothing declared to check
+            continue
+
+        declaration = inspect.getattr_static(worker, "validate_query")
+        if not isinstance(declaration, staticmethod):
+            offenders.append(name)
+
+    assert not offenders, (
+        "These workers define validate_query without @staticmethod; it is called on the "
+        f"class, so it must be a static method: {sorted(set(offenders))}"
+    )
+
+
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_option_declarations(logger, fourcat_modules, mock_dataset, mock_basic_config):
+    """
+    Option defaults are stored and filled in exactly as declared - they skip
+    the type parsing that user input gets - so a wrongly typed default shows
+    up as a confusing runtime value instead of an error. Check the
+    declarations themselves: toggles need a True/False default, a choice
+    default must be one of the choices, text options with a min/max are
+    treated as numbers so their default must be a number, and multi-choice
+    defaults must be lists.
+    """
+    from common.lib.helpers import UserInput
+
+    problems = []
+    for name, worker in fourcat_modules.processors.items():
+        try:
+            options = worker.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
+        except Exception:
+            # get_options failures are already reported by test_processors
+            continue
+
+        for option, settings in (options or {}).items():
+            if not isinstance(settings, dict):
+                problems.append((name, option, "option settings are not a dictionary"))
+                continue
+
+            option_type = settings.get("type")
+            default = settings.get("default")
+
+            if option_type in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
+                if "default" in settings and not isinstance(default, bool):
+                    problems.append((name, option, f"toggle default should be True or False, not {default!r}"))
+
+            elif option_type == UserInput.OPTION_CHOICE:
+                choices = settings.get("options", {})
+                if isinstance(choices, dict) and choices and all(isinstance(choice, dict) for choice in choices.values()):
+                    # choices grouped into categories: the real values are the inner keys
+                    choices = [value for group in choices.values() for value in group]
+                if "default" in settings and choices and default not in choices:
+                    problems.append((name, option, f"default {default!r} is not one of the choices"))
+
+            elif option_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
+                if ("min" in settings or "max" in settings) and "default" in settings \
+                        and not isinstance(default, (int, float)):
+                    problems.append((name, option, f"option has a min/max so its value is treated as a number, but the default is {default!r}"))
+
+            elif option_type in (UserInput.OPTION_MULTI, UserInput.OPTION_MULTI_SELECT):
+                if "default" in settings and default is not None and not isinstance(default, (list, tuple)):
+                    problems.append((name, option, f"default for a multiple-choice option should be a list, not {default!r}"))
+
+    if problems:
+        report = "\n".join(f"{name} / {option}: {problem}" for name, option, problem in sorted(problems))
+        pytest.fail(f"{len(problems)} option declaration(s) have defaults that do not match their type:\n{report}")
+    else:
+        logger.info("All option declarations look consistent.")
+
+
+def test_parse_all_gated_options():
+    """
+    Options with a "requires" condition are only part of the parsed input when
+    their condition is met - whether or not the (hidden) form field was
+    submitted. This keeps the stored parameters honest: a missing key means
+    the user never saw the option, a present key means they chose a value or
+    its default applies. At run time, self.parameters fills every declared
+    option regardless (so plain reads are always safe); the stored honesty is
+    exposed to workers through BasicProcessor.option_given().
+    """
+    from common.lib.user_input import UserInput
+
+    options = {
+        "gate": {"type": UserInput.OPTION_TOGGLE, "default": False},
+        "gated": {"type": UserInput.OPTION_TEXT, "default": ",", "requires": "gate==true"},
+        "gated_toggle": {"type": UserInput.OPTION_TOGGLE, "default": True, "requires": "gate==true"},
+        "plain": {"type": UserInput.OPTION_TEXT, "default": "x"},
+    }
+
+    # gate off, gated fields not submitted: gated options are absent, not defaulted
+    parsed = UserInput.parse_all(options, {"option-plain": "y"})
+    assert parsed == {"gate": False, "plain": "y"}
+
+    # gate off, gated field submitted anyway (e.g. hidden field still posts):
+    # still absent
+    parsed = UserInput.parse_all(options, {"option-gated": ";"})
+    assert "gated" not in parsed and "gated_toggle" not in parsed
+
+    # gate on: gated options are parsed (submitted value) or defaulted (absent)
+    parsed = UserInput.parse_all(options, {"option-gate": "on", "option-gated": ";"})
+    assert parsed["gated"] == ";" and parsed["gated_toggle"] is False and parsed["gate"] is True
+
+
+def test_get_validated_query_flags_stored_none():
+    """
+    get_validated_query is the doorway between validate_query and the stored
+    dataset parameters. It warns when a validate_query stores None for an
+    option that was not part of the submission (the query.get() mistake in a
+    rebuilt dictionary), and refuses a validate_query that returns nothing.
+    """
+    from backend.lib.processor import BasicProcessor
+    from common.lib.exceptions import ProcessorException
+
+    class Rebuilder(BasicProcessor):
+        type = "rebuilder-test"
+
+        def process(self):
+            pass
+
+        @staticmethod
+        def validate_query(query, request, config):
+            return {"kept": query.get("kept"), "junk": query.get("junk")}
+
+    log = MagicMock()
+    result = Rebuilder.get_validated_query({"kept": "value"}, None, None, log=log)
+    assert result == {"kept": "value", "junk": None}
+    log.warning.assert_called_once()
+    assert "junk" in log.warning.call_args[0][0]
+
+    log = MagicMock()
+    Rebuilder.get_validated_query({"kept": "value", "junk": "given"}, None, None, log=log)
+    log.warning.assert_not_called()
+
+    # framework-injected transient keys are stripped from the stored result,
+    # even when validate_query returns them (e.g. a modify-in-place worker)
+    class PassThrough(BasicProcessor):
+        type = "passthrough-test"
+
+        def process(self):
+            pass
+
+        @staticmethod
+        def validate_query(query, request, config):
+            return query
+
+    result = PassThrough.get_validated_query({"kept": "value", "frontend-confirm": True}, None, None)
+    assert result == {"kept": "value"}
+
+    class Forgetful(BasicProcessor):
+        type = "forgetful-test"
+
+        def process(self):
+            pass
+
+        @staticmethod
+        def validate_query(query, request, config):
+            pass
+
+    with pytest.raises(ProcessorException):
+        Forgetful.get_validated_query({}, None, None)
+
+
+def test_warn_unexpected_parameters():
+    """
+    Programmatically-queued datasets (preset pipelines, `next` chains) are not
+    validated like user queries, so a parameter meant for another processor or
+    misspelled is silently ignored. warn_unexpected_parameters logs a warning
+    for any key the target processor doesn't declare, while treating framework
+    keys and `_`-prefixed internal plumbing as expected. It never raises.
+    """
+    from backend.lib.processor import BasicProcessor
+
+    def config_with_dev_mode(enabled):
+        cfg = MagicMock()
+        cfg.get = MagicMock(side_effect=lambda key, default=None, **kw: enabled if key == "dev.mode" else default)
+        return cfg
+
+    dev_on = config_with_dev_mode(True)
+
+    processor = MagicMock()
+    processor.type = "tokenise-posts"
+    processor.get_options.return_value = {"docs_per": {}, "columns": {}}
+
+    # a key the processor doesn't declare is flagged; declared, framework, and
+    # underscore-prefixed keys are not
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        processor,
+        {"docs_per": "month", "columns": "body", "timeframe": "x",
+         "next": [], "attach_to": "k", "_internal": 1},
+        parent_dataset=None, config=dev_on, log=log)
+    log.warning.assert_called_once()
+    assert "timeframe" in log.warning.call_args[0][0]
+
+    # nothing unexpected -> no warning
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        processor, {"docs_per": "month"}, parent_dataset=None, config=dev_on, log=log)
+    log.warning.assert_not_called()
+
+    # a key the target reads but does not declare, listed in accepted_parameters,
+    # is not flagged (e.g. a config-gated option a preset deliberately passes)
+    processor.accepted_parameters = ("also_indirect",)
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        processor, {"docs_per": "month", "also_indirect": "all"},
+        parent_dataset=None, config=dev_on, log=log)
+    log.warning.assert_not_called()
+
+    # dev mode off -> no warning, even for an unexpected key
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        processor, {"timeframe": "x"}, parent_dataset=None, config=config_with_dev_mode(False), log=log)
+    log.warning.assert_not_called()
+
+    # a processor whose get_options raises must not raise here
+    broken = MagicMock()
+    broken.type = "broken"
+    broken.get_options.side_effect = RuntimeError("boom")
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        broken, {"anything": 1}, parent_dataset=None, config=dev_on, log=log)
+    log.warning.assert_not_called()
+
+
+def test_remove_sensitive_parameters_from_next(mock_dataset):
+    """
+    Sensitive values queued for follow-up processors in a dataset's `next`
+    chain (e.g. an API key a follow-up needs) must be removed from the stored
+    record once the follow-up datasets exist and hold their own copy. Nested
+    chains are cleaned recursively; non-sensitive values are left in place.
+    """
+    fake_processor = MagicMock()
+    fake_processor.get_options.return_value = {
+        "api_key": {"sensitive": True},
+        "amount": {},
+    }
+    mock_dataset.modules = MagicMock()
+    mock_dataset.modules.processors = {"fake-proc": fake_processor}
+
+    mock_dataset.parameters = {
+        "next": [{
+            "type": "fake-proc",
+            "parameters": {
+                "api_key": "SECRET",
+                "amount": 5,
+                "next": [{
+                    "type": "fake-proc",
+                    "parameters": {"api_key": "ALSO_SECRET", "amount": 9},
+                }],
+            },
+        }],
+    }
+
+    mock_dataset.remove_sensitive_parameters_from_next(config=None)
+
+    top = mock_dataset.parameters["next"][0]["parameters"]
+    assert "api_key" not in top, "top-level sensitive key should be removed"
+    assert top["amount"] == 5, "non-sensitive key should be kept"
+    nested = top["next"][0]["parameters"]
+    assert "api_key" not in nested, "nested sensitive key should be removed"
+    assert nested["amount"] == 9, "nested non-sensitive key should be kept"
+
+
+def test_remove_sensitive_parameters(mock_dataset):
+    """
+    Sensitive option values (e.g. API keys) must be removed from a dataset's
+    own stored parameters as soon as it runs. The options are resolved from
+    both the processor that produced the dataset and the one matching its
+    current type (these can differ once a filter has adopted a new type), so a
+    sensitive option declared by either is scrubbed while non-sensitive values
+    are left in place.
+    """
+    producer = MagicMock()
+    producer.get_options.return_value = {"api_key": {"sensitive": True}, "amount": {}}
+    own = MagicMock()
+    own.get_options.return_value = {"session_token": {"sensitive": True}}
+
+    mock_dataset.get_producer_processor = MagicMock(return_value=producer)
+    mock_dataset.get_own_processor = MagicMock(return_value=own)
+
+    deleted = []
+    mock_dataset.delete_parameter = MagicMock(side_effect=deleted.append)
+
+    mock_dataset.remove_sensitive_parameters(config=None)
+
+    # a sensitive option declared by either processor is removed; the
+    # non-sensitive one is left untouched
+    assert set(deleted) == {"api_key", "session_token"}
+    assert "amount" not in deleted
+
+
 def test_dataset_finish_raises_on_double_finish(mock_dataset):
     """
     Regression guard for common/lib/dataset.py:986.

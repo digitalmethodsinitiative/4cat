@@ -114,6 +114,29 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: evaluated from it.
     compatibility = None
 
+    #: Keys the framework injects into validate_query's input that are not
+    #: dataset parameters and must never be stored. validate_query may read
+    #: them, but get_validated_query strips them from the result. These are
+    #: only the transient queue-time signals that pass *through* validate_query;
+    #: functional keys added elsewhere (datasource, type, email-complete,
+    #: pseudonymise) and provenance keys (copied_from, producer_type) are not
+    #: listed here because they are meaningful and are added downstream of this.
+    TRANSIENT_QUERY_KEYS = ("frontend-confirm",)
+
+    #: Parameter keys the framework itself uses on a dataset (as opposed to a
+    #: processor's own options), so they are expected on a queued processor
+    #: even though no get_options() declares them. Used by
+    #: warn_unexpected_parameters(); keys starting with `_` (internal
+    #: cross-processor plumbing) are also treated as expected.
+    FRAMEWORK_PARAMETER_KEYS = ("next", "attach_to", "copy_to")
+
+    #: Parameters this processor reads but does not (always) declare in
+    #: get_options() — e.g. an option offered only under certain config, or a
+    #: value a preset deliberately passes it. Override per-processor to state
+    #: this input surface; these keys are exempt from
+    #: warn_unexpected_parameters().
+    accepted_parameters = tuple()
+
     def work(self):
         """
         Process a dataset
@@ -198,22 +221,33 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # Add source dataset to cleanup list to remove disposable files
             self.for_cleanup.append(self.source_dataset)
 
-        # get parameters
-        # if possible, fill defaults where parameters are not provided
+        # build the single runtime view of this dataset's parameters: every
+        # stored parameter, plus the declared default for any option that was
+        # not stored, so worker code can read any declared option without
+        # checking whether it exists. The stored parameters themselves are
+        # kept as self.given_parameters: they hold only the options that were
+        # actually part of the submission (see option_given()). Worker code
+        # should read options from self.parameters, and not re-read them from
+        # the dataset mid-run — stored parameters may change during a run,
+        # but these dictionaries stay stable.
         given_parameters = self.dataset.parameters.copy()
         all_parameters = self.get_options(self.source_dataset, config=self.config)
+        self.given_parameters = given_parameters
         self.parameters = {
             param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
             for param in [*all_parameters.keys(), *given_parameters.keys()]
         }
 
-        # now the parameters have been loaded into memory, clear any sensitive
-        # ones. This has a side-effect that a processor may not run again
-        # without starting from scratch, but this is the price of progress
-        options = self.get_options(self.dataset.get_parent(), config=self.config)
-        for option, option_settings in options.items():
-            if option_settings.get("sensitive"):
-                self.dataset.delete_parameter(option)
+        # the values of sensitive options (e.g. API keys) stay available in
+        # self.parameters for the duration of this run, but are removed from
+        # the stored dataset record right away, so they spend as little time
+        # in the database as possible. The deliberate trade-off is that a run
+        # that is interrupted and retried later no longer has these values.
+        try:
+            self.dataset.remove_sensitive_parameters(config=self.config)
+        except Exception as e:
+            # failing to remove these values should not fail the dataset
+            self.log.warning(f"Could not remove sensitive parameters of dataset {self.dataset.key}: {e}")
 
         if self.interrupted:
             self.dataset.log("Processing interrupted, trying again later")
@@ -223,7 +257,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             try:
                 self.process()
                 self.after_process()
-                
+
                 # processors should usually finish their jobs by themselves, but if
                 # the worker finished without errors, the job can be finished in
                 # any case
@@ -299,6 +333,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                         next_type, self.dataset.key))
 
             elif next_type in available_processors:
+                self.warn_unexpected_parameters(
+                    available_processors[next_type], next_parameters, self.dataset, self.config, self.log)
                 next_analysis = DataSet(
                     parameters=next_parameters,
                     type=next_type,
@@ -340,6 +376,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                                 self.log.warning(
                                     "Cannot find preset's source dataset for dataset %s" % self.dataset.key)
                                 break
+
+        # the follow-up datasets now hold their own copy of any sensitive
+        # values that were queued for them, so remove those values from this
+        # dataset's stored `next` chain, where they would otherwise remain
+        try:
+            self.dataset.remove_sensitive_parameters_from_next(config=self.config)
+        except Exception as e:
+            self.log.warning(f"Could not remove sensitive next parameters of dataset {self.dataset.key}: {e}")
 
         # see if we need to register the result somewhere
         if "copy_to" in self.parameters:
@@ -430,6 +474,29 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                     send_email([owner], message, self.config)
                 except (SMTPException, ConnectionRefusedError, socket.timeout):
                     self.log.error("Error sending email to %s" % owner)
+
+    def option_given(self, option):
+        """
+        Check whether an option was actually part of this dataset's submission
+
+        `self.parameters` always contains every option this worker declares,
+        with defaults filled in for anything that was not stored. That is
+        convenient for reading values, but it cannot tell you whether the
+        option was really part of the submission. This method can: it checks
+        the parameters as they were stored when the dataset was created. For
+        datasets queued via the web interface, an option is only stored if
+        the user could see it when submitting (i.e. its `requires` condition
+        was met); for datasets queued by other code (e.g. presets), an option
+        is only stored if the calling code explicitly set it.
+
+        Note that a stored option may still hold its default value: a user
+        who saw an option and left it untouched still counts as having been
+        given it.
+
+        :param str option:  Option name, as used in `get_options()`
+        :return bool:  Whether the option was part of the stored parameters
+        """
+        return option in self.given_parameters
 
     def clean_up_on_error(self):
         try:
@@ -1050,6 +1117,150 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         """
 
         return copy.deepcopy(cls.options) if hasattr(cls, "options") else {}
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check and finalise user input before a dataset is created
+
+        The web tool calls this before creating a dataset for this worker.
+        `query` contains the values the user entered for the options from
+        `get_options()`: parsed, with defaults filled in for options the user
+        did not touch, plus `frontend-confirm` (True when the user has already
+        answered a confirmation pop-up for this submission). Options that were
+        hidden because their `requires` condition was not met are absent.
+
+        Implementations can check these values and:
+
+        - raise QueryParametersException("message") to reject the input; the
+          message is shown next to the form;
+        - raise QueryNeedsExplicitConfirmationException("question") to show an
+          OK/cancel pop-up; when the user accepts, the form is re-submitted
+          with `frontend-confirm` set, so only raise this when that key is not
+          set;
+        - raise QueryNeedsFurtherInputException(config={...}) to add extra
+          fields to the form (same format as get_options() values), after
+          which it is re-submitted.
+
+        Whatever this method returns is stored as the new dataset's
+        parameters. 4CAT adds a few keys of its own, and the values of options
+        marked `sensitive` are removed from the stored record when the dataset
+        starts running. At run time, the worker reads all of this back through
+        `self.parameters`, with declared option defaults filled in for any
+        missing keys; `option_given()` tells a worker whether an option was
+        really part of the stored submission.
+
+        When rebuilding the returned dictionary instead of editing the given
+        one, copy optional keys only when they are present in the input: a
+        pattern like `"option": query.get("option")` stores a meaningless
+        None for options the user was never given. Keys you leave untouched
+        in an edited dictionary keep this property automatically.
+
+        By default nothing is checked and the input is stored as-is. Search
+        workers must define their own version: doing so is what makes a
+        datasource queryable from the web interface.
+
+        :param dict query:  Parsed user input for this worker's options
+        :param request:  Flask request the input arrived in, for e.g. access
+          to uploaded files
+        :param config:  Configuration reader, scoped to the queueing user
+        :return dict:  The parameters to store with the new dataset
+        """
+        return query
+
+    @classmethod
+    def get_validated_query(cls, query, request, config, log=None):
+        """
+        Run this worker's validate_query and check the result
+
+        Code that turns user input into a dataset should call this instead of
+        calling validate_query directly, so that the checks below apply no
+        matter where a dataset is created from. Future rules about
+        validate_query itself (for example, warning when a worker defines no
+        validation of its own) also belong here, so that they automatically
+        cover every place datasets are created.
+
+        Currently checked: a returned key that was not part of the submitted
+        input and holds None is almost always `query.get()` on an option the
+        user was never given, which stores a meaningless value in the dataset
+        record. Such keys are logged so the worker can be fixed.
+
+        :param dict query:  Parsed user input, as passed to validate_query
+        :param request:  Flask request the input arrived in
+        :param config:  Configuration reader, scoped to the queueing user
+        :param log:  Logger to report suspicious results to, if any
+        :return dict:  The parameters to store with the new dataset
+        """
+        sanitised = cls.validate_query(query, request, config)
+
+        if sanitised is None:
+            raise ProcessorException(f"validate_query of {cls.type} returned nothing; it must return the "
+                                     "dictionary of parameters to store with the dataset")
+
+        # drop framework-injected signals that validate_query may have read but
+        # that are not parameters; storing them would clutter the record
+        for key in cls.TRANSIENT_QUERY_KEYS:
+            sanitised.pop(key, None)
+
+        if log:
+            junk = [option for option, value in sanitised.items() if value is None and option not in query]
+            if junk:
+                log.warning(f"validate_query of {cls.type} stored None for options that were not part of the "
+                            f"submission ({', '.join(junk)}); such keys should only be stored when they are given")
+
+        return sanitised
+
+    @staticmethod
+    def warn_unexpected_parameters(processor, parameters, parent_dataset, config, log):
+        """
+        Warn when a processor is queued with parameters it does not use
+
+        Datasets created programmatically (preset pipelines and `next` chains)
+        are not validated the way user-submitted queries are, so a parameter
+        meant for a different processor - or simply misspelled - is silently
+        ignored at run time. This logs a warning for any parameter key the
+        target processor does not declare in get_options(), so such mistakes
+        are visible. It never raises: the value is developer-authored, and
+        dropping a stale key is better than breaking the chain.
+
+        Keys the framework itself uses (FRAMEWORK_PARAMETER_KEYS), keys the
+        target lists in its `accepted_parameters` (things it reads but does not
+        always offer as an option), and keys starting with `_` (internal
+        cross-processor plumbing, not user options) are expected and not warned
+        about.
+
+        This only runs when the `dev.mode` setting is enabled: the warnings are
+        a developer aid (a processor may legitimately read a parameter it does
+        not declare), so they are off by default and can be toggled live in the
+        control panel.
+
+        :param processor:  The processor class the dataset is queued for.
+        :param dict parameters:  The parameters the dataset is queued with.
+        :param parent_dataset:  The dataset the processor will run on, used to
+          resolve options whose availability depends on it.
+        :param config:  Configuration reader.
+        :param log:  Logger to warn to.
+        """
+        if not processor or not log:
+            return
+
+        if not config or not config.get("dev.mode", False):
+            return
+
+        try:
+            known = set(processor.get_options(parent_dataset, config=config))
+        except Exception:
+            # if the options can't be determined, don't guess at what's unexpected
+            return
+
+        accepted = set(getattr(processor, "accepted_parameters", ()) or ())
+
+        for key in parameters:
+            if key in known or key in accepted \
+                    or key in BasicProcessor.FRAMEWORK_PARAMETER_KEYS or key.startswith("_"):
+                continue
+            log.warning(f"Processor {processor.type} was queued with parameter '{key}', which it does not "
+                        "use; the value will be ignored.")
 
     @classmethod
     def get_status(cls):

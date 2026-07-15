@@ -126,7 +126,7 @@ class SearchTelegram(Search):
                         f"ranges have **no** effect for [hashtag searches](https://telegram.org/blog/message-effects-and-more)"
                         f", which will always simply return all matching messages in reverse "
                         f"chronological order.")
-},
+            },
             "query": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Entities to scrape",
@@ -308,9 +308,9 @@ class SearchTelegram(Search):
             return []
 
         # ready our parameters
-        parameters = self.dataset.get_parameters()
-        queries = [query.strip() for query in parameters.get("query", "").split(",")]
-        max_items = convert_to_int(parameters.get("items", 10), 10)
+        parameters = self.parameters
+        queries = [query.strip() for query in parameters["query"].split(",")]
+        max_items = convert_to_int(parameters["max_posts"], 10)
 
         # If any query is a numeric ID, pre-fetch the dialog list so Telethon
         # caches access_hash values for every channel/group the account is in.
@@ -380,7 +380,6 @@ class SearchTelegram(Search):
         crawl_max_depth = self.parameters.get("crawl-depth", 0)
         crawl_msg_threshold = self.parameters.get("crawl-threshold", 10)
         crawl_via_links = self.parameters.get("crawl-via-links", False)
-
         self.dataset.log(f"Max crawl depth: {crawl_max_depth}")
         self.dataset.log(f"Crawl threshold: {crawl_msg_threshold}")
 
@@ -1038,13 +1037,22 @@ class SearchTelegram(Search):
     @staticmethod
     def validate_query(query, request, config):
         """
-        Validate Telegram query
+        Validate Telegram query. Checks for required parameters and sanitizes the query.
 
-        :param config:
+        Updated values:
+          - "query": Sanitized query string, with whitespace removed and newlines replaced by commas.
+          - "max_posts": Number of posts to query, limited by config settings.
+
+        Added keys:
+          - "min_date" (optional): Minimum date for the query, from daterange.
+          - "max_date" (optional): Maximum date for the query, from daterange.
+
+        Deleted keys:
+          - "daterange": Removed after extracting min_date and max_date.
+
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
-        :param User user:  User object of user who has submitted the query
-        :param ConfigManager config:  Configuration reader (context-aware)
+        :param config:
         :return dict:  Safe query parameters
         """
         # no query 4 u
@@ -1169,22 +1177,19 @@ class SearchTelegram(Search):
                     "help": "Security code",
                     "sensitive": True
                 }})
+        
+        # Update query with sanitized items and date bounds
+        query["max_posts"] = num_items
+        query["query"] = ",".join(sanitized_items)
 
-        # simple!
-        return {
-            "items": num_items,
-            "query": ",".join(sanitized_items),
-            "api_id": query.get("api_id"),
-            "api_hash": query.get("api_hash"),
-            "api_phone": query.get("api_phone"),
-            "save-session": query.get("save-session"),
-            "resolve-entities": query.get("resolve-entities"),
-            "min_date": min_date,
-            "max_date": max_date,
-            "crawl-depth": query.get("crawl-depth"),
-            "crawl-threshold": query.get("crawl-threshold"),
-            "crawl-via-links": query.get("crawl-via-links")
-        }
+        # only store date bounds that were actually set
+        if min_date:
+            query["min_date"] = min_date
+        if max_date:
+            query["max_date"] = max_date
+        del query["daterange"]
+
+        return query
 
     async def iter_hashtag_messages(self, entity, offset_date=None):
         """
