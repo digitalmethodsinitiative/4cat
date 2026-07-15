@@ -615,6 +615,15 @@ def test_warn_unexpected_parameters():
         processor, {"docs_per": "month"}, parent_dataset=None, config=dev_on, log=log)
     log.warning.assert_not_called()
 
+    # a key the target reads but does not declare, listed in accepted_parameters,
+    # is not flagged (e.g. a config-gated option a preset deliberately passes)
+    processor.accepted_parameters = ("also_indirect",)
+    log = MagicMock()
+    BasicProcessor.warn_unexpected_parameters(
+        processor, {"docs_per": "month", "also_indirect": "all"},
+        parent_dataset=None, config=dev_on, log=log)
+    log.warning.assert_not_called()
+
     # dev mode off -> no warning, even for an unexpected key
     log = MagicMock()
     BasicProcessor.warn_unexpected_parameters(

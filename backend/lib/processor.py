@@ -130,6 +130,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: cross-processor plumbing) are also treated as expected.
     FRAMEWORK_PARAMETER_KEYS = ("next", "attach_to", "copy_to")
 
+    #: Parameters this processor reads but does not (always) declare in
+    #: get_options() — e.g. an option offered only under certain config, or a
+    #: value a preset deliberately passes it. Override per-processor to state
+    #: this input surface; these keys are exempt from
+    #: warn_unexpected_parameters().
+    accepted_parameters = tuple()
+
     def work(self):
         """
         Process a dataset
@@ -1216,9 +1223,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         are visible. It never raises: the value is developer-authored, and
         dropping a stale key is better than breaking the chain.
 
-        Keys the framework itself uses (FRAMEWORK_PARAMETER_KEYS) and keys
-        starting with `_` (internal cross-processor plumbing, not user options)
-        are expected and not warned about.
+        Keys the framework itself uses (FRAMEWORK_PARAMETER_KEYS), keys the
+        target lists in its `accepted_parameters` (things it reads but does not
+        always offer as an option), and keys starting with `_` (internal
+        cross-processor plumbing, not user options) are expected and not warned
+        about.
 
         This only runs when the `dev.mode` setting is enabled: the warnings are
         a developer aid (a processor may legitimately read a parameter it does
@@ -1244,8 +1253,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             # if the options can't be determined, don't guess at what's unexpected
             return
 
+        accepted = set(getattr(processor, "accepted_parameters", ()) or ())
+
         for key in parameters:
-            if key in known or key in BasicProcessor.FRAMEWORK_PARAMETER_KEYS or key.startswith("_"):
+            if key in known or key in accepted \
+                    or key in BasicProcessor.FRAMEWORK_PARAMETER_KEYS or key.startswith("_"):
                 continue
             log.warning(f"Processor {processor.type} was queued with parameter '{key}', which it does not "
                         "use; the value will be ignored.")
