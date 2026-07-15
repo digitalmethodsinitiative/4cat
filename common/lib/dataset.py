@@ -1894,10 +1894,10 @@ class DataSet(FourcatModule):
         """
         # check the options of both the processor that created this dataset
         # and the processor matching its current type. These can differ after
-        # adopt_type() has rewritten the type. self.get_own_processor is purly
-        # defensive as the record is scrubbed before a type is ever adopted, 
-        # and the periodic cleanup only sees datasets that never ran - but 
-        # this should ensure check is correct for future callers.
+        # adopt_type() has rewritten the type. get_own_processor is purely
+        # defensive: the record is scrubbed before a type is ever adopted, and
+        # the periodic cleanup only sees datasets that never ran - but this
+        # keeps the check correct for future callers.
         for worker in {self.get_producer_processor(), self.get_own_processor()}:
             if not worker:
                 continue
@@ -1951,7 +1951,10 @@ class DataSet(FourcatModule):
             processor = self.modules.processors.get(step.get("type")) if self.modules else None
             if processor:
                 try:
-                    options = processor.get_options(config=config)
+                    # the immediate follow-ups run on this dataset, so this 
+                    # dataset is their parent context; pass self so options 
+                    # depedant on the parent resolve.
+                    options = processor.get_options(self, config=config)
                 except Exception:
                     # never let a follow-up's get_options failure block cleanup
                     options = {}
