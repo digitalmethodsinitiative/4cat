@@ -92,17 +92,14 @@ class AnnotateImages(ProcessorPreset):
             # first, extract top images
             {
                 "type": "top-images",
-                "parameters": {
-                    "overwrite": False
-                }
+                "parameters": {}
             },
             # then, download the images we want to annotate
             {
                 "type": "image-downloader",
                 "parameters": {
                     "amount": amount,
-                    "columns": "item",
-                    "overwrite": False
+                    "columns": "item"
                 }
             },
             # then, annotate the downloaded images with the Google Vision API
@@ -116,7 +113,7 @@ class AnnotateImages(ProcessorPreset):
             },
             # finally, create a simplified CSV file from the download NDJSON (which can also be retrieved later)
             {
-                "type": "convert-vision-to-csv",
+                "type": "convert-google-vision-to-csv",
                 "parameters": {}
             }
         ]
