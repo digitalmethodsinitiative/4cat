@@ -287,8 +287,14 @@ def test_compatibility_coverage(logger, fourcat_modules):
         if isinstance(getattr(processor_class, "compatibility", None), Compatibility):
             continue  # fully covered
 
-        own_method = getattr(processor_class.is_compatible_with, "__func__", None)
-        if own_method is not None and own_method is not base_method:
+        # detect an override however it is declared: a classmethod or bound
+        # method exposes the underlying function as __func__, while a staticmethod
+        # or plain method already IS that function, so fall back to the attribute
+        # itself. (Without this fallback a @staticmethod override reads as no
+        # override and is misreported as a hard-failing straggler.)
+        attr = processor_class.is_compatible_with
+        own_method = getattr(attr, "__func__", attr)
+        if own_method is not base_method:
             override_only.append(name)
         else:
             stragglers.append(name)
