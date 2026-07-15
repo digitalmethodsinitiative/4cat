@@ -685,6 +685,34 @@ def test_remove_sensitive_parameters_from_next(mock_dataset):
     assert nested["amount"] == 9, "nested non-sensitive key should be kept"
 
 
+def test_remove_sensitive_parameters(mock_dataset):
+    """
+    Sensitive option values (e.g. API keys) must be removed from a dataset's
+    own stored parameters as soon as it runs. The options are resolved from
+    both the processor that produced the dataset and the one matching its
+    current type (these can differ once a filter has adopted a new type), so a
+    sensitive option declared by either is scrubbed while non-sensitive values
+    are left in place.
+    """
+    producer = MagicMock()
+    producer.get_options.return_value = {"api_key": {"sensitive": True}, "amount": {}}
+    own = MagicMock()
+    own.get_options.return_value = {"session_token": {"sensitive": True}}
+
+    mock_dataset.get_producer_processor = MagicMock(return_value=producer)
+    mock_dataset.get_own_processor = MagicMock(return_value=own)
+
+    deleted = []
+    mock_dataset.delete_parameter = MagicMock(side_effect=deleted.append)
+
+    mock_dataset.remove_sensitive_parameters(config=None)
+
+    # a sensitive option declared by either processor is removed; the
+    # non-sensitive one is left untouched
+    assert set(deleted) == {"api_key", "session_token"}
+    assert "amount" not in deleted
+
+
 def test_dataset_finish_raises_on_double_finish(mock_dataset):
     """
     Regression guard for common/lib/dataset.py:986.

@@ -100,7 +100,7 @@ class SearchTelegram(Search):
                         "authentication for Telegram."
             },
             "api_id": {
-                "type": UserInput.OPTION_TEXT, 
+                "type": UserInput.OPTION_TEXT,
                 "help": "API ID",
                 "cache": True,
             },
@@ -1037,8 +1037,8 @@ class SearchTelegram(Search):
     @staticmethod
     def validate_query(query, request, config):
         """
-        Validate Telegram query. Checks for required parameters and sanitizes the query. 
-        
+        Validate Telegram query. Checks for required parameters and sanitizes the query.
+
         Updated values:
           - "query": Sanitized query string, with whitespace removed and newlines replaced by commas.
           - "max_posts": Number of posts to query, limited by config settings.
@@ -1049,7 +1049,7 @@ class SearchTelegram(Search):
 
         Deleted keys:
           - "daterange": Removed after extracting min_date and max_date.
-        
+
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
         :param config:
