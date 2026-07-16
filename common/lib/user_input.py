@@ -431,7 +431,7 @@ class UserInput:
             # any number of values out of a list of possible values. these
             # arrive either comma-separated (text controls and some client-side
             # helpers) or as an actual list (real multi-selects and raw API
-            # callers), so accept both shapes. (OPTION_MULTI used to assume a
+            # callers), so accept both shapes.
             if not choice:
                 return settings.get("default", [])
 
@@ -475,12 +475,16 @@ class UserInput:
 
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
             # a text field. it may be a plain string, or constrained to a number
+            # by a coerce_type (e.g. int) and/or a min/max. for a numeric field,
             # a non-number or an out-of-range value is rejected (when
             # silently_correct is off) or corrected to the default / nearest
             # bound (when it is on).
             coerce_type = settings.get("coerce_type")
+            if coerce_type is not None and not callable(coerce_type):
                 # the option is declared wrong: coerce_type should be a type
                 # such as int or float, not e.g. the string "int"
+                if not silently_correct:
+                    raise QueryParametersException("This option is misconfigured: its coerce_type is not a type.")
                 coerce_type = None
 
             has_range = "min" in settings or "max" in settings
@@ -492,40 +496,45 @@ class UserInput:
             else:
                 number_type = None
 
+            if choice is None or choice == "":
                 # no value given: fall back to the default
                 choice = settings.get("default")
                 if choice is None:
                     choice = 0 if has_range else ""
+
+            elif number_type is not None:
+                # a number is expected: coerce it first, then keep it in range.
+                # coercion and range are checked separately so the error
+                # actually matches the problem (a non-number no longer reports
+                # an out-of-range message, and an out-of-range value is no
+                # longer silently clamped away).
                 try:
-                    choice = min(settings["max"], value_type(choice))
+                    choice = number_type(choice)
                 except (ValueError, TypeError):
                     if not silently_correct:
-                        raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
-
+                        raise QueryParametersException("'%s' is not a valid number." % choice)
                     choice = settings.get("default")
+                else:
+                    if "max" in settings and choice > settings["max"]:
+                        if not silently_correct:
+                            raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
+                        choice = settings["max"]
+                    if "min" in settings and choice < settings["min"]:
+                        if not silently_correct:
+                            raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
+                        choice = settings["min"]
 
-            if "min" in settings:
+            # apply an explicit coerce_type so a value that came from the default
+            # still has the declared type
+            if coerce_type:
                 try:
-                    choice = max(settings["min"], value_type(choice))
+                    return coerce_type(choice)
                 except (ValueError, TypeError):
                     if not silently_correct:
-                        raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
-
-                    choice = settings.get("default")
-
-            if choice is None or choice == "":
-                choice = settings.get("default")
-
-            if choice is None:
-                choice = 0 if "min" in settings or "max" in settings else ""
-
-            if settings.get("coerce_type"):
-                try:
-                    return value_type(choice)
-                except (ValueError, TypeError):
+                        raise QueryParametersException("This option's default value cannot be parsed.")
                     return settings.get("default")
-            else:
-                return choice
+
+            return choice
 
         else:
             # no filtering
