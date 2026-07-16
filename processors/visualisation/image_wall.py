@@ -72,6 +72,10 @@ class ImageWallGenerator(VideoWallGenerator):
                 "kmeans-dominant": "Dominant K-means (precise, slow)",
                 "average-hsv": "Average colour (HSV; imprecise, fastest)",
             }
+            # the inherited default sorts by video length, which is not one of
+            # these, so the interface silently fell back to the first option;
+            # say so explicitly instead
+            options["sort-mode"]["default"] = ""
         else:
             # add some caveats for running this directly on a video dataset
             options["sort-mode"]["tooltip"] = ("To sort by e.g. average colour, first extract frames as images and "
