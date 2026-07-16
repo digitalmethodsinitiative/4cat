@@ -203,7 +203,9 @@ class VideoSceneDetector(BasicProcessor):
 		ffmpeg_path = config.get("video-downloader.ffmpeg_path")
 		if not ffmpeg_path or not os.path.exists(shutil.which(ffmpeg_path)):
 			del options["detector_type"]["options"]["ffmpeg_select"]
-			options["detector_type"]["default"] = list(options["detector_type"]["options"].values())[0]
+			# the default must be one of the option's keys, not one of the
+			# labels shown next to them
+			options["detector_type"]["default"] = list(options["detector_type"]["options"].keys())[0]
 
 		return options
 
