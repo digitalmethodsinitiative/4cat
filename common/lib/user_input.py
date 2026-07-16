@@ -148,20 +148,17 @@ class UserInput:
                 continue
 
             # an option's default is set by us, not by the user, so an invalid
-            # one is a bug in the option definition and the user must not pay
-            # for it. the form pre-fills defaults, which means a bad default
-            # comes back looking exactly like a value the user typed and would
-            # otherwise be reported to them as their mistake. so: warn
-            # developers, and parse this one option leniently, which quietly
-            # corrects the bad value instead of rejecting it.
+            # one is a bug in the option definition: warn developers about it.
+            # it is deliberately not corrected quietly. the form pre-fills
+            # defaults, so a bad default comes back looking like a value the
+            # user typed; silently replacing it would run the analysis on a
+            # value the user never chose and cannot see, which is worse than an
+            # error. it is validated like any other value below, so it gets
+            # reported (naming the option) rather than hidden.
             default_problem = UserInput.validate_default(settings)
-            if default_problem:
-                if log:
-                    log.warning("Option '%s' has an invalid default (%s); correcting it quietly. "
-                                "Please fix the option definition." % (option, default_problem))
-                option_silently_correct = True
-            else:
-                option_silently_correct = silently_correct
+            if default_problem and log:
+                log.warning("Option '%s' has an invalid default (%s). "
+                            "Please fix the option definition." % (option, default_problem))
 
             if settings.get("type") == UserInput.OPTION_DATERANGE:
                 # special case, since it combines two inputs
@@ -178,10 +175,10 @@ class UserInput:
 
                 # save as a tuple of unix timestamps (or None)
                 try:
-                    after, before = (UserInput.parse_value(settings, input.get(option_min), parsed_input, option_silently_correct), UserInput.parse_value(settings, input.get(option_max), parsed_input, option_silently_correct))
+                    after, before = (UserInput.parse_value(settings, input.get(option_min), parsed_input, silently_correct), UserInput.parse_value(settings, input.get(option_max), parsed_input, silently_correct))
 
                     if before and after and after > before:
-                        if not option_silently_correct:
+                        if not silently_correct:
                             raise QueryParametersException("the start of the range must be before its end.")
                         else:
                             before = after
@@ -200,7 +197,7 @@ class UserInput:
                 try:
                     if option in input:
                         # Toggle needs to be parsed
-                        parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, option_silently_correct)
+                        parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
                     else:
                         # Toggle was left blank
                         parsed_input[option] = False
@@ -238,7 +235,7 @@ class UserInput:
 
                         choice = input.get(option + "-" + datasource + "-" + column, False)
                         column_settings = settings["columns"][column]  # sub-settings per column
-                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=option_silently_correct)
+                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=silently_correct)
 
                 parsed_input[option] = table_input
 
@@ -261,7 +258,7 @@ class UserInput:
                         if input_index not in input_items:
                             input_items[input_index] = {}
 
-                        input_items[input_index][option_item] = UserInput.parse_value(item_options[option_item], value, input_items[input_index], option_silently_correct)
+                        input_items[input_index][option_item] = UserInput.parse_value(item_options[option_item], value, input_items[input_index], silently_correct)
 
                 # discard items that are only default values
                 parsed_input[option] = []
@@ -282,20 +279,14 @@ class UserInput:
                         parsed_input[option] = {value[settings["dict_key"]]: {**value, "_id": value[settings["dict_key"]]} for value in parsed_input[option]}
 
             elif option not in input:
-                # not provided? use the default. an invalid one was warned
-                # about above; parsing it leniently corrects it quietly
-                if default_problem:
-                    try:
-                        parsed_input[option] = UserInput.parse_value(settings, settings.get("default"), parsed_input, silently_correct=True)
-                    except RequirementsNotMetException:
-                        pass
-                else:
-                    parsed_input[option] = settings.get("default", None)
+                # not provided? use the default (an invalid one was warned
+                # about above, but is not silently replaced with something else)
+                parsed_input[option] = settings.get("default", None)
 
             else:
                 # normal parsing and sanitisation
                 try:
-                    parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, option_silently_correct)
+                    parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
                 except RequirementsNotMetException:
                     pass
                 except QueryParametersException as e:

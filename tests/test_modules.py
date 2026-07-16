@@ -327,14 +327,16 @@ def test_option_keys_known(logger, fourcat_modules, mock_job, mock_job_queue, mo
         logger.info("All option keys are recognised.")
 
 
-def test_parse_all_bad_default_is_not_blamed_on_the_user():
+def test_parse_all_warns_about_a_bad_default_but_does_not_correct_it():
     """
-    The form pre-fills an option's default, so a bad default is submitted back
-    looking exactly like a value the user typed. That is our mistake, not
-    theirs: it must be corrected quietly and logged for developers, never
-    raised as an error at the user.
+    An option's default is set by us, so an invalid one is our bug and
+    developers are warned about it. It is deliberately not corrected quietly:
+    the form pre-fills defaults, so silently replacing the value would run the
+    analysis on something the user never chose and cannot see, which is worse
+    than an error. It is reported like any other invalid value instead.
     """
     from common.lib.user_input import UserInput
+    from common.lib.exceptions import QueryParametersException
 
     options = {"threshold": {
         "type": UserInput.OPTION_TEXT,
@@ -346,10 +348,10 @@ def test_parse_all_bad_default_is_not_blamed_on_the_user():
     }}
     log = MagicMock()
 
-    # the form submits the pre-filled (bad) default back to us
-    parsed = UserInput.parse_all(options, {"option-threshold": "27.0"}, silently_correct=False, log=log)
+    # the form pre-fills the (bad) default and submits it back
+    with pytest.raises(QueryParametersException):
+        UserInput.parse_all(options, {"option-threshold": "27.0"}, silently_correct=False, log=log)
 
-    assert parsed["threshold"] == 5, "a bad default should be corrected, not rejected"
     assert log.warning.called, "developers should be warned about the bad default"
 
 
