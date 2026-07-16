@@ -400,19 +400,6 @@ class UserInput:
                 # this end of the range was left empty
                 return None
             try:
-
-        elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS):
-            # any number of values out of a list of possible values
-            # comma-separated during input, returned as a list of valid options
-            if not choice:
-                return settings.get("default", [])
-
-            chosen = choice.split(",")
-            return [item for item in chosen if item in settings.get("options", [])]
-
-        elif input_type == UserInput.OPTION_MULTI_SELECT:
-            # multiple number of values out of a dropdown list of possible values
-            # comma-separated during input, returned as a list of valid options
                 return int(choice)
             except (ValueError, TypeError):
                 pass
@@ -423,16 +410,24 @@ class UserInput:
                 if not silently_correct:
                     raise QueryParametersException("'%s' is not a valid date." % choice)
                 return None
+
+        elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS, UserInput.OPTION_MULTI_SELECT):
+            # any number of values out of a list of possible values. these
+            # arrive either comma-separated (text controls and some client-side
+            # helpers) or as an actual list (real multi-selects and raw API
+            # callers), so accept both shapes.
             if not choice:
                 return settings.get("default", [])
 
             if type(choice) is str:
-                # should be a list if the form control was actually a multiselect
-                # but we have some client side UI helpers that may produce a string
-                # instead
                 choice = choice.split(",")
 
-            return [item for item in choice if item in settings.get("options", [])]
+            options = settings.get("options", [])
+            invalid = [item for item in choice if item not in options]
+            if invalid and not silently_correct:
+                raise QueryParametersException("Invalid value(s) selected: %s." % ", ".join(str(i) for i in invalid))
+
+            return [item for item in choice if item in options]
 
         elif input_type == UserInput.OPTION_CHOICE:
             # select box
