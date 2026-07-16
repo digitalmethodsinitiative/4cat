@@ -43,6 +43,39 @@ class UserInput:
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
+    # the keys the framework understands in an option's settings dict. a key
+    # outside this set is almost always a typo (e.g. "coerce" for
+    # "coerce_type"), which is silently ignored and so has no effect - the
+    # module test flags these so they are caught rather than shipped.
+    KNOWN_OPTION_KEYS = frozenset({
+        # read by the parser / module loader
+        "type", "default", "options", "requires", "min", "max", "coerce_type",
+        "indirect", "delegated", "dict_key", "columns", "sensitive",
+        # read by the interface templates
+        "help", "tooltip", "label", "inline", "original_default", "value",
+        "saturation", "accept", "update", "password", "multiple", "cache",
+        # annotation options
+        "to_parent", "hide_in_explorer",
+        # datasource options
+        "board_specific",
+    })
+
+    @staticmethod
+    def unknown_option_keys(settings):
+        """
+        List an option's settings keys that the framework does not understand
+
+        Unknown keys are silently ignored at parse time, so a typo like
+        "coerce" (for "coerce_type") quietly does nothing. Used by the module
+        test to catch these.
+
+        :param dict settings:  An option's settings dictionary
+        :return list:  The unrecognised keys, sorted (empty if all are known)
+        """
+        if not isinstance(settings, dict):
+            return []
+        return sorted(set(settings) - UserInput.KNOWN_OPTION_KEYS)
+
     @staticmethod
     def parse_all(options, input, silently_correct=True):
         """
@@ -60,7 +93,12 @@ class UserInput:
         :param dict input:  Input, as a form field -> value dictionary
         :param bool silently_correct:  If true, replace invalid values with the
         given default value; else, raise a QueryParametersException if a value
-        is invalid.
+        is invalid. Defaults to false: every real caller wants the strict
+        behaviour, and tolerant parsing should be opted into deliberately.
+        :param log:  Optional logger. When an option's *default* value turns
+        out to be invalid (a developer mistake, not user input), a warning is
+        logged here and the default is corrected silently rather than shown to
+        the user.
 
         :return dict:  Sanitised form input
         """
@@ -178,7 +216,7 @@ class UserInput:
 
                         choice = input.get(option + "-" + datasource + "-" + column, False)
                         column_settings = settings["columns"][column]  # sub-settings per column
-                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
+                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=silently_correct)
 
                 parsed_input[option] = table_input
 
@@ -333,7 +371,6 @@ class UserInput:
         return True
 
     @staticmethod
-    def parse_value(settings, choice, other_input=None, silently_correct=True):
     def parse_value(settings, choice, other_input=None, silently_correct=False):
         """
         Filter user input
