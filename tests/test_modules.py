@@ -327,6 +327,55 @@ def test_option_keys_known(logger, fourcat_modules, mock_job, mock_job_queue, mo
         logger.info("All option keys are recognised.")
 
 
+def test_parse_all_bad_default_is_not_blamed_on_the_user():
+    """
+    The form pre-fills an option's default, so a bad default is submitted back
+    looking exactly like a value the user typed. That is our mistake, not
+    theirs: it must be corrected quietly and logged for developers, never
+    raised as an error at the user.
+    """
+    from common.lib.user_input import UserInput
+
+    options = {"threshold": {
+        "type": UserInput.OPTION_TEXT,
+        "help": "Threshold",
+        "coerce_type": float,
+        "default": 27.0,  # invalid: above the max below
+        "min": 0,
+        "max": 5,
+    }}
+    log = MagicMock()
+
+    # the form submits the pre-filled (bad) default back to us
+    parsed = UserInput.parse_all(options, {"option-threshold": "27.0"}, silently_correct=False, log=log)
+
+    assert parsed["threshold"] == 5, "a bad default should be corrected, not rejected"
+    assert log.warning.called, "developers should be warned about the bad default"
+
+
+def test_parse_all_error_names_the_option():
+    """
+    A genuine user error should say which option it is about, rather than a
+    bare 'Provide a value of 5 or lower.' with no context.
+    """
+    from common.lib.user_input import UserInput
+    from common.lib.exceptions import QueryParametersException
+
+    options = {"cd_threshold": {
+        "type": UserInput.OPTION_TEXT,
+        "help": "Pixel intensity delta threshold",
+        "coerce_type": float,
+        "default": 1.0,  # valid, so the value below is the user's own doing
+        "min": 0,
+        "max": 5,
+    }}
+
+    with pytest.raises(QueryParametersException) as raised:
+        UserInput.parse_all(options, {"option-cd_threshold": "99"}, silently_correct=False)
+
+    assert "Pixel intensity delta threshold" in str(raised.value)
+
+
 @pytest.mark.dependency(depends=["test_module_collector"])
 def test_compatibility_coverage(logger, fourcat_modules):
     """

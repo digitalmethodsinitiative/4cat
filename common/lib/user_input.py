@@ -173,6 +173,10 @@ class UserInput:
                     parsed_input[option] = (after, before)
                 except RequirementsNotMetException:
                     pass
+                except QueryParametersException as e:
+                    # say which option the problem is about; parse_value only
+                    # sees an option's settings, not its name
+                    raise QueryParametersException("%s: %s" % (settings.get("help") or option, e))
 
             elif settings.get("type") in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
                 # special case too, since if a checkbox is unchecked, it simply
@@ -186,6 +190,8 @@ class UserInput:
                         parsed_input[option] = False
                 except RequirementsNotMetException:
                     pass
+                except QueryParametersException as e:
+                    raise QueryParametersException("%s: %s" % (settings.get("help") or option, e))
 
             elif settings.get("type") == UserInput.OPTION_DATASOURCES:
                 # special case, because this combines multiple inputs to
@@ -260,15 +266,9 @@ class UserInput:
                         parsed_input[option] = {value[settings["dict_key"]]: {**value, "_id": value[settings["dict_key"]]} for value in parsed_input[option]}
 
             elif option not in input:
-                # not provided? use the default. the default is set by the
-                # developer, so if it is somehow invalid that is our mistake,
-                # not the user's: correct it silently and warn developers via
-                # the log, rather than surfacing the mistake to the user.
-                problem = UserInput.validate_default(settings)
-                if problem:
-                    if log:
-                        log.warning("Option '%s' has an invalid default (%s); using a corrected value. "
-                                    "Please fix the option definition." % (option, problem))
+                # not provided? use the default. an invalid one was warned
+                # about above; parsing it leniently corrects it quietly
+                if default_problem:
                     try:
                         parsed_input[option] = UserInput.parse_value(settings, settings.get("default"), parsed_input, silently_correct=True)
                     except RequirementsNotMetException:
@@ -279,9 +279,13 @@ class UserInput:
             else:
                 # normal parsing and sanitisation
                 try:
-                    parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
+                    parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, option_silently_correct)
                 except RequirementsNotMetException:
                     pass
+                except QueryParametersException as e:
+                    # say which option the problem is about; parse_value only
+                    # sees an option's settings, not its name
+                    raise QueryParametersException("%s: %s" % (settings.get("help") or option, e))
 
         return parsed_input
 
@@ -468,7 +472,8 @@ class UserInput:
             # any number of values out of a list of possible values. these
             # arrive either comma-separated (text controls and some client-side
             # helpers) or as an actual list (real multi-selects and raw API
-            # callers), so accept both shapes.
+            # callers), so accept both shapes. (OPTION_MULTI used to assume a
+            # string and crashed on a real list.)
             if not choice:
                 return settings.get("default", [])
 
