@@ -452,7 +452,7 @@ def queue_dataset():
 		# just in case
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(search_worker.get_options(None, g.config), request.form, silently_correct=False)
+			sanitised_query = UserInput.parse_all(search_worker.get_options(None, g.config), request.form, silently_correct=False, log=g.log)
 
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
@@ -1207,6 +1207,7 @@ def queue_processor(key=None, processor=None):
 			processor_worker.get_options(dataset, g.config),
 			request.form,
 			silently_correct=False,
+			log=g.log,
 		)
 
 		sanitised_query["frontend-confirm"] = bool(request.form.get("frontend-confirm", False))

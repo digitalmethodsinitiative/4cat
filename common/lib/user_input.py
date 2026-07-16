@@ -77,7 +77,7 @@ class UserInput:
         return sorted(set(settings) - UserInput.KNOWN_OPTION_KEYS)
 
     @staticmethod
-    def parse_all(options, input, silently_correct=True):
+    def parse_all(options, input, silently_correct=False, log=None):
         """
         Parse form input for the provided options
 
@@ -576,3 +576,71 @@ class UserInput:
         else:
             # no filtering
             return choice
+
+    @staticmethod
+    def validate_default(settings):
+        """
+        Check an option's own default value against the option's own rules
+
+        A default is set by the developer, so a bad one is a bug in the option
+        definition, not something a user should ever see. This is what the
+        module test uses to catch those bugs, and what `parse_all` uses at
+        runtime to correct them quietly (see there).
+
+        The value rules live in one place, `parse_value`: for the types where it
+        applies, this feeds the default back through `parse_value` (strictly,
+        and ignoring any "requires" gate, since we are checking the value on its
+        own) and reports whatever it rejects. Only a few structural checks that
+        `parse_value` cannot express are done here directly.
+
+        Membership of a choice or multi-choice default in its option list is
+        checked only when that list is populated. Such lists are often built
+        from the parent dataset, so at test time (with no real parent) they may
+        be empty, in which case the check is skipped; at runtime the list is
+        authoritative and the check catches a default that isn't a real option.
+
+        :param dict settings:  An option's settings dictionary
+        :return str|None:  A short developer-facing description of the problem,
+          or None if the default is fine
+        """
+        default = settings.get("default")
+        input_type = settings.get("type")
+
+        # an empty or absent default means "no default; the user must choose",
+        # which is a legitimate pattern rather than a mistake
+        if default is None or default == "" or default == [] or default == {}:
+            return None
+
+        if input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_MULTI_SELECT, UserInput.OPTION_ANNOTATIONS):
+            # a multi-value default must be a list; a bare string or, worse, a
+            # generator leaks a wrong-typed value into stored parameters
+            if not isinstance(default, list):
+                return "default should be a list, not %s" % type(default).__name__
+
+        # for choice/multi options, membership can only be checked when the
+        # list of options is populated (see docstring); skip it otherwise
+        if input_type in (UserInput.OPTION_CHOICE, UserInput.OPTION_MULTI,
+                          UserInput.OPTION_MULTI_SELECT, UserInput.OPTION_ANNOTATIONS) and not settings.get("options"):
+            return None
+
+        if input_type == UserInput.OPTION_TEXT_JSON:
+            # a JSON option's default is a Python object, not a raw string, so
+            # check it is serialisable instead of sending it through parse_value
+            try:
+                json.dumps(default)
+                return None
+            except (TypeError, ValueError) as e:
+                return "default is not valid JSON (%s)" % e
+
+        if input_type == UserInput.OPTION_DATERANGE:
+            # date ranges have no meaningful single default value
+            return None
+
+        probe = {key: value for key, value in settings.items() if key != "requires"}
+        try:
+            UserInput.parse_value(probe, default, silently_correct=False)
+            return None
+        except QueryParametersException as e:
+            return str(e)
+        except RequirementsNotMetException:
+            return None
