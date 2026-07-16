@@ -222,8 +222,21 @@ class UserInput:
                         parsed_input[option] = {value[settings["dict_key"]]: {**value, "_id": value[settings["dict_key"]]} for value in parsed_input[option]}
 
             elif option not in input:
-                # not provided? use default
-                parsed_input[option] = settings.get("default", None)
+                # not provided? use the default. the default is set by the
+                # developer, so if it is somehow invalid that is our mistake,
+                # not the user's: correct it silently and warn developers via
+                # the log, rather than surfacing the mistake to the user.
+                problem = UserInput.validate_default(settings)
+                if problem:
+                    if log:
+                        log.warning("Option '%s' has an invalid default (%s); using a corrected value. "
+                                    "Please fix the option definition." % (option, problem))
+                    try:
+                        parsed_input[option] = UserInput.parse_value(settings, settings.get("default"), parsed_input, silently_correct=True)
+                    except RequirementsNotMetException:
+                        pass
+                else:
+                    parsed_input[option] = settings.get("default", None)
 
             else:
                 # normal parsing and sanitisation
@@ -321,6 +334,7 @@ class UserInput:
 
     @staticmethod
     def parse_value(settings, choice, other_input=None, silently_correct=True):
+    def parse_value(settings, choice, other_input=None, silently_correct=False):
         """
         Filter user input
 
@@ -406,7 +420,9 @@ class UserInput:
             try:
                 return int(parse_datetime(choice).timestamp())
             except (ValueError, TypeError, OverflowError):
-                # not a number and not a date we can recognise.
+                # not a number and not a date we can recognise. (previously this
+                # was swallowed by a return inside a finally block and silently
+                # became an open-ended range.)
                 if not silently_correct:
                     raise QueryParametersException("'%s' is not a valid date." % choice)
                 return None
@@ -415,7 +431,7 @@ class UserInput:
             # any number of values out of a list of possible values. these
             # arrive either comma-separated (text controls and some client-side
             # helpers) or as an actual list (real multi-selects and raw API
-            # callers), so accept both shapes.
+            # callers), so accept both shapes. (OPTION_MULTI used to assume a
             if not choice:
                 return settings.get("default", [])
 
@@ -458,18 +474,28 @@ class UserInput:
             return json.loads(choice)
 
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
-            # text string
-            # optionally clamp it as an integer; return default if not a valid
-            # integer (or float; inferred from default or made explicit via the
-            # coerce_type setting)
-            if settings.get("coerce_type"):
-                value_type = settings["coerce_type"]
-            else:
-                value_type = type(settings.get("default"))
-                if value_type not in (int, float):
-                    value_type = int
+            # a text field. it may be a plain string, or constrained to a number
+            # a non-number or an out-of-range value is rejected (when
+            # silently_correct is off) or corrected to the default / nearest
+            # bound (when it is on).
+            coerce_type = settings.get("coerce_type")
+                # the option is declared wrong: coerce_type should be a type
+                # such as int or float, not e.g. the string "int"
+                coerce_type = None
 
-            if "max" in settings:
+            has_range = "min" in settings or "max" in settings
+            if coerce_type in (int, float):
+                number_type = coerce_type
+            elif has_range:
+                default_type = type(settings.get("default"))
+                number_type = default_type if default_type in (int, float) else int
+            else:
+                number_type = None
+
+                # no value given: fall back to the default
+                choice = settings.get("default")
+                if choice is None:
+                    choice = 0 if has_range else ""
                 try:
                     choice = min(settings["max"], value_type(choice))
                 except (ValueError, TypeError):
