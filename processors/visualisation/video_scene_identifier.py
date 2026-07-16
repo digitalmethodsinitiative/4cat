@@ -135,7 +135,7 @@ class VideoSceneDetector(BasicProcessor):
 				"coerce_type": float,
 				"default": 27.0,
 				"min": 0,
-				"max": 5,
+				"max": 255,
 				"requires": "detector_type==content_detector"
 			},
 			"ad_adaptive_threshold": {
