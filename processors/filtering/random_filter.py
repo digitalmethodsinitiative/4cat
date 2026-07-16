@@ -7,7 +7,6 @@ from backend.lib.processor import BasicProcessor
 from processors.filtering.base_filter import BaseFilter
 from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
-from common.lib.exceptions import QueryParametersException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -43,7 +42,8 @@ class RandomFilter(BaseFilter):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Sample size",
 				"default": 10,
-				"coerce": int,
+				"coerce_type": int,
+				"min": 1,
 			}
 		}
 
@@ -69,6 +69,8 @@ class RandomFilter(BaseFilter):
 		# Get the amount of rows to sample
 		sample_size = self.parameters.get("sample_size")
 
+		# the sample size is checked when the job is queued, but jobs started by
+		# presets and other code do not go through that check, so check again
 		try:
 			sample_size = int(sample_size)
 		except ValueError:
@@ -104,24 +106,6 @@ class RandomFilter(BaseFilter):
 			count += 1
 
 
-	@staticmethod
-	def validate_query(query, request, config):
-		"""
-		Validate input
-
-		Checks if everything needed is filled in.
-
-		:param query:
-		:param request:
-		:param config:
-		:return:
-		"""
-
-		if not query["sample_size"] or not query["sample_size"].isnumeric() or not int(query["sample_size"]) > 0:
-			raise QueryParametersException("Please enter a valid sample size.")
-
-		return query
-	
 class RandomProcessorFilter(RandomFilter):
     """
     Retain only posts where a given column matches a given value

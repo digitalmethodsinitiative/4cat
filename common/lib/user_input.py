@@ -43,8 +43,41 @@ class UserInput:
 
     OPTIONS_COSMETIC = (OPTION_INFO, OPTION_DIVIDER)
 
+    # the keys the framework understands in an option's settings dict. a key
+    # outside this set is almost always a typo (e.g. "coerce" for
+    # "coerce_type"), which is silently ignored and so has no effect - the
+    # module test flags these so they are caught rather than shipped.
+    KNOWN_OPTION_KEYS = frozenset({
+        # read by the parser / module loader
+        "type", "default", "options", "requires", "min", "max", "coerce_type",
+        "indirect", "delegated", "dict_key", "columns", "sensitive",
+        # read by the interface templates
+        "help", "tooltip", "label", "inline", "original_default", "value",
+        "saturation", "accept", "update", "password", "multiple", "cache",
+        # annotation options
+        "to_parent", "hide_in_explorer",
+        # datasource options
+        "board_specific",
+    })
+
     @staticmethod
-    def parse_all(options, input, silently_correct=True):
+    def unknown_option_keys(settings):
+        """
+        List an option's settings keys that the framework does not understand
+
+        Unknown keys are silently ignored at parse time, so a typo like
+        "coerce" (for "coerce_type") quietly does nothing. Used by the module
+        test to catch these.
+
+        :param dict settings:  An option's settings dictionary
+        :return list:  The unrecognised keys, sorted (empty if all are known)
+        """
+        if not isinstance(settings, dict):
+            return []
+        return sorted(set(settings) - UserInput.KNOWN_OPTION_KEYS)
+
+    @staticmethod
+    def parse_all(options, input, silently_correct=False, log=None):
         """
         Parse form input for the provided options
 
@@ -60,7 +93,12 @@ class UserInput:
         :param dict input:  Input, as a form field -> value dictionary
         :param bool silently_correct:  If true, replace invalid values with the
         given default value; else, raise a QueryParametersException if a value
-        is invalid.
+        is invalid. Defaults to false: every real caller wants the strict
+        behaviour, and tolerant parsing should be opted into deliberately.
+        :param log:  Optional logger. When an option's *default* value turns
+        out to be invalid (a developer mistake, not user input), a warning is
+        logged here and the default is corrected silently rather than shown to
+        the user.
 
         :return dict:  Sanitised form input
         """
@@ -115,6 +153,19 @@ class UserInput:
                 # whether or not the (hidden) form field was submitted.
                 continue
 
+            # an option's default is set by us, not by the user, so an invalid
+            # one is a bug in the option definition: warn developers about it.
+            # it is deliberately not corrected quietly. the form pre-fills
+            # defaults, so a bad default comes back looking like a value the
+            # user typed; silently replacing it would run the analysis on a
+            # value the user never chose and cannot see, which is worse than an
+            # error. it is validated like any other value below, so it gets
+            # reported (naming the option) rather than hidden.
+            default_problem = UserInput.validate_default(settings)
+            if default_problem and log:
+                log.warning("Option '%s' has an invalid default (%s). "
+                            "Please fix the option definition." % (option, default_problem))
+
             if settings.get("type") == UserInput.OPTION_DATERANGE:
                 # special case, since it combines two inputs
                 option_min = option + "-min"
@@ -134,13 +185,17 @@ class UserInput:
 
                     if before and after and after > before:
                         if not silently_correct:
-                            raise QueryParametersException("The start of the date range must be before its end.")
+                            raise QueryParametersException("the start of the date range must be before its end.")
                         else:
                             before = after
 
                     parsed_input[option] = (after, before)
                 except RequirementsNotMetException:
                     pass
+                except QueryParametersException as e:
+                    # say which option the problem is about; parse_value only
+                    # sees an option's settings, not its name
+                    raise QueryParametersException("%s: %s" % (settings.get("help") or option, e))
 
             elif settings.get("type") in (UserInput.OPTION_TOGGLE, UserInput.OPTION_ANNOTATION):
                 # special case too, since if a checkbox is unchecked, it simply
@@ -154,6 +209,8 @@ class UserInput:
                         parsed_input[option] = False
                 except RequirementsNotMetException:
                     pass
+                except QueryParametersException as e:
+                    raise QueryParametersException("%s: %s" % (settings.get("help") or option, e))
 
             elif settings.get("type") == UserInput.OPTION_DATASOURCES:
                 # special case, because this combines multiple inputs to
@@ -184,7 +241,7 @@ class UserInput:
 
                         choice = input.get(option + "-" + datasource + "-" + column, False)
                         column_settings = settings["columns"][column]  # sub-settings per column
-                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=True)
+                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=silently_correct)
 
                 parsed_input[option] = table_input
 
@@ -228,7 +285,8 @@ class UserInput:
                         parsed_input[option] = {value[settings["dict_key"]]: {**value, "_id": value[settings["dict_key"]]} for value in parsed_input[option]}
 
             elif option not in input:
-                # not provided? use default
+                # not provided? use the default (an invalid one was warned
+                # about above, but is not silently replaced with something else)
                 parsed_input[option] = settings.get("default", None)
 
             else:
@@ -237,6 +295,10 @@ class UserInput:
                     parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
                 except RequirementsNotMetException:
                     pass
+                except QueryParametersException as e:
+                    # say which option the problem is about; parse_value only
+                    # sees an option's settings, not its name
+                    raise QueryParametersException("%s: %s" % (settings.get("help") or option, e))
 
         return parsed_input
 
@@ -363,7 +425,7 @@ class UserInput:
         return True
 
     @staticmethod
-    def parse_value(settings, choice, other_input=None, silently_correct=True):
+    def parse_value(settings, choice, other_input=None, silently_correct=False):
         """
         Filter user input
 
@@ -406,37 +468,41 @@ class UserInput:
             # parse either integers (unix timestamps) or try to guess the date
             # format (the latter may be used for input if JavaScript is turned
             # off in the front-end and the input comes from there)
-            value = None
+            if choice is None or choice == "":
+                # this end of the range was left empty
+                return None
             try:
-                value = int(choice)
-            except ValueError:
-                parsed_choice = parse_datetime(choice)
-                value = int(parsed_choice.timestamp())
-            finally:
-                return value
+                return int(choice)
+            except (ValueError, TypeError):
+                pass
+            try:
+                return int(parse_datetime(choice).timestamp())
+            except (ValueError, TypeError, OverflowError):
+                # not a number and not a date we can recognise. (previously this
+                # was swallowed by a return inside a finally block and silently
+                # became an open-ended range.)
+                if not silently_correct:
+                    raise QueryParametersException("'%s' is not a valid date." % choice)
+                return None
 
-        elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS):
-            # any number of values out of a list of possible values
-            # comma-separated during input, returned as a list of valid options
-            if not choice:
-                return settings.get("default", [])
-
-            chosen = choice.split(",")
-            return [item for item in chosen if item in settings.get("options", [])]
-
-        elif input_type == UserInput.OPTION_MULTI_SELECT:
-            # multiple number of values out of a dropdown list of possible values
-            # comma-separated during input, returned as a list of valid options
+        elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS, UserInput.OPTION_MULTI_SELECT):
+            # any number of values out of a list of possible values. these
+            # arrive either comma-separated (text controls and some client-side
+            # helpers) or as an actual list (real multi-selects and raw API
+            # callers), so accept both shapes. (OPTION_MULTI used to assume a
+            # string and crashed on a real list.)
             if not choice:
                 return settings.get("default", [])
 
             if type(choice) is str:
-                # should be a list if the form control was actually a multiselect
-                # but we have some client side UI helpers that may produce a string
-                # instead
                 choice = choice.split(",")
 
-            return [item for item in choice if item in settings.get("options", [])]
+            options = settings.get("options", [])
+            invalid = [item for item in choice if item not in options]
+            if invalid and not silently_correct:
+                raise QueryParametersException("Invalid value(s) selected: %s." % ", ".join(str(i) for i in invalid))
+
+            return [item for item in choice if item in options]
 
         elif input_type == UserInput.OPTION_CHOICE:
             # select box
@@ -467,49 +533,136 @@ class UserInput:
             return json.loads(choice)
 
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
-            # text string
-            # optionally clamp it as an integer; return default if not a valid
-            # integer (or float; inferred from default or made explicit via the
-            # coerce_type setting)
-            if settings.get("coerce_type"):
-                value_type = settings["coerce_type"]
+            # a text field. it may be a plain string, or constrained to a number
+            # by a coerce_type (e.g. int) and/or a min/max. for a numeric field,
+            # a non-number or an out-of-range value is rejected (when
+            # silently_correct is off) or corrected to the default / nearest
+            # bound (when it is on).
+            coerce_type = settings.get("coerce_type")
+            if coerce_type is not None and not callable(coerce_type):
+                # the option is declared wrong: coerce_type should be a type
+                # such as int or float, not e.g. the string "int"
+                if not silently_correct:
+                    raise QueryParametersException("This option is misconfigured: its coerce_type is not a type.")
+                coerce_type = None
+
+            has_range = "min" in settings or "max" in settings
+            if coerce_type in (int, float):
+                number_type = coerce_type
+            elif has_range:
+                default_type = type(settings.get("default"))
+                number_type = default_type if default_type in (int, float) else int
             else:
-                value_type = type(settings.get("default"))
-                if value_type not in (int, float):
-                    value_type = int
-
-            if "max" in settings:
-                try:
-                    choice = min(settings["max"], value_type(choice))
-                except (ValueError, TypeError):
-                    if not silently_correct:
-                        raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
-
-                    choice = settings.get("default")
-
-            if "min" in settings:
-                try:
-                    choice = max(settings["min"], value_type(choice))
-                except (ValueError, TypeError):
-                    if not silently_correct:
-                        raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
-
-                    choice = settings.get("default")
+                number_type = None
 
             if choice is None or choice == "":
+                # no value given: fall back to the default
                 choice = settings.get("default")
+                if choice is None:
+                    choice = 0 if has_range else ""
 
-            if choice is None:
-                choice = 0 if "min" in settings or "max" in settings else ""
-
-            if settings.get("coerce_type"):
+            elif number_type is not None:
+                # a number is expected: coerce it first, then keep it in range.
+                # coercion and range are checked separately so the error
+                # actually matches the problem (a non-number no longer reports
+                # an out-of-range message, and an out-of-range value is no
+                # longer silently clamped away).
                 try:
-                    return value_type(choice)
+                    choice = number_type(choice)
                 except (ValueError, TypeError):
+                    if not silently_correct:
+                        raise QueryParametersException("'%s' is not a valid number." % choice)
+                    choice = settings.get("default")
+                else:
+                    if "max" in settings and choice > settings["max"]:
+                        if not silently_correct:
+                            raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
+                        choice = settings["max"]
+                    if "min" in settings and choice < settings["min"]:
+                        if not silently_correct:
+                            raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
+                        choice = settings["min"]
+
+            # apply an explicit coerce_type so a value that came from the default
+            # still has the declared type
+            if coerce_type:
+                try:
+                    return coerce_type(choice)
+                except (ValueError, TypeError):
+                    if not silently_correct:
+                        raise QueryParametersException("This option's default value cannot be parsed.")
                     return settings.get("default")
-            else:
-                return choice
+
+            return choice
 
         else:
             # no filtering
             return choice
+
+    @staticmethod
+    def validate_default(settings):
+        """
+        Check an option's own default value against the option's own rules
+
+        A default is set by the developer, so a bad one is a bug in the option
+        definition, not something a user should ever see. This is what the
+        module test uses to catch those bugs, and what `parse_all` uses at
+        runtime to correct them quietly (see there).
+
+        The value rules live in one place, `parse_value`: for the types where it
+        applies, this feeds the default back through `parse_value` (strictly,
+        and ignoring any "requires" gate, since we are checking the value on its
+        own) and reports whatever it rejects. Only a few structural checks that
+        `parse_value` cannot express are done here directly.
+
+        Membership of a choice or multi-choice default in its option list is
+        checked only when that list is populated. Such lists are often built
+        from the parent dataset, so at test time (with no real parent) they may
+        be empty, in which case the check is skipped; at runtime the list is
+        authoritative and the check catches a default that isn't a real option.
+
+        :param dict settings:  An option's settings dictionary
+        :return str|None:  A short developer-facing description of the problem,
+          or None if the default is fine
+        """
+        default = settings.get("default")
+        input_type = settings.get("type")
+
+        # an empty or absent default means "no default; the user must choose",
+        # which is a legitimate pattern rather than a mistake
+        if default is None or default == "" or default == [] or default == {}:
+            return None
+
+        if input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_MULTI_SELECT, UserInput.OPTION_ANNOTATIONS):
+            # a multi-value default must be a list; a bare string or, worse, a
+            # generator leaks a wrong-typed value into stored parameters
+            if not isinstance(default, list):
+                return "default should be a list, not %s" % type(default).__name__
+
+        # for choice/multi options, membership can only be checked when the
+        # list of options is populated (see docstring); skip it otherwise
+        if input_type in (UserInput.OPTION_CHOICE, UserInput.OPTION_MULTI,
+                          UserInput.OPTION_MULTI_SELECT, UserInput.OPTION_ANNOTATIONS) and not settings.get("options"):
+            return None
+
+        if input_type == UserInput.OPTION_TEXT_JSON:
+            # a JSON option's default is a Python object, not a raw string, so
+            # check it is serialisable instead of sending it through parse_value
+            try:
+                json.dumps(default)
+                return None
+            except (TypeError, ValueError) as e:
+                return "default is not valid JSON (%s)" % e
+
+        if input_type == UserInput.OPTION_DATERANGE:
+            # date ranges have no meaningful single default value
+            return None
+
+        probe = {key: value for key, value in settings.items() if key != "requires"}
+        try:
+            UserInput.parse_value(probe, default, silently_correct=False)
+            return None
+        except QueryParametersException as e:
+            return str(e)
+        except RequirementsNotMetException:
+            return None

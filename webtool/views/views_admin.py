@@ -654,7 +654,7 @@ def manipulate_settings():
             # this gives us the parsed values, as Python variables, i.e. before
             # potentially encoding them as JSON
             new_settings = UserInput.parse_all(definition, request.form,
-                                               silently_correct=False)
+                                               silently_correct=False, log=g.log)
 
             for setting, value in new_settings.items():
                 if tag:

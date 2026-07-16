@@ -135,7 +135,7 @@ class VideoSceneDetector(BasicProcessor):
 				"coerce_type": float,
 				"default": 27.0,
 				"min": 0,
-				"max": 5,
+				"max": 255,
 				"requires": "detector_type==content_detector"
 			},
 			"ad_adaptive_threshold": {
@@ -194,7 +194,7 @@ class VideoSceneDetector(BasicProcessor):
 			"save_annotations": {
 				"type": UserInput.OPTION_ANNOTATION,
 				"label": "scene data",
-				"hidden_in_explorer": True,
+				"hide_in_explorer": True,
 				"tooltip": "Add amount of scenes per video to top dataset",
 				"default": False
 			}
