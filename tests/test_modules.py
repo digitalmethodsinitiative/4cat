@@ -252,6 +252,81 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
     else:
         logger.info("All processors passed successfully.")
 
+
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_option_default_validity(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_basic_config):
+    """
+    Every option's declared default must be valid under that option's own
+    rules. A bad default -- a number outside its own min/max, a coerce_type
+    that is not a callable type, a multi-value default that is not a list,
+    unparseable JSON -- is a mistake in the option definition, not user input,
+    and should never reach a user. Catch those here instead.
+
+    Uses UserInput.validate_default. Membership of choice/multi defaults in
+    option lists that are built from the parent dataset at runtime is
+    intentionally not checked (it cannot be verified out of context).
+    """
+    from common.lib.user_input import UserInput
+
+    problems = []
+    for processor_name, processor_class in fourcat_modules.processors.items():
+        try:
+            options = processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
+        except Exception:
+            # a failing get_options is test_processors' concern, not this test's
+            continue
+
+        if not isinstance(options, dict):
+            continue
+
+        for option_name, settings in options.items():
+            if not isinstance(settings, dict):
+                continue
+            problem = UserInput.validate_default(settings)
+            if problem:
+                logger.error(f"{processor_name} option '{option_name}': {problem}")
+                problems.append(f"{processor_name}.{option_name}: {problem}")
+
+    if problems:
+        pytest.fail("The following option defaults are invalid:\n" + "\n".join(problems))
+    else:
+        logger.info("All option defaults are valid.")
+
+
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_option_keys_known(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_basic_config):
+    """
+    Every key in an option's settings dictionary must be one the framework
+    understands. An unknown key (e.g. 'coerce' instead of 'coerce_type') is
+    silently ignored at parse time, so the setting it was meant to express
+    quietly has no effect. Catch those typos here.
+
+    See UserInput.KNOWN_OPTION_KEYS for the recognised set.
+    """
+    from common.lib.user_input import UserInput
+
+    problems = []
+    for processor_name, processor_class in fourcat_modules.processors.items():
+        try:
+            options = processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
+        except Exception:
+            continue
+
+        if not isinstance(options, dict):
+            continue
+
+        for option_name, settings in options.items():
+            unknown = UserInput.unknown_option_keys(settings)
+            if unknown:
+                logger.error(f"{processor_name} option '{option_name}': unknown key(s) {unknown}")
+                problems.append(f"{processor_name}.{option_name}: unknown key(s) {', '.join(unknown)}")
+
+    if problems:
+        pytest.fail("The following options have unrecognised keys:\n" + "\n".join(problems))
+    else:
+        logger.info("All option keys are recognised.")
+
+
 @pytest.mark.dependency(depends=["test_module_collector"])
 def test_compatibility_coverage(logger, fourcat_modules):
     """
