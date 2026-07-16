@@ -147,7 +147,23 @@ class UserInput:
                 # ignored
                 continue
 
-            elif settings.get("type") == UserInput.OPTION_DATERANGE:
+            # an option's default is set by us, not by the user, so an invalid
+            # one is a bug in the option definition and the user must not pay
+            # for it. the form pre-fills defaults, which means a bad default
+            # comes back looking exactly like a value the user typed and would
+            # otherwise be reported to them as their mistake. so: warn
+            # developers, and parse this one option leniently, which quietly
+            # corrects the bad value instead of rejecting it.
+            default_problem = UserInput.validate_default(settings)
+            if default_problem:
+                if log:
+                    log.warning("Option '%s' has an invalid default (%s); correcting it quietly. "
+                                "Please fix the option definition." % (option, default_problem))
+                option_silently_correct = True
+            else:
+                option_silently_correct = silently_correct
+
+            if settings.get("type") == UserInput.OPTION_DATERANGE:
                 # special case, since it combines two inputs
                 option_min = option + "-min"
                 option_max = option + "-max"
@@ -162,11 +178,11 @@ class UserInput:
 
                 # save as a tuple of unix timestamps (or None)
                 try:
-                    after, before = (UserInput.parse_value(settings, input.get(option_min), parsed_input, silently_correct), UserInput.parse_value(settings, input.get(option_max), parsed_input, silently_correct))
+                    after, before = (UserInput.parse_value(settings, input.get(option_min), parsed_input, option_silently_correct), UserInput.parse_value(settings, input.get(option_max), parsed_input, option_silently_correct))
 
                     if before and after and after > before:
-                        if not silently_correct:
-                            raise QueryParametersException("End of date range must be after beginning of date range.")
+                        if not option_silently_correct:
+                            raise QueryParametersException("the start of the range must be before its end.")
                         else:
                             before = after
 
@@ -184,7 +200,7 @@ class UserInput:
                 try:
                     if option in input:
                         # Toggle needs to be parsed
-                        parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
+                        parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, option_silently_correct)
                     else:
                         # Toggle was left blank
                         parsed_input[option] = False
@@ -222,7 +238,7 @@ class UserInput:
 
                         choice = input.get(option + "-" + datasource + "-" + column, False)
                         column_settings = settings["columns"][column]  # sub-settings per column
-                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=silently_correct)
+                        table_input[datasource][column] = UserInput.parse_value(column_settings, choice, table_input, silently_correct=option_silently_correct)
 
                 parsed_input[option] = table_input
 
@@ -245,7 +261,7 @@ class UserInput:
                         if input_index not in input_items:
                             input_items[input_index] = {}
 
-                        input_items[input_index][option_item] = UserInput.parse_value(item_options[option_item], value, input_items[input_index], silently_correct)
+                        input_items[input_index][option_item] = UserInput.parse_value(item_options[option_item], value, input_items[input_index], option_silently_correct)
 
                 # discard items that are only default values
                 parsed_input[option] = []
