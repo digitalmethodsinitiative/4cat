@@ -396,14 +396,10 @@ class UserInput:
             # parse either integers (unix timestamps) or try to guess the date
             # format (the latter may be used for input if JavaScript is turned
             # off in the front-end and the input comes from there)
-            value = None
+            if choice is None or choice == "":
+                # this end of the range was left empty
+                return None
             try:
-                value = int(choice)
-            except ValueError:
-                parsed_choice = parse_datetime(choice)
-                value = int(parsed_choice.timestamp())
-            finally:
-                return value
 
         elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS):
             # any number of values out of a list of possible values
@@ -417,6 +413,16 @@ class UserInput:
         elif input_type == UserInput.OPTION_MULTI_SELECT:
             # multiple number of values out of a dropdown list of possible values
             # comma-separated during input, returned as a list of valid options
+                return int(choice)
+            except (ValueError, TypeError):
+                pass
+            try:
+                return int(parse_datetime(choice).timestamp())
+            except (ValueError, TypeError, OverflowError):
+                # not a number and not a date we can recognise.
+                if not silently_correct:
+                    raise QueryParametersException("'%s' is not a valid date." % choice)
+                return None
             if not choice:
                 return settings.get("default", [])
 
