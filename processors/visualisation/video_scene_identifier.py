@@ -194,7 +194,7 @@ class VideoSceneDetector(BasicProcessor):
 			"save_annotations": {
 				"type": UserInput.OPTION_ANNOTATION,
 				"label": "scene data",
-				"hidden_in_explorer": True,
+				"hide_in_explorer": True,
 				"tooltip": "Add amount of scenes per video to top dataset",
 				"default": False
 			}
