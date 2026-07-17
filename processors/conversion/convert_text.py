@@ -35,7 +35,7 @@ class ConvertText(BasicProcessor):
         options = {
             "columns": {
                 "type": UserInput.OPTION_TEXT,
-                "default": "body",
+                "default": ["body"],
                 "help": "Columns with texts to replace",
             },
             "find": {
