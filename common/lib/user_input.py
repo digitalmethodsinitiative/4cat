@@ -61,6 +61,7 @@ class UserInput:
         "dict_key",      # sub-field or callable used as key for multi_option items
         "columns",       # sub-option definitions for table-style options
         "sensitive",     # treated as sensitive; excluded from public displays/logs and deleted on run
+        "mandatory",     # user-submitted value must not be blank/empty
 
         # -- read by the interface templates --
         "help",            # primary label/help text shown next to the form control
@@ -206,6 +207,9 @@ class UserInput:
                 if option_max not in input or input.get(option_max) == "-1":
                     option_max += "_proxy"
 
+                if settings.get("mandatory") and UserInput.is_empty_value(input.get(option_min)) and UserInput.is_empty_value(input.get(option_max)):
+                    raise QueryParametersException("%s: This field is required." % (settings.get("help") or option))
+
                 # save as a tuple of unix timestamps (or None)
                 try:
                     after, before = (UserInput.parse_value(settings, input.get(option_min), parsed_input, silently_correct), UserInput.parse_value(settings, input.get(option_max), parsed_input, silently_correct))
@@ -279,6 +283,10 @@ class UserInput:
                 # i.e. forms within forms!!!
                 item_options = settings["options"]
                 input_items = {}
+
+                if settings.get("mandatory") and not any(re.match(f"{option}-([0-9]+)-(.+)", key) for key in input):
+                    raise QueryParametersException("%s: This field is required." % (settings.get("help") or option))
+
                 for key, value in input.items():
                     if key_match := re.match(f"{option}-([0-9]+)-(.+)", key):
                         input_index = int(key_match[1])
@@ -319,6 +327,9 @@ class UserInput:
             else:
                 # normal parsing and sanitisation
                 try:
+                    if settings.get("mandatory") and UserInput.is_empty_value(input[option]):
+                        raise QueryParametersException("This field is required.")
+
                     parsed_input[option] = UserInput.parse_value(settings, input[option], parsed_input, silently_correct)
                 except RequirementsNotMetException:
                     pass
@@ -328,6 +339,26 @@ class UserInput:
                     raise QueryParametersException("%s: %s" % (settings.get("help") or option, e))
 
         return parsed_input
+
+    @staticmethod
+    def is_empty_value(value):
+        """
+        Check whether a raw submitted value counts as blank for mandatory fields
+
+        None, empty strings, and empty lists are treated as blank. Whitespace-
+        only strings are also considered blank. This is intentionally lenient
+        for other types; parse_value handles detailed validation.
+
+        :param value:  Raw submitted value
+        :return bool:  True if the value is blank
+        """
+        if value is None:
+            return True
+        if isinstance(value, str) and value.strip() == "":
+            return True
+        if isinstance(value, list) and len(value) == 0:
+            return True
+        return False
 
     @staticmethod
     def requirements_met(requires, other_input):
@@ -519,6 +550,8 @@ class UserInput:
             # callers), so accept both shapes. (OPTION_MULTI used to assume a
             # string and crashed on a real list.)
             if not choice:
+                if settings.get("mandatory"):
+                    raise QueryParametersException("This field is required.")
                 return settings.get("default", [])
 
             if type(choice) is str:
