@@ -48,16 +48,43 @@ class UserInput:
     # "coerce_type"), which is silently ignored and so has no effect - the
     # module test flags these so they are caught rather than shipped.
     KNOWN_OPTION_KEYS = frozenset({
-        # read by the parser / module loader
-        "type", "default", "options", "requires", "min", "max", "coerce_type",
-        "indirect", "delegated", "dict_key", "columns", "sensitive",
-        # read by the interface templates
-        "help", "tooltip", "label", "inline", "original_default", "value",
-        "saturation", "accept", "update", "password", "multiple", "cache",
-        # annotation options
-        "to_parent", "hide_in_explorer",
-        # datasource options
-        "board_specific",
+        # -- read by the parser / module loader --
+        "type",          # UI/control type of the option (toggle, choice, string, ...)
+        "default",       # value used when the option is not present in submitted input
+        "options",       # valid choices for choice/multi/annotation options
+        "requires",      # condition(s) controlling when the option is shown/parsed
+        "min",           # minimum allowed value for numeric text options
+        "max",           # maximum allowed value for numeric text options
+        "coerce_type",   # Python type (int, float) the parsed value is coerced to
+        "indirect",      # derived from other settings; skipped during parsing
+        "delegated",     # shown/parsed only when dynamically delegated by another option
+        "dict_key",      # sub-field or callable used as key for multi_option items
+        "columns",       # sub-option definitions for table-style options
+        "sensitive",     # treated as sensitive; excluded from public displays/logs and deleted on run
+
+        # -- read by the interface templates --
+        "help",            # primary label/help text shown next to the form control
+        "tooltip",         # longer explanatory text shown as tooltip or placeholder
+        "label",           # display label for annotation badges
+        "inline",          # render multi/multi_select choices inline
+        "original_default",  # configured default preserved when the live value is overridden (settings panel)
+        "value",           # HSV lightness/value component for hue colour pickers
+        "saturation",      # HSV saturation component for hue colour pickers
+        "accept",          # accepted file type for file inputs
+        "update",          # CSS selector to update with hue picker changes
+        "password",        # render string input as a password field
+        "multiple",        # allow selecting multiple files
+        "cache",           # tell the frontend to cache the value locally
+
+        # -- annotation options --
+        "to_parent",          # attach annotations to the parent dataset
+        "hide_in_explorer",   # hide annotation column from the Explorer UI
+
+        # -- datasource options --
+        "board_specific",   # list of board IDs for which the option is shown
+
+        # -- config/admin settings --
+        "global",   # setting applies across all users (not user-scoped)
     })
 
     @staticmethod
