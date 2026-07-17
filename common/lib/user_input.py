@@ -111,11 +111,23 @@ class UserInput:
 
         Ignores all input not belonging to any of the defined options: parses
         and sanitises the rest, and returns a dictionary with the sanitised
-        options. If an option is *not* present in the input, the default value
-        is used, and if that is absent, `None`.
+        options.
+
+        An option that is *not* present in the input at all is an error when
+        parsing strictly: our own form always submits every field it shows, so
+        a missing option means an incomplete submission (e.g. an API call that
+        left it out), and quietly proceeding without it would let later checks
+        pass on values the caller never sent. Exceptions are options a form
+        legitimately leaves out: unchecked toggles (submitted as nothing, read
+        as False), file uploads (sent outside the form values), fields gated
+        by an unmet "requires" condition or by "board_specific" (left out of
+        the result), and unticked multi-selects (the form submits an empty
+        marker so they are still present). When parsing tolerantly
+        (silently_correct), a missing option gets its default instead.
 
         In other words, this ensures a dictionary with 1) only white-listed
-        keys, 2) a value of an expected type for each key.
+        keys, 2) a value of an expected type for each key, and 3) when strict,
+        a complete submission.
 
         :param dict options:  Options, as a name -> settings dictionary
         :param dict input:  Input, as a form field -> value dictionary
@@ -320,17 +332,40 @@ class UserInput:
                         parsed_input[option] = {value[settings["dict_key"]]: {**value, "_id": value[settings["dict_key"]]} for value in parsed_input[option]}
 
             elif option not in input:
-                # not provided? use the default (an invalid one was warned
-                # about above, but is not silently replaced with something else)
-                parsed_input[option] = settings.get("default", None)
+                # the option was not part of the submission at all. our own
+                # form always submits every field it shows - fields hidden by
+                # an unmet "requires" condition were already dropped above -
+                # so apart from the two exceptions below, a missing option
+                # means an incomplete submission.
+                if settings.get("type") == UserInput.OPTION_FILE:
+                    # a file input's content does not travel among the form
+                    # values (it is sent separately, in request.files), so it
+                    # is never present here; whether a file was actually
+                    # uploaded is for the module's validate_query to check
+                    pass
 
-                # a mandatory option that was not submitted at all is only
-                # satisfied if its default fills it in. this is the shape an
-                # unselected multi-select arrives in: like an unchecked
-                # checkbox, the form leaves the field out altogether rather
-                # than sending it empty
-                if settings.get("mandatory") and UserInput.is_empty_value(parsed_input[option]):
+                elif settings.get("board_specific"):
+                    # only shown for particular boards: the form disables the
+                    # field when another board is selected, and a disabled
+                    # field is not submitted. like an unmet "requires", the
+                    # user never saw it, so leave it out
+                    pass
+
+                elif settings.get("mandatory"):
                     raise QueryParametersException("%s: This field is required." % (settings.get("help") or option))
+
+                elif silently_correct:
+                    # a caller that asked to be corrected quietly gets the
+                    # default filled in
+                    parsed_input[option] = settings.get("default", None)
+
+                else:
+                    # strict parsing: quietly filling in the default - or
+                    # quietly leaving the option out - would let later checks
+                    # pass on a value the caller never sent. an incomplete
+                    # submission is the caller's mistake, so say so.
+                    raise QueryParametersException(
+                        "%s: this field was missing from the submitted form." % (settings.get("help") or option))
 
             else:
                 # normal parsing and sanitisation
@@ -557,13 +592,25 @@ class UserInput:
             # helpers) or as an actual list (real multi-selects and raw API
             # callers), so accept both shapes. (OPTION_MULTI used to assume a
             # string and crashed on a real list.)
+            if type(choice) is str:
+                choice = choice.split(",")
+
+            # the form submits an empty value alongside whatever is selected, so
+            # that the field is present even when nothing is: a browser leaves a
+            # select with no selection out of the submission entirely, which is
+            # indistinguishable from the field never having been shown. discard
+            # that empty marker, and treat what remains as the selection.
+            choice = [item for item in (choice or []) if item != ""]
+
             if not choice:
                 if settings.get("mandatory"):
                     raise QueryParametersException("This field is required.")
-                return settings.get("default", [])
-
-            if type(choice) is str:
-                choice = choice.split(",")
+                if silently_correct:
+                    return settings.get("default", [])
+                # a submitted-but-empty selection means the user unticked
+                # everything: a choice of nothing, not a request for the
+                # default back
+                return []
 
             options = settings.get("options", [])
             invalid = [item for item in choice if item not in options]
@@ -624,10 +671,20 @@ class UserInput:
                 number_type = None
 
             if choice is None or choice == "":
-                # no value given: fall back to the default
-                choice = settings.get("default")
-                if choice is None:
-                    choice = 0 if has_range else ""
+                # an empty value that was actively submitted - an option left
+                # out of the submission never reaches this point. the default
+                # is not quietly filled back in: the form showed it, and the
+                # user removed it. for a text field, empty is an answer
+                # ("nothing"); for a numeric field it is not one. a tolerant
+                # caller gets the correcting behaviour, i.e. the default.
+                if silently_correct:
+                    choice = settings.get("default")
+                    if choice is None:
+                        choice = 0 if number_type is not None else ""
+                elif number_type is None:
+                    return ""
+                else:
+                    raise QueryParametersException("This field needs a number.")
 
             elif number_type is not None:
                 # a number is expected: coerce it first, then keep it in range.

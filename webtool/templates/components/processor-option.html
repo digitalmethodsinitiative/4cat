@@ -36,6 +36,11 @@
         </select>
     {% elif option_settings.type in ("multi", "annotations") %}
         <div class="multichoice-wrapper{% if option_settings.inline or option_settings.type == "annotations" %} inline{% endif %}" style="flex-basis: 100%;">
+            {# a browser submits nothing at all for a select with nothing selected, which
+               would be indistinguishable from the field never having been shown. this
+               empty value keeps the field in the submission either way; it is discarded
+               while parsing #}
+            <input name="option-{{ option }}" type="hidden" value="">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in option_settings.options %}
                 <option value="{{ choice }}"{% if option_settings.default and choice in option_settings.default %} selected="selected"{% endif %}>{% if option_settings.inline %}{{ option_settings.options[choice] | truncate(30, True, "...", 0) }}{% else %}{{option_settings.options[choice]}}{% endif %}</option>
@@ -44,6 +49,8 @@
         </div>
     {% elif option_settings.type == "multi_select" %}
         <div class="multi-select-wrapper">
+            {# see above: keeps the field present when nothing is selected #}
+            <input name="option-{{ option }}" type="hidden" value="">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in option_settings.options %}
                 <option value="{{ choice }}"{% if option_settings.default and choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>

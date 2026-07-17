@@ -641,12 +641,14 @@ def test_parse_all_gated_options():
     assert parsed == {"gate": False, "plain": "y"}
 
     # gate off, gated field submitted anyway (e.g. hidden field still posts):
-    # still absent
-    parsed = UserInput.parse_all(options, {"option-gated": ";"})
+    # still absent. (plain must be submitted: a missing non-gated option is an
+    # incomplete submission and raises)
+    parsed = UserInput.parse_all(options, {"option-plain": "y", "option-gated": ";"})
     assert "gated" not in parsed and "gated_toggle" not in parsed
 
-    # gate on: gated options are parsed (submitted value) or defaulted (absent)
-    parsed = UserInput.parse_all(options, {"option-gate": "on", "option-gated": ";"})
+    # gate on: the gated text field is parsed; the gated toggle is absent from
+    # the submission, which for a toggle simply means unchecked
+    parsed = UserInput.parse_all(options, {"option-gate": "on", "option-plain": "y", "option-gated": ";"})
     assert parsed["gated"] == ";" and parsed["gated_toggle"] is False and parsed["gate"] is True
 
 

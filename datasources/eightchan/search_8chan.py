@@ -101,13 +101,15 @@ class Search8Chan(Search4Chan):
                 "min": 0,
                 "max": 100,
                 "default": 15,
-                "tooltip": "At least this many % of messages in the thread must match the query"
+                "tooltip": "At least this many % of messages in the thread must match the query",
+                "requires": "search_scope==dense-threads"
             },
             "scope_length": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Min. dense thread length",
                 "min": 30,
                 "default": 30,
-                "tooltip": "A thread must at least be this many messages long to qualify as a 'dense thread'"
+                "tooltip": "A thread must at least be this many messages long to qualify as a 'dense thread'",
+                "requires": "search_scope==dense-threads"
             }
         }

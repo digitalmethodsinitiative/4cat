@@ -76,9 +76,12 @@ class TestMandatoryOption:
         with pytest.raises(QueryParametersException):
             UserInput.parse_all(options, {})
 
-    def test_mandatory_text_with_default_missing_input_does_not_raise(self):
+    def test_mandatory_text_with_default_missing_input_raises(self):
         """
-        If the option was not submitted but has a default, the default is used.
+        A default is the form's starting value, not a stand-in for an answer.
+        Defaults are no longer filled in for a strict caller, so an option that
+        was not submitted has not been given - and a mandatory option that was
+        not given fails, whether or not it has a default.
         """
         options = {
             "query": {
@@ -88,12 +91,17 @@ class TestMandatoryOption:
                 "mandatory": True,
             }
         }
-        parsed = UserInput.parse_all(options, {})
-        assert parsed == {"query": "default query"}
+        with pytest.raises(QueryParametersException):
+            UserInput.parse_all(options, {})
 
-    def test_non_mandatory_text_empty_is_allowed(self):
+    def test_missing_option_raises_unless_correcting_silently(self):
         """
-        Without mandatory=True, an empty value should fall back to the default.
+        Our own form always submits every field it shows, so an option that is
+        missing from the input altogether means an incomplete submission (e.g.
+        an API call that left it out). Strict parsing refuses it, naming the
+        option - quietly proceeding would let later checks pass on values the
+        caller never sent. A caller that asked to be corrected quietly gets
+        the default filled in instead.
         """
         options = {
             "query": {
@@ -102,8 +110,68 @@ class TestMandatoryOption:
                 "default": "default query",
             }
         }
-        parsed = UserInput.parse_all(options, {"query": ""})
-        assert parsed == {"query": "default query"}
+
+        assert UserInput.parse_all(options, {}, silently_correct=True) == {"query": "default query"}
+        with pytest.raises(QueryParametersException) as raised:
+            UserInput.parse_all(options, {})
+        assert "Search query" in str(raised.value)
+
+    def test_cleared_text_stays_cleared(self):
+        """
+        The form pre-fills the default into the field, so an empty submitted
+        value means the user deliberately removed it. That is an answer
+        ("nothing"), and it is stored as such - not quietly swapped back for
+        the default the user just deleted. A tolerant caller still gets the
+        default.
+        """
+        options = {
+            "query": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Search query",
+                "default": "default query",
+            }
+        }
+        assert UserInput.parse_all(options, {"query": ""}) == {"query": ""}
+        assert UserInput.parse_all(options, {"query": ""}, silently_correct=True) == {"query": "default query"}
+
+    def test_cleared_number_field_raises(self):
+        """
+        There is no honest empty number: a user who clears a numeric field and
+        submits is told to enter a number, rather than having the deleted
+        default quietly restored.
+        """
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Number of items",
+                "coerce_type": int,
+                "min": 1,
+                "default": 10,
+            }
+        }
+        with pytest.raises(QueryParametersException) as raised:
+            UserInput.parse_all(options, {"amount": ""})
+        assert "Number of items" in str(raised.value)
+
+        assert UserInput.parse_all(options, {"amount": ""}, silently_correct=True) == {"amount": 10}
+
+    def test_unticking_an_optional_multi_means_none(self):
+        """
+        Unticking every option of a non-mandatory multi-select is a choice of
+        nothing - the result is an empty selection, not the default the user
+        just unticked.
+        """
+        options = {
+            "boards": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Boards",
+                "options": {"pol": "/pol/", "v": "/v/"},
+                "default": ["pol"],
+            }
+        }
+        # the form's empty marker on its own: nothing selected
+        assert UserInput.parse_all(options, {"boards": ""}) == {"boards": []}
+        assert UserInput.parse_all(options, {"boards": ""}, silently_correct=True) == {"boards": ["pol"]}
 
     def test_mandatory_multi_raises_when_empty(self):
         """
@@ -138,6 +206,59 @@ class TestMandatoryOption:
         }
         with pytest.raises(QueryParametersException):
             UserInput.parse_all(options, {})
+
+    def test_mandatory_multi_raises_when_default_is_unselected(self):
+        """
+        A user who unticks every option, including a selected default, has
+        chosen nothing and should be told so rather than quietly handed the
+        default back.
+
+        A browser submits nothing at all for a select with no selection, which
+        would be indistinguishable from the field never having been shown, so
+        the form submits an empty value alongside it. That empty marker on its
+        own is what "I unticked everything" looks like here.
+        """
+        options = {
+            "boards": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Boards",
+                "options": {"pol": "/pol/", "v": "/v/"},
+                "default": ["pol"],
+                "mandatory": True,
+            }
+        }
+        with pytest.raises(QueryParametersException):
+            UserInput.parse_all(options, {"boards": ""})
+
+    def test_multi_discards_the_empty_marker(self):
+        """
+        The empty value the form submits alongside the selected ones is not a
+        selection, and must not be mistaken for an invalid choice.
+        """
+        options = {
+            "boards": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Boards",
+                "options": {"pol": "/pol/", "v": "/v/"},
+            }
+        }
+        parsed = UserInput.parse_all(options, {"boards": ["", "pol"]})
+        assert parsed == {"boards": ["pol"]}
+
+    def test_multi_still_rejects_an_invalid_choice_alongside_the_marker(self):
+        """
+        Discarding the marker must not become a way to smuggle bad values past
+        validation.
+        """
+        options = {
+            "boards": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Boards",
+                "options": {"pol": "/pol/", "v": "/v/"},
+            }
+        }
+        with pytest.raises(QueryParametersException):
+            UserInput.parse_all(options, {"boards": ["", "nope"]})
 
     def test_mandatory_multi_accepts_value(self):
         """
