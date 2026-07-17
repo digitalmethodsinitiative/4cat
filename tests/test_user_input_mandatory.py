@@ -59,10 +59,12 @@ class TestMandatoryOption:
         parsed = UserInput.parse_all(options, {"query": "hello"})
         assert parsed == {"query": "hello"}
 
-    def test_mandatory_text_missing_default_does_not_raise(self):
+    def test_mandatory_text_missing_raises(self):
         """
-        If the option was never submitted and has no default, mandatory should
-        not raise.
+        A mandatory option that was not submitted at all, and whose default
+        does not fill it in, is not satisfied. This is how an API caller
+        omitting a field arrives, and it matches what a mandatory date range
+        or multi_option already does when absent.
         """
         options = {
             "query": {
@@ -71,8 +73,8 @@ class TestMandatoryOption:
                 "mandatory": True,
             }
         }
-        parsed = UserInput.parse_all(options, {})
-        assert parsed == {"query": None}
+        with pytest.raises(QueryParametersException):
+            UserInput.parse_all(options, {})
 
     def test_mandatory_text_with_default_missing_input_does_not_raise(self):
         """
@@ -117,6 +119,25 @@ class TestMandatoryOption:
         }
         with pytest.raises(QueryParametersException):
             UserInput.parse_all(options, {"boards": ""})
+
+    def test_mandatory_multi_raises_when_nothing_selected(self):
+        """
+        When a user selects nothing in a multi-select, the form leaves the
+        field out of the submission altogether rather than sending it empty -
+        the same way an unchecked checkbox behaves. That absent shape, not an
+        empty value, is what actually reaches us, so it is the one that has to
+        be caught.
+        """
+        options = {
+            "boards": {
+                "type": UserInput.OPTION_MULTI,
+                "help": "Boards",
+                "options": {"pol": "/pol/", "v": "/v/"},
+                "mandatory": True,
+            }
+        }
+        with pytest.raises(QueryParametersException):
+            UserInput.parse_all(options, {})
 
     def test_mandatory_multi_accepts_value(self):
         """

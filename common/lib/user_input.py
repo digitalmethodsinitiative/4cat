@@ -324,6 +324,14 @@ class UserInput:
                 # about above, but is not silently replaced with something else)
                 parsed_input[option] = settings.get("default", None)
 
+                # a mandatory option that was not submitted at all is only
+                # satisfied if its default fills it in. this is the shape an
+                # unselected multi-select arrives in: like an unchecked
+                # checkbox, the form leaves the field out altogether rather
+                # than sending it empty
+                if settings.get("mandatory") and UserInput.is_empty_value(parsed_input[option]):
+                    raise QueryParametersException("%s: This field is required." % (settings.get("help") or option))
+
             else:
                 # normal parsing and sanitisation
                 try:
