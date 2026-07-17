@@ -9,8 +9,7 @@ from requests.exceptions import ConnectionError
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, \
-    QueryNeedsExplicitConfirmationException
+from common.lib.exceptions import ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
@@ -256,7 +255,8 @@ class AudioToText(BasicProcessor):
                 "help": "OpenAI API key",
                 "tooltip": "Can be created on platform.openapi.com",
                 "requires": "model_host==openai",
-                "sensitive": True
+                "sensitive": True,
+                "mandatory": True
             }
 
         return options
@@ -264,26 +264,21 @@ class AudioToText(BasicProcessor):
     @staticmethod
     def validate_query(query, request, config):
         """
-        Check OpenAI requirements before the job is queued
+        Ask for confirmation before audio is sent to OpenAI
 
-        The API key field is only part of the form when no site-wide key is
-        configured, so when it is part of the submission the user has to fill
-        it in. Sending audio to OpenAI also shares data with a third party
-        and is likely to cost money, so ask for an explicit confirmation.
+        Sending audio to OpenAI shares data with a third party and is likely to
+        cost money, so ask the user to confirm that first. That the API key is
+        actually filled in is handled by the option's `mandatory` setting.
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
         :param ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:  Safe query parameters
         """
-        if query.get("model_host") == "openai":
-            if "api_key" in query and not (query["api_key"] or "").strip():
-                raise QueryParametersException("You need to provide an OpenAI API key to use OpenAI models.")
-
-            if not query.get("frontend-confirm"):
-                raise QueryNeedsExplicitConfirmationException(
-                    "Your audio files will be sent to OpenAI for processing. This shares your data with a third "
-                    "party and is likely to incur costs. Do you want to continue?")
+        if query.get("model_host") == "openai" and not query.get("frontend-confirm"):
+            raise QueryNeedsExplicitConfirmationException(
+                "Your audio files will be sent to OpenAI for processing. This shares your data with a third "
+                "party and is likely to incur costs. Do you want to continue?")
 
         return query
 

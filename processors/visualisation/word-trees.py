@@ -8,7 +8,6 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
-from common.lib.exceptions import QueryParametersException
 from common.lib.compatibility import Compatibility
 
 from nltk.tokenize import word_tokenize, TweetTokenizer
@@ -256,6 +255,7 @@ class MakeWordtree(BasicProcessor):
             "query": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
+                "mandatory": True,
                 "help": "Word tree root query",
                 "tooltip": "Enter a text here to serve as the root of the word tree. The context of this query will be "
                            "visualised as a tree graph. You can use wildcards: 'politic*' will match 'politician' and "
@@ -450,23 +450,6 @@ class MakeWordtree(BasicProcessor):
         canvas.save(pretty=True)
 
         return self.dataset.finish(len(list(PreOrderIter(root))))
-
-    @staticmethod
-    def validate_query(query, request, config):
-        """
-        Validate input
-
-        Checks if everything needed is filled in.
-
-        :param query:
-        :param request:
-        :param config:
-        :return:
-        """
-        if not query.get("query", "").strip():
-            raise QueryParametersException("Query cannot be empty.")
-
-        return query
 
     def build_tree(self, query: str) -> tuple[TreeNode, int]:
         """

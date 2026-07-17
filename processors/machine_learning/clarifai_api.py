@@ -67,6 +67,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 "help": "API Key",
                 "cache": True,
                 "sensitive": True,
+                "mandatory": True,
                 "tooltip": "The API key for your Clarifai account. You'll need to go to clarifai.com and create a new "
                         "project to generate a key."
             },

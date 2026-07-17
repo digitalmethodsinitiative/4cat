@@ -48,6 +48,7 @@ class AnnotateImages(ProcessorPreset):
             "api_key": {
                 "type": UserInput.OPTION_TEXT,
                 "sensitive": True,
+                "mandatory": True,
                 "help": "API Key",
                 "tooltip": "The API Key for your Google API account. You can generate and find this "
                         "key on the API dashboard."

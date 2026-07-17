@@ -45,6 +45,7 @@ class LexicalFilter(BaseFilter):
             "lexicon-custom": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
+                "mandatory": True,
                 "help": "Custom word list (separate with commas)"
             },
             "as_regex": {

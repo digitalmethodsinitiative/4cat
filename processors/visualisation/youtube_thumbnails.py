@@ -48,7 +48,8 @@ class YouTubeThumbnails(BasicProcessor):
 					"default": "",
 					"help": "YouTube API key",
 					"tooltip": "Can be created on https://developers.google.com/youtube/v3",
-					"sensitive": True
+					"sensitive": True,
+					"mandatory": True
 				}
 			}
 

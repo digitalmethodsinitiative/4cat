@@ -41,6 +41,7 @@ class ConvertText(BasicProcessor):
             "find": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
+                "mandatory": True,
                 "help": "Text to replace",
                 "tooltip": "Multiple values can be replaced; separate with comma.",
             },

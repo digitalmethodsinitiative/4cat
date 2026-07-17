@@ -45,6 +45,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		return {
 			"words": {
 				"type": UserInput.OPTION_TEXT,
+				"mandatory": True,
 				"help": "Words",
 				"tooltip": "Separate with commas."
 			},
