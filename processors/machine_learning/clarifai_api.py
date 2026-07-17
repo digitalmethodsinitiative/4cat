@@ -96,8 +96,10 @@ class ClarifaiAPIFetcher(BasicProcessor):
             "annotation_threshold": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Only add labels above this confidence",
-                "default": "0.95",
-                "coerce_type": "float",
+                "default": 0.95,
+                "coerce_type": float,
+                "min": 0,
+                "max": 1,
                 "requires": "save_annotations==true"
             },
             "csv_info": {

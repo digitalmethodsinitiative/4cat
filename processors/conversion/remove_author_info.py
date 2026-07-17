@@ -76,7 +76,10 @@ class AuthorInfoRemover(BasicProcessor):
             parent_columns = parent_dataset.get_columns()
             parent_columns = {c: c for c in sorted(parent_columns)}
 
-            default_fields = itertools.chain(*[[c for c in parent_columns if fnmatch.fnmatch(c, d)] for d in default_fields])
+            # a list, not the generator itertools.chain returns: this ends up as
+            # the option's default, which is stored and must survive being read
+            # more than once
+            default_fields = list(itertools.chain(*[[c for c in parent_columns if fnmatch.fnmatch(c, d)] for d in default_fields]))
 
             options["fields"] = {
                 "type": UserInput.OPTION_MULTI_SELECT,

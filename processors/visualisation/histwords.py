@@ -92,7 +92,10 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Similarity threshold",
                 "tooltip": "Decimal value between 0 and 1; only neighbours with a higher similarity score than this will be included",
-                "default": "0.3"
+                "coerce_type": float,
+                "default": 0.3,
+                "min": -1,
+                "max": 1
             },
             "overlay": {
                 "type": UserInput.OPTION_TOGGLE,

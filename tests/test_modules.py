@@ -252,6 +252,132 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
     else:
         logger.info("All processors passed successfully.")
 
+
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_option_default_validity(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_basic_config):
+    """
+    Every option's declared default must be valid under that option's own
+    rules. A bad default -- a number outside its own min/max, a coerce_type
+    that is not a callable type, a multi-value default that is not a list,
+    unparseable JSON -- is a mistake in the option definition, not user input,
+    and should never reach a user. Catch those here instead.
+
+    Uses UserInput.validate_default. Membership of choice/multi defaults in
+    option lists that are built from the parent dataset at runtime is
+    intentionally not checked (it cannot be verified out of context).
+    """
+    from common.lib.user_input import UserInput
+
+    problems = []
+    for processor_name, processor_class in fourcat_modules.processors.items():
+        try:
+            options = processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
+        except Exception:
+            # a failing get_options is test_processors' concern, not this test's
+            continue
+
+        if not isinstance(options, dict):
+            continue
+
+        for option_name, settings in options.items():
+            if not isinstance(settings, dict):
+                continue
+            problem = UserInput.validate_default(settings)
+            if problem:
+                logger.error(f"{processor_name} option '{option_name}': {problem}")
+                problems.append(f"{processor_name}.{option_name}: {problem}")
+
+    if problems:
+        pytest.fail("The following option defaults are invalid:\n" + "\n".join(problems))
+    else:
+        logger.info("All option defaults are valid.")
+
+
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_option_keys_known(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_basic_config):
+    """
+    Every key in an option's settings dictionary must be one the framework
+    understands. An unknown key (e.g. 'coerce' instead of 'coerce_type') is
+    silently ignored at parse time, so the setting it was meant to express
+    quietly has no effect. Catch those typos here.
+
+    See UserInput.KNOWN_OPTION_KEYS for the recognised set.
+    """
+    from common.lib.user_input import UserInput
+
+    problems = []
+    for processor_name, processor_class in fourcat_modules.processors.items():
+        try:
+            options = processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
+        except Exception:
+            continue
+
+        if not isinstance(options, dict):
+            continue
+
+        for option_name, settings in options.items():
+            unknown = UserInput.unknown_option_keys(settings)
+            if unknown:
+                logger.error(f"{processor_name} option '{option_name}': unknown key(s) {unknown}")
+                problems.append(f"{processor_name}.{option_name}: unknown key(s) {', '.join(unknown)}")
+
+    if problems:
+        pytest.fail("The following options have unrecognised keys:\n" + "\n".join(problems))
+    else:
+        logger.info("All option keys are recognised.")
+
+
+def test_parse_all_warns_about_a_bad_default_but_does_not_correct_it():
+    """
+    An option's default is set by us, so an invalid one is our bug and
+    developers are warned about it. It is deliberately not corrected quietly:
+    the form pre-fills defaults, so silently replacing the value would run the
+    analysis on something the user never chose and cannot see, which is worse
+    than an error. It is reported like any other invalid value instead.
+    """
+    from common.lib.user_input import UserInput
+    from common.lib.exceptions import QueryParametersException
+
+    options = {"threshold": {
+        "type": UserInput.OPTION_TEXT,
+        "help": "Threshold",
+        "coerce_type": float,
+        "default": 27.0,  # invalid: above the max below
+        "min": 0,
+        "max": 5,
+    }}
+    log = MagicMock()
+
+    # the form pre-fills the (bad) default and submits it back
+    with pytest.raises(QueryParametersException):
+        UserInput.parse_all(options, {"option-threshold": "27.0"}, silently_correct=False, log=log)
+
+    assert log.warning.called, "developers should be warned about the bad default"
+
+
+def test_parse_all_error_names_the_option():
+    """
+    A genuine user error should say which option it is about, rather than a
+    bare 'Provide a value of 5 or lower.' with no context.
+    """
+    from common.lib.user_input import UserInput
+    from common.lib.exceptions import QueryParametersException
+
+    options = {"cd_threshold": {
+        "type": UserInput.OPTION_TEXT,
+        "help": "Pixel intensity delta threshold",
+        "coerce_type": float,
+        "default": 1.0,  # valid, so the value below is the user's own doing
+        "min": 0,
+        "max": 5,
+    }}
+
+    with pytest.raises(QueryParametersException) as raised:
+        UserInput.parse_all(options, {"option-cd_threshold": "99"}, silently_correct=False)
+
+    assert "Pixel intensity delta threshold" in str(raised.value)
+
+
 @pytest.mark.dependency(depends=["test_module_collector"])
 def test_compatibility_coverage(logger, fourcat_modules):
     """
@@ -515,12 +641,14 @@ def test_parse_all_gated_options():
     assert parsed == {"gate": False, "plain": "y"}
 
     # gate off, gated field submitted anyway (e.g. hidden field still posts):
-    # still absent
-    parsed = UserInput.parse_all(options, {"option-gated": ";"})
+    # still absent. (plain must be submitted: a missing non-gated option is an
+    # incomplete submission and raises)
+    parsed = UserInput.parse_all(options, {"option-plain": "y", "option-gated": ";"})
     assert "gated" not in parsed and "gated_toggle" not in parsed
 
-    # gate on: gated options are parsed (submitted value) or defaulted (absent)
-    parsed = UserInput.parse_all(options, {"option-gate": "on", "option-gated": ";"})
+    # gate on: the gated text field is parsed; the gated toggle is absent from
+    # the submission, which for a toggle simply means unchecked
+    parsed = UserInput.parse_all(options, {"option-gate": "on", "option-plain": "y", "option-gated": ";"})
     assert parsed["gated"] == ";" and parsed["gated_toggle"] is False and parsed["gate"] is True
 
 
