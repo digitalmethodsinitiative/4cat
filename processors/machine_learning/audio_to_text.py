@@ -9,7 +9,8 @@ from requests.exceptions import ConnectionError
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, \
+    QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
@@ -260,6 +261,32 @@ class AudioToText(BasicProcessor):
 
         return options
 
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check OpenAI requirements before the job is queued
+
+        The API key field is only part of the form when no site-wide key is
+        configured, so when it is part of the submission the user has to fill
+        it in. Sending audio to OpenAI also shares data with a third party
+        and is likely to cost money, so ask for an explicit confirmation.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        if query.get("model_host") == "openai":
+            if "api_key" in query and not (query["api_key"] or "").strip():
+                raise QueryParametersException("You need to provide an OpenAI API key to use OpenAI models.")
+
+            if not query.get("frontend-confirm"):
+                raise QueryNeedsExplicitConfirmationException(
+                    "Your audio files will be sent to OpenAI for processing. This shares your data with a third "
+                    "party and is likely to incur costs. Do you want to continue?")
+
+        return query
+
     def process(self):
         """
         This takes a zipped set of audio files and uses a Whisper docker image to identify speech and convert to text,
@@ -318,7 +345,9 @@ class AudioToText(BasicProcessor):
                     return
 
         else:
-            # Check for API key if using OpenAI models
+            # the key is also checked when the job is queued, but jobs started
+            # by presets and `next` steps skip that check, and a site-wide key
+            # can be removed between queueing and running
             api_key = self.parameters.get("api_key")
             if not api_key:
                 api_key = self.config.get("api.openai.api_key")
