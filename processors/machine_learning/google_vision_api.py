@@ -59,6 +59,8 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             "amount": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Images to process (0 = all)",
+                "coerce_type": int,
+                "min": 0,
                 "default": 0
             },
             "api_key": {

@@ -60,7 +60,10 @@ class SimilarWord2VecWords(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Similarity threshold",
 				"tooltip": "Decimal value between 0 and 1; only words with a higher similarity score than this will be included",
-				"default": "0.25"
+				"coerce_type": float,
+				"min": -1, # Technically -1 is possible, but may not make sense in context
+				"max": 1,
+				"default": 0.25
 			},
 			"crawl_depth": {
 				"type": UserInput.OPTION_CHOICE,

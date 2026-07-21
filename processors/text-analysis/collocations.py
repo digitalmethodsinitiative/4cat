@@ -88,11 +88,15 @@ class GetCollocations(BasicProcessor):
 			"min_frequency": {
 				"type": UserInput.OPTION_TEXT,
 				"default": 1,
+				"coerce_type": int,
+				"min": 1,
 				"help": "Minimum frequency of co-words occurrences"
 			},
 			"max_output": {
 				"type": UserInput.OPTION_TEXT,
 				"default": 0,
+				"coerce_type": int,
+				"min": 0,
 				"help": "Maximum number of top co-words to extract (0 = all)"
 			},
 			"save_annotations": {

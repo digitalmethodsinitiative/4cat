@@ -96,7 +96,9 @@ class AttributeRanker(BasicProcessor):
             "top": {
                 "type": UserInput.OPTION_TEXT,
                 "default": 25,
-                "help": "Limit to this amount of results"
+                "coerce_type": int,
+                "min": 0,
+                "help": "Limit to this amount of results (0 = no limit)"
             },
             "top-style": {
                 "type": UserInput.OPTION_CHOICE,
