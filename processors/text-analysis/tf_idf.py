@@ -14,6 +14,7 @@ from common.lib.compatibility import Compatibility
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import TfidfModel
+from gensim.models.tfidfmodel import resolve_weights
 from gensim import corpora
 
 __author__ = "Sal Hagen"
@@ -118,13 +119,15 @@ class TfIdf(BasicProcessor):
 	@staticmethod
 	def validate_query(query, request, config):
 		"""
-		Check that the range of allowed word occurrences is possible
+		Check the occurrence range and the SMART parameters
 
 		Asking for words that appear in at least X but at most fewer than X
 		documents describes no word at all, and leaves nothing to calculate
 		with. Zero means "no maximum", so it is not a lower bound to compare
-		against. The options only exist when scikit-learn is chosen, so a
-		missing key here means the user was offered the other library.
+		against. 
+		
+		Each option only exists for the library it belongs to, so a
+		missing key here means the user was offered the other one.
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
@@ -139,6 +142,14 @@ class TfIdf(BasicProcessor):
 					"Words cannot appear in both more than %s and fewer than %s documents. Lower the minimum, "
 					"raise the maximum, or set the maximum to 0 for no upper limit." % (
 						query["min_occurrences"], maximum))
+
+		# smartirs only exists if gensim chosen. gensim decides what it accepts,
+		# so ask it rather than keeping a second copy of the rules here.
+		if "smartirs" in query:
+			try:
+				resolve_weights(query["smartirs"])
+			except ValueError as e:
+				raise QueryParametersException("These SMART parameters cannot be used: %s." % e)
 
 		return query
 

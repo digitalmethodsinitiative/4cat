@@ -9,6 +9,7 @@ from itertools import islice, chain
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -146,6 +147,40 @@ class AttributeRanker(BasicProcessor):
 
         return options
 
+    @staticmethod
+    def compile_filter(item_filter):
+        """
+        Build the item filter's regular expression
+
+        Used both to check the filter before the job is queued and to do the
+        filtering itself, so that what is checked is exactly what will be used.
+
+        :param str item_filter:  The filter as the user wrote it
+        :return re.Pattern|None:  The expression, or None if no filter was given
+        :raises QueryParametersException:  If it is not a usable expression
+        """
+        if not item_filter:
+            return None
+
+        try:
+            return re.compile(".*" + item_filter + ".*")
+        except (re.error, TypeError) as e:
+            raise QueryParametersException("The item filter is not a valid regular expression (%s)." % e)
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check that the item filter is a usable regular expression
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        AttributeRanker.compile_filter(query.get("filter"))
+
+        return query
+
     def process(self):
         """
         Reads a CSV file, counts occurences of chosen values over all posts,
@@ -169,15 +204,16 @@ class AttributeRanker(BasicProcessor):
         to_lowercase = self.parameters.get("to-lowercase", True)
         self.include_missing_data = self.parameters.get("count_missing")
 
+        # the filter is checked when the job is queued, but jobs started by
+        # presets and other code do not go through that check, so build it the
+        # same way here and stop if it cannot be used
         try:
-            if self.parameters.get("filter"):
-                filter = re.compile(".*" + self.parameters.get("filter") + ".*")
-            else:
-                filter = None
-            negate_filter = self.parameters.get("negate-filter", False)
-        except (TypeError, re.error):
-            self.dataset.finish_with_error("Could not complete: regular expression invalid")
+            filter = self.compile_filter(self.parameters.get("filter"))
+        except QueryParametersException as e:
+            self.dataset.finish_with_error(str(e))
             return
+
+        negate_filter = self.parameters.get("negate-filter", False)
 
         # we need to be able to order the values later, chronologically, so use
         # and OrderedDict; all frequencies go into this variable
