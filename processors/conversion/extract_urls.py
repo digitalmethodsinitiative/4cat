@@ -9,7 +9,7 @@ import time
 import requests
 from ural import urls_from_text
 
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.compatibility import Compatibility
@@ -219,6 +219,29 @@ class ExtractURLs(BasicProcessor):
                 options["columns"]["default"] = columns[0]
 
         return options
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Ask for confirmation before expanding shortened URLs
+
+        Expanding them means contacting each shortening service in turn to ask
+        where its link leads, one request at a time. That takes a while for a
+        large dataset, and it tells those services that the links are being
+        looked up, so it is worth agreeing to first.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        if query.get("expand_urls") and not query.get("frontend-confirm"):
+            raise QueryNeedsExplicitConfirmationException(
+                "Expanding shortened URLs sends a request to each shortening service, one at a time, so this can "
+                "take hours for a large dataset. Those services are also told that the links are being looked up. "
+                "Do you want to continue?")
+
+        return query
 
     def process(self):
         """
