@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import itertools
 
+from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
@@ -94,7 +95,7 @@ class TfIdf(BasicProcessor):
 				"min": 0,
 				"max": 10000,
 				"help": "[scikit-learn] Ignore terms that appear in more than this amount of documents",
-				"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months.",
+				"tooltip": "Useful for getting more specific terms per document. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months. Leaving as '0' means terms may appear in all documents.",
 				"requires": "library==scikit-learn"
 			},
 			"n_size": {
@@ -113,6 +114,33 @@ class TfIdf(BasicProcessor):
 				"requires": "library==gensim"
 			}
 		}
+
+	@staticmethod
+	def validate_query(query, request, config):
+		"""
+		Check that the range of allowed word occurrences is possible
+
+		Asking for words that appear in at least X but at most fewer than X
+		documents describes no word at all, and leaves nothing to calculate
+		with. Zero means "no maximum", so it is not a lower bound to compare
+		against. The options only exist when scikit-learn is chosen, so a
+		missing key here means the user was offered the other library.
+
+		:param dict query:  Query parameters, from client-side.
+		:param request:  Flask request
+		:param ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:  Safe query parameters
+		"""
+		# min and max only exist if sklearn chosen
+		if "min_occurrences" in query and "max_occurrences" in query:
+			maximum = query["max_occurrences"]
+			if maximum and query["min_occurrences"] > maximum:
+				raise QueryParametersException(
+					"Words cannot appear in both more than %s and fewer than %s documents. Lower the minimum, "
+					"raise the maximum, or set the maximum to 0 for no upper limit." % (
+						query["min_occurrences"], maximum))
+
+		return query
 
 	def process(self):
 		"""
