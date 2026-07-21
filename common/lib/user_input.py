@@ -1,6 +1,8 @@
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import QueryParametersException
 from werkzeug.datastructures import ImmutableMultiDict
+from pathlib import Path
+import inspect
 import json
 
 import re
@@ -105,7 +107,42 @@ class UserInput:
         return sorted(set(settings) - UserInput.KNOWN_OPTION_KEYS)
 
     @staticmethod
-    def parse_all(options, input, silently_correct=False, log=None):
+    def describe_source(source):
+        """
+        Say which module some options belong to, and where they are defined.
+        Helper for staticmethod parse_all.
+
+        Look up location of processor through the `get_options` method rather 
+        than the class itself, so that it still points at the right file when a
+        module inherits its options from a parent class instead of defining
+        them itself.
+
+        :param source:  The worker class the options came from, or None
+        :return tuple:  A (name, location) tuple of strings. Either one is
+          empty if it cannot be worked out.
+        """
+        if source is None:
+            return "", ""
+
+        name = getattr(source, "type", "") or getattr(source, "__name__", "")
+
+        try:
+            definition = source.get_options
+            file = Path(inspect.getsourcefile(definition))
+            line = inspect.getsourcelines(definition)[1]
+        except (AttributeError, TypeError, OSError):
+            # the location cannot be read back
+            return name, ""
+
+        # check relative_to root in case an extension lives outside it
+        root = Path(__file__).parents[2]
+        if file.is_relative_to(root):
+            file = file.relative_to(root)
+
+        return name, "%s:%i" % (file.as_posix(), line)
+
+    @staticmethod
+    def parse_all(options, input, silently_correct=False, log=None, source=None):
         """
         Parse form input for the provided options
 
@@ -137,8 +174,10 @@ class UserInput:
         behaviour, and tolerant parsing should be opted into deliberately.
         :param log:  Optional logger. When an option's *default* value turns
         out to be invalid (a developer mistake, not user input), a warning is
-        logged here and the default is corrected silently rather than shown to
-        the user.
+        logged here so that it can be fixed.
+        :param source:  Optional worker class the options came from. Only used
+        to say which module a faulty default belongs to, and where that option
+        is defined, so the warning can be acted on without hunting for it.
 
         :return dict:  Sanitised form input
         """
@@ -203,8 +242,13 @@ class UserInput:
             # reported (naming the option) rather than hidden.
             default_problem = UserInput.validate_default(settings)
             if default_problem and log:
-                log.warning("Option '%s' has an invalid default (%s). "
-                            "Please fix the option definition." % (option, default_problem))
+                source_name, source_location = UserInput.describe_source(source)
+                log.warning("Option '%s'%s has an invalid default (%s). "
+                            "Please fix the option definition%s." % (
+                                option,
+                                " of '%s'" % source_name if source_name else "",
+                                default_problem,
+                                " in %s" % source_location if source_location else ""))
 
             if settings.get("type") == UserInput.OPTION_DATERANGE:
                 # special case, since it combines two inputs
