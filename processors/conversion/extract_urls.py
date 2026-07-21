@@ -210,13 +210,15 @@ class ExtractURLs(BasicProcessor):
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["options"] = {v: v for v in columns}
 
+            # a list: this is a multi-select, so its default is a set of
+            # selected options, not a single one
             if "body" in columns:
-                options["columns"]["default"] = "body"
+                options["columns"]["default"] = ["body"]
             elif text_columns := sorted(columns, key=lambda k: "text" in k):
-                options["columns"]["default"] = text_columns.pop()
+                options["columns"]["default"] = [text_columns.pop()]
             else:
                 # give up, no column we can recognise as text-based
-                options["columns"]["default"] = columns[0]
+                options["columns"]["default"] = [columns[0]]
 
         return options
 

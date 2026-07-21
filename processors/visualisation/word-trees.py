@@ -341,7 +341,9 @@ class MakeWordtree(BasicProcessor):
                 default for default in ["body", "text", "subject"] if default in columns
             ]
             if default_options:
-                options["columns"]["default"] = default_options.pop(0)
+                # a list: this is a multi-select, so its default is a set of
+                # selected options, not a single one
+                options["columns"]["default"] = default_options[:1]
 
         return options
 

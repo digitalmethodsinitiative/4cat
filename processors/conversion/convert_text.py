@@ -83,9 +83,10 @@ class ConvertText(BasicProcessor):
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["inline"] = True
             options["columns"]["options"] = {v: v for v in columns}
-            options["columns"]["default"] = "body" if "body" in columns else sorted(columns,
-                                                                                    key=lambda
-                                                                                        k: "text" in k).pop()
+            # a list: this is a multi-select, so its default is a set of
+            # selected options, not a single one
+            options["columns"]["default"] = ["body"] if "body" in columns else [
+                sorted(columns, key=lambda k: "text" in k).pop()]
         return options
 
     @staticmethod
