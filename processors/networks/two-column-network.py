@@ -6,6 +6,7 @@ from functools import partial
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 import networkx as nx
@@ -142,6 +143,26 @@ class ColumnNetworker(BasicProcessor):
 		}
 
         return options
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check that the chosen columns can produce any edges at all
+
+        If column a and b are the same, loops or split-comma must also be True.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        same_column = query.get("column-a") == query.get("column-b")
+        if same_column and not query.get("split-comma") and not query.get("allow-loops"):
+            raise QueryParametersException(
+                "Using one column for both sides of the network only produces edges from a value to itself. "
+                "Choose a second column, or enable splitting values by comma or allowing loops.")
+
+        return query
 
     def process(self):
         """

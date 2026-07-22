@@ -8,7 +8,7 @@ import numpy as np
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import ProcessorException
+from common.lib.exceptions import ProcessorException, QueryParametersException
 from common.lib.helpers import UserInput
 
 
@@ -70,6 +70,21 @@ class HashSimilarityNetworker(BasicProcessor):
             options["descriptor_column"]["default"] = "id" if "id" in columns else sorted(columns, key=lambda k: "id" in k).pop()
 
         return options
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check that the hashes and the IDs come from different columns
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        if query.get("descriptor_column") == query.get("choice_column"):
+            raise QueryParametersException("The hashes and the IDs must come from two different columns.")
+
+        return query
 
     def process(self):
         """

@@ -67,6 +67,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         return {
             "words": {
                 "type": UserInput.OPTION_TEXT,
+                "mandatory": True,
                 "help": "Word(s)",
                 "tooltip": "Nearest neighbours for these words will be charted, and the position of the words will be highlighted"
             },

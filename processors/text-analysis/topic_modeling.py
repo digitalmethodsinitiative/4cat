@@ -5,7 +5,7 @@ Create topic clusters based on datasets
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException
 
 import json
 import pickle
@@ -80,13 +80,37 @@ class TopicModeler(BasicProcessor):
             },
             "max_df": {
                 "type": UserInput.OPTION_TEXT,
-                "min": 0.0,
+                "min": 0.0, # real min is > 0 but 0.00000000...000001?; we'll check for that in validate_query()
                 "max": 1.0,
                 "default": 0.8,
                 "help": "Maximum document frequency",
                 "tooltip": "Tokens are ignored if they  occur in more than this fraction (between 0 and 1) of all tokenised items."
             }
         }
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check that the document frequency bounds work together
+
+        Both bounds are already limited to numbers between 0 and 1 when the
+        form input is parsed, but they can still contradict each other, which
+        would otherwise only surface as an error halfway through the run.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        if query.get("max_df") == 0:
+            raise QueryParametersException("The maximum document frequency must be above zero, or every token "
+                                           "would be ignored.")
+
+        if "min_df" in query and "max_df" in query and query["min_df"] > query["max_df"]:
+            raise QueryParametersException("The minimum document frequency cannot be higher than the maximum "
+                                           "document frequency, or every token would be ignored.")
+
+        return query
 
     def process(self):
         """

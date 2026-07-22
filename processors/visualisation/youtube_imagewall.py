@@ -51,6 +51,8 @@ class YouTubeImageWall(BasicProcessor):
             "max_amount": {
                 "type": UserInput.OPTION_TEXT,
                 "default": 0,
+                "coerce_type": int,
+                "min": 0,
                 "help": "Only use this amount of thumbnails (0 = all)"
             },
             "category_overlay": {

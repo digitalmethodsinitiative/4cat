@@ -5,6 +5,7 @@ import re
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.compatibility import Compatibility
+from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -45,6 +46,7 @@ class LexicalFilter(BaseFilter):
             "lexicon-custom": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
+                "mandatory": True,
                 "help": "Custom word list (separate with commas)"
             },
             "as_regex": {
@@ -65,6 +67,59 @@ class LexicalFilter(BaseFilter):
                 "help": "Case sensitive"
             }
         }
+
+    @staticmethod
+    def compile_lexicon(words, as_regex=False, case_sensitive=False):
+        """
+        Build a word list's regular expression
+
+        Used both to check the words before the job is queued and to do the
+        filtering itself, so that what is checked is exactly what will be used.
+        Accepts the words as the user wrote them or as a collection
+
+        The words are joined into a single expression, so they have to be
+        checked together: a word can be a valid expression on its own but not
+        once joined with the others.
+
+        :param words:  The words, comma-separated or as a collection
+        :param bool as_regex:  Read the words as regular expressions? If not,
+          they are escaped, and then any text is safe to use
+        :param bool case_sensitive:  Match capitals exactly?
+        :return re.Pattern|None:  The expression, or None if there are no words
+        :raises QueryParametersException:  If it is not a usable expression
+        """
+        if isinstance(words, str):
+            words = words.split(",")
+
+        phrases = [word.strip() for word in words if word and word.strip()]
+        if not phrases:
+            return None
+
+        if not as_regex:
+            phrases = [re.escape(phrase) for phrase in phrases]
+
+        try:
+            return re.compile(r"\b(" + "|".join(phrases) + r")\b", flags=0 if case_sensitive else re.IGNORECASE)
+        except re.error as e:
+            raise QueryParametersException("The word list is not a valid regular expression (%s)." % e)
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check that the word list works as a regular expression
+
+        This only fails when the words are meant to be read as regular
+        expressions; they are otherwise escaped before use.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        LexicalFilter.compile_lexicon(
+            query.get("lexicon-custom", ""), query.get("as_regex"), query.get("case-sensitive"))
+
+        return query
 
     def filter_items(self):
         """
@@ -93,27 +148,19 @@ class LexicalFilter(BaseFilter):
             [word.strip() for word in custom_lexicon.split(",") if word.strip()])
         lexicons[custom_id] |= custom_lexicon
 
-        # compile into regex for quick matching
+        # compile into regex for quick matching. the words are checked when the
+        # job is queued, but jobs started by presets and other code do not go
+        # through that check, so build them the same way here 
         lexicon_regexes = {}
         for lexicon_id in lexicons:
             if not lexicons[lexicon_id]:
                 continue
 
-            if not self.parameters.get("as_regex"):
-                phrases = [re.escape(term) for term in lexicons[lexicon_id] if term]
-            else:
-                phrases = [term for term in lexicons[lexicon_id] if term]
-
             try:
-                if not case_sensitive:
-                    lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b",
-                        flags=re.IGNORECASE)
-                else:
-                    lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b")
-            except re.error:
-                self.dataset.finish_with_error("Invalid regular expression, cannot use as filter")
+                lexicon_regexes[lexicon_id] = self.compile_lexicon(
+                    lexicons[lexicon_id], self.parameters.get("as_regex"), case_sensitive)
+            except QueryParametersException as e:
+                self.dataset.finish_with_error(str(e))
                 return
 
         # now for the real deal

@@ -187,6 +187,31 @@ def mock_dataset(mock_dataset_database, fourcat_modules):
         yield dataset
 
 
+@pytest.fixture
+def mock_dataset_with_columns(mock_dataset_database, fourcat_modules):
+    """
+    A parent dataset that has columns
+
+    Processors routinely build their options differently when the parent has
+    columns: a plain text field becomes a list of columns to pick from, and a
+    default is chosen out of those columns. get_columns() returns nothing when
+    there is no result file to read, as with the mock dataset above, so that
+    whole branch of get_options() never runs - and the options it produces go
+    unchecked. This parent reports columns so those options are built too.
+    """
+    from common.lib.dataset import DataSet
+
+    columns = ["id", "thread_id", "timestamp", "body", "subject", "author", "image_url", "video_hash"]
+    with patch.object(DataSet, "refresh_owners", return_value=None), \
+         patch.object(DataSet, "get_parent", return_value=MagicMock(type="test_parent")):
+        dataset = DataSet(key="test_dataset", db=mock_dataset_database, modules=fourcat_modules)
+        # give the columns to this dataset only, rather than to every DataSet:
+        # the column-less parent is used in the same test and has to keep
+        # reporting none, or both parents would be the same thing
+        dataset.get_columns = lambda annotation_columns=True: columns
+        yield dataset
+
+
 @pytest.mark.dependency(depends=["test_module_collector"])
 def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_basic_config):
     """
@@ -254,13 +279,20 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
 
 
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_option_default_validity(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_basic_config):
+def test_option_default_validity(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset,
+                                 mock_dataset_with_columns, mock_database, mock_basic_config):
     """
     Every option's declared default must be valid under that option's own
     rules. A bad default -- a number outside its own min/max, a coerce_type
     that is not a callable type, a multi-value default that is not a list,
     unparseable JSON -- is a mistake in the option definition, not user input,
     and should never reach a user. Catch those here instead.
+
+    Options are checked for a parent dataset with and without columns, because
+    a processor commonly offers different options for each: without columns a
+    field may be plain text, and with them the same field becomes a list of
+    columns to choose from, with a default picked out of those columns. Only
+    checking one of the two leaves the other's options unchecked.
 
     Uses UserInput.validate_default. Membership of choice/multi defaults in
     option lists that are built from the parent dataset at runtime is
@@ -269,23 +301,25 @@ def test_option_default_validity(logger, fourcat_modules, mock_job, mock_job_que
     from common.lib.user_input import UserInput
 
     problems = []
-    for processor_name, processor_class in fourcat_modules.processors.items():
-        try:
-            options = processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
-        except Exception:
-            # a failing get_options is test_processors' concern, not this test's
-            continue
-
-        if not isinstance(options, dict):
-            continue
-
-        for option_name, settings in options.items():
-            if not isinstance(settings, dict):
+    for parent_description, parent in (("no columns", mock_dataset),
+                                       ("with columns", mock_dataset_with_columns)):
+        for processor_name, processor_class in fourcat_modules.processors.items():
+            try:
+                options = processor_class.get_options(parent_dataset=parent, config=mock_basic_config)
+            except Exception:
+                # a failing get_options is test_processors' concern, not this test's
                 continue
-            problem = UserInput.validate_default(settings)
-            if problem:
-                logger.error(f"{processor_name} option '{option_name}': {problem}")
-                problems.append(f"{processor_name}.{option_name}: {problem}")
+
+            if not isinstance(options, dict):
+                continue
+
+            for option_name, settings in options.items():
+                if not isinstance(settings, dict):
+                    continue
+                problem = UserInput.validate_default(settings)
+                if problem:
+                    logger.error(f"{processor_name} option '{option_name}' (parent {parent_description}): {problem}")
+                    problems.append(f"{processor_name}.{option_name} (parent {parent_description}): {problem}")
 
     if problems:
         pytest.fail("The following option defaults are invalid:\n" + "\n".join(problems))
@@ -294,32 +328,40 @@ def test_option_default_validity(logger, fourcat_modules, mock_job, mock_job_que
 
 
 @pytest.mark.dependency(depends=["test_module_collector"])
-def test_option_keys_known(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset, mock_database, mock_basic_config):
+def test_option_keys_known(logger, fourcat_modules, mock_job, mock_job_queue, mock_dataset,
+                           mock_dataset_with_columns, mock_database, mock_basic_config):
     """
     Every key in an option's settings dictionary must be one the framework
     understands. An unknown key (e.g. 'coerce' instead of 'coerce_type') is
     silently ignored at parse time, so the setting it was meant to express
     quietly has no effect. Catch those typos here.
 
+    Checked for a parent dataset with and without columns, since a processor
+    may offer different options for each (see test_option_default_validity).
+
     See UserInput.KNOWN_OPTION_KEYS for the recognised set.
     """
     from common.lib.user_input import UserInput
 
     problems = []
-    for processor_name, processor_class in fourcat_modules.processors.items():
-        try:
-            options = processor_class.get_options(parent_dataset=mock_dataset, config=mock_basic_config)
-        except Exception:
-            continue
+    for parent_description, parent in (("no columns", mock_dataset),
+                                       ("with columns", mock_dataset_with_columns)):
+        for processor_name, processor_class in fourcat_modules.processors.items():
+            try:
+                options = processor_class.get_options(parent_dataset=parent, config=mock_basic_config)
+            except Exception:
+                continue
 
-        if not isinstance(options, dict):
-            continue
+            if not isinstance(options, dict):
+                continue
 
-        for option_name, settings in options.items():
-            unknown = UserInput.unknown_option_keys(settings)
-            if unknown:
-                logger.error(f"{processor_name} option '{option_name}': unknown key(s) {unknown}")
-                problems.append(f"{processor_name}.{option_name}: unknown key(s) {', '.join(unknown)}")
+            for option_name, settings in options.items():
+                unknown = UserInput.unknown_option_keys(settings)
+                if unknown:
+                    logger.error(f"{processor_name} option '{option_name}' (parent {parent_description}): "
+                                 f"unknown key(s) {unknown}")
+                    problems.append(f"{processor_name}.{option_name} (parent {parent_description}): "
+                                    f"unknown key(s) {', '.join(unknown)}")
 
     if problems:
         pytest.fail("The following options have unrecognised keys:\n" + "\n".join(problems))

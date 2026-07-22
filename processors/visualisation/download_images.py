@@ -129,18 +129,19 @@ class ImageDownloader(BasicProcessor):
             columns = parent_dataset.get_columns()
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["options"] = {v: v for v in columns}
-            # Pick a good default
+            # Pick a good default. a list: this is a multi-select, so its
+            # default is a set of selected options, not a single one
             if "image_url" in columns:
-                options["columns"]["default"] = "image_url"
+                options["columns"]["default"] = ["image_url"]
             elif any("image" in (col or "").lower() for col in columns):
                 # Any image will do
                 image_cols = sorted(
                     [col for col in columns if "image" in (col or "").lower()],
                     key=lambda c: (len(c), c.lower()),
                 )
-                options["columns"]["default"] = image_cols[0] if image_cols else "body"
+                options["columns"]["default"] = [image_cols[0]] if image_cols else ["body"]
             else:
-                options["columns"]["default"] = "body"
+                options["columns"]["default"] = ["body"]
 
         return options
 

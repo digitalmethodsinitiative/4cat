@@ -41,6 +41,8 @@ class AnnotateImages(ProcessorPreset):
             "amount": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Images to process (0 = all)",
+                "coerce_type": int,
+                "min": 0,
                 "default": 10,
                 "tooltip": "Setting this to 0 (process all images) is NOT recommended unless you have infinite Google API"
                         " credit."
@@ -48,6 +50,7 @@ class AnnotateImages(ProcessorPreset):
             "api_key": {
                 "type": UserInput.OPTION_TEXT,
                 "sensitive": True,
+                "mandatory": True,
                 "help": "API Key",
                 "tooltip": "The API Key for your Google API account. You can generate and find this "
                         "key on the API dashboard."

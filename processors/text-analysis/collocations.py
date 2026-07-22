@@ -8,6 +8,7 @@ import pickle
 import operator
 from nltk.collocations import TrigramCollocationFinder, BigramCollocationFinder
 
+from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
@@ -87,11 +88,15 @@ class GetCollocations(BasicProcessor):
 			"min_frequency": {
 				"type": UserInput.OPTION_TEXT,
 				"default": 1,
+				"coerce_type": int,
+				"min": 1,
 				"help": "Minimum frequency of co-words occurrences"
 			},
 			"max_output": {
 				"type": UserInput.OPTION_TEXT,
 				"default": 0,
+				"coerce_type": int,
+				"min": 0,
 				"help": "Maximum number of top co-words to extract (0 = all)"
 			},
 			"save_annotations": {
@@ -102,6 +107,27 @@ class GetCollocations(BasicProcessor):
 				"tooltip": "Co-words are written as a string containing a lists of tuples"
 			}
 		}
+
+	@staticmethod
+	def validate_query(query, request, config):
+		"""
+		Check that the requested word groups fit in the word window
+
+		Asking for groups of more words than the window holds cannot be done,
+		and used to quietly produce smaller groups instead - so someone who
+		asked for three-word groups received two-word ones without being told.
+
+		:param dict query:  Query parameters, from client-side.
+		:param request:  Flask request
+		:param ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:  Safe query parameters
+		"""
+		if int(query.get("n_size", 2)) > int(query.get("window_size", 2)):
+			raise QueryParametersException(
+				"The window size must be at least as large as the number of co-words, "
+				"since a window of that many words cannot contain a larger group.")
+
+		return query
 
 	def process(self):
 		"""

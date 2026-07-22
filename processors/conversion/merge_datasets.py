@@ -67,6 +67,7 @@ class DatasetMerger(BasicProcessor):
         options = {
             "source": {
                 "type": UserInput.OPTION_TEXT_LARGE,
+                "mandatory": True,
                 "help": "Source dataset URLs",
                 "tooltip": "This should be the URL(s) of the result pages of the 4CAT dataset you want to merge with this "
                         "dataset. Note that all datasets need to have the same format! Separate URLs with new lines or "

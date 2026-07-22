@@ -93,6 +93,8 @@ class GenerateWordEmbeddings(BasicProcessor):
 			"min_count": {
 				"type": UserInput.OPTION_TEXT,
 				"default": 5,
+				"coerce_type": int,
+				"min": 1,
 				"help": "Minimum word occurrence",
 				"tooltip": "How often a word should occur in the corpus to be included"
 			},

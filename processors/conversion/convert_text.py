@@ -4,7 +4,7 @@ Change the text in a dataset and write it to a new one
 import re
 import csv
 
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
@@ -35,12 +35,13 @@ class ConvertText(BasicProcessor):
         options = {
             "columns": {
                 "type": UserInput.OPTION_TEXT,
-                "default": "body",
+                "default": ["body"],
                 "help": "Columns with texts to replace",
             },
             "find": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
+                "mandatory": True,
                 "help": "Text to replace",
                 "tooltip": "Multiple values can be replaced; separate with comma.",
             },
@@ -82,10 +83,57 @@ class ConvertText(BasicProcessor):
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["inline"] = True
             options["columns"]["options"] = {v: v for v in columns}
-            options["columns"]["default"] = "body" if "body" in columns else sorted(columns,
-                                                                                    key=lambda
-                                                                                        k: "text" in k).pop()
+            # a list: this is a multi-select, so its default is a set of
+            # selected options, not a single one
+            options["columns"]["default"] = ["body"] if "body" in columns else [
+                sorted(columns, key=lambda k: "text" in k).pop()]
         return options
+
+    @staticmethod
+    def compile_find(find, as_regex=False, case_sensitive=False):
+        """
+        Build the regular expression for the text to replace
+
+        Used both to check the text before the job is queued and to do the
+        replacing itself, so that what is checked is exactly what will be used.
+
+        :param str find:  The text to replace, as the user wrote it
+        :param bool as_regex:  Read it as a regular expression? If not, it is
+          escaped, and then any text is safe to use
+        :param bool case_sensitive:  Match capitals exactly?
+        :return re.Pattern|None:  The expression, or None if no text was given
+        :raises QueryParametersException:  If it is not a usable expression
+        """
+        if not find:
+            return None
+
+        flags = 0 if case_sensitive else re.IGNORECASE
+
+        try:
+            if as_regex:
+                return re.compile(find, flags=flags)
+
+            terms = [re.escape(term) for term in find.split(",")]
+            return re.compile(r"(" + "|".join(terms) + r")", flags=flags)
+        except re.error as e:
+            raise QueryParametersException("The text to replace is not a valid regular expression (%s)." % e)
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check that the text to replace works as a regular expression
+
+        This only fails when the text is meant to be read as one; it is
+        otherwise escaped before use.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        ConvertText.compile_find(query.get("find"), query.get("as_regex"), query.get("case-sensitive"))
+
+        return query
 
     def process(self):
         """
@@ -108,20 +156,14 @@ class ConvertText(BasicProcessor):
         if not replace:
             replace = ""
 
-        case_sensitive = self.parameters.get("case-sensitive", False)
-        kwargs = {}
-        if not case_sensitive:
-            kwargs["flags"] = re.IGNORECASE
-        as_regex = self.parameters.get("as_regex")
-        if not as_regex:
-            find = [re.escape(term) for term in find.split(",")]
+        # the text is checked when the job is queued, but jobs started by
+        # presets and other code do not go through that check, so build it the
+        # same way here and stop if it cannot be used
         try:
-            if not as_regex:
-                regex = re.compile(r"(" + "|".join(find) + r")", **kwargs)
-            else:
-                regex = re.compile(fr"{find}", **kwargs)
-        except re.error:
-            self.dataset.finish_with_error("Invalid regular expression, cannot use as filter")
+            regex = self.compile_find(find, self.parameters.get("as_regex"),
+                                      self.parameters.get("case-sensitive", False))
+        except QueryParametersException as e:
+            self.dataset.finish_with_error(str(e))
             return
 
         save_annotations = self.parameters.get("save_annotations")

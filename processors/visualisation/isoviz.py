@@ -79,6 +79,9 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			"complete": {
 				"type": UserInput.OPTION_TEXT,
 				"default": 0,
+				"coerce_type": int,
+				"min": 0,
+				"max": 100,
 				"help": "Data completeness required",
 				"tooltip": "At least this % of intervals should be present for an item to be graphed; 0 to disable"
 			},

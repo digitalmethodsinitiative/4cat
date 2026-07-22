@@ -122,9 +122,10 @@ class YouTubeMetadata(BasicProcessor):
 			columns = parent_dataset.get_columns()
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "extracted_urls" if "extracted_urls" in columns else sorted(columns,
-																										key=lambda
-																											k: "text" in k).pop()
+			# a list: this is a multi-select, so its default is a set of
+			# selected options, not a single one
+			options["columns"]["default"] = ["extracted_urls"] if "extracted_urls" in columns else [
+				sorted(columns, key=lambda k: "text" in k).pop()]
 		api_key = config.get("api.youtube.key")
 		if not api_key:
 			options["key"] = {
@@ -132,7 +133,8 @@ class YouTubeMetadata(BasicProcessor):
 				"default": "",
 				"help": "YouTube API key",
 				"tooltip": "Can be created on https://developers.google.com/youtube/v3",
-				"sensitive": True
+				"sensitive": True,
+				"mandatory": True
 			}
 
 		return options

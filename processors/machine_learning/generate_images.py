@@ -92,7 +92,8 @@ class StableDiffusionImageGenerator(BasicProcessor):
             },
             "prompt-column": {
                 "type": UserInput.OPTION_TEXT,
-                "default": False,
+                "default": "",
+                "mandatory": True,
                 "help": "Dataset field containing prompt",
                 "tooltip": "Prompts will be truncated to 70 characters"
             },

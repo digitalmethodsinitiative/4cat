@@ -59,7 +59,8 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Images to process (0 = all)",
                 "cache": True,
-                "sensitive": True,
+                "coerce_type": int,
+                "min": 0,
                 "default": 0
             },
             "api_key": {
@@ -67,6 +68,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 "help": "API Key",
                 "cache": True,
                 "sensitive": True,
+                "mandatory": True,
                 "tooltip": "The API key for your Clarifai account. You'll need to go to clarifai.com and create a new "
                         "project to generate a key."
             },

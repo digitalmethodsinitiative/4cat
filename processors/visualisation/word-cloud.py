@@ -7,7 +7,8 @@ from wordcloud import WordCloud
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException
+from common.lib.helpers import UserInput, convert_to_int
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -62,10 +63,34 @@ class MakeWordCloud(BasicProcessor):
 				"max_words": {
 					"type": UserInput.OPTION_TEXT,
 					"default": 200,
+					"min": 1,
 					"help": "Max words to show"
 				}
 			}
 		return options
+
+	@staticmethod
+	def validate_query(query, request, config):
+		"""
+		Check that a word and count column were chosen
+
+		The column choices default to an empty value when the parent dataset
+		has no obvious word and count columns, so the form can be submitted
+		with an empty choice. Catch that here so the user can fix it in the
+		form, instead of the processor failing after it has started.
+
+		:param dict query:  Query parameters, from client-side.
+		:param request:  Flask request
+		:param ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:  Safe query parameters
+		"""
+		if "word_column" in query and not query.get("word_column"):
+			raise QueryParametersException("Select the column containing the words for the word cloud.")
+
+		if "count_column" in query and not query.get("count_column"):
+			raise QueryParametersException("Select the column containing the word counts.")
+
+		return query
 
 	def process(self):
 		"""
@@ -78,13 +103,15 @@ class MakeWordCloud(BasicProcessor):
 		word_column = self.parameters.get("word_column")
 		count_column = self.parameters.get("count_column")
 		to_lower = self.parameters.get("to_lower")
-		try:
-			max_words = int(self.parameters.get("max_words"))
-		except (ValueError, TypeError):
-			max_words = self.parameters["max_words"]["default"]
+		# form input is checked when the job is queued, but presets and other
+		# code can start this processor with unchecked values, so make sure
+		# the amount is a usable number here as well
+		max_words = max(1, convert_to_int(self.parameters.get("max_words"), 200))
 
 		self.dataset.update_status("Extracting words and counts.")
 
+		# also checked when the job is queued, but kept for jobs started by
+		# presets and other code, which skip that check
 		if not word_column:
 			self.dataset.finish_with_error("Please set a valid word column.")
 			return

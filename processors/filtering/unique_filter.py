@@ -109,6 +109,7 @@ class UniqueFilter(BaseFilter):
         options = {
             "columns": {
                 "type": UserInput.OPTION_TEXT,
+                "mandatory": True,
                 "help": "Columns to consider for uniqueness",
                 "inline": True,
                 "default": "body"
@@ -138,6 +139,8 @@ class UniqueFilter(BaseFilter):
             columns = parent_dataset.get_columns()
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["options"] = {v: v for v in columns}
-            options["columns"]["default"] = "body" if "body" in columns else ""
+            # a list: this is a multi-select, so its default is a set of
+            # selected options, not a single one
+            options["columns"]["default"] = ["body"] if "body" in columns else []
 
         return options

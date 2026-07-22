@@ -8,7 +8,7 @@ from gensim.models import KeyedVectors
 from common.lib.helpers import UserInput, convert_to_int, convert_to_float
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Stijn Peeters"]
@@ -45,6 +45,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		return {
 			"words": {
 				"type": UserInput.OPTION_TEXT,
+				"mandatory": True,
 				"help": "Words",
 				"tooltip": "Separate with commas."
 			},
@@ -59,7 +60,10 @@ class SimilarWord2VecWords(BasicProcessor):
 				"type": UserInput.OPTION_TEXT,
 				"help": "Similarity threshold",
 				"tooltip": "Decimal value between 0 and 1; only words with a higher similarity score than this will be included",
-				"default": "0.25"
+				"coerce_type": float,
+				"min": -1, # Technically -1 is possible, but may not make sense in context
+				"max": 1,
+				"default": 0.25
 			},
 			"crawl_depth": {
 				"type": UserInput.OPTION_CHOICE,
@@ -68,6 +72,34 @@ class SimilarWord2VecWords(BasicProcessor):
 				"help": "The crawl depth. 1 only gets the neighbours of the input word(s), 2 also their neighbours, etc."
 			}
 		}
+
+	@staticmethod
+	def validate_query(query, request, config):
+		"""
+		Ask for confirmation before a very wide crawl
+
+		Each level looks up the neighbours of every word the level before it
+		found, so the work multiplies with each one: a few dozen words at the
+		first level become tens of thousands by the third. That is a long run
+		and a very large result, so ask first when the numbers chosen make it
+		likely. Words that turn up more than once are only looked at once, so
+		the real total is lower than this estimate.
+
+		:param dict query:  Query parameters, from client-side.
+		:param request:  Flask request
+		:param ConfigManager|None config:  Configuration reader (context-aware)
+		:return dict:  Safe query parameters
+		"""
+		words = [word.strip() for word in query.get("words", "").split(",") if word.strip()]
+		estimate = len(words) * int(query.get("num-words", 10)) ** int(query.get("crawl_depth", 1))
+
+		if estimate > 10000 and not query.get("frontend-confirm"):
+			raise QueryNeedsExplicitConfirmationException(
+				"With this crawl depth and this many similar words, up to around %s words could be looked up per "
+				"model, which can take a long time and produce a very large result. Do you want to continue?" % (
+					f"{estimate:,}"))
+
+		return query
 
 	def process(self):
 		"""
