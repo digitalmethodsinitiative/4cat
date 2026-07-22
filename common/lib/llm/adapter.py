@@ -61,7 +61,6 @@ class LLMAdapter:
         # rather than the connection type is what lets third-party models
         # resolve to the right SDK.
         wrapper = self.model["wrapper"]
-        print(wrapper)
 
         chat_params = {
             "model": self.model["local_id"],
@@ -96,6 +95,12 @@ class LLMAdapter:
 
         elif wrapper == "ollama":
             adapter_class = ChatOllama
+            # An Ollama server can sit behind a proxy that expects an auth
+            # header. Ollama's SDK takes extra headers via client_kwargs, so
+            # pass them there; without this the request goes out unauthenticated
+            # and the proxy rejects it, even though the model list loads fine.
+            if self.server.get("auth_header"):
+                self.client_kwargs.setdefault("headers", {})[self.server["auth_header"]] = self.server["auth_key"]
             chat_params.update({"client_kwargs": self.client_kwargs})
 
         elif wrapper in {"litellm", "openai-like"}:
