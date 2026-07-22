@@ -33,6 +33,11 @@ class PromptCompassRunner(ProcessorPreset):
         "See the processor options for references to the sources of each prompt in the library."
     ]
 
+    @classmethod
+    def is_compatible_with(cls, module=None, config=None):
+        # Same compatibility as the LLM Prompter, since this is just a wrapper around it
+        return LLMPrompter.is_compatible_with(module=module, config=config)
+
     @staticmethod
     def get_prompt_library(config):
         """
