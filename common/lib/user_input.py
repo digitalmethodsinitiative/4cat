@@ -134,11 +134,6 @@ class UserInput:
             # the location cannot be read back
             return name, ""
 
-        # check relative_to root in case an extension lives outside it
-        root = Path(__file__).parents[2]
-        if file.is_relative_to(root):
-            file = file.relative_to(root)
-
         return name, "%s:%i" % (file.as_posix(), line)
 
     @staticmethod
