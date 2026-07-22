@@ -87,7 +87,7 @@ class PromptCompassRunner(ProcessorPreset):
         available_models = config.get("llm.available_models", {})
         enabled_model_ids = config.get("llm.enabled_models", [])
         if not config.get("llm.access"):
-            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("api-")]
+            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
 
         enabled_models = {k: v for k, v in available_models.items() if k in enabled_model_ids}
 
@@ -97,7 +97,8 @@ class PromptCompassRunner(ProcessorPreset):
                 "help": "Model to use",
                 "tooltip": "Third-party models require an API key to run.",
                 "options": LLMPrompter.get_model_library(config),
-                "default": sorted(list(enabled_models.keys()), key=lambda k: not k.startswith("api"))[-1] if enabled_models else ""
+                # prefer a locally hosted model, so the default does not cost money
+                "default": sorted(list(enabled_models.keys()), key=lambda k: not k.startswith("thirdparty"))[-1] if enabled_models else ""
             },
         }
 
@@ -118,7 +119,7 @@ class PromptCompassRunner(ProcessorPreset):
                 "cache": True,
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
                            "/api-keys). Note that this often involves billing.",
-                "requires": "model^=api-"
+                "requires": "model^=thirdparty"
             },
             "hide_think": {
                 "type": UserInput.OPTION_TOGGLE,
