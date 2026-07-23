@@ -185,7 +185,7 @@ class PromptCompassRunner(ProcessorPreset):
         }
 
         if parent_dataset:
-            options["limit"]["default"] = int(min(round(parent_dataset.num_rows / 10, 0), 50))
+            options["limit"]["default"] = int(min(max(round(parent_dataset.num_rows / 10, 0), 5), 50))
 
         return options
 
@@ -262,7 +262,6 @@ class PromptCompassRunner(ProcessorPreset):
                                                           "likely to incur costs. Do you want to continue?")
 
         return query
-
     @staticmethod
     def map_item(item):
         """
