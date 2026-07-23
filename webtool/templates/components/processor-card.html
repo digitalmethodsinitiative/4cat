@@ -31,11 +31,11 @@
                     <dt>Follow-ups</dt>
                     {% if processor.compatibility.preferred_followups %}
                         {% for followup in (processor.compatibility.preferred_followups|list)[:3] %}
-                            <a href="/processor-catalogue/{{ followup }}"><dd>{{ followup }}</dd></a>
+                            <a href="{{ url_for('misc.module_catalog') }}/{{ followup }}"><dd>{{ followup }}</dd></a>
                         {% endfor %}
                     {% endif %}
                     <ul>
-                        <li class="button-secondary"><a href="/processor-catalogue/{{ processor.type }}">See all</a></li>
+                        <li class="button-secondary"><a href="{{ url_for('misc.module_catalog') }}/{{ processor.type }}">See all</a></li>
                     </ul>
                 </div>
                 {% endif %}

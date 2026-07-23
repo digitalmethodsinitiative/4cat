@@ -140,7 +140,7 @@ def favicon():
     """
     return redirect(url_for('static', filename='img/favicon/favicon.ico'))
 
-@component.route("/module-catalog")
+@component.route("/module-catalog/")
 @component.route("/module-catalog/<module_type>")
 @login_required
 def module_catalog(module_type=None):

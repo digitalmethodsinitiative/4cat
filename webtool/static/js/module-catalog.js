@@ -1,7 +1,7 @@
-/* Processor catalogue (prototype).
+/* Module catalogue.
  *
  * A thin reactive client over the /api/processor-map/* endpoints: browse/search
- * processors, then open one to see "how to run this" (the dataset it needs and the
+ * modules, then open one to see "how to run this" (the dataset it needs and the
  * sensible ways to get there from a data source) and "what can run on this" (the
  * follow-up processors and filters its output unlocks). Holds no compatibility
  * logic itself -- that all lives in common/lib/processor_map.py; this file only
@@ -71,7 +71,7 @@
       else document.getElementById("pc-detail-body").innerHTML = BROWSE_PLACEHOLDER;
     });
 
-    // If the page was opened as a deep link (/processor-catalogue/<type>), draw that
+    // If the page was opened as a deep link (/module-catalog/<type>), draw that
     // processor before the browse grid -- but only if it really exists, so a stale or
     // mistyped link just falls through to the browse view. Its request is already in
     // flight (detailPromise) and TITLE is now ready for its follow-up chips. "replace"
@@ -166,7 +166,7 @@
     // share exactly what they are looking at. "push" adds a history entry (a normal
     // click); "replace" rewrites the current one (first load, where the URL is already
     // right); "none" leaves it alone (a back/forward already moved the URL for us).
-    const url = `/processor-catalogue/${encodeURIComponent(type)}`;
+    const url = `/module-catalog/${encodeURIComponent(type)}`;
     if (urlMode === "push") history.pushState({ pcType: type }, "", url);
     else if (urlMode === "replace") history.replaceState({ pcType: type }, "", url);
     body.querySelectorAll("[data-type]").forEach(el =>

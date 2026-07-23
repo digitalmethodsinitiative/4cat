@@ -1,4 +1,4 @@
-/* Processor catalogue (prototype) -- a separate stylesheet so the shared 4CAT
+/* Module catalogue -- a separate stylesheet so the shared 4CAT
    styles stay untouched. Reuses 4CAT classes (view-controls, banner,
    property-badge, metadata-wrapper) and adds only the catalogue-specific bits:
    the detail panel, the search block, the prerequisite chain + groups. */
