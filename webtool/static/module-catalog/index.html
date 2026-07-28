@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4CAT data sources &amp; processors</title>
+<meta name="description" content="Every data source and processor in an official 4CAT release: what each one does, the dataset it needs, and what can run on its output.">
+
+<!-- The one request this page makes to another server. 4CAT's own pages load
+     their typefaces from Google Fonts the same way; serving the font files from
+     this bundle instead would keep every visitor's request on this site. Still to
+     be decided. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="assets/fontawesome/css/fontawesome.css">
+<link rel="stylesheet" href="assets/fontawesome/css/solid.css">
+<link rel="stylesheet" href="assets/fontawesome/css/brands.css">
+<link rel="stylesheet" href="assets/css/fourcat-new.css">
+<link rel="stylesheet" href="assets/css/module-catalog.css">
+</head>
+
+<!-- The body class and the #main-content wrapper below are what 4CAT's stylesheet
+     hangs its page styling on, so this page keeps them and gets the same look as
+     the catalogue inside 4CAT. The site header is a plain version of 4CAT's own:
+     there is nothing to log in to here, so it carries no navigation into an
+     application. -->
+<body class="plain-page module-catalog">
+
+<section id="header-container">
+    <header id="site-header">
+        <section class="header-orientation">
+            <div class="site-title"><a href="https://4cat.nl/">4CAT</a></div>
+            <nav class="main-navigation">
+                <ul>
+                    <li><a href="https://4cat.nl/">About 4CAT</a></li>
+                    <li><a href="https://github.com/digitalmethodsinitiative/4cat">Source code</a></li>
+                </ul>
+            </nav>
+        </section>
+    </header>
+</section>
+
+<article id="main-content">
+    <h1>Data sources &amp; processors</h1>
+    <p>Every data source and processor in an official 4CAT release: what each one does,
+       the kind of dataset it needs, and what you can run on its output.</p>
+    <p id="pc-provenance" class="pc-provenance"></p>
+
+    <article id="pc-page">
+<!--CATALOGUE-BODY-->
+    </article>
+</article>
+
+<script>
+/* Where this page gets its catalogue data.
+ *
+ * There is no 4CAT application behind this page, so instead of asking a running
+ * 4CAT it reads one file written when the release was published, and puts the
+ * open module in the address as ?module=<type> so links work on any web server
+ * without special configuration. The script loaded below is the same file 4CAT
+ * itself uses to draw the catalogue; only this object differs. */
+window.MODULE_CATALOG_SOURCE = (function () {
+    "use strict";
+
+    const DATA_FILE = "data/catalogue-v1.json";
+    const SUPPORTED_SCHEMA = 1;
+    let pending = null;
+
+    // Read the data once, however many times it is asked for. A file written to a
+    // newer contract than this page understands is refused outright rather than
+    // drawn with pieces silently missing.
+    function snapshot() {
+        if (!pending) {
+            pending = fetch(DATA_FILE).then(function (response) {
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                return response.json();
+            }).then(function (data) {
+                if (data.schema_version !== SUPPORTED_SCHEMA)
+                    throw new Error("catalogue data version " + data.schema_version + " is not supported by this page");
+                showProvenance(data.source || {});
+                return data;
+            });
+        }
+        return pending;
+    }
+
+    // Say which 4CAT release this catalogue describes, so it is clear the page
+    // documents an official release rather than somebody's running installation.
+    function showProvenance(source) {
+        const element = document.getElementById("pc-provenance");
+        if (!element) return;
+        const commit = String(source.git_commit || "");
+        element.textContent = "4CAT version " + (source.fourcat_version || "unknown")
+            + ". Extensions are not included. ";
+        if (commit) {
+            const link = document.createElement("a");
+            link.href = "https://github.com/digitalmethodsinitiative/4cat/commit/" + encodeURIComponent(commit);
+            link.textContent = "Commit " + commit.slice(0, 8);
+            element.appendChild(link);
+        }
+    }
+
+    return {
+        loadCatalogue: async () => (await snapshot()).catalogue || [],
+        loadModule: async type => ((await snapshot()).modules || {})[type] || null,
+        initialModule: () => (new URLSearchParams(window.location.search).get("module") || "").trim(),
+        urlForModule: type => "?module=" + encodeURIComponent(type)
+    };
+})();
+</script>
+<script src="assets/catalogue.js"></script>
+</body>
+</html>
