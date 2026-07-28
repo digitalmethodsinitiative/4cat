@@ -582,13 +582,46 @@ class VideoDownloaderPlus(BasicProcessor):
             except FailedToCopy as e:
                 self.dataset.log(f"{str(e)}; attempting to download again")
         elif "not_a_video" in hit.reasons:
-            # a previous run established this URL is not a video; don't retry
-            urls_dict[url]["success"] = False
-            urls_dict[url]["reason"] = "not_a_video"
-            self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
-            result["skip"] = True
+            # a previous run established this URL is not a video, so normally
+            # don't retry. But that conclusion only holds for the kinds of URL
+            # that run was allowed to hand to yt-dlp: if this run is allowed
+            # more, the URL deserves another try.
+            if self._widens_indirect_downloads(hit):
+                self.dataset.log(f"Previously identified as not a video, but this run allows yt-dlp more "
+                                 f"URLs than the run that decided that; trying again: {url}")
+            else:
+                urls_dict[url]["success"] = False
+                urls_dict[url]["reason"] = "not_a_video"
+                self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
+                result["skip"] = True
 
         return result
+
+    # How much of the web yt-dlp is allowed to be pointed at, least to most.
+    # A run can only reach URLs a lower setting would have skipped.
+    INDIRECT_DOWNLOAD_LEVELS = {"none": 0, "yt_only": 1, "all": 2}
+
+    def _widens_indirect_downloads(self, hit):
+        """
+        Does this run allow yt-dlp more URLs than every run that decided this URL
+        was not a video?
+
+        The datasets those runs produced store the parameters they ran with, so
+        their settings are read back from there rather than from the archive's
+        metadata. A dataset created before this setting existed reads as the
+        lowest level, so it is retried rather than wrongly skipped.
+
+        :param MediaLibraryHit hit:  failure hit for the URL
+        :return bool:  True if this run is more permissive than all of them
+        """
+        levels = self.INDIRECT_DOWNLOAD_LEVELS
+        current = levels.get(self.parameters.get("also_indirect", "none"), 0)
+        previous = max(
+            (levels.get(dataset.parameters.get("also_indirect", "none"), 0)
+             for dataset in hit.datasets_for_reason("not_a_video")),
+            default=0
+        )
+        return current > previous
 
     @staticmethod
     def _copied_url_fields(hit):

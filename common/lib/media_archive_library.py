@@ -15,15 +15,41 @@ class MediaLibraryHit:
 
 	A success hit carries the archive the files live in (`metadata`, whose
 	`.dataset` locates the zip) and the matching `(filename, item)` entries.
-	A failure hit carries the set of failure `reasons` seen for the URL
-	across all previous archives; the consumer decides what they mean.
+	A failure hit carries every failure recorded for the URL, as
+	`(metadata, failure)` pairs, so that a consumer can see not only why each
+	attempt failed but which dataset made it - and therefore what settings it
+	ran with, since a dataset stores the parameters it was created with.
 	"""
 
-	def __init__(self, is_success, metadata=None, entries=None, reasons=None):
+	def __init__(self, is_success, metadata=None, entries=None, failures=None):
 		self.is_success = is_success
 		self.metadata = metadata
 		self.entries = entries or []
-		self.reasons = reasons or set()
+		self.failures = failures or []
+
+	@property
+	def reasons(self) -> set:
+		"""
+		The failure reasons seen for this URL across all previous archives.
+
+		:return set:  reason codes, e.g. `{"not_a_video"}`
+		"""
+		return {failure.get("reason") for _, failure in self.failures if failure.get("reason")}
+
+	def datasets_for_reason(self, reason) -> list:
+		"""
+		The datasets whose archives recorded a given failure reason for this URL.
+
+		Use this to compare a previous attempt's settings against the current
+		run's: each dataset stores the parameters it ran with, so nothing about
+		those settings has to be repeated in the metadata file.
+
+		:param str reason:  reason code to look for, e.g. `"not_a_video"`
+		:return list:  the datasets that recorded it, skipping any metadata that
+		  was not read from a dataset
+		"""
+		return [metadata.dataset for metadata, failure in self.failures
+				if failure.get("reason") == reason and metadata.dataset is not None]
 
 
 class MediaArchiveLibrary:
@@ -150,11 +176,10 @@ class MediaArchiveLibrary:
 					   if metadata is first_metadata]
 			return MediaLibraryHit(is_success=True, metadata=first_metadata, entries=entries)
 
-		# pass all the failures (e.g. in case one is "error", but later is "not_a_video", or 
-		# something else the consumer wants to interpret)
-		reasons = {failure.get("reason") for _, failure in bucket["failures"]
-				   if failure.get("reason")}
-		return MediaLibraryHit(is_success=False, reasons=reasons)
+		# pass all the failures (e.g. in case one is "error", but later is "not_a_video", or
+		# something else the consumer wants to interpret), each with the archive
+		# that recorded it, so the consumer can also tell which run it came from
+		return MediaLibraryHit(is_success=False, failures=list(bucket["failures"]))
 
 	def __len__(self) -> int:
 		return len(self.metadata_objects)
