@@ -113,6 +113,21 @@ class TikTokVideoDownloader(ProcessorPreset):
 
         return pipeline
 
+    @staticmethod
+    def map_metadata(url, data):
+        """
+        Iterator to yield modified metadata for CSV
+
+        The archive this preset produces is written by the video downloader in
+        its pipeline and copied to this dataset, so the metadata file inside it
+        has the video downloader's format and is read the same way.
+
+        :param str url:  string that may contain URLs
+        :param dict data:  dictionary with metadata collected previously
+        :yield dict:  	  iterator containing reformated metadata
+        """
+        yield from VideoDownloaderPlus.map_metadata(url, data)
+
 
 class TikTokVideoMetadata(BasicProcessor):
     """
