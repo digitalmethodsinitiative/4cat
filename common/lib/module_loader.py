@@ -22,6 +22,13 @@ class ModuleCollector:
     found in datasource folders or the default "processors" and
     "backend/workers" folder. All these folders are scanned for both
     processors and workers (processors being a specific kind of worker).
+
+    A process is expected to build one collector only. The registries below are
+    class attributes, so what one collector finds stays visible to any collector
+    built later in the same process, and that later collector skips every module
+    the first one already indexed. Also note that the file path and extension flag 
+    are also stored on the worker classes themselves, which Python shares 
+    process-wide through its module cache.
     """
     ignore = []
     missing_modules = {}
@@ -132,10 +139,6 @@ class ModuleCollector:
                     if module_name in self.ignore:
                         continue
 
-                    if module_name in sys.modules:
-                        # This skips processors/datasources that were loaded by others and may not yet be captured
-                        pass
-
                     if is_extension and len(module_name.split(".")) > 1 and extension_name not in enabled_extensions:
                         continue
 
@@ -156,6 +159,10 @@ class ModuleCollector:
                     # through all of its members
                     components = inspect.getmembers(module, predicate=self.is_4cat_class)
                     for component in components:
+                        if component[1].__module__ != module_name:
+                            # this is not the module we're looking for (e.g. a base class imported from elsewhere), skip it
+                            continue
+
                         if component[1].type in self.workers:
                             # already indexed
                             continue
