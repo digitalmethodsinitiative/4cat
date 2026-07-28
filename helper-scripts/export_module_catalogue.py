@@ -40,10 +40,17 @@ sys.path.insert(0, str(PATH_ROOT))
 from common.lib.module_loader import ModuleCollector  # noqa: E402
 from common.lib.processor_map import ProcessorMap  # noqa: E402
 
-# Raise this only when the published data changes in a way an older page cannot
-# read; the page refuses a file it does not understand rather than showing gaps.
+# Two separate promises, raised separately.
+#
+# FORMAT_VERSION covers the shape of the bundle: that there is a manifest, that it
+# names the data file, and what else it carries. SCHEMA_VERSION covers the module
+# data inside that file. A page written for one release can then tell "I do not
+# understand this bundle at all" apart from "I found the data but not in a shape I
+# can read", and refuse either rather than drawing half a catalogue.
+FORMAT_VERSION = 2
 SCHEMA_VERSION = 1
 DATA_FILE = "data/catalogue-v1.json"
+MANIFEST_FILE = "manifest.json"
 
 PATH_STATIC = PATH_ROOT.joinpath("webtool", "static")
 
@@ -74,6 +81,26 @@ ASSETS = (
 # Another file a stylesheet pulls in: `url(...)` covers both plain references and
 # `@import url(...)`; the second half catches an `@import` written without `url`.
 CSS_REFERENCE = re.compile(r"""url\(\s*['"]?([^'")]+)['"]?\s*\)|@import\s+['"]([^'"]+)['"]""")
+
+# A file the finished page or a stylesheet loads as part of itself: a <link>,
+# anything with a src, or a url() in CSS. Deliberately not <a href>, which is
+# somewhere a visitor may choose to go rather than something the page fetches --
+# the page is meant to link out to the 4CAT site and to the release it describes.
+PAGE_REFERENCE = re.compile(
+    r"""<link\b[^>]*\bhref\s*=\s*["']([^"']+)["']"""
+    r"""|\bsrc\s*=\s*["']([^"']+)["']"""
+    r"""|url\(\s*["']?([^"')]+?)["']?\s*\)""",
+    re.IGNORECASE)
+
+
+def page_references(text):
+    """Every file the given page or stylesheet expects to find beside it."""
+    found = set()
+    for match in PAGE_REFERENCE.finditer(text):
+        reference = (match.group(1) or match.group(2) or match.group(3) or "").strip()
+        if reference and not reference.startswith(("http://", "https://", "//", "data:", "#")):
+            found.add(reference.split("?")[0].split("#")[0])
+    return found
 
 
 class ExportConfig:
@@ -127,6 +154,44 @@ def git(*arguments, default=""):
     except (OSError, subprocess.SubprocessError):
         return default
     return result.stdout.strip() if result.returncode == 0 else default
+
+
+def describe_source(version=None, release_tag=None, commit=None, generated_at=None):
+    """
+    Work out what exactly is being published, and say so plainly.
+
+    The distinction that matters to a reader is whether this is a 4CAT release or
+    somebody's work in progress. Git's `describe` cannot answer that on its own:
+    "v1.55-145-ga6e11f52e" means 145 commits *after* v1.55, so treating it as a
+    release tag would put a version on the public page that was never released.
+
+    So a release is only claimed when the commit carries that tag exactly, or when
+    whoever is running the export names the tag themselves. Everything else is a
+    development snapshot, and says so. `git_describe` is still recorded, because it
+    is the most human-readable summary of where a commit sits.
+
+    Note for automation: a shallow checkout has no tags, so `describe` finds nothing
+    and even a real release would look like a snapshot. Release builds should pass
+    --release-tag rather than relying on what git can work out.
+    """
+    tag = release_tag if release_tag is not None else git("describe", "--exact-match", "--tags", "HEAD")
+    tag = tag.strip() or None
+
+    # only the first line of VERSION is the version; the rest explains the file
+    version_file = PATH_ROOT.joinpath("VERSION")
+    if not version and version_file.exists():
+        version = version_file.read_text(encoding="utf-8").splitlines()[0].strip()
+
+    return {
+        "kind": "release" if tag else "development_snapshot",
+        "fourcat_version": version or "unknown",
+        "release_tag": tag,
+        "git_describe": git("describe", "--tags", "--always", default="unknown"),
+        "git_commit": commit or git("rev-parse", "HEAD", default="unknown"),
+        # the commit's own date, so exporting a release again reproduces it exactly
+        "generated_at": generated_at or git("show", "-s", "--format=%cI", "HEAD")
+            or datetime.now(timezone.utc).isoformat(),
+    }
 
 
 def build_map(scratch):
@@ -188,9 +253,10 @@ def prepare_output(output):
     to stop than to empty out a directory that turns out to be something else.
     """
     if output.exists() and any(output.iterdir()):
-        if not output.joinpath("manifest.json").exists():
+        if not output.joinpath(MANIFEST_FILE).exists():
             raise RuntimeError("%s is not empty and does not look like an earlier catalogue "
-                               "export (it has no manifest.json), so it was left untouched" % output)
+                               "export (it has no %s), so it was left untouched"
+                               % (output, MANIFEST_FILE))
         shutil.rmtree(output)
     output.mkdir(parents=True, exist_ok=True)
 
@@ -287,6 +353,119 @@ def write_page(output):
     output.joinpath("index.html").write_text(shell.replace(BODY_MARKER, body), encoding="utf-8")
 
 
+def check_bundle(output):
+    """
+    Read the finished bundle back and check it is fit to publish.
+
+    Everything up to here checked what went in; this checks what came out, by
+    reading the files the way a visitor's browser will. Every problem found is
+    collected rather than raised one at a time, so a broken export can be fixed in
+    one go instead of one error per attempt.
+    """
+    problems = []
+
+    def read_json(name):
+        try:
+            return json.loads(output.joinpath(name).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            problems.append("%s cannot be read as JSON: %s" % (name, e))
+            return None
+
+    manifest = read_json(MANIFEST_FILE)
+    page = output.joinpath("index.html").read_text(encoding="utf-8")
+
+    # the manifest names the data file, so follow it rather than assuming the name
+    data = None
+    if manifest:
+        named = str(manifest.get("data_file", ""))
+        target = output.joinpath(named).resolve()
+        if not named or output.resolve() not in target.parents:
+            problems.append("the manifest's data_file (%r) is not inside the bundle" % named)
+        elif not target.exists():
+            problems.append("the manifest names %s, which is not in the bundle" % named)
+        else:
+            data = read_json(named)
+
+    # the page has to understand both the bundle and the data it is given
+    for label, declared, expected in (
+            ("manifest", re.search(r"SUPPORTED_MANIFEST\s*=\s*(\d+)", page), FORMAT_VERSION),
+            ("data", re.search(r"SUPPORTED_DATA\s*=\s*(\d+)", page), SCHEMA_VERSION)):
+        if not declared:
+            problems.append("the page does not say which %s version it can read" % label)
+        elif int(declared.group(1)) != expected:
+            problems.append("the page reads %s version %s, but this export writes version %i"
+                            % (label, declared.group(1), expected))
+
+    if manifest:
+        if manifest.get("format_version") != FORMAT_VERSION:
+            problems.append("the manifest says format_version %r, expected %i"
+                            % (manifest.get("format_version"), FORMAT_VERSION))
+        if manifest.get("data_schema_version") != SCHEMA_VERSION:
+            problems.append("the manifest says data_schema_version %r, expected %i"
+                            % (manifest.get("data_schema_version"), SCHEMA_VERSION))
+        if data and data.get("schema_version") != manifest.get("data_schema_version"):
+            problems.append("the data file and the manifest disagree about the data version")
+        if data and data.get("source") != manifest.get("source"):
+            problems.append("the data file and the manifest disagree about where this came from")
+
+    # every module listed to browse has exactly one detailed record, and vice versa
+    if data:
+        listed = [entry.get("type") for entry in data.get("catalogue", [])]
+        if not all(listed):
+            problems.append("a module in the catalogue has no type")
+        if len(set(listed)) != len(listed):
+            problems.append("the catalogue lists the same module more than once")
+        detailed = set(data.get("modules", {}))
+        for missing in sorted(set(listed) - detailed):
+            problems.append("%s is listed but has no details" % missing)
+        for extra in sorted(detailed - set(listed)):
+            problems.append("%s has details but is not listed" % extra)
+
+    # nothing left for a template engine to fill in, since nothing will
+    for delimiter in ("{{", "{%", "{#"):
+        if delimiter in page:
+            problems.append("index.html still contains %s, which nothing will fill in" % delimiter)
+
+    # everything the page and its styling load has to be here, and stay here
+    for source_file in [output.joinpath("index.html"), *sorted(output.rglob("*.css"))]:
+        for reference in page_references(source_file.read_text(encoding="utf-8")):
+            target = source_file.parent.joinpath(reference).resolve()
+            where = source_file.relative_to(output)
+            if output.resolve() not in target.parents:
+                problems.append("%s reaches outside the bundle for %s" % (where, reference))
+            elif not target.exists():
+                problems.append("%s needs %s, which is not in the bundle" % (where, reference))
+
+    if problems:
+        raise RuntimeError("the export came out wrong, so nothing was published:\n  %s"
+                           % "\n  ".join(problems))
+
+    return check_javascript(output.joinpath("assets", "catalogue.js"))
+
+
+def check_javascript(script):
+    """
+    Check the renderer is valid JavaScript, where there is something to check it
+    with. Returns what was done, to be reported rather than quietly assumed.
+
+    Node is not part of the 4CAT image, so this usually cannot run here; a release
+    pipeline that has it should run this same check.
+    """
+    if not script.exists():
+        raise RuntimeError("the renderer is missing from the bundle")
+    if not script.read_text(encoding="utf-8").strip():
+        raise RuntimeError("the renderer in the bundle is empty")
+
+    try:
+        result = subprocess.run(["node", "--check", str(script)],
+                                capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return "renderer not syntax-checked (node is not available here)"
+    if result.returncode != 0:
+        raise RuntimeError("the renderer is not valid JavaScript:\n%s" % result.stderr.strip())
+    return "renderer checked with node"
+
+
 def export(output, source):
     """Write the whole bundle and return what should be reported about it."""
     prepare_output(output)
@@ -303,20 +482,25 @@ def export(output, source):
     write_page(output)
     stylesheets = copy_stylesheets(output)
     copy_assets(output)
-    output.joinpath("manifest.json").write_text(json.dumps({
-        "format_version": SCHEMA_VERSION,
-        "fourcat_version": source["fourcat_version"],
-        "git_tag": source["git_tag"],
-        "git_commit": source["git_commit"],
-        "generated_at": source["generated_at"],
+
+    # The manifest is what the site reads first: it says what kind of bundle this
+    # is, which data file to load, and which release it describes. `source` is the
+    # same object written into the data file, so the two cannot disagree.
+    output.joinpath(MANIFEST_FILE).write_text(json.dumps({
+        "format_version": FORMAT_VERSION,
+        "data_schema_version": SCHEMA_VERSION,
+        "source": source,
         "data_file": DATA_FILE,
     }, indent=2) + "\n", encoding="utf-8")
+
+    javascript = check_bundle(output)
 
     encoded = data.encode("utf-8")
     return {
         "modules": len(snapshot["catalogue"]),
         "datasources": len([e for e in snapshot["catalogue"] if e["is_datasource"]]),
         "stylesheets": stylesheets,
+        "javascript": javascript,
         "bytes": len(encoded),
         "gzipped": len(gzip.compress(encoded)),
         "sha256": hashlib.sha256(encoded).hexdigest(),
@@ -328,32 +512,32 @@ def main():
     parser.add_argument("--output", required=True, type=Path,
                         help="directory to write the catalogue to")
     parser.add_argument("--version", help="the 4CAT version this describes (default: the VERSION file)")
-    parser.add_argument("--tag", help="the release tag this describes (default: asked of git)")
+    parser.add_argument("--release-tag", help="publish this as an official release of the named tag. "
+                                              "Without it, a release is claimed only when the commit "
+                                              "carries a tag exactly; anything else is published as a "
+                                              "development snapshot. Release builds should pass this, "
+                                              "because a shallow checkout has no tags for git to find.")
     parser.add_argument("--commit", help="the commit this describes (default: asked of git)")
     parser.add_argument("--generated-at", help="timestamp to record (default: the commit's own date, "
                                                "so re-exporting a release reproduces it exactly)")
     arguments = parser.parse_args()
 
-    # only the first line of VERSION is the version; the rest of the file explains
-    # what it is for
-    version_file = PATH_ROOT.joinpath("VERSION")
-    source = {
-        "fourcat_version": arguments.version
-            or (version_file.read_text().splitlines()[0].strip() if version_file.exists() else "unknown"),
-        "git_tag": arguments.tag or git("describe", "--tags", "--always", default="unknown"),
-        "git_commit": arguments.commit or git("rev-parse", "HEAD", default="unknown"),
-        "generated_at": arguments.generated_at or git("show", "-s", "--format=%cI", "HEAD")
-            or datetime.now(timezone.utc).isoformat(),
-    }
+    source = describe_source(version=arguments.version, release_tag=arguments.release_tag,
+                             commit=arguments.commit, generated_at=arguments.generated_at)
 
     try:
         result = export(arguments.output, source)
     except RuntimeError as e:
         sys.exit("Nothing was published: %s" % e)
 
-    print("4CAT %s (tag %s, commit %s)" % (source["fourcat_version"], source["git_tag"], source["git_commit"][:8]))
+    if source["kind"] == "release":
+        print("4CAT release %s (version %s)" % (source["release_tag"], source["fourcat_version"]))
+    else:
+        print("Development snapshot of 4CAT %s -- NOT a release (%s)"
+              % (source["fourcat_version"], source["git_describe"]))
+    print("commit %s, dated %s" % (source["git_commit"], source["generated_at"]))
     print("%i modules, of which %i data sources" % (result["modules"], result["datasources"]))
-    print("%i styling files copied from 4CAT" % result["stylesheets"])
+    print("%i styling files copied from 4CAT; %s" % (result["stylesheets"], result["javascript"]))
     print("%s: %.1f kB, %.1f kB compressed, sha256 %s"
           % (DATA_FILE, result["bytes"] / 1000, result["gzipped"] / 1000, result["sha256"]))
     print("written to %s" % arguments.output.resolve())

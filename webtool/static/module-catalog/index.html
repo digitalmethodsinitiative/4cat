@@ -64,42 +64,66 @@
 window.MODULE_CATALOG_SOURCE = (function () {
     "use strict";
 
-    const DATA_FILE = "data/catalogue-v1.json";
-    const SUPPORTED_SCHEMA = 1;
+    const MANIFEST_FILE = "manifest.json";
+
+    // What this page can read. The first is the shape of the bundle -- that there
+    // is a manifest and what it holds; the second is the shape of the module data
+    // it points at. They are separate so that a page can tell "I do not understand
+    // this bundle at all" apart from "I found the data but cannot read it", and
+    // refuse either instead of drawing half a catalogue. The export checks these
+    // against what it writes, so a mismatch is caught before anything is published.
+    const SUPPORTED_MANIFEST = 2;
+    const SUPPORTED_DATA = 1;
+
     let pending = null;
 
-    // Read the data once, however many times it is asked for. A file written to a
-    // newer contract than this page understands is refused outright rather than
-    // drawn with pieces silently missing.
+    async function get(file) {
+        const response = await fetch(file);
+        if (!response.ok) throw new Error(file + ": HTTP " + response.status);
+        return response.json();
+    }
+
+    // Read the bundle once, however many times it is asked for: the manifest first,
+    // since that says which data file to load and which release this describes.
     function snapshot() {
         if (!pending) {
-            pending = fetch(DATA_FILE).then(function (response) {
-                if (!response.ok) throw new Error("HTTP " + response.status);
-                return response.json();
-            }).then(function (data) {
-                if (data.schema_version !== SUPPORTED_SCHEMA)
-                    throw new Error("catalogue data version " + data.schema_version + " is not supported by this page");
-                showProvenance(data.source || {});
-                return data;
+            pending = get(MANIFEST_FILE).then(function (manifest) {
+                if (manifest.format_version !== SUPPORTED_MANIFEST)
+                    throw new Error("this catalogue was published in format " + manifest.format_version
+                        + ", which this page cannot read");
+                showProvenance(manifest.source || {});
+                return get(manifest.data_file).then(function (data) {
+                    if (data.schema_version !== SUPPORTED_DATA)
+                        throw new Error("the module data is version " + data.schema_version
+                            + ", which this page cannot read");
+                    return data;
+                });
             });
         }
         return pending;
     }
 
-    // Say which 4CAT release this catalogue describes, so it is clear the page
-    // documents an official release rather than somebody's running installation.
+    // Say exactly what this catalogue describes. A released 4CAT is named by its
+    // release; anything else is a snapshot of work in progress and says so, rather
+    // than borrowing the last release's number and looking official.
     function showProvenance(source) {
         const element = document.getElementById("pc-provenance");
         if (!element) return;
         const commit = String(source.git_commit || "");
-        element.textContent = "4CAT version " + (source.fourcat_version || "unknown")
-            + ". Extensions are not included. ";
+
+        element.textContent = source.kind === "release"
+            ? "Catalogue for 4CAT " + (source.release_tag || source.fourcat_version) + ". "
+            : "Development snapshot of 4CAT " + (source.fourcat_version || "unknown")
+              + " — not a released version. ";
+
         if (commit) {
             const link = document.createElement("a");
             link.href = "https://github.com/digitalmethodsinitiative/4cat/commit/" + encodeURIComponent(commit);
             link.textContent = "Commit " + commit.slice(0, 8);
             element.appendChild(link);
+            element.appendChild(document.createTextNode(". "));
         }
+        element.appendChild(document.createTextNode("Extensions are not included."));
     }
 
     return {
