@@ -628,7 +628,7 @@ class SearchBluesky(Search):
         """
         try:
             datetime_object = parser.isoparse(datetime_string)
-        except ValueError as e:
+        except (TypeError, ValueError) as e:
             if raise_error:
                 raise e
             return datetime_string

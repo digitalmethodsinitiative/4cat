@@ -3,6 +3,7 @@ Generate co-word network of word collocations
 """
 
 from backend.lib.preset import ProcessorPreset
+from common.lib.compatibility import Compatibility
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -22,15 +23,8 @@ class CowordNetworker(ProcessorPreset):
                   "amount of co-word occurrences."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on collocations
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type == "collocations"
+    # Allow processor to run on collocations
+    compatibility = Compatibility(types={"collocations"})
 
     def get_processor_pipeline(self):
         """

@@ -2,14 +2,19 @@
 {% for worker in workers %}
     {% set worker_uniqid = uniqid() %}
     <li>
-        <div {% if worker.dataset and worker.dataset.progress and worker.dataset.progress > 0 and not worker.dataset.is_finished() %}class="progress progress-{{ (worker.dataset.progress * 100)|round(0)|int }}"{% endif %}>
+        <div {% if worker.is_running and worker.dataset and worker.dataset.progress and worker.dataset.progress > 0 and not worker.dataset.is_finished() %}class="progress progress-{{ (worker.dataset.progress * 100)|round(0)|int }}"{% endif %}>
             <h4>
                 {% if worker.type in worker_types and worker_types[worker.type]|hasattr("title") %}{{ worker_types[worker.type]|attr("title") }}{% else %}{{ worker.type }}{% endif %}
                 {% if worker.is_recurring %}<i class="fa fa-recycle tooltip-trigger" aria-hidden="true" aria-controls="tooltip-recurring-{{ worker_uniqid }}"></i> <p role="tooltip" id="tooltip-recurring-{{ worker_uniqid }}">Recurring worker</p>{% endif %}
-                {% if worker.dataset_parent_key %}<a class="tooltip-trigger" href="{{ url_for('dataset.show_result', key=worker.dataset_parent_key) }}" aria-controls="tooltip-worker-{{ worker_uniqid }}"><i class="fa fa-link" aria-label="tooltip-dataset-{{ worker_uniqid }}"></i></a> <span role="tooltip" id="tooltip-worker-{{ worker_uniqid }}">Processor (click to view parent dataset)</span>{% endif %}
-                {% if worker.dataset_user %}<i class="tooltip-trigger fa fa-user" aria-controls="tooltip-user-{{ worker_uniqid }}"></i></i> <span role="tooltip" id="tooltip-user-{{ worker_uniqid }}">Processor queued by {{ worker.dataset_user }}</span>{% endif %}
+                {% if worker.dataset %}<a class="tooltip-trigger" href="{{ url_for('dataset.show_result', key=worker.dataset.key) }}" aria-controls="tooltip-dataset-{{ worker_uniqid }}"><i class="fa fa-link" aria-label="View dataset"></i></a> <span role="tooltip" id="tooltip-dataset-{{ worker_uniqid }}">Click to view dataset</span>{% endif %}
+                {% if worker.dataset and worker.dataset.creator %}<i class="tooltip-trigger fa fa-user" aria-controls="tooltip-user-{{ worker_uniqid }}"></i> <span role="tooltip" id="tooltip-user-{{ worker_uniqid }}">Queued by {{ worker.dataset.creator }}</span>{% endif %}
+                {% if worker.is_parked or (worker.is_maybe_crashed and (now - worker.timestamp_claimed) > 60) %}<i class="fa fa-warning tooltip-trigger" aria-hidden="true" aria-controls="tooltip-crashed-{{ worker_uniqid }}"></i> <span role="tooltip" id="tooltip-crashed-{{ worker_uniqid }}">{% if worker.is_parked %}Crashed &ndash; will be retried on restart{% else %}No live worker &ndash; possibly crashed or stalled{% endif %}</span>{% endif %}
             </h4>
-            <p>Started {{ (now - worker.timestamp_claimed)|int|timify }} ago</p>
+            {% if worker.is_parked %}
+                <p>Crashed {{ (now - worker.timestamp_lastclaimed)|int|timify }} ago</p>
+            {% else %}
+                <p>Started {{ (now - worker.timestamp_lastclaimed)|int|timify }} ago</p>
+            {% endif %}
         </div>
     </li>
 {% endfor %}

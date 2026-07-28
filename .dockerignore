@@ -3,3 +3,5 @@ data/
 .ipynb_checkpoints/
 .idea/
 __pycache__/
+# runtime symlink created by helper-scripts/migrate.py; dangles under a dev bind-mount
+extensions

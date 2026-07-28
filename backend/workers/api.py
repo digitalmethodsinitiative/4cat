@@ -260,35 +260,39 @@ class InternalAPI(BasicWorker):
 						worker = candidate
 						break
 				
-				is_claimed = job["timestamp_claimed"] > 0
-				if not is_claimed and not worker:
+				# a job's claim flag encodes three states:
+				#   0  -> queued/claimable
+				#  >0  -> claimed (running if a live worker exists, else a likely
+				#        hard-kill zombie)
+				#  -1  -> parked after a crash (Job.STATUS_PARKED); retried on the
+				#        next restart. see Job.park() / BasicWorker.run().
+				timestamp_claimed = job["timestamp_claimed"]
+				is_claimed = timestamp_claimed > 0
+				is_parked = timestamp_claimed == Job.STATUS_PARKED
+
+				if not worker and not is_claimed and not is_parked:
+					# truly queued and waiting to be claimed
 					if jobtype not in queue:
 						queue[jobtype] = 0
 					queue[jobtype] += 1
 				else:
-					# Claimed or has worker
-					if hasattr(worker, "dataset") and worker.dataset:
-						running_key = worker.dataset.key
-						running_user = worker.dataset.creator
-						running_parent = worker.dataset.top_parent().key
-					else:
-						running_key = None
-						running_user = None
-						running_parent = None
-
+					# has a live worker, or is claimed/parked without one. dataset
+					# resolution is left to the frontend (which treats remote_id as
+					# a dataset key only for processor jobtypes); the API just
+					# reports job state.
 					running.append({
 						"type": jobtype,
 						"queue_id": queue_key,
+						"remote_id": job["remote_id"],
 						"is_claimed": is_claimed,
 						"is_running": bool(worker),
-						"is_processor": hasattr(worker, "dataset"),
+						# Processors have DataSets
+						"is_processor": jobtype in self.modules.processors,
 						"is_recurring": (int(job["interval"]) > 0),
+						"is_parked": is_parked,
 						"is_maybe_crashed": is_claimed and not bool(worker),
-						"dataset_key": running_key,
-						"dataset_user": running_user,
-						"dataset_parent_key": running_parent,
 						"timestamp_queued": job["timestamp"],
-						"timestamp_claimed": job["timestamp_claimed"],
+						"timestamp_claimed": timestamp_claimed,
 						"timestamp_lastclaimed": job["timestamp_lastclaimed"],
 					})
 

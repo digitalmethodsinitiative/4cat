@@ -22,6 +22,13 @@ class ModuleCollector:
     found in datasource folders or the default "processors" and
     "backend/workers" folder. All these folders are scanned for both
     processors and workers (processors being a specific kind of worker).
+
+    A process is expected to build one collector only. The registries below are
+    class attributes, so what one collector finds stays visible to any collector
+    built later in the same process, and that later collector skips every module
+    the first one already indexed. Also note that the file path and extension flag 
+    are also stored on the worker classes themselves, which Python shares 
+    process-wide through its module cache.
     """
     ignore = []
     missing_modules = {}
@@ -132,10 +139,6 @@ class ModuleCollector:
                     if module_name in self.ignore:
                         continue
 
-                    if module_name in sys.modules:
-                        # This skips processors/datasources that were loaded by others and may not yet be captured
-                        pass
-
                     if is_extension and len(module_name.split(".")) > 1 and extension_name not in enabled_extensions:
                         continue
 
@@ -156,6 +159,10 @@ class ModuleCollector:
                     # through all of its members
                     components = inspect.getmembers(module, predicate=self.is_4cat_class)
                     for component in components:
+                        if component[1].__module__ != module_name:
+                            # this is not the module we're looking for (e.g. a base class imported from elsewhere), skip it
+                            continue
+
                         if component[1].type in self.workers:
                             # already indexed
                             continue
@@ -217,6 +224,11 @@ class ModuleCollector:
                 self.log_buffer += "Could not import %s: %s\n" % (module_name, e)
                 return
 
+            if getattr(datasource, "DATASOURCE_DISABLED", False):
+                # module deliberately declined to register (e.g. dev-only datasource
+                # gated behind an env var); not an error, so don't warn.
+                return
+
             if not hasattr(datasource, "init_datasource") or not hasattr(datasource, "DATASOURCE"):
                 self.log_buffer += "Could not load datasource %s: missing init_datasource or DATASOURCE\n" % subdirectory
                 return
@@ -257,21 +269,38 @@ class ModuleCollector:
                               sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}
         self.datasources = sorted_datasources
 
+    def get_datasource_worker(self, datasource_id):
+        """
+        Find the collector or importer worker for a datasource
+
+        A datasource is served by a single worker that collects or imports its
+        items. By convention that worker's type is the datasource ID followed
+        by `-search` (a collector, e.g. `tiktok-search`) or `-import` (an
+        importer, e.g. `twitter-import`). Both suffixes are tried, `-search`
+        first.
+
+        :param str datasource_id:  Datasource ID, e.g. `twitter`
+        :return:  The worker class for the datasource, or None if it has none
+        """
+        for suffix in ("-search", "-import"):
+            worker = self.workers.get(datasource_id + suffix)
+            if worker:
+                return worker
+        return None
+
     def expand_datasources(self):
         """
         Expand datasource metadata
 
         Some datasource metadata can only be known after all workers have been
-        loaded, e.g. whether there is a search worker for the datasource. This
-        function takes care of populating those values.
+        loaded, e.g. whether there is a search or import worker for the
+        datasource. This function takes care of populating those values.
         """
         for datasource_id in self.datasources:
-            worker = self.workers.get("%s-search" % datasource_id)
+            worker = self.get_datasource_worker(datasource_id)
             self.datasources[datasource_id]["has_worker"] = bool(worker)
-            self.datasources[datasource_id]["has_options"] = self.datasources[datasource_id]["has_worker"] and \
-                                                             bool(self.workers[
-                                                                      "%s-search" % datasource_id].get_options(
-                                                                 config=self.config))
+            self.datasources[datasource_id]["has_options"] = bool(worker) and \
+                                                             bool(worker.get_options(config=self.config))
             self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_zeeschuimer") and worker.is_from_zeeschuimer
 
     def load_datasource_explorer_templates(self, datasource_id, datasource_path):

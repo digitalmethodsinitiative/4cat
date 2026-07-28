@@ -1,9 +1,12 @@
 """
 Use a prompt from a preset list
 """
+import json
+from itertools import chain
+
 from backend.lib.preset import ProcessorPreset
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
-from common.lib.llm import LLMAdapter
 
 from common.lib.exceptions import (
     QueryParametersException,
@@ -11,8 +14,6 @@ from common.lib.exceptions import (
 )
 
 from processors.machine_learning.llm_prompter import LLMPrompter
-
-import json
 
 class PromptCompassRunner(ProcessorPreset):
     """
@@ -25,22 +26,30 @@ class PromptCompassRunner(ProcessorPreset):
                    "original dataset as a new column.")
     extension = "ndjson"
 
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
+
     references = [
-	    "This processor is an implementation of the stand-alone tool [PromptCompass](https://github.com/ErikBorra/PromptCompass) by Erik Borra.",
-	    "See the processor options for references to the sources of each prompt in the library."
+        "This processor is an implementation of the stand-alone tool [PromptCompass](https://github.com/ErikBorra/PromptCompass) by Erik Borra.",
+        "See the processor options for references to the sources of each prompt in the library."
     ]
+
+    @classmethod
+    def is_compatible_with(cls, module=None, config=None):
+        # Same compatibility as the LLM Prompter, since this is just a wrapper around it
+        return LLMPrompter.is_compatible_with(module=module, config=config)
 
     @staticmethod
     def get_prompt_library(config):
         """
         Get prompt library from file
 
+        :param config:  Config reader
         :return list:  List of prompts and metadata
         """
         prompt_library_file = config.get("PATH_ROOT").joinpath("common/assets/prompt_library.json")
         if not prompt_library_file.exists():
             return []
-        
+
         with prompt_library_file.open(encoding="utf-8") as infile:
             prompt_library = json.load(infile)
 
@@ -63,39 +72,6 @@ class PromptCompassRunner(ProcessorPreset):
 
         return prompt_library
 
-    @staticmethod
-    def get_available_models(config):
-        """
-        Get available model providers
-
-        Combine the list defined by the LLMAdapter with known local models.
-
-        :param config:  Configuration reader
-        :return dict:  Models and metadata
-        """
-        # get cached local models
-        models = config.get("llm.available_models", {})
-        models = {} if models == [] else models
-        models.update({k: v for k, v in LLMAdapter.get_models(config).items() if k not in ("none", "custom")})
-
-        models = {k: v for k, v in models.items() if "model_card" in v}
-
-        return models
-
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        models = PromptCompassRunner.get_available_models(config)
-        return (models
-                and module.is_top_dataset()
-                and module.get_extension() in ("csv", "ndjson"))
-
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """
@@ -108,25 +84,32 @@ class PromptCompassRunner(ProcessorPreset):
         :return:
         """
         prompt_library = cls.get_prompt_library(config)
-        available_models = cls.get_available_models(config)
+        available_models = config.get("llm.available_models", {})
+        enabled_model_ids = config.get("llm.enabled_models", [])
+        if not config.get("llm.access"):
+            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
+
+        enabled_models = {k: v for k, v in available_models.items() if k in enabled_model_ids}
 
         options = {
             "model": {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Model to use",
                 "tooltip": "Third-party models require an API key to run.",
-                "options": {("local/" if v["provider"] == "local" else f"{v['provider']}/") + k: v["name"] for k, v in available_models.items()},
-                "default": sorted(list(available_models.keys()), key=lambda k: k.startswith("local"))[-1]
+                "options": LLMPrompter.get_model_library(config),
+                # prefer a locally hosted model, so the default does not cost money
+                "default": sorted(list(enabled_models.keys()), key=lambda k: not k.startswith("thirdparty"))[-1] if enabled_models else ""
             },
         }
 
-        for model, metadata in available_models.items():
-            model_key = metadata["provider"] + "/" + model
-            options[f"{model_key}-info"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": f"Read the [model card]({metadata['model_card']}) for {model}.",
-                "requires": f"model=={model_key}"
-            }
+        for model, metadata in enabled_models.items():
+            if metadata.get("model_card"):
+                model_key = metadata["server"] + "/" + model
+                options[f"{model_key}-info"] = {
+                    "type": UserInput.OPTION_INFO,
+                    "help": f"Read the [model card]({metadata['model_card']}) for {model}.",
+                    "requires": f"model=={model_key}"
+                }
 
         options.update({
             "api_key": {
@@ -136,20 +119,20 @@ class PromptCompassRunner(ProcessorPreset):
                 "cache": True,
                 "tooltip": "Create an API key on the LLM provider's website (e.g. https://admin.mistral.ai/organization"
                            "/api-keys). Note that this often involves billing.",
-                "requires": "model!^=local"
+                "requires": "model^=thirdparty"
             },
             "hide_think": {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Hide reasoning",
                 "default": False,
                 "tooltip": "Some models include reasoning in their output, between <think></think> tags. This option "
-                           "removes this tag and its contents from the output.",
-                "requires": "model^=local/deepseek"
+                           "removes this tag and its contents from the output, if present.",
             },
             "temperature": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Temperature",
-                "tooltip": "Between 0 and 1. Higher temperatures increase variability and may lead to strange results",
+                "tooltip": "Between 0 and 1. Higher temperatures increase variability and may lead to strange "
+                           "results. Does not have an effect on all models.",
                 "coerce_type": float,
                 "min": 0.0,
                 "max": 1.0,
@@ -165,7 +148,7 @@ class PromptCompassRunner(ProcessorPreset):
         })
 
         for i, task in enumerate(prompt_library):
-            task_key = f"task-{i+1}"
+            task_key = f"task-{i + 1}"
             options[task_key] = {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "requires": f"task=={task_key}",
@@ -202,7 +185,7 @@ class PromptCompassRunner(ProcessorPreset):
         }
 
         if parent_dataset:
-            options["limit"]["default"] = int(min(round(parent_dataset.num_rows / 10, 0), 50))
+            options["limit"]["default"] = int(min(max(round(parent_dataset.num_rows / 10, 0), 5), 50))
 
         return options
 
@@ -227,24 +210,15 @@ class PromptCompassRunner(ProcessorPreset):
         if short_name:
             self.dataset.update_label(f"PromptCompass ({short_name})")
 
-        chosen_model = "/".join(self.parameters.get("model").split("/")[1:])
-        models = self.get_available_models(self.config)
-        if chosen_model not in models:
-            return self.dataset.finish_with_error(f"Model {self.parameters['model']} is not available, halting processor.")
-
-        model = models[chosen_model]
+        if self.parameters.get("model") not in self.config.get("llm.enabled_models", []):
+            return self.dataset.finish_with_error(
+                f"Model {self.parameters['model']} is not available, halting processor.")
 
         pipeline = [
             {
                 "type": "llm-prompter",
                 "parameters": {
-                    "api_or_local": "local" if model["provider"] == "local" else "api",
-                    "api_model": chosen_model if model["provider"] != "local" else "",
-                    "api_key": self.parameters.get("api_key"),
-                    "api_custom_model_provider": "",
-                    "local_provider": self.config.get("llm.provider_type"),
-                    "local_base_url": self.config.get("llm.server"),
-                    "ollama_model": chosen_model if model["provider"] == "local" else "",
+                    "model": self.parameters.get("model"),
                     "prompt": self.parameters[self.parameters["task"]],
                     "structured_output": False,
                     "temperature": self.parameters["temperature"],
@@ -260,7 +234,6 @@ class PromptCompassRunner(ProcessorPreset):
 
         return pipeline
 
-
     @staticmethod
     def validate_query(query, request, config):
         """
@@ -273,19 +246,22 @@ class PromptCompassRunner(ProcessorPreset):
         :param config:
         :return:
         """
-        if not query["model"].startswith("local") and not query.get("api_key"):
+        allowed_models = LLMPrompter.get_model_library(config)
+        if query["model"] not in chain(*[v.keys() for v in allowed_models.values()]):
+            raise QueryParametersException(f"The '{query['model']}' model is not currently available.")
+
+        if query["model"].startswith("thirdparty") and not query.get("api_key"):
             raise QueryParametersException("You need to enter an API key when using third-party models.")
 
         if not query[query.get("task")].strip():
             raise QueryParametersException("The prompt cannot be empty.")
 
-        if not query["model"].startswith("local") and not query.get("frontend-confirm"):
+        if query["model"].startswith("thirdparty") and not query.get("frontend-confirm"):
             raise QueryNeedsExplicitConfirmationException("Your data will be sent to a third-party service for "
                                                           "processing, which will share your data with them and is "
                                                           "likely to incur costs. Do you want to continue?")
 
         return query
-
     @staticmethod
     def map_item(item):
         """

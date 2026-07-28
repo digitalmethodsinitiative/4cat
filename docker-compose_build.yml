@@ -1,3 +1,10 @@
+# Build-from-source 4CAT deployment. Builds the image locally from
+# docker/Dockerfile instead of pulling it from Docker Hub -- use this for a
+# modified or unreleased checkout. Source is baked into the image at build
+# time, so code changes need a rebuild; layer docker-compose_dev.yml on top
+# (-f docker-compose_build.yml -f docker-compose_dev.yml) for live edits.
+# See docker/README.md for all compose variants.
+
 services:
   db:
     container_name: 4cat_db
@@ -66,7 +73,7 @@ services:
       # - 4cat_data:/usr/src/app/data/
       # - 4cat_config:/usr/src/app/config/
       # - 4cat_logs:/usr/src/app/logs/
-    command: ["docker/wait-for-backend.sh"]
+    command: ["sh", "docker/wait-for-backend.sh"]
 
 volumes:
   4cat_db:

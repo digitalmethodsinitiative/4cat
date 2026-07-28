@@ -24,6 +24,8 @@ const processor = {
      * Submit parameters and update result tree with new item if added
      *
      * @param e  Event that triggered queueing
+     * @param extra_data  extra data to send with the queue request
+     * @param run  run processor, without extra checks
      */
     queue: function (e, extra_data=null, run=false) {
         e.preventDefault();
@@ -70,20 +72,20 @@ const processor = {
                     }
 
                     if(['confirm', 'error', 'extra-form'].includes(response.status)) {
-                        if (response['status'] === 'confirm') {
+                        if (response.status === 'confirm') {
                             reset_form = false;
                             popup.confirm(response.message, 'Confirm', function () {
                                 // re-send, but this time for real
                                 processor.queue(e, {'frontend-confirm': true});
                             });
                             return;
-                        } else if (response['status'] === 'error') {
+                        } else if (response.status === 'error') {
                             reset_form = false;
                             if (response.hasOwnProperty("message") && response.message) {
                                 popup.alert(response.message);
                             }
                             return;
-                        } else if (response['status'] === 'extra-form') {
+                        } else if (response.status === 'extra-form') {
                             // new form elements to fill in
                             // some fancy css juggling to make it obvious that these need to be completed
                             reset_form = false;

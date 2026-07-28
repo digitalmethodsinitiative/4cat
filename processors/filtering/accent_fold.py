@@ -6,6 +6,7 @@ import csv
 
 from unidecode import unidecode
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -27,16 +28,8 @@ class AccentFoldingFilter(BasicProcessor):
                    "'á' to 'a', 'ç' to 'c', etc. This creates a new dataset.")
     extension = "csv"  # extension of result file, used internally and in UI
 
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on iterable files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.is_top_dataset() and module.get_extension() in ["csv"]
+    # Allow on top-level CSV datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv"})
 
     def process(self):
         """
@@ -105,7 +98,7 @@ class AccentFoldingFilter(BasicProcessor):
         :param config ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:   Options for this processor
         """
-            
+
         options = {
             "mode": {
                 "help": "What to replace?",

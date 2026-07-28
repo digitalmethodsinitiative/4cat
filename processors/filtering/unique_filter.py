@@ -4,6 +4,7 @@ Filter by unique posts
 import json
 
 from processors.filtering.base_filter import BaseFilter
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -21,15 +22,8 @@ class UniqueFilter(BaseFilter):
     title = "Filter for unique items"  # title displayed in UI
     description = "Only keeps the first encounter of an item. This creates a new dataset."  # description displayed in UI
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on NDJSON and CSV files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
     def filter_items(self):
         """

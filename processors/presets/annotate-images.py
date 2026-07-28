@@ -2,6 +2,7 @@
 Annotate top images
 """
 from backend.lib.preset import ProcessorPreset
+from common.lib.compatibility import Compatibility
 
 from common.lib.helpers import UserInput, convert_to_int
 
@@ -16,6 +17,9 @@ class AnnotateImages(ProcessorPreset):
     description = "Use the Google Vision API to extract labels detected in the most-linked images from the dataset. Note that " \
                   "this is a paid service and will count towards your API credit."
     extension = "csv"
+
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
     references = [
         "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",
@@ -66,17 +70,6 @@ class AnnotateImages(ProcessorPreset):
                 "default": ["LABEL_DETECTION"]
             }
         }
-
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def get_processor_pipeline(self):
         """

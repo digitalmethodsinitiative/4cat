@@ -5,6 +5,7 @@ Generate MAE, MSE, R2, and RMSE scores for numerical values in two columns.
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import numpy as np
@@ -24,6 +25,9 @@ class RegressionEvaluation(BasicProcessor):
     title = "Regression evaluation"  # title displayed in UI
     description = "Calculate regression metrics (MAE, MSE, R2, RMSE) between two numerical columns."
     extension = "csv"  # extension of result file, used internally in UI
+
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -70,25 +74,14 @@ class RegressionEvaluation(BasicProcessor):
 
         return options
 
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.get_extension() in ("csv", "ndjson")
-
     def process(self):
         skip_empty = self.parameters.get("skip_empty", True)
         metrics = self.parameters.get("metrics", ["mae", "mse", "rmse", "r2"])
-        
+
         if not metrics:
             self.dataset.finish_with_error("Please select at least one evaluation metric")
             return
-            
+
         # Get which metrics to calculate
         get_mae = "mae" in metrics
         get_mse = "mse" in metrics
@@ -98,7 +91,7 @@ class RegressionEvaluation(BasicProcessor):
         # Parse the column names
         column_true = self.parameters.get("column_true", "")
         column_pred = self.parameters.get("column_pred", "")
-        
+
         if not column_true or not column_pred:
             self.dataset.finish_with_error("Please specify which columns contain the true and predicted values")
             return
@@ -122,7 +115,7 @@ class RegressionEvaluation(BasicProcessor):
             if skip_empty and (true_val is None or pred_val is None or true_val == "" or pred_val == ""):
                 skipped_rows += 1
                 continue
-                
+
             # Try to convert to float
             try:
                 true_float = float(true_val)
@@ -142,42 +135,42 @@ class RegressionEvaluation(BasicProcessor):
         if not true_values or not pred_values:
             self.dataset.finish_with_error("No valid numerical values found in the specified columns")
             return
-            
+
         if len(true_values) != len(pred_values):
             self.dataset.finish_with_error("Mismatch in number of true and predicted values")
             return
-            
+
         if skipped_rows > 0:
             self.dataset.update_status(f"Skipped {skipped_rows} rows with missing or invalid values")
 
         # Convert to numpy arrays for calculations
         true_array = np.array(true_values)
         pred_array = np.array(pred_values)
-        
+
         # Calculate metrics
         results = []
-        
+
         if get_mae:
             mae = mean_absolute_error(true_array, pred_array)
             results.append({
                 "metric": "MAE",
                 "value": round(mae, 5)
             })
-            
+
         if get_mse:
             mse = mean_squared_error(true_array, pred_array)
             results.append({
                 "metric": "MSE",
                 "value": round(mse, 5)
             })
-            
+
         if get_rmse:
             rmse = np.sqrt(mean_squared_error(true_array, pred_array))
             results.append({
                 "metric": "RMSE",
                 "value": round(rmse, 5)
             })
-            
+
         if get_r2:
             r2 = r2_score(true_array, pred_array)
             results.append({

@@ -136,6 +136,34 @@ class SlackLogHandler(WebHookLogHandler):
 
         super().__init__(*args, **kwargs)
 
+    def _linkify_dataset_keys(self, message):
+        """
+        Wrap 32-char hex IDs with Slack mrkdwn links to the dataset.
+
+        Hex IDs already inside a URL are left alone, since the URL itself
+        is already a usable link.
+
+        :param str message:  Log message
+        :return str:  Message with dataset keys linkified
+        """
+        # this also catches other 32-char hex strings...
+        # but a few false positives are OK as a trade-off for the convenience
+        hex_pattern = re.compile(r"\b([0-9a-fA-F]{32})\b")
+        hex_link = f"<{self._base_4cat_url}\\1/|\\1>"
+
+        parts = []
+        last_end = 0
+        for url_match in re.finditer(r"https?://\S+", message):
+            # Non URL match, sub hex IDs in preceeding text
+            parts.append(hex_pattern.sub(hex_link, message[last_end:url_match.start()]))
+            # URL match, leave it as is
+            parts.append(url_match.group(0))
+            # Update last_end to the end of the URL match
+            last_end = url_match.end()
+        # Add remaining text after the last URL match, subbing hex IDs
+        parts.append(hex_pattern.sub(hex_link, message[last_end:]))
+        return "".join(parts)
+
     def mapLogRecord(self, record):
         """
         Format log message so it is compatible with Slack webhooks
@@ -152,9 +180,7 @@ class SlackLogHandler(WebHookLogHandler):
             emoji = ":information_source:"
             color = "#3CC619"  # green
 
-        # this also catches other 32-char hex strings...
-        # but a few false positives are OK as a trade-off for the convenience
-        error_message = re.sub(r"\b([0-9a-fA-F]{32})\b", f"<{self._base_4cat_url}\\1/|\\1>", record.message)
+        error_message = self._linkify_dataset_keys(record.message)
 
         # simple stack trace
         if record.stack:

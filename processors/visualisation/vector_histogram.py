@@ -12,6 +12,7 @@ from svgwrite.text import Text
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, pad_interval, get_4cat_canvas
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -27,6 +28,9 @@ class SVGHistogramRenderer(BasicProcessor):
 	title = "Histogram"  # title displayed in UI
 	description = "Generates a histogram from time frequencies."  # description displayed in UI
 	extension = "svg"
+
+	# rankable datasets with a single value per item (multiple_items=False)
+	compatibility = Compatibility(rankable=True, rankable_multiple_items=False)
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -48,16 +52,6 @@ class SVGHistogramRenderer(BasicProcessor):
 			}
 		}
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on rankable items
-
-		:param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.is_rankable(multiple_items=False)
-		
 	def process(self):
 		"""
 		Render an SVG histogram/bar chart using a previous frequency analysis

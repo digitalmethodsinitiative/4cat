@@ -330,6 +330,48 @@ article.small .form-element select[multiple] {
     top: -0.4em;
 }
 
+.form-multi-option-wrapper, .form-multi-option-header {
+    margin: 0 1em;
+}
+
+.form-multi-option-wrapper {
+    margin: 1em;
+}
+
+.form-multi-option-header {
+
+}
+
+.form-multi-option-wrapper li {
+    border-left: 2px solid var(--accent);
+    margin-bottom: 4px;
+    position: relative;
+    margin-left: 20px;
+}
+
+.form-multi-option-wrapper .action-button:not(.hidden) {
+    position: absolute;
+    top: 0.5em;
+    left: 0.5em;
+    padding: 0 0.4em;
+}
+
+.form-multi-option-wrapper .action-button.delete-button {
+    left: 2.5em;
+}
+
+.form-multi-option-wrapper li::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -17px;
+    border-left: 2px solid var(--contrast-dark);
+    border-bottom: 2px solid var(--contrast-dark);
+    width: 15px;
+    height: 15px;
+
+}
+
 .data-overview-link {
     display: block;
     font-size: 13px;
@@ -441,6 +483,7 @@ h2 .inline-search input, h3 .inline-search input {
     overflow: hidden;
     box-sizing: border-box;
     border-width: 0;
+    padding: 0;
 }
 .ellipsis {
     font-weight: bold;

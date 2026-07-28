@@ -5,6 +5,7 @@ from dateutil.relativedelta import relativedelta
 from functools import partial
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 import networkx as nx
@@ -26,6 +27,9 @@ class ColumnNetworker(BasicProcessor):
     description = "Create a GEXF network file comprised of linked values between a custom set of columns " \
                   "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
     extension = "gexf"
+
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     references = [
         "Utilises [Networkx](https://networkx.org/)' built-in [Louvain](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html#networkx.algorithms.community.louvain.louvain_communities) and [greedy modularity](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.modularity_max.greedy_modularity_communities.html#networkx.algorithms.community.modularity_max.greedy_modularity_communities) community detection algorithms."
@@ -139,16 +143,6 @@ class ColumnNetworker(BasicProcessor):
 
         return options
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.get_extension() in ("csv", "ndjson")
-
     def process(self):
         """
         This takes a 4CAT results file as input, and creates a network file
@@ -226,7 +220,7 @@ class ColumnNetworker(BasicProcessor):
                     raise ValueError(f"Date '{item.get('timestamp')}' cannot be parsed")
             except ValueError as e:
                 return self.dataset.finish_with_error(f"{e}, cannot count posts per {interval_type}")
-            
+
             # Track nodes per item (categoise option adjusts node name to include column if True)
             processed_nodes = set()
 
@@ -256,13 +250,13 @@ class ColumnNetworker(BasicProcessor):
                         network.nodes[node_a]["intervals"][interval] += 1
 
                         processed_nodes.add(node_a)
-                    
+
                     if node_b not in processed_nodes:
                         if node_b not in network.nodes():
                             network.add_node(node_b, intervals={}, frequency=1, label=value_b, **({"category": column_b} if categorise else {}))
                         else:
                             network.nodes[node_b]["frequency"] += 1
-                       
+
                         if interval not in network.nodes[node_b]["intervals"]:
                             network.nodes[node_b]["intervals"][interval] = 0
                         network.nodes[node_b]["intervals"][interval] += 1
@@ -275,7 +269,7 @@ class ColumnNetworker(BasicProcessor):
                         edge = tuple(sorted((node_a, node_b)))
                     else:
                         edge = (node_a, node_b)
-                    
+
                     if edge not in processed_edges:
                         if edge not in network.edges():
                             network.add_edge(node_a, node_b, intervals={}, frequency=1, weight=1)

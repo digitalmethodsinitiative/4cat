@@ -1,0 +1,32 @@
+# Dev override: bind-mounts host source into backend/frontend so edits are
+# live without `docker cp` or image rebuilds.
+#
+# This is an override, never a standalone stack -- it only declares extra
+# `volumes`. Layer it on top of a base file with a second -f. It works with
+# either base:
+#   docker compose -f docker-compose_build.yml -f docker-compose_dev.yml up -d
+#   docker compose -f docker-compose.yml       -f docker-compose_dev.yml up -d
+# The first builds the image from local source; the second uses the released
+# Docker Hub image. Either way, this file makes the running source live.
+#
+# How the volume merge works: Compose concatenates the `volumes` lists from
+# both files. The `.:/usr/src/app` mount declared here is the broad source
+# mount; the base file's mounts for /usr/src/app/{data,config,logs} (named
+# volumes or host dirs, depending on the base) are more specific paths and
+# still win on those subtrees, so data/config/logs keep their own storage
+# instead of being shadowed by the broad source mount.
+#
+# The anonymous volume on `/usr/src/app/fourcat.egg-info` preserves the
+# container's `pip install -e .` metadata so the source mount doesn't shadow
+# it with an empty (or stale) host directory.
+
+services:
+  backend:
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/fourcat.egg-info
+
+  frontend:
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/fourcat.egg-info

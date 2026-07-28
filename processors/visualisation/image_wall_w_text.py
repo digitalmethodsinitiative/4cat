@@ -17,6 +17,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
@@ -34,9 +35,13 @@ class ImageTextWallGenerator(BasicProcessor):
     description = "Combine images into a single image including text"  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
-    image_datasets = ["image-downloader", "video-hasher-1"]
-    caption_datasets = ["image-captions", "text-from-images"]
+    image_datasets = ["image-downloader", "video-hasher-1", "media-import-search"]
+    caption_datasets = ["image-captions", "text-from-images", "llm-prompter"]
     combined_dataset = ["image-downloader-stable-diffusion"]
+
+    # coarse map spec; is_compatible_with (below) is the runtime truth -- it walks the
+    # genealogy (identity_dataset_types) to confirm both an image and a text/caption dataset
+    compatibility = Compatibility(types=set(combined_dataset), type_prefixes=set(caption_datasets))
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -98,11 +103,17 @@ class ImageTextWallGenerator(BasicProcessor):
         """
         Identify dataset types that are compatible with this processor
         """
-        # TODO: use `media_type` method to identify image datasets after merge
-        # TODO: do we have additional text datasets we would like to support?
+        # Datasets that have both images and captions
+        # TODO: after metadata merge: text from metadata
         if source_dataset.type in ImageTextWallGenerator.combined_dataset:
             # This dataset has both images and captions
             return source_dataset, source_dataset
+
+        # Datasets that have separate images and captions
+        if source_dataset is None or source_dataset.get_parent() is None:
+            return None, None
+        
+        # TODO: add additional caption datasets, allow column selection for text dataset (need filename column + text column)
         elif any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in
                   ImageTextWallGenerator.caption_datasets]):
             text_dataset = source_dataset
@@ -157,6 +168,15 @@ class ImageTextWallGenerator(BasicProcessor):
                 image_text = (item.get("extra") or {}).get("prompt", "")
                 max_text_len = max(max_text_len, len(image_text))
                 filename_to_text_mapping[filename] = image_text
+        elif text_dataset.type == "llm-prompter":
+            # llm-prompter store filename as "id" and text as "output"
+            for item in text_dataset.iterate_items(self):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while collecting text")
+                if "id" in item:
+                    image_text = item.get("output", "")
+                    max_text_len = max(max_text_len, len(image_text))
+                    filename_to_text_mapping[item["id"]] = image_text
         else:
             # For datasets with separate images and text
             for item in text_dataset.iterate_items(self):
@@ -188,7 +208,7 @@ class ImageTextWallGenerator(BasicProcessor):
         load_errors = []
         self.dataset.update_status("Creating Image wall")
         self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
-        for image in image_dataset.iterate_items(self):
+        for image in image_dataset.iterate_items(self, immediately_delete=False):
             if image.file.name in [".metadata.json"]:
                 if convert_to_int(self.parameters.get("amount"), 100) == 0:
                     max_images = max_images - 1

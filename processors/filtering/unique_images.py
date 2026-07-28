@@ -6,6 +6,7 @@ import shutil
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.helpers import UserInput, hash_file
+from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -22,6 +23,9 @@ class UniqueImageFilter(BasicProcessor):
     title = "Filter for unique images"  # title displayed in UI
     description = "Only keeps one instance per image using various detection methods."  # description displayed in UI
     extension = "zip"
+
+    # image datasets: image archives, image-downloader output, or extracted video frames
+    compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"})
 
     references = [
         "[Imagehash library](https://github.com/JohannesBuchner/imagehash?tab=readme-ov-file)",
@@ -56,16 +60,6 @@ class UniqueImageFilter(BasicProcessor):
                 }
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on image archives
-
-        :param module: Module to determine compatibility with
-        """
-        return module.get_media_type() == "image" or module.type.startswith(
-            "image-downloader") or module.type == "video-frames"
 
     def process(self):
         """

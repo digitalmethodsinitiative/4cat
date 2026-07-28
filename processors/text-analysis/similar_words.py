@@ -7,6 +7,7 @@ from gensim.models import KeyedVectors
 
 from common.lib.helpers import UserInput, convert_to_int, convert_to_float
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
@@ -25,7 +26,8 @@ class SimilarWord2VecWords(BasicProcessor):
 	description = "Uses a word2vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = ["wordcloud"]
+	# Allow processor on word embedding models
+	compatibility = Compatibility(types={"generate-embeddings"}, preferred_followups=["wordcloud"])
 
 	flawless = True
 
@@ -66,16 +68,6 @@ class SimilarWord2VecWords(BasicProcessor):
 				"help": "The crawl depth. 1 only gets the neighbours of the input word(s), 2 also their neighbours, etc."
 			}
 		}
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on word embedding models
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.type == "generate-embeddings"
 
 	def process(self):
 		"""

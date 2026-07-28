@@ -11,6 +11,11 @@ export const query = {
     poll_interval: null,
     query_key: null,
 
+    // State for check_processor_queue's gate (see that function for the
+    // purpose of these). Initialized so the first poll on page load fires.
+    last_queue_empty: false,
+    last_processor_poll: 0,
+
     /**
      * Set up query status checkers and event listeners
      */
@@ -35,9 +40,9 @@ export const query = {
         setInterval(query.check_resultpage, 1000);
 
         // Start querying when go button is clicked
-        $('#query-form').on('submit', function (e) {
+        $('#query-form').on('submit', async function (e) {
             e.preventDefault();
-            query.start();
+            await query.start();
         });
 
         // Data source select boxes trigger an update of the boards available for the chosen data source
@@ -153,7 +158,7 @@ export const query = {
         let datasource = form.attr('class');
         form.find('.cacheable input').each(function () {
             let item_name = datasource + '.' + $(this).attr('name');
-            let s = localStorage.setItem(item_name, $(this).val());
+            localStorage.setItem(item_name, $(this).val());
         });
 
         // Disable form
@@ -173,26 +178,26 @@ export const query = {
                 return response.json();
             })
             .then(function (response) {
-                if (response['status'] === 'error') {
+                if (response.status === 'error') {
                     query.reset_form();
-                    popup.alert(response['message'], 'Error');
-                } else if (response['status'] === 'confirm') {
+                    popup.alert(response.message, 'Error');
+                } else if (response.status === 'confirm') {
                     query.enable_form();
-                    popup.confirm(response['message'], 'Confirm', function () {
+                    popup.confirm(response.message, 'Confirm', function () {
                         // re-send, but this time for real
                         query.start({'frontend-confirm': true}, true);
                     });
-                } else if (response['status'] === 'validated') {
+                } else if (response.status === 'validated') {
                     // parameters OK, start for real
-                    query.start({'frontend-confirm': true, ...response['keep']}, true);
-                } else if (response['status'] === 'extra-form') {
+                    query.start({'frontend-confirm': true, ...response.keep}, true);
+                } else if (response.status === 'extra-form') {
                     // new form elements to fill in
                     // some fancy css juggling to make it obvious that these need to be completed
                     query.enable_form();
                     $('#query-status .message').html('Enter dataset parameters to continue.');
                     let target_top = $('#datasource-form')[0].offsetTop + $('#datasource-form')[0].offsetHeight - 50;
 
-                    let extra_elements = $(response['html']);
+                    let extra_elements = $(response.html);
                     extra_elements.addClass('datasource-extra-input').css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').appendTo('#datasource-form');
                     let targetHeight = extra_elements.height();
                     extra_elements.css('position', '').css('display', '').css('visibility', '').css('height', 0);
@@ -204,7 +209,7 @@ export const query = {
                     });
                 } else {
                     $('#query-status .message').html('Query submitted, waiting for results');
-                    query.query_key = response['key'];
+                    query.query_key = response.key;
                     query.check(query.query_key);
 
                     $('#query-status').append($('<button class="delete-link" data-dataset-key="' + query.query_key + '">Cancel</button>'));
@@ -414,14 +419,14 @@ export const query = {
                 let search_queue_notice = "";
 
                 for (let i = 0; i < json.length; i += 1) {
-                    search_queue_length += json[i]['count'];
-                    search_queue_notice += " <span class='property-badge'>" + json[i]['processor_name'] + ' (' + json[i]['count'] + ')' + '</span>';
+                    search_queue_length += json[i].count;
+                    search_queue_notice += " <span class='property-badge'>" + json[i].processor_name + ' (' + json[i].count + ')' + '</span>';
                 }
 
-                if (search_queue_length == 0) {
+                if (search_queue_length === 0) {
                     search_queue_box.html('Search queue is empty.');
                     search_queue_list.html('');
-                } else if (search_queue_length == 1) {
+                } else if (search_queue_length === 1) {
                     search_queue_box.html('Currently collecting 1 dataset: ');
                     search_queue_list.html(search_queue_notice);
                 } else {
@@ -437,40 +442,61 @@ export const query = {
 
     check_processor_queue: function () {
         /*
-        Checks what processors are in the queue and keeps updating the option/run buttons
-        and already-queued processes buttons.
+        Polls the backend job queue and paints "X in queue" notices in two places:
+        - inside Run/Options buttons on processor-details cards (pre-flight: how
+          deep the global queue is for that processor type before the user clicks)
+        - inside already-queued result indicators in the Analysis results section
+          (position info for processors this dataset has queued but not started)
         */
         if (!document.hasFocus()) {
-            //don't hammer the server while user is looking at something else
+            // Don't hammer the server while the user is looking at another tab.
             return;
         }
+
+        // a locally-queued analysis is on the page. 
+        let has_local_queued = $('.processor-result-indicator.queued-button').length > 0;
+
+        // the backend was active as of our last check. (jobs running, update indicators)
+        let backend_was_active = !query.last_queue_empty;
+
+        // heartbeat 60s backstop. (did anyone else queue anything)
+        let heartbeat_due = (Date.now() - query.last_processor_poll) >= 60000;
+
+        if (!has_local_queued && !backend_was_active && !heartbeat_due) {
+            return;
+        }
+
+        query.last_processor_poll = Date.now();
 
         $.getJSON({
             url: getRelativeURL('api/status.json'),
             success: function (json) {
 
+                const queued_processes = json.items.backend.queued;
+
+                // Remember whether the backend queue is empty so future ticks
+                // can downshift to heartbeat-only polling
+                query.last_queue_empty = !queued_processes.total;
+
                 // Remove previous notices
                 $(".queue-notice").html("");
-
-                const queued_processes = json["items"]["backend"]["queued"];
 
                 // Loop through all running processors
                 for (const queued_process in queued_processes) {
 
                     // The message to display
-                    let notice = json["items"]["backend"]["queued"][queued_process] + " in queue";
+                    let notice = json.items.backend.queued[queued_process] + " in queue";
 
                     // Add notice if this processor has a run/options button
                     let processor_run = $('.processor-queue-button.' + queued_process + '-button');
                     if ($(processor_run).length > 0) {
-                        $('.processor-queue-button.' + queued_process + '-button > .queue-notice').html(notice);
+                        $(`.processor-queue-button.${queued_process}-button > .queue-notice`).html(notice);
                     }
 
                     // Add another notice to "analysis results" section if processor is pending
-                    let processor_started = $('.processor-result-indicator.' + queued_process + '-button');
+                    let processor_started = $(`.processor-result-indicator.${queued_process}-button`);
                     if ($(processor_started).length > 0) {
-
-                        $('.processor-result-indicator.' + queued_process + '-button.queued-button > .button-object > .queue-notice').html(notice);
+                        $(`.processor-result-indicator.${queued_process}-button.queued-button > .button-object > .queue-notice`).html(notice);
                     }
                 }
             },
@@ -694,7 +720,7 @@ export const query = {
 
         handle: function (e) {
             let button = $(this).parents('div').find('button');
-            if (e.type == 'keydown' && e.keyCode != 13) {
+            if (e.type === 'keydown' && e.keyCode !== 13) {
                 return;
             }
 
@@ -790,10 +816,10 @@ export const query = {
                 })
                     .then((response) => response.json())
                     .then((data) => {
-                        if(!data['html']) {
-                            popup.alert('There was an error adding the owner to the dataset. ' + data['error']);
+                        if(!data.html) {
+                            popup.alert('There was an error adding the owner to the dataset. ' + data.error);
                         } else {
-                            document.querySelector('.dataset-owner-list ul').insertAdjacentHTML('beforeend', data['html']);
+                            document.querySelector('.dataset-owner-list ul').insertAdjacentHTML('beforeend', data.html);
                         }
                     })
                     .catch((error) => {
@@ -824,8 +850,8 @@ export const query = {
                 .then((response) => response.json())
                 .then(data => {
                     console.log(data);
-                    if (data['error']) {
-                        popup.alert('There was an error removing the owner from the dataset. ' + data['error']);
+                    if (data.error) {
+                        popup.alert('There was an error removing the owner from the dataset. ' + data.error);
                     } else {
                         document.querySelector('[data-owner="' + owner + '"]').remove();
                     }

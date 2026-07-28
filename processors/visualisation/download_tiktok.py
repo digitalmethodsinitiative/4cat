@@ -15,6 +15,7 @@ from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
 from processors.visualisation.download_images import ImageDownloader
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 
 __author__ = "Dale Wahl"
@@ -30,7 +31,8 @@ class TikTokImageDownloader(BasicProcessor):
     extension = "zip"
     media_type = "image"
 
-    followups = ImageDownloader.followups
+    # Allow processor on TikTok datasets
+    compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"}, preferred_followups=ImageDownloader.followups)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -80,16 +82,6 @@ class TikTokImageDownloader(BasicProcessor):
             options["amount"]["min"] = 1
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor TikTok datasets
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager config:  Configuration reader (context-aware)
-        """
-        return module.type in ["tiktok-search", "tiktok-urls-search"]
 
     def process(self):
         """

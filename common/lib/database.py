@@ -258,22 +258,25 @@ class Database:
 		cursor.close()
 		return result
 
-	def upsert(self, table, data, commit=True, constraints=None):
+	def upsert(self, table, data, constraints, commit=True):
 		"""
 		Create or update database record
 
 		If the record could not be inserted because of a constraint, the
 		constraining record is updated instead.
 
+		`constraints` is required: an `ON CONFLICT ... DO UPDATE` statement is
+		only valid SQL when it specifies an inference target, so there is no
+		meaningful upsert without it. Use `insert()` if you do not need conflict
+		handling.
+
 		:param string table:  Table to upsert record into
 		:param dict data:   Data to upsert
+		:param tuple constraints: The columns that should be used as the conflict
+								  target, e.g. ON CONFLICT (name, lastname) DO UPDATE
 		:param bool commit: Whether to commit after executing the query
-		:param tuple constraints: This tuple may contain the columns that should be used as a
-								  constraint, e.g. ON CONFLICT (name, lastname) DO UPDATE
 		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
 		"""
-		if constraints is None:
-			constraints = []
 
 		# escape identifiers
 		identifiers = [sql.Identifier(column) for column in data.keys()]

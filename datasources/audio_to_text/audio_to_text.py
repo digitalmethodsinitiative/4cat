@@ -16,9 +16,8 @@ class AudioUploadToText(SearchMedia):
     title = "Convert speech to text"  # title displayed in UI
     description = "Upload your own audio and use OpenAI's Whisper or GPT models to create transcripts"  # description displayed in UI
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        return AudioToText.is_compatible_with(module=module, config=config)
+    # reuse the AudioToText processor's compatibility -- this datasource runs it on uploaded audio
+    compatibility = AudioToText.compatibility
 
     @classmethod
     def get_options(cls, *args, **kwargs):

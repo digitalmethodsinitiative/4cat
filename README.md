@@ -73,6 +73,11 @@ You can install 4CAT locally or on a server via Docker or manually. For easiest 
 docker-compose up -d
 ```
 
+If you are developing 4CAT or running it from a source checkout rather than a
+release, see [`docker/README.md`](docker/README.md) for the
+`docker-compose_build.yml` (build the image locally) and `docker-compose_dev.yml`
+(live-reload source edits) variants.
+
 In depth instructions on both Docker installation and manual installation can be found [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT). A video walkthrough installing 4CAT via Docker can be found on [YouTube here](https://youtu.be/oWsB7bvNfOY).
 

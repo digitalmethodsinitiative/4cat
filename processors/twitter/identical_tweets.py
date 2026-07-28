@@ -3,6 +3,7 @@ Twitter APIv2 hashtag statistics
 """
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -19,6 +20,9 @@ class TwitterIdenticalTweets(TwitterStatsBase):
     title = "Identical tweet frequency"  # title displayed in UI
     description = "Groups tweets by text and counts the number of times they have been (re)tweeted indentically."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
+    compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})
 
     sorted = 'Number of Identical Tweets'
 
@@ -42,16 +46,6 @@ class TwitterIdenticalTweets(TwitterStatsBase):
                 "help": "Produce counts per"
             },
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
     def map_data(self, post):
         """

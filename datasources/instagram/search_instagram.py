@@ -36,6 +36,17 @@ class SearchInstagram(Search):
     MEDIA_TYPE_VIDEO = 2
     MEDIA_TYPE_CAROUSEL = 8
 
+    HASHTAG_REGEX = re.compile(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)")
+
+    @staticmethod
+    def extract_hashtags(caption):
+        """
+        Extract comma-joined hashtags from a caption, tolerating MissingMappedField.
+        """
+        if isinstance(caption, MissingMappedField):
+            return ""
+        return ",".join(SearchInstagram.HASHTAG_REGEX.findall(caption))
+
     def get_items(self, query):
         """
         Run custom search
@@ -133,7 +144,7 @@ class SearchInstagram(Search):
             "body": caption,
 
             # Authors
-            "author_id": user.get("id", owner.get("id", MissingMappedField(""))), # This should always be present
+            "author_id": user.get("id", owner.get("id", MissingMappedField(""))), # This should always be present; and yet I have seen old datasets where it is not
             "author": user.get("username", owner.get("username", MissingMappedField(""))),
             # full_name not seen in this format
             "author_fullname": user.get("full_name", owner.get("full_name", MissingMappedField(""))),
@@ -152,7 +163,7 @@ class SearchInstagram(Search):
             "media_urls": media_urls,
 
             # Engagement
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)) if type(caption) is not MissingMappedField else "",
+            "hashtags": SearchInstagram.extract_hashtags(caption),
             "usertags": MissingMappedField(""), # Not available in this format
             "play_count": node.get("play_count", MissingMappedField(0)),
             
@@ -230,7 +241,7 @@ class SearchInstagram(Search):
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
-        user = node.get("user")
+        user = node.get("user") or {}
         owner = node.get("owner")
         if node.get("user") and node.get("owner"):
             if owner.get("id") == user.get("id"):
@@ -277,7 +288,7 @@ class SearchInstagram(Search):
             "media_urls": media_url,
 
             # Engagement
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", caption)),
+            "hashtags": SearchInstagram.extract_hashtags(caption),
             # Unsure if usertags will work; need data (this could raise it to attention...)
             "usertags": ",".join(
                 [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
@@ -397,9 +408,10 @@ class SearchInstagram(Search):
             for coauthor_node in node["coauthor_producers"]:
                 coauthors.append(coauthor_node.get("username", MissingMappedField("")))
                 coauthor_fullnames.append(coauthor_node.get("full_name", MissingMappedField("")))
-                coauthor_ids.append(coauthor_node.get("id"))
+                coauthor_ids.append(coauthor_node.get("id", MissingMappedField("")))
         coauthors = ",".join([str(value) for value in coauthors])
         coauthor_fullnames = ",".join([str(value) for value in coauthor_fullnames])
+        coauthor_ids = ",".join([str(value) for value in coauthor_ids])
 
         no_likes = bool(node.get("like_and_view_counts_disabled"))
 
@@ -447,7 +459,7 @@ class SearchInstagram(Search):
             "author_avatar_url": user.get("profile_pic_url", owner.get("profile_pic_url", MissingMappedField(""))),
             "coauthors": coauthors,
             "coauthor_fullnames": coauthor_fullnames,
-            "coauthor_ids": ",".join(coauthor_ids),
+            "coauthor_ids": coauthor_ids,
 
             # Media
             "media_type": media_type,
@@ -456,7 +468,7 @@ class SearchInstagram(Search):
             "media_urls": ",".join(media_urls),
 
             # Engagement
-            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~'‘’]+)", caption)) if type(caption) is not MissingMappedField else "",
+            "hashtags": SearchInstagram.extract_hashtags(caption),
             "usertags": usertags,
             "play_count": play_count,
             "likes_hidden": "yes" if no_likes else "no",

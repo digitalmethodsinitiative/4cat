@@ -6,6 +6,7 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, pad_interval, get_4cat_canvas
+from common.lib.compatibility import Compatibility
 
 from calendar import month_abbr
 from math import sin, cos, tan, degrees, radians, copysign
@@ -34,6 +35,9 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	title = "Side-by-side area graphs"  # title displayed in UI
 	description = "Generate area graphs showing prevalence per item over time. These are visualised side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
+
+	# rankable datasets with a single value per item (multiple_items=False)
+	compatibility = Compatibility(rankable=True, rankable_multiple_items=False)
 
 	# a palette generated with https://medialab.github.io/iwanthue/
 	colours = ["#eb010a", "#495dff", "#f35f00", "#5137e0", "#ffeb45", "#d05edf",
@@ -85,18 +89,6 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			}
 		}
 
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor on rankable items
-
-		:param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		if module.is_dataset():
-			return module.is_rankable(multiple_items=False)
-		return False
-		
 	def process(self):
 		graphs = {}
 		intervals = []

@@ -4,6 +4,7 @@ Find similar words
 from nltk.stem.snowball import SnowballStemmer
 
 from backend.lib.preset import ProcessorPreset
+from common.lib.compatibility import Compatibility
 
 from common.lib.helpers import UserInput
 
@@ -18,6 +19,9 @@ class SimilarWords(ProcessorPreset):
 	description = ("Create a word2vec model to find words used in a similar context as the queried word(s). Only works "
 				   "with large datasets (e.g. 100,000+ items).")
 	extension = "csv"
+
+	# Allow on top-level CSV/NDJSON datasets
+	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -49,19 +53,6 @@ class SimilarWords(ProcessorPreset):
 				"help": "Language"
 			}
 		}
-
-	@staticmethod
-	def is_compatible_with(module=None, config=None):
-		"""
-        Determine compatibility
-
-        This preset is compatible with any module that has a "body" column
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
 	def get_processor_pipeline(self):
 		"""

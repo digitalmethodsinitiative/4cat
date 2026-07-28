@@ -13,6 +13,33 @@ https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT#install-4c
 
 Note: if your computer/server is already using some of the same ports that Docker wishes to use, you can modify the `.env` file in the home directory and change the ports that Docker uses. Any modifications to configuration files will require you to rebuild the docker images with `docker-compose up --build`.
 
+## Compose file variants
+
+4CAT ships several `docker-compose` files. Run the one that matches your situation by adding `-f <file>` to the `docker compose` command; the plain command uses `docker-compose.yml`.
+
+| File | What it does | When to use |
+|------|--------------|-------------|
+| `docker-compose.yml` | Pulls the released 4CAT image from Docker Hub. | Normal install. **Start here.** |
+| `docker-compose_build.yml` | Builds the image locally from this source tree instead of pulling it. | You are running a modified or unreleased copy of 4CAT. |
+| `docker-compose_dev.yml` | Override that bind-mounts your working copy into the container so source edits take effect without a rebuild. | Active development. Always combined with one of the files above. |
+| `docker-compose_public_ip.yml` | Like `docker-compose.yml`, but serves 4CAT at the machine's bare IP address. | Deploying to a server that has no domain name. |
+
+```
+# normal install (released image)
+docker compose up -d
+
+# build the image from local source
+docker compose -f docker-compose_build.yml up -d
+
+# build from local source, with live-reloading source edits
+docker compose -f docker-compose_build.yml -f docker-compose_dev.yml up -d
+
+# released image, with live-reloading source edits (no build step)
+docker compose -f docker-compose.yml -f docker-compose_dev.yml up -d
+```
+
+`docker-compose_dev.yml` can never be used on its own — it only adds volume mounts, so it must be layered onto a base file with a second `-f`. It works with either `docker-compose.yml` or `docker-compose_build.yml`: the base file controls where the image comes from, and the dev override controls whether your local source is live-mounted on top of it.
+
 ## Docker Trouble shooting
 
 1. localhost does not load and '4cat_frontend exited with code 3' found in console
@@ -42,3 +69,76 @@ https://github.com/docker/buildx/issues/426
 https://stackoverflow.com/questions/64221861/failed-to-resolve-with-frontend-dockerfile-v0
 
 4. More errors coming soon! (No doubt)
+
+---
+
+## Running a local Ollama instance alongside 4CAT
+
+4CAT can use a local [Ollama](https://ollama.com) server for LLM-powered processors.
+A Docker Compose override file (`docker-compose_ollama.yml`) is included to add
+Ollama as a sidecar service so you do not need to run it separately on the host.
+
+### Quick start
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose_ollama.yml up -d
+```
+
+This starts the standard 4CAT stack plus an `ollama` container that is only
+accessible within the Docker network (and optionally on `localhost:11434` on
+the host via the exposed port).
+
+### Configuring 4CAT to use Ollama
+
+#### Automatic configuration (fresh Docker install with sidecar)
+
+When you start 4CAT for the first time using the Ollama override file, the
+`docker_setup.py` initialisation script automatically detects the `ollama`
+sidecar and sets **LLM Provider Type**, **LLM Server URL**, and **LLM Access**
+for you. You can skip to step 2 below.
+
+#### Manual configuration (or to verify/change settings)
+
+1. Log in as admin and open **Control Panel → Settings → LLM Providers**.
+2. Confirm that a provider with the following settings is present:
+
+   | Setting | Value |
+   |---|---|
+   | LLM Provider Type | `ollama` |
+   | LLM Server URL | `http://ollama:11434` |
+   | LLM Access | enabled |
+
+3. Save settings.
+4. Open **Control Panel → LLMs & Providers** (visible once *LLM Access* is enabled).
+5. Use the **Refresh** button to load available models, then **Pull** a model
+   (e.g. `llama3.2:3b`) to download it from the Ollama library.
+6. Enable the models you want to make available to users.
+
+### GPU support (NVIDIA)
+
+Uncomment the `deploy.resources` block in `docker-compose_ollama.yml` and
+ensure the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+is installed on your host. Then restart the stack with the override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose_ollama.yml up -d
+```
+
+### Persisting models
+
+Models downloaded by Ollama are stored in the `4cat_ollama_data` Docker volume.
+They survive container restarts and re-creations unless you explicitly remove
+the volume (`docker volume rm 4cat_ollama_data`).
+
+### Using an external Ollama server
+
+If you already run Ollama on the host or elsewhere, skip the override file and
+point 4CAT directly at that server:
+
+- **On the same host**: use `http://host.docker.internal:11434` as the LLM Server URL.
+- **Remote server**: use the server's reachable URL and configure any required
+  API key in the *Authentication header* and *Authentication key* settings.
+
+In both cases, configure the LLM settings manually via **Control Panel → Settings**
+(see *Manual configuration* above), using the appropriate server URL instead of
+`http://ollama:11434`.

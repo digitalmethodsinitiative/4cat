@@ -5,6 +5,7 @@ Generate descriptive statistics for numerical columns in the dataset.
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 import numpy as np
 
@@ -23,6 +24,9 @@ class DescriptiveStatistics(BasicProcessor):
     title = "Descriptive statistics"  # title displayed in UI
     description = "Calculate descriptive statistics (mean, median, std dev, etc.) for numerical columns."
     extension = "csv"  # extension of result file, used internally in UI
+
+    # Allow on CSV/NDJSON datasets
+    compatibility = Compatibility(extensions={"csv", "ndjson"})
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -51,21 +55,10 @@ class DescriptiveStatistics(BasicProcessor):
 
         return options
 
-    @staticmethod
-    def is_compatible_with(module=None, config=None):
-        """
-        Determine compatibility
-
-        :param Dataset module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return module.get_extension() in ("csv", "ndjson")
-
     def process(self):
         skip_empty = self.parameters.get("skip_empty", True)
         selected_columns = self.parameters.get("columns", [])
-        
+
         if not selected_columns:
             self.dataset.finish_with_error("Please select at least one column to analyze")
             return
@@ -87,14 +80,14 @@ class DescriptiveStatistics(BasicProcessor):
             # First pass: check if we can process this row
             for col in selected_columns:
                 val = item.get(col, "")
-                
+
                 # Handle empty values
                 if val is None or val == "":
                     if not skip_empty:
                         row_valid = False
                         break
                     continue
-                
+
                 # Try to convert to float
                 try:
                     float_val = float(val)
@@ -108,7 +101,7 @@ class DescriptiveStatistics(BasicProcessor):
                         return
                     row_valid = False
                     break
-            
+
             # Second pass: add valid values to our data structure
             if row_valid and row_values:
                 for col in selected_columns:
@@ -122,15 +115,15 @@ class DescriptiveStatistics(BasicProcessor):
 
         # Calculate statistics for each column
         results = []
-        
+
         for column in selected_columns:
             if not column_data[column]:
                 self.dataset.finish_with_error(f"No valid numerical values found in column '{column}'")
                 return
-                
+
             # Convert to numpy array for calculations
             values = np.array(column_data[column])
-            
+
             # Calculate statistics
             stats = {"column": column}
 

@@ -12,6 +12,7 @@ from common.lib.helpers import UserInput
 from processors.visualisation.download_videos import VideoDownloaderPlus
 from backend.lib.processor import BasicProcessor
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
+from common.lib.compatibility import Compatibility
 
 class TikTokVideoDownloader(ProcessorPreset):
     """
@@ -26,7 +27,9 @@ class TikTokVideoDownloader(ProcessorPreset):
     extension = "zip"
     media_type = "video"
 
-    followups = VideoDownloaderPlus.followups
+    # coarse map spec; is_compatible_with (below) is the runtime truth -- it also accepts
+    # tiktok uploads, which depends on the dataset label and can't be declared statically
+    compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"}, preferred_followups=VideoDownloaderPlus.followups)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -103,12 +106,37 @@ class TikTokVideoDownloader(ProcessorPreset):
                     "columns": ["video_url"],
                     "split-comma": False,
                     "also_indirect": "all", # enabled YT-DLP
-                    "_ytdlp_fallback_column": "tiktok_url" # YT-DLP uses TikTok post URL
+                    "_ytdlp_fallback_column": "tiktok_url", # YT-DLP uses TikTok post URL
+                    # The helper dataset above copies each item's own id through,
+                    # so the archive's metadata can credit the dataset this preset
+                    # was run on rather than the helper. Only when the id column is
+                    # the items' own `id`: with any other column the recorded post
+                    # IDs would not match that dataset's items, and the helper -
+                    # whose `id` column does hold them - stays the right answer.
+                    **({"_from_dataset": self.source_dataset.key} if column == "id" else {}),
                 }
             },
         ]
 
         return pipeline
+
+    @classmethod
+    def map_metadata(cls, filename, item):
+        """
+        Yield CSV row(s) for a successful metadata entry
+
+        The archive this preset produces is written by the video downloader in
+        its pipeline and copied to this dataset, so the metadata file inside it
+        has the video downloader's format and is read the same way.
+        """
+        yield from VideoDownloaderPlus.map_metadata(filename, item)
+
+    @classmethod
+    def map_failure_metadata(cls, failure):
+        """
+        Yield CSV row(s) for a failed download, in the video downloader's format
+        """
+        yield from VideoDownloaderPlus.map_failure_metadata(failure)
 
 
 class TikTokVideoMetadata(BasicProcessor):
@@ -125,13 +153,9 @@ class TikTokVideoMetadata(BasicProcessor):
 
     consecutive_failures = None
 
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Do not show anywhere
-        """
-        return False
-    
+    # internal helper dataset; never offered as a processor
+    compatibility = Compatibility(types=set())
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
         """

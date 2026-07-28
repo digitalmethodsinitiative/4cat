@@ -17,6 +17,7 @@ from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = ["Stijn Peeters", "Sal Hagen"]
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
@@ -36,7 +37,7 @@ class Tokenise(BasicProcessor):
                   "tokens per sentence."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    followups = ["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller", ]
+    compatibility = Compatibility(extensions={"csv", "ndjson"}, preferred_followups=["collocations", "vectorise-tokens", "generate-embeddings", "tfidf", "topic-modeller", ])
 
     references = [
         "[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
@@ -46,17 +47,6 @@ class Tokenise(BasicProcessor):
         "[Words in cracklib word list](https://github.com/cracklib/cracklib/tree/master/words)",
         "[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)"
     ]
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Dataset or processor to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-
-        return module.get_extension() in ("csv", "ndjson")
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -425,6 +415,7 @@ class Tokenise(BasicProcessor):
 
             if processed % 500 == 0:
                 self.dataset.update_progress(processed / self.source_dataset.num_rows)
+                self.dataset.update_status(f"Processing items ({processed:,} of {self.source_dataset.num_rows:,}; in set '{document_descriptor}')")
             processed += 1
 
             # tokenise...
@@ -470,7 +461,6 @@ class Tokenise(BasicProcessor):
                     output_path = str(output_file)
 
                     if current_output_path != output_path:
-                        self.dataset.update_status("Processing items (%s)" % document_descriptor)
                         if output_file_handle:
                             output_file_handle.close()
                         output_file_handle = output_file.open("a")

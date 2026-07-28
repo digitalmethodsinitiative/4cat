@@ -5,6 +5,7 @@ import datetime
 import time
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -30,17 +31,8 @@ class DebateMetrics(BasicProcessor):
 	description = "Returns a csv with meta-metrics per thread."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	followups = []
-
-	@classmethod
-	def is_compatible_with(cls, module=None, config=None):
-		"""
-		Allow processor if dataset is a 'top level' dataset
-
-		:param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-		"""
-		return module.parameters.get("datasource") in ("fourchan", "eightchan", "eightkun")
+	# chan datasets (thread-level debate metrics)
+	compatibility = Compatibility(datasources={"fourchan", "eightchan", "eightkun"})
 
 	def process(self):
 		"""
@@ -78,7 +70,7 @@ class DebateMetrics(BasicProcessor):
 			"subject": threads[thread_id]["subject"],
 			"num_posts": threads[thread_id]["count"],
 			"num_images": threads[thread_id]["images"],
-			"op_replies": threads[thread_id]["op_length"]
+			"op_length": threads[thread_id]["op_length"]
 		} for thread_id in threads]
 
 		if not results:

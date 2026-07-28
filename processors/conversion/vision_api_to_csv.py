@@ -4,6 +4,7 @@ Convert Google Vision API annotations to CSV
 import csv
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -29,6 +30,9 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                    "to the original dataset.")  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    # Allow processor on Google Vision API output
+    compatibility = Compatibility(types={"google-vision-api"})
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -48,16 +52,6 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                 "tooltip": "Every feature will receive its own annotation"
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine if processor is compatible with dataset
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type == "google-vision-api"
 
     def process(self):
         """

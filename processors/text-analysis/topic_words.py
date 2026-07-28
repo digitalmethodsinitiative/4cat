@@ -4,6 +4,7 @@ Extracts topics per model and top associated words
 
 from common.lib.helpers import UserInput
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
 
 import pickle
@@ -24,7 +25,8 @@ class TopicModelWordExtractor(BasicProcessor):
     description = "Creates a CSV file with the top tokens (words) per topic in the generated topic model, and their associated weights."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    followups = ["wordcloud"]
+    # Allow processor on topic models
+    compatibility = Compatibility(types={"topic-modeller"}, preferred_followups=["wordcloud"])
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -47,16 +49,6 @@ class TopicModelWordExtractor(BasicProcessor):
                 "tooltip": "This many of the most relevant tokens will be retained per topic"
             }
         }
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on topic models
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.type == "topic-modeller"
 
     def process(self):
         """

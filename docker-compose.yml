@@ -1,3 +1,9 @@
+# Standard 4CAT deployment. Runs the released image pulled from Docker Hub
+# (digitalmethodsinitiative/4cat). This is the recommended way to install
+# 4CAT. For building the image locally, live-reloading source edits, or
+# hosting at a bare IP, see the other docker-compose_*.yml files and
+# docker/README.md.
+
 services:
   db:
     container_name: 4cat_db
@@ -59,7 +65,7 @@ services:
       - 4cat_data:/usr/src/app/data/
       - 4cat_config:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
-    command: ["docker/wait-for-backend.sh"]
+    command: ["sh", "docker/wait-for-backend.sh"]
 
 volumes:
   4cat_db:

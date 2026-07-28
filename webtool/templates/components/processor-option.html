@@ -1,4 +1,4 @@
-{% if not option_override %}{% set option_settings = processor.get_options(dataset, __config)[option] %}{% else %}{% set option_settings = option_override[option] %}{% endif %}
+{% if not option_override %}{% set option_settings = processor_options[option] %}{% else %}{% set option_settings = option_override[option] %}{% endif %}
 <div class="processor-option-wrap{% if option_override %} delegated-option{% endif %}"{% if option_settings.requires %}{% if option_settings.requires is string %} data-requires="{{ option_settings.requires|e }}"{% else %} data-requires='{{ option_settings.requires|tojson }}'{% endif %}{% endif %}>
     <label class="option-type-{{ option_settings.type }}">
         {% if option_settings.type in ("toggle", "annotation") %}
@@ -22,7 +22,16 @@
     {% elif option_settings.type == "choice" %}
         <select name="option-{{ option }}">
         {% for choice in option_settings.options %}
-            <option value="{{ choice }}"{% if choice == option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
+            {% if option_settings.options[choice] is mapping %}
+                <optgroup label="{{ choice }}">
+                {% set choice = option_settings.options[choice] %}
+                {% for optgroup_choice in choice %}
+                    <option value="{{ optgroup_choice }}"{% if optgroup_choice == option_settings.default %} selected="selected"{% endif %}>{{ choice[optgroup_choice] }}</option>
+                {% endfor %}
+                </optgroup>
+            {% else %}
+                <option value="{{ choice }}"{% if choice == option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
+            {% endif %}
         {% endfor %}
         </select>
     {% elif option_settings.type in ("multi", "annotations") %}

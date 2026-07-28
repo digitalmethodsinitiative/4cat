@@ -1,0 +1,8 @@
+{
+  "esversion": 11,
+  "undef": true,
+  "globals": {
+    "$": false,
+    "document": false,
+  }
+}

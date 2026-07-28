@@ -6,6 +6,7 @@ async function load() {
         await import("./modules/dataset-page.js"),
         await import("./modules/dynamic-container.js"),
         await import("./modules/multichoice.js"),
+        await import("./modules/multi-form.js"),
         await import("./modules/popup.js"),
         await import("./modules/run-processor.js"),
         await import("./modules/tooltip.js"),

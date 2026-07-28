@@ -5,6 +5,7 @@ import re
 import string
 
 from backend.lib.processor import BasicProcessor
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -22,11 +23,14 @@ class Stringify(BasicProcessor):
 	description = "Merges the data from the body column into a single text file. The result can be used for word clouds, word trees, etc."  # description displayed in UI
 	extension = "txt"  # extension of result file, used internally and in UI
 
+	# Allow on top-level CSV/NDJSON datasets
+	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
+
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
 		"""
 		Get processor options
-		
+
 		:param parent_dataset DataSet:  An object representing the dataset that
 			the processor would be or was run on. Can be used, in conjunction with
 			config, to show some options only to privileged users.
@@ -57,17 +61,6 @@ class Stringify(BasicProcessor):
 			}
 		}
 
-	@staticmethod
-	def is_compatible_with(module=None, config=None):
-		"""
-        Determine compatibility; this processor is only compatible with top datasets in CSV or NDJSON format.
-
-        :param str module:  Module ID to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a plain text file
@@ -86,7 +79,7 @@ class Stringify(BasicProcessor):
 			regex += "0-9"
 		if strip_punctuation:
 			regex += string.punctuation
-		
+
 		delete_regex = re.compile("[\n\t" + regex + "]")
 
 		posts = 0

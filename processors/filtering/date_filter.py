@@ -6,6 +6,7 @@ from dateutil.parser import ParserError
 from datetime import datetime
 
 from processors.filtering.base_filter import BaseFilter
+from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
 from common.lib.exceptions import QueryParametersException
 
@@ -23,6 +24,9 @@ class DateFilter(BaseFilter):
     category = "Filtering"  # category
     title = "Filter by date"  # title displayed in UI
     description = "Retains posts between given dates. This creates a new dataset."
+
+    # Allow on top-level CSV/NDJSON datasets
+    compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
     
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -55,16 +59,6 @@ class DateFilter(BaseFilter):
         }
         
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Allow processor on NDJSON and CSV files
-
-        :param module: Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def filter_items(self):
         """

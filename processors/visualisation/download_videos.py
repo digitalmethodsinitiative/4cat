@@ -18,6 +18,7 @@ from yt_dlp.utils import ExistingVideoReached
 
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
+from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
 from common.lib.media_archive_library import MediaArchiveLibrary
@@ -93,7 +94,12 @@ class VideoDownloaderPlus(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "video"  # media type of the processor
 
+    # Shared list -- other download_* processors reuse this as VideoDownloaderPlus.followups
+    # (and preferred_followups below reuses it), so it stays a named attribute.
     followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
+
+    # any collector's csv/ndjson output (except sources with their own downloaders), plus the tiktok-metadata helper
+    compatibility = Compatibility(is_collector=True, types={"tiktok-video-downloader-metadata"}, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
 
     references = [
         "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
@@ -299,26 +305,6 @@ class VideoDownloaderPlus(BasicProcessor):
             }
 
         return options
-
-    @classmethod
-    def is_compatible_with(cls, module=None, config=None):
-        """
-        Determine compatibility
-
-        Compatible with any top-level dataset. Could run on any type of dataset
-        in principle, but any links to videos are likely to come from the top
-        dataset anyway.
-
-        :param module:  Module to determine compatibility with
-        :param ConfigManager|None config:  Configuration reader (context-aware)
-        :return bool:
-        """
-        return ((module.type.endswith("-search") or 
-                 module.is_from_collector() or 
-                 module.type == "tiktok-video-downloader-metadata")
-                # These have their own video downloaders
-                and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]) \
-                and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
@@ -977,8 +963,13 @@ class VideoDownloaderPlus(BasicProcessor):
     def _save_metadata(self, urls_dict, results_path):
         """Save metadata to .metadata.json in the staging area."""
         self.dataset.update_status("Updating and saving metadata")
+        # A preset may run this downloader on a stand-in dataset it built itself.
+        # Where that stand-in carries the original items' IDs, the preset names
+        # the original dataset here, so the metadata credits the dataset a
+        # researcher would recognise instead of the stand-in.
+        from_dataset = self.parameters.get("_from_dataset") or self.source_dataset.key
         metadata = self.dataset.new_media_metadata(
-            processor_type=self.type, from_dataset=self.source_dataset.key
+            processor_type=self.type, from_dataset=from_dataset
         )
         for url, data in urls_dict.items():
             data = sets_to_lists(data)
