@@ -378,6 +378,37 @@ def test_collect_source_data_skips_unreadable_dataset(tmp_path):
     assert any("no readable columns" in message for message in output.logs)
 
 
+def test_collect_source_items_reports_unmappable_source_items(tmp_path):
+    """
+    A dataset can have more rows than it yields when some items cannot be mapped
+    (e.g. Instagram ads). If that leaves media untraced, the gap is reported so
+    a partial join is not mistaken for missing metadata.
+    """
+    processor, output = make_processor(tmp_path)
+    # 5 rows, but only 3 items come back from iteration: 2 were unmappable
+    dataset = FakeDataset(key="posts", num_rows=5, columns=["id", "body"],
+                          items=[{"id": "p1", "body": "a"}, {"id": "p2", "body": "b"},
+                                 {"id": "p3", "body": "c"}])
+
+    found = processor.collect_source_items(dataset, ["id", "body"], {"p1", "p2", "gone"})
+
+    assert set(found) == {"p1", "p2"}
+    assert any("could not be read" in message and "2 of 5" in message for message in output.logs)
+
+
+def test_collect_source_items_silent_when_all_media_traced(tmp_path):
+    """No report when every item the media refers to was found, even if the
+    dataset also holds unrelated rows that were never reached."""
+    processor, output = make_processor(tmp_path)
+    dataset = FakeDataset(key="posts", num_rows=9, columns=["id", "body"],
+                          items=[{"id": "p1", "body": "a"}, {"id": "p2", "body": "b"}])
+
+    found = processor.collect_source_items(dataset, ["id", "body"], {"p1", "p2"})
+
+    assert set(found) == {"p1", "p2"}
+    assert not any("could not be read" in message for message in output.logs)
+
+
 # -- the whole thing --
 
 def test_process_joins_source_dataset(tmp_path):
@@ -406,7 +437,9 @@ def test_process_joins_source_dataset(tmp_path):
     # 1.jpg twice (once per item), 2.jpg once, 4.jpg once
     assert len(rows) == 4
     assert output.finished == 4
-    assert output.warning is None
+    # 4.jpg did not trace back to an item, so a partial-match warning is raised
+    assert output.warning is not None
+    assert "1 of 3 media file(s) could not be traced" in output.warning
 
     by_file = {}
     for row in rows:
@@ -423,6 +456,46 @@ def test_process_joins_source_dataset(tmp_path):
     # nothing to trace 4.jpg back to, but it is not dropped
     assert by_file["4.jpg"][0]["media_source_matched"] == "False"
     assert by_file["4.jpg"][0]["body"] == ""
+
+
+def test_process_media_without_post_id_renders_empty_not_none(tmp_path):
+    """
+    Media with no traceable item (e.g. an Instagram ad) has a null post id in
+    the archive. It must show as an empty post-id cell and an unmatched row, not
+    the literal text "None".
+    """
+    metadata = make_metadata(items=[
+        ("ad.jpg", [None], "http://example.com/ad.jpg"),
+        ("ok.jpg", ["p1"], "http://example.com/ok.jpg"),
+    ])
+    source = FakeDataset(key="posts", num_rows=1, columns=["id", "body"],
+                         items=[{"id": "p1", "body": "first"}])
+    processor, output = make_processor(tmp_path, metadata, {"join_source": True}, source)
+
+    processor.process()
+
+    _, rows = read_result(output)
+    by_file = {r["media_filename"]: r for r in rows}
+    assert by_file["ad.jpg"]["media_post_ids"] == ""
+    assert by_file["ad.jpg"]["media_source_matched"] == "False"
+    assert by_file["ad.jpg"]["body"] == ""
+    assert by_file["ok.jpg"]["media_source_matched"] == "True"
+
+
+def test_process_no_warning_when_all_media_traced(tmp_path):
+    """When every media file traces back to an item, the dataset finishes cleanly."""
+    metadata = make_metadata(items=[
+        ("1.jpg", ["p1"], "http://example.com/1.jpg"),
+        ("2.jpg", ["p2"], "http://example.com/2.jpg"),
+    ])
+    source = FakeDataset(key="posts", num_rows=2, columns=["id", "body"],
+                         items=[{"id": "p1", "body": "first"}, {"id": "p2", "body": "second"}])
+    processor, output = make_processor(tmp_path, metadata, {"join_source": True}, source)
+
+    processor.process()
+
+    assert output.warning is None
+    assert output.finished == 2
 
 
 def test_process_without_join(tmp_path):
@@ -453,7 +526,7 @@ def test_process_warns_when_nothing_matches(tmp_path):
     assert len(rows) == 1
     assert rows[0]["media_source_matched"] == "False"
     assert output.warning is not None
-    assert "none of them could be traced back" in output.warning
+    assert "None of the 1 media file(s) could be traced back" in output.warning
 
 
 def test_process_errors_without_metadata_file(tmp_path):

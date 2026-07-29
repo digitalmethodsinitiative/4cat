@@ -286,6 +286,37 @@ def test_add_item_normalizes_post_ids():
 	assert m.get_entry("c.jpg")["post_ids"] == ["1", "2", "3"]
 
 
+def test_add_item_drops_null_and_blank_post_ids():
+	"""
+	Media with no traceable item (e.g. Instagram ads) records a null or blank
+	post id. These are dropped, not kept as the text "None" or "", so nothing
+	downstream tries to match on a fabricated id.
+	"""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[None])
+	m.add_item("b.jpg", post_ids=[None, "p1", "  ", "p2"])
+	m.add_item("c.jpg", post_ids=[])
+	assert m.get_entry("a.jpg")["post_ids"] == []
+	assert m.get_entry("b.jpg")["post_ids"] == ["p1", "p2"]
+	assert m.get_entry("c.jpg")["post_ids"] == []
+
+
+def test_legacy_null_post_ids_dropped():
+	"""The old image downloader wrote `post_ids: [null]` for ad media."""
+	legacy = {
+		"https://example.com/ad.jpg": {
+			"filename": "ad.jpg",
+			"success": True,
+			"from_dataset": "src",
+			"post_ids": [None],
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+	# the file is still recorded, it just has no item to trace back to
+	assert m.get_entry("ad.jpg")["post_ids"] == []
+
+
 def test_add_item_duplicate_raises():
 	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.add_item("a.jpg", post_ids=["1"])

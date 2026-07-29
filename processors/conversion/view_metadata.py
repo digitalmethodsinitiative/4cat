@@ -131,8 +131,11 @@ class ViewMetadata(BasicProcessor):
 
 		def add(rows, entry):
 			# a download that produced no file still records the items it was
-			# for, so failures can be traced back to an item as well
-			post_ids = list(dict.fromkeys(str(post_id).strip() for post_id in entry.get("post_ids", [])))
+			# for, so failures can be traced back to an item as well. Post IDs
+			# are already normalised to non-blank strings when the metadata is
+			# read, so media with no traceable item (e.g. Instagram ads) simply
+			# has an empty list here rather than a placeholder id.
+			post_ids = list(dict.fromkeys(entry.get("post_ids", [])))
 			for row in rows:
 				media_rows.append(({self.media_prefix + column: cell for column, cell in row.items()}, post_ids))
 				wanted_ids.update(post_ids)
@@ -238,9 +241,11 @@ class ViewMetadata(BasicProcessor):
 		:return dict:  Item ID to the values of those columns
 		"""
 		found = {}
-		for items_read, item in enumerate(dataset.iterate_items(self)):
+		items_read = 0
+		for item in dataset.iterate_items(self):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while reading source dataset")
+			items_read += 1
 
 			for post_id in self.item_ids(item):
 				if post_id in wanted_ids and post_id not in found:
@@ -250,8 +255,22 @@ class ViewMetadata(BasicProcessor):
 				# every item the media refers to has been found
 				break
 
-			if items_read and items_read % 500 == 0:
+			if items_read % 500 == 0:
 				self.dataset.update_status(f"Looked for media in {items_read:,} of {dataset.num_rows:,} item(s)")
+
+		# When some media could not be traced and the whole dataset was read,
+		# items the datasource could not read back (e.g. Instagram ads, which its
+		# map_item rejects) are the likely reason: they are skipped on read, so
+		# the media pointing at them has nothing to match. Say so, so a partial
+		# join is not mistaken for missing or corrupt metadata.
+		if len(found) < len(wanted_ids):
+			unread = dataset.num_rows - items_read
+			if unread > 0:
+				self.dataset.log(
+					f"{unread:,} of {dataset.num_rows:,} item(s) in '{dataset.get_label()}' could not be read "
+					f"and were skipped (e.g. items a datasource cannot map, such as ads); media "
+					f"downloaded from them cannot be traced back and is left unmatched."
+				)
 
 		return found
 
@@ -294,17 +313,21 @@ class ViewMetadata(BasicProcessor):
 					}))
 					num_rows += 1
 
+		total = len(media_rows)
 		if source_columns:
-			self.dataset.log(f"Traced {matched:,} of {len(media_rows):,} metadata row(s) back to an item")
+			self.dataset.log(f"Traced {matched:,} of {total:,} media file(s) back to an item")
 
 		self.dataset.update_status(f"Read metadata for {num_rows:,} item(s).")
 
-		if source_columns and not matched:
-			self.dataset.finish_with_warning(
-				num_rows,
-				f"Wrote {num_rows:,} metadata row(s), but none of them could be traced back to an item in the "
-				f"dataset the media was downloaded from; its columns are empty."
-			)
+		# When combining with a source dataset, any media that could not be traced
+		# back to an item is worth flagging: the row is still written, but its
+		# source columns are empty. This is a warning rather than an error - the
+		# result is usable - and the front end shows it to the user as such.
+		if source_columns and matched < total:
+			unmatched = total - matched
+			warning = (f"{'None' if unmatched == total else f'{unmatched:,}'} of the {total:,} media file(s) could be traced back to an item in the dataset "
+						   "so the added columns are empty (e.g. ads or other unsupported items).")
+			self.dataset.finish_with_warning(num_rows, warning)
 		else:
 			self.dataset.finish(num_rows)
 
