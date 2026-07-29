@@ -192,6 +192,9 @@ class VideoWallGenerator(BasicProcessor):
             self.dataset.update_status(f"Determined dimensions of {len(media):,} of {self.source_dataset.num_rows:,} file(s)")
             if item.file.suffix.lower() in (".json", ".log"):
                 continue
+            elif item.file == "video_archive":
+                # yt-dlp created file
+                continue
 
             try:
                 dimensions[item.file.name], lengths[item.file.name], sort_values[item.file.name] = \
