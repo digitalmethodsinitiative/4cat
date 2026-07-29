@@ -101,6 +101,66 @@ def test_success_beats_failure():
 	assert hit.metadata is ok
 
 
+# -- tracing a failure back to the run that recorded it --
+
+class FakeDataset:
+	"""A dataset stores the parameters it was created with; that is all that is needed here."""
+
+	def __init__(self, key, parameters=None):
+		self.key = key
+		self.parameters = parameters or {}
+
+
+def _meta_from(dataset):
+	"""
+	Metadata as read from a dataset.
+
+	Uses the plain constructor rather than `new()`, which would try to resolve
+	the 4CAT version from the dataset's processor.
+	"""
+	return MediaArchiveMetadata(dataset, processor_type="video-downloader", from_dataset="src")
+
+
+def test_datasets_for_reason_returns_the_recording_dataset():
+	dataset = FakeDataset("previous", {"also_indirect": "none"})
+	m = _meta_from(dataset)
+	m.add_failure(post_ids=["p1"], reason="not_a_video", url="https://example.com/x")
+	lib = MediaArchiveLibrary([m])
+
+	hit = lib.find("https://example.com/x")
+	assert hit.datasets_for_reason("not_a_video") == [dataset]
+
+
+def test_datasets_for_reason_ignores_other_reasons():
+	"""
+	Each reason has to be traced separately: a URL can fail one way in one run
+	and another way in another, and the settings that produced each differ.
+	"""
+	errored = FakeDataset("errored", {"also_indirect": "all"})
+	not_video = FakeDataset("not-video", {"also_indirect": "none"})
+	m1 = _meta_from(errored)
+	m1.add_failure(post_ids=["p1"], reason="error", url="https://example.com/x")
+	m2 = _meta_from(not_video)
+	m2.add_failure(post_ids=["p1"], reason="not_a_video", url="https://example.com/x")
+	lib = MediaArchiveLibrary([m1, m2])
+
+	hit = lib.find("https://example.com/x")
+	assert hit.reasons == {"error", "not_a_video"}
+	assert hit.datasets_for_reason("not_a_video") == [not_video]
+	assert hit.datasets_for_reason("error") == [errored]
+
+
+def test_datasets_for_reason_skips_metadata_without_a_dataset():
+	"""Metadata built outside a dataset (e.g. in a test) has nothing to trace to."""
+	m = _meta()
+	m.add_failure(post_ids=["p1"], reason="not_a_video", url="https://example.com/x")
+	lib = MediaArchiveLibrary([m])
+
+	hit = lib.find("https://example.com/x")
+	assert hit.reasons == {"not_a_video"}
+	assert hit.datasets_for_reason("not_a_video") == []
+
+
 # -- misc --
 
 def test_items_without_url_are_not_indexed():
