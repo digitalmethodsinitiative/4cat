@@ -26,7 +26,6 @@
     mask: radial-gradient(#0000 71%, #F09 1%) 10000% 10000%/99.5% 200%;
 }
 
-
 /** very last item of analysis tree root level **/
 .analysis-results > ul > li:last-child {
     border-color: transparent;
