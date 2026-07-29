@@ -475,8 +475,12 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		if post_ids is None:
 			return []
 		if isinstance(post_ids, (str, int)):
-			return [str(post_ids)]
-		return [str(p) for p in post_ids]
+			post_ids = [post_ids]
+		# coerce to stripped strings, dropping null and blank ids rather than
+		# keeping them as the text "None" or "": some media (e.g. Instagram ads)
+		# records no usable id, and a fabricated id would only mislead anything
+		# that later matches on it.
+		return [str(p).strip() for p in post_ids if p is not None and str(p).strip()]
 
 	@classmethod
 	def _normalize_entry_post_ids(cls, entry):
