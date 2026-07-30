@@ -36,8 +36,6 @@
     margin-right: var(--spacing-smaller);
     background: var(--fourcat-accent);
     mask-image: url('../../img/4cat-heads-header.svg');
-    /* for testing - need HTTP image */
-    mask-image: url('https://4cat.digitalmethods.net/static/img/4cat-heads.svg');
     mask-size: cover;
     content: '';
     animation: .2s;

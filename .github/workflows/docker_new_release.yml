@@ -1,4 +1,17 @@
-# This will publish an image to Docker Hub on a new release
+# On a new release this publishes the Docker image, and then publishes the module
+# catalogue -- the public list of every data source and processor in the release --
+# as a static site, by opening a pull request against digitalmethodsinitiative/4cat-site.
+#
+# The two jobs are deliberately independent: the catalogue runs after the image and
+# cannot hold it up or undo it. See docs/module-catalog-export-contract.md for what
+# the catalogue bundle has to contain and why.
+#
+# Required secrets (Settings -> Secrets and variables -> Actions):
+#   DOCKER_DALE_LOGIN / DOCKER_DALE_PASSWORD - Docker Hub credentials
+#   CATALOGUE_SITE_APP_ID                    - numeric App ID of the GitHub App installed on
+#                                              digitalmethodsinitiative/4cat-site with permissions
+#                                              contents:write + pull-requests:write (and nothing else)
+#   CATALOGUE_SITE_APP_PRIVATE_KEY           - full PEM private key for that App (with BEGIN/END lines)
 
 name: Publish new release to Docker Hub
 
@@ -6,11 +19,32 @@ name: Publish new release to Docker Hub
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Publish the catalogue as this release tag (e.g. v1.56). Leave empty to build a development snapshot of this commit, which must not replace the public catalogue.'
+        type: string
+        default: ''
+      open_pull_request:
+        description: 'Open a pull request against 4cat-site. Off by default for manual runs; the bundle is always attached to the run as an artifact.'
+        type: boolean
+        default: false
+
+# Least privilege: this workflow's own token only reads this repository. Writing to
+# 4cat-site is done with a separate, narrowly scoped App token minted below.
+permissions:
+  contents: read
 
 jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub
+    # Only a real release publishes an image; a manual run is for the catalogue.
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    outputs:
+      # The tag the image was actually pushed under, so the catalogue job runs the
+      # exporter inside that exact image rather than guessing its name.
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -52,3 +86,304 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: digitalmethodsinitiative/4cat:stable
+
+  module_catalogue:
+    name: Publish the module catalogue
+    needs: push_to_registry
+    # Runs after the image on a release, and on its own for a manual run (where
+    # push_to_registry is skipped, not failed). Never runs if the image build failed:
+    # there would be nothing to export from.
+    if: always() && needs.push_to_registry.result != 'failure'
+    runs-on: ubuntu-latest
+    # Raised from the workflow's read-only default for one step: attaching the
+    # catalogue archive to the release. Writing to 4cat-site is not covered by this
+    # and uses the separate App token minted below.
+    permissions:
+      contents: write
+    # The catalogue is an extra. A broken export must leave the previously published
+    # catalogue in place and report itself, not turn a good release red -- so the job
+    # is allowed to fail without failing the run, and says so in the run summary.
+    continue-on-error: true
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+        with:
+          # Full history and tags: the provenance recorded in the published bundle is
+          # worked out here, where git can see the tags, rather than inside the
+          # container, which was built from a shallow checkout that has none.
+          fetch-depth: 0
+
+      - name: Work out what is being published
+        id: provenance
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+          IMAGE_VERSION: ${{ needs.push_to_registry.outputs.version }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # 4CAT is started the way the rest of this repository's CI starts it, so the
+          # export runs against a properly set up instance.
+          #
+          # A release starts the image that was just published, so the catalogue comes
+          # from exactly the code that was released. A manual run has no such image
+          # and builds one from the checkout instead.
+          if [ "$EVENT_NAME" = "release" ]; then
+            echo "compose_file=docker-compose.yml" >> "$GITHUB_OUTPUT"
+            echo "docker_tag=$IMAGE_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "compose_file=docker-compose_build.yml" >> "$GITHUB_OUTPUT"
+            echo "docker_tag=stable" >> "$GITHUB_OUTPUT"
+          fi
+
+          # An empty tag means "not a release", and the exporter will publish this as
+          # a development snapshot that says so on the page.
+          if [ -n "$RELEASE_TAG" ]; then
+            echo "release_arg=--release-tag $RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_arg=" >> "$GITHUB_OUTPUT"
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Recorded in the bundle so a published catalogue can always be traced back
+          # to the commit it came from, and re-exported to the same bytes.
+          echo "described=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
+          echo "committed_at=$(git show -s --format=%cI "$COMMIT")" >> "$GITHUB_OUTPUT"
+
+      - name: Start 4CAT
+        env:
+          # Compose reads this from the environment in preference to .env, so the
+          # release starts the image that was just published rather than the default.
+          DOCKER_TAG: ${{ steps.provenance.outputs.docker_tag }}
+          COMPOSE_FILE: ${{ steps.provenance.outputs.compose_file }}
+        # Only the backend, which brings up the database and memcached it depends on.
+        # The frontend plays no part in an export.
+        run: docker compose -f "$COMPOSE_FILE" up -d backend
+
+      - name: Wait for 4CAT to finish setting itself up
+        env:
+          COMPOSE_FILE: ${{ steps.provenance.outputs.compose_file }}
+        run: |
+          set -euo pipefail
+          # The entrypoint seeds the database, runs the migrations, and only then
+          # writes config.ini. Waiting for that file waits for the part the export
+          # actually depends on, rather than guessing at a length of time.
+          for _ in $(seq 1 60); do
+            if docker exec 4cat_backend test -f config/config.ini; then
+              echo "4CAT is set up."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "4CAT did not finish starting up within five minutes."
+          docker compose -f "$COMPOSE_FILE" logs backend
+          exit 1
+
+      - name: Export the catalogue
+        env:
+          RELEASE_ARG: ${{ steps.provenance.outputs.release_arg }}
+          COMMIT: ${{ github.sha }}
+          DESCRIBED: ${{ steps.provenance.outputs.described }}
+          COMMITTED_AT: ${{ steps.provenance.outputs.committed_at }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # The exporter validates its own output and exits non-zero rather than
+          # writing an incomplete catalogue, so a failure here means nothing was
+          # published. Values are passed through the environment rather than
+          # interpolated, and $RELEASE_ARG is left unquoted on purpose so that it
+          # word-splits into two arguments, or into none when it is empty.
+          docker exec \
+            -e COMMIT -e DESCRIBED -e COMMITTED_AT -e RELEASE_ARG \
+            4cat_backend sh -c '
+              exec python3 helper-scripts/export_module_catalogue.py \
+                --output /usr/src/app/dist/catalog \
+                --commit "$COMMIT" \
+                --git-describe "$DESCRIBED" \
+                --generated-at "$COMMITTED_AT" \
+                $RELEASE_ARG
+            '
+          # Copied out rather than written through a mounted directory, so the files
+          # arrive owned by the user this job runs as and the later steps can commit
+          # them without having to take ownership first.
+          docker cp 4cat_backend:/usr/src/app/dist/catalog ./dist/catalog
+
+      - name: Check the renderer is valid JavaScript
+        # The one check the exporter cannot run itself: node is not in the 4CAT
+        # image, but it is on the runner. The renderer is copied byte-for-byte from
+        # webtool/static/js/module-catalog.js, so a failure here means that file is
+        # broken -- in the application as much as in the published catalogue.
+        run: node --check dist/catalog/assets/catalogue.js
+
+      - name: Summarise what was built
+        id: bundle
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import hashlib, json, pathlib
+
+          bundle = pathlib.Path("dist/catalog")
+          manifest = json.loads(bundle.joinpath("manifest.json").read_text(encoding="utf-8"))
+          data = bundle.joinpath(manifest["data_file"]).read_bytes()
+          catalogue = json.loads(data)["catalogue"]
+
+          source = manifest["source"]
+          print("kind=%s" % source["kind"])
+          print("version=%s" % source["fourcat_version"])
+          print("release_tag=%s" % (source["release_tag"] or ""))
+          print("commit=%s" % source["git_commit"])
+          print("modules=%i" % len(catalogue))
+          print("datasources=%i" % sum(1 for entry in catalogue if entry["is_datasource"]))
+          print("sha256=%s" % hashlib.sha256(data).hexdigest())
+          PY
+
+      - name: Upload the bundle as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4cat-module-catalogue-${{ steps.bundle.outputs.version }}
+          path: dist/catalog
+          if-no-files-found: error
+
+      - name: Attach the bundle to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          tar -czf "4cat-module-catalogue-${TAG}.tar.gz" -C dist catalog
+          gh release upload "$TAG" "4cat-module-catalogue-${TAG}.tar.gz" --clobber --repo "$GITHUB_REPOSITORY"
+
+      # --- publish to the public site -------------------------------------------
+      # Only a real release replaces the public catalogue. A development snapshot is
+      # built and kept as an artifact so it can be looked at, but never published:
+      # the public page must describe a release, not somebody's work in progress.
+
+      - name: Mint 4cat-site App token
+        id: app_token
+        if: steps.provenance.outputs.is_release == 'true' && (github.event_name == 'release' || inputs.open_pull_request)
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.CATALOGUE_SITE_APP_ID }}
+          private-key: ${{ secrets.CATALOGUE_SITE_APP_PRIVATE_KEY }}
+          owner: digitalmethodsinitiative
+          repositories: 4cat-site
+
+      - name: Check out 4cat-site
+        if: steps.app_token.outcome == 'success'
+        uses: actions/checkout@v4
+        with:
+          repository: digitalmethodsinitiative/4cat-site
+          path: site-checkout
+          token: ${{ steps.app_token.outputs.token }}
+
+      - name: Replace the published catalogue
+        if: steps.app_token.outcome == 'success'
+        run: |
+          set -euo pipefail
+          # Replace the directory wholesale rather than copying files over an older
+          # export: that way files a newer export no longer produces are removed
+          # instead of being left behind to be served alongside the new ones.
+          rm -rf site-checkout/public/catalog
+          mkdir -p site-checkout/public
+          cp -r dist/catalog site-checkout/public/catalog
+
+      - name: Write the pull request body
+        if: steps.app_token.outcome == 'success'
+        env:
+          KIND: ${{ steps.bundle.outputs.kind }}
+          VERSION: ${{ steps.bundle.outputs.version }}
+          RELEASE_TAG: ${{ steps.bundle.outputs.release_tag }}
+          COMMIT: ${{ steps.bundle.outputs.commit }}
+          MODULES: ${{ steps.bundle.outputs.modules }}
+          DATASOURCES: ${{ steps.bundle.outputs.datasources }}
+          SHA256: ${{ steps.bundle.outputs.sha256 }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # A heredoc with the values passed through the environment, so nothing from
+          # a tag or version name is interpolated into the file by the shell.
+          cat > pr_body.md <<'EOF'
+          Generated from a 4CAT release by the 4CAT release workflow. It replaces the
+          whole of `public/catalog/` with a freshly exported bundle.
+
+          EOF
+          {
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| 4CAT version | \`${VERSION}\` |"
+            echo "| Release tag | \`${RELEASE_TAG}\` |"
+            echo "| Commit | \`${COMMIT}\` |"
+            echo "| Modules | ${MODULES}, of which ${DATASOURCES} data sources |"
+            echo "| Data file sha256 | \`${SHA256}\` |"
+            echo ""
+            echo "- Release: ${RELEASE_URL}"
+            echo "- Build: ${RUN_URL}"
+            echo ""
+            echo "Extensions are deliberately excluded: this describes an official 4CAT"
+            echo "release, not the modules installed on any particular server."
+            echo ""
+            echo "Worth checking before merging: that the version and commit above are the"
+            echo "release you expect, that the module count has not changed unexpectedly,"
+            echo "and that the rendered page still looks right."
+            # A manual run builds from whatever branch it was started on and labels the
+            # result with whatever tag was typed in. That is useful for rehearsing this
+            # process, and would be a lie to publish, so it says so plainly.
+            if [ "$EVENT_NAME" != "release" ]; then
+              echo ""
+              echo "> **Started by hand, not by a release.** This was built from"
+              echo "> \`${REF_NAME}\` and labelled \`${RELEASE_TAG}\`, which is not"
+              echo "> necessarily the code that tag points at. Check the commit above"
+              echo "> before merging, or close this if it was only a rehearsal."
+            fi
+          } >> pr_body.md
+
+      - name: Open or update the 4cat-site pull request
+        if: steps.app_token.outcome == 'success'
+        # Third-party action that operates with a write token to 4cat-site -- pinned
+        # to a full commit SHA (the v6 release) rather than the mutable `@v6` tag, so
+        # a tag move cannot silently change what runs here.
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
+        with:
+          path: site-checkout
+          token: ${{ steps.app_token.outputs.token }}
+          branch: auto/module-catalogue-${{ steps.bundle.outputs.release_tag }}
+          title: "Update module catalogue to 4CAT ${{ steps.bundle.outputs.release_tag }}"
+          commit-message: "chore: update module catalogue to 4CAT ${{ steps.bundle.outputs.release_tag }}"
+          body-path: pr_body.md
+
+      - name: Show 4CAT's logs if something went wrong
+        if: failure()
+        env:
+          COMPOSE_FILE: ${{ steps.provenance.outputs.compose_file }}
+        run: |
+          echo "::group::4CAT backend container"
+          docker compose -f "$COMPOSE_FILE" logs backend || true
+          echo "::endgroup::"
+          echo "::group::4CAT backend log file"
+          docker exec 4cat_backend sh -c 'cat logs/backend_4cat.log 2>/dev/null || cat data/logs/backend_4cat.log 2>/dev/null' || true
+          echo "::endgroup::"
+
+      - name: Say what happened
+        if: always()
+        env:
+          KIND: ${{ steps.bundle.outputs.kind }}
+          MODULES: ${{ steps.bundle.outputs.modules }}
+        run: |
+          set -eu
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "Exported ${MODULES} modules as a ${KIND}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### The module catalogue was not published"
+              echo ""
+              echo "The release itself is unaffected -- the Docker image was published by a"
+              echo "separate job, and the previously published catalogue is still in place."
+              echo "The export refuses to publish an incomplete or drifted bundle, so this"
+              echo "means something needs fixing before the catalogue can be updated."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

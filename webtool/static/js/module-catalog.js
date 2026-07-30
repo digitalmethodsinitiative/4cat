@@ -1,17 +1,18 @@
 /* Module catalogue.
  *
- * A thin reactive client over the /api/processor-map/* endpoints: browse/search
- * modules, then open one to see "how to run this" (the dataset it needs and the
- * sensible ways to get there from a data source) and "what can run on this" (the
- * follow-up processors and filters its output unlocks). Holds no compatibility
- * logic itself -- that all lives in common/lib/processor_map.py; this file only
- * fetches what that computed and lays it out.
+ * Browse/search every data source and processor, then open one to see "how to run
+ * this" (the dataset it needs and the sensible ways to get there from a data
+ * source) and "what can run on this" (the follow-up processors and filters its
+ * output unlocks). Holds no compatibility logic itself -- that all lives in
+ * common/lib/processor_map.py; this file only lays out what that computed.
+ *
+ * Where the data comes from is not decided here (see SOURCE below), so the same
+ * renderer serves the live application and the published static catalogue.
  */
 (function () {
   "use strict";
 
-  const API = "/api/processor-map";
-  let CATALOGUE = [];   // every processor, as returned by the catalogue endpoint
+  let CATALOGUE = [];   // every module, as returned by the catalogue source
   const TITLE = {};     // processor type -> display title, so links can show names not ids
   let BROWSE_PLACEHOLDER = "";  // detail pane's empty state, kept so back/forward can restore it
 
@@ -29,29 +30,41 @@
     return response.json();
   }
 
+  // Where the catalogue data comes from, and how a module is addressed in the URL.
+  // The live application uses the default below and reads the API. The published
+  // static catalogue has no API, so its page defines window.MODULE_CATALOG_SOURCE
+  // before loading this file: it serves the same data from an exported JSON file
+  // and addresses modules with ?module=<type>. Everything after this point is
+  // identical in both.
+  const API = "/api/processor-map";
+  const SOURCE = window.MODULE_CATALOG_SOURCE || {
+    loadCatalogue: async () => (await getJSON(`${API}/catalogue`)).processors || [],
+    loadModule: type => getJSON(`${API}/processor/${encodeURIComponent(type)}`),
+    initialModule: () => (document.getElementById("pc-page").dataset.initialProcessor || "").trim(),
+    urlForModule: type => `/module-catalog/${encodeURIComponent(type)}`
+  };
+
   // On load: pull the whole catalogue once, remember every title, wire up the search
   // box and category dropdown, and draw the list. Everything after this is redrawing.
   // When the page is a deep link, the selected processor is fetched and drawn first --
   // its request goes out alongside the catalogue's, and its detail paints before the grid.
   async function init() {
-    const initial = (document.getElementById("pc-page").dataset.initialProcessor || "").trim();
+    const initial = SOURCE.initialModule();
 
     // On a deep link, start the selected processor's request right away -- in parallel with
     // the larger catalogue request rather than queued behind it -- so its content is ready
     // as soon as possible. Pre-caught to null so a bad type raises no unhandled rejection;
     // showDetail then treats null as "not found".
-    const detailPromise = initial
-      ? getJSON(`${API}/processor/${encodeURIComponent(initial)}`).catch(() => null)
-      : null;
+    const detailPromise = initial ? Promise.resolve(SOURCE.loadModule(initial)).catch(() => null) : null;
 
-    let data;
+    let modules;
     try {
-      data = await getJSON(`${API}/catalogue`);
+      modules = await SOURCE.loadCatalogue();
     } catch (e) {
-      document.getElementById("pc-loading").textContent = "Could not load processors.";
+      document.getElementById("pc-loading").textContent = "Could not load modules.";
       return;
     }
-    CATALOGUE = (data.processors || []).slice().sort((a, b) => (a.title || a.type).localeCompare(b.title || b.type));
+    CATALOGUE = modules.slice().sort((a, b) => (a.title || a.type).localeCompare(b.title || b.type));
     CATALOGUE.forEach(p => { TITLE[p.type] = p.title || p.type; });
 
     populateTags();
@@ -71,7 +84,7 @@
       else document.getElementById("pc-detail-body").innerHTML = BROWSE_PLACEHOLDER;
     });
 
-    // If the page was opened as a deep link (/module-catalog/<type>), draw that
+    // If the page was opened as a deep link to one module, draw that
     // processor before the browse grid -- but only if it really exists, so a stale or
     // mistyped link just falls through to the browse view. Its request is already in
     // flight (detailPromise) and TITLE is now ready for its follow-up chips. "replace"
@@ -152,7 +165,7 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
     let info;
     try {
-      info = await (infoPromise || getJSON(`${API}/processor/${encodeURIComponent(type)}`));
+      info = await (infoPromise || SOURCE.loadModule(type));
     } catch (e) {
       body.innerHTML = '<p class="banner">Could not load this processor.</p>';
       return;
@@ -166,7 +179,7 @@
     // share exactly what they are looking at. "push" adds a history entry (a normal
     // click); "replace" rewrites the current one (first load, where the URL is already
     // right); "none" leaves it alone (a back/forward already moved the URL for us).
-    const url = `/module-catalog/${encodeURIComponent(type)}`;
+    const url = SOURCE.urlForModule(type);
     if (urlMode === "push") history.pushState({ pcType: type }, "", url);
     else if (urlMode === "replace") history.replaceState({ pcType: type }, "", url);
     body.querySelectorAll("[data-type]").forEach(el =>
@@ -301,6 +314,20 @@
     return next || '<p class="pc-muted">Nothing runs on this output.</p>';
   }
 
+  // A module's icon, following the same convention as the module-icon template: a
+  // name starting with "brand-" is a Font Awesome brand icon (the prefix is dropped
+  // and the brand style used), anything else is an ordinary one, and a module with
+  // no icon of its own gets the generic puzzle piece.
+  function iconHtml(name) {
+    let icon = name || "puzzle-piece";
+    let style = "fa";
+    if (icon.startsWith("brand-")) {
+      style = "fab";
+      icon = icon.slice(6);
+    }
+    return `<i class="${style} fa-fw fa-${esc(icon)}" aria-hidden="true"></i> `;
+  }
+
   // Render a references-style string: turn any [text](url) markdown links into anchors,
   // escaping everything else. Plain citations (no link) pass through unchanged.
   function mdLinks(s) {
@@ -343,7 +370,7 @@
 
     // the first tag is the category (shown below), so chip only the rest next to the title
     const tags = (info.tags || []).slice(1).map(t => `<span class="pc-tag">${esc(t)}</span>`).join("");
-    const icon = info.icon ? `<i class="fa fa-fw fa-${esc(info.icon)}" aria-hidden="true"></i> ` : "";
+    const icon = iconHtml(info.icon);
     const references = (info.references || []).length
       ? `<div class="pc-refs">${info.references.map(r => `<span>${mdLinks(r)}</span>`).join("")}</div>` : "";
     const foot = (produces || references)

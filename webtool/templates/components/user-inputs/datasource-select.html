@@ -23,5 +23,5 @@
                 :class="{ disabled: !datasource }"
                 x-tooltip="Data source info"
                 x-init="$nextTick(() => { const upd = () => { const id = $el.getAttribute('aria-describedby'); if (id) document.getElementById(id).textContent = infoText || 'Data source info'; }; upd(); $watch('datasource', upd); })"
-        ><a :href="datasource ? '{{ url_for('misc.module_catalog') }}/' + datasource : null"><i class="fa-solid fa-circle-info"></i></a></li></ul>
+        ><a :href="datasource ? '{{ url_for('misc.module_catalog') }}' + datasource : null"><i class="fa-solid fa-circle-info"></i></a></li></ul>
 </div>
