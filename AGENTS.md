@@ -132,7 +132,7 @@ Invocation (the plain `docker compose` command uses `docker-compose.yml`):
 
 ## Coding Rules
 - Follow existing project style, conventions, and naming.
-- **Indentation**: The codebase uses **tabs** for Python indentation. Match this in all edits.
+- **Indentation**: Mixed, and no single rule applies. **Match the file you are editing.** A repo-wide formatter (`ruff format` / `black`) has been discussed but is not settled, so do not reformat code you are not otherwise changing — a formatting-only diff makes review harder and buries the actual change.
 - Python `>= 3.11` is required. Use modern Python features (e.g. `match`, `|` for union types) when appropriate.
 - Avoid adding dependencies unless clearly necessary. If a dependency is added, add it to the appropriate set in `setup.py` (`core_packages` or `processor_packages`) with a version pin.
 - Add comments only when logic is non-obvious.

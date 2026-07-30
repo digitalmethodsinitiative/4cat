@@ -65,6 +65,8 @@ class ModuleCollector:
         self.expand_datasources()
 
         # cache module-defined config options for use by the config manager
+        # this covers datasource settings too: those are declared on the
+        # datasource's search/import worker class, which is in self.workers
         if write_cache:
             module_config = {}
             for worker in self.workers.values():
@@ -241,7 +243,6 @@ class ModuleCollector:
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
                 "init": datasource.init_datasource,
-                "config": {} if not hasattr(datasource, "config") else datasource.config,
                 "explorer-templates": self.load_datasource_explorer_templates(datasource_id, subdirectory)
             }
 

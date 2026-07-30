@@ -231,8 +231,21 @@ class ConfigManager(BaseConfigReader):
         """
         Ensure the database is in sync with the config definition
 
-        Deletes all stored settings not defined in 4CAT, and creates a global
-        setting for all settings not yet in the database.
+        Creates a global setting with the default value for every setting in
+        the config definition that has no value in the database yet, and keeps
+        the tag order in sync with the tags actually in use.
+
+        This does *not* delete settings that are in the database but no longer
+        defined anywhere to avoid deleting settings because their
+        extension is uninstalled or disabled, or because their module failed to
+        import this boot; telling those apart needs provenance that is not
+        available here.
+
+        Note this runs *before* the ModuleCollector (see backend/bootstrap.py),
+        which reads `extensions.enabled` and `datasources.expiration` from the
+        database. It therefore sees the module config cached by the *previous*
+        boot, and on a fresh install sees no module-declared settings at all -
+        those first get a row on the second boot.
         """
         self.with_db()
 
