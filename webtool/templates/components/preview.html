@@ -31,9 +31,14 @@
     <iframe class="dataset-preview-frame" title="Preview of {{ dataset.get_label() }}"
             :src="loaded ? '{{ _preview_url }}' : ''"></iframe>
     {% else %}
-    <div class="dataset-preview-content" hx-get="{{ _preview_url }}" hx-trigger="intersect once"
-         hx-swap="innerHTML">
-        {% with spinner_id = "" %}{% include "components/spinner.html" %}{% endwith %}
+    <div
+            class="dataset-preview-content"
+            hx-get="{{ _preview_url }}"
+            hx-trigger="intersect once"
+            hx-swap="innerHTML"
+            hx-indicator="#preview-spinner"
+    >
+        {% with spinner_id = "preview-spinner" %}{% include "components/spinner.html" %}{% endwith %}
     </div>
     {% endif %}
 </div>

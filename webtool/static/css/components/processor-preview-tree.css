@@ -15,52 +15,133 @@
     padding: 0;
 }
 
+/** simplified 'subway line' (cf. analysis-tree.css): a trunk descends from the
+    marker of a dataset box and curves into the marker of the box nested below
+    it. The very first box has no marker, so there the trunk simply continues
+    down from the bottom of the box itself. **/
+.processor-preview-tree {
+    --preview-marker-size: calc(var(--font-normal) * 0.75);
+    --preview-marker-gap: var(--spacing-regular);
+    /** centre of a marker, measured from the top of the box it belongs to **/
+    --preview-marker-y: calc(var(--spacing-small) + 0.6em);
+    /** box edge -> trunk, so that trunk and markers share a centre line **/
+    --preview-line-x: calc(var(--preview-marker-gap) + (var(--preview-marker-size) / 2) + (var(--stroke) / 2));
+    /** horizontal indent of a nested box relative to its parent box **/
+    --preview-branch: var(--spacing-tiny);
+}
+
 .processor-preview-item {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-small);
+    /** room to the left of the box for the marker the trunk ends in **/
+    padding-left: calc(var(--preview-marker-size) + var(--preview-marker-gap));
+}
+
+.processor-preview-tree > ul > .processor-preview-item {
+    /** the first box has no marker: no line arrives at it **/
+    padding-left: 0;
 }
 
 .processor-preview-tree .processor-preview-box {
-    padding: var(--spacing-tiny) var(--spacing-regular);
-    border: var(--stroke) solid var(--button-grey);
-}
-
-/** simplified 'subway line' (cf. analysis-tree.css): a curved L runs from the
-    bottom of a dataset box down and into the left edge of the box below it **/
-.processor-preview-tree .processor-preview-children {
-    margin-left: var(--spacing-regular);
-    padding-left: var(--spacing-regular);
-}
-
-.processor-preview-children > .processor-preview-item {
     position: relative;
+    padding: var(--spacing-tiny) calc(var(--spacing-regular) - 5px);
+    border: var(--stroke) solid var(--panel-bg-3);
+    line-height: 1;
 }
 
-.processor-preview-children > .processor-preview-item::before {
-    /** curve towards the box, starting at the bottom of the box above **/
+.journey-marker-preview {
+    /** circle at the bottom-right end of the line, centred on it. border-box so
+        that the border grows inwards and the circle keeps the exact diameter the
+        lines are positioned against **/
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: 0;
+    top: calc(var(--preview-marker-y) - (var(--preview-marker-size) / 2));
+    width: var(--preview-marker-size);
+    height: var(--preview-marker-size);
+    padding: 0;
+    border: var(--stroke) solid var(--panel-bg-3);
+    border-radius: 50%;
+    background: var(--semidark);
+    font: inherit;
+    z-index: var(--z-journey-marker);
+}
+
+.processor-preview-tree .processor-preview-children {
+    margin-left: var(--preview-branch);
+    padding-left: 0;
+}
+
+.processor-preview-box::after {
+    /** trunk descending from this box' marker to the item nested below it **/
     content: '';
     display: block;
     position: absolute;
-    top: calc(var(--spacing-small) * -1);
-    left: calc(var(--spacing-regular) * -1);
-    width: calc(var(--spacing-regular) - var(--stroke));
-    height: calc((var(--spacing-small) * 2) + 0.6em);
-    border: 0 solid var(--panel-bg-2);
+    top: calc(var(--preview-marker-y) - var(--stroke));
+    bottom: calc((var(--spacing-small) + var(--stroke)) * -1);
+    left: calc((var(--preview-line-x) + var(--stroke)) * -1);
+    border-left: var(--stroke) solid var(--panel-bg-3);
+}
+
+.processor-preview-tree > ul > .processor-preview-item > .processor-preview-box::after {
+    /** ... except for the first box, which has no marker: there the trunk drops
+        from the bottom of the box straight down onto the marker below it **/
+    top: 100%;
+    left: calc(var(--preview-branch) + (var(--preview-marker-size) / 2) - (var(--stroke) * 1.5));
+}
+
+.processor-preview-new-hint > .processor-preview-box {
+    border: var(--stroke) solid var(--bright);
+}
+
+.processor-preview-new-hint > .journey-marker-preview {
+    /** the line ends in the 'run a processor' marker of the analysis tree
+        (cf. .run-processor-button): a star of life in an accented circle. Sized
+        via the marker variable so that it stays centred on the line **/
+    --preview-marker-size: calc(var(--font-normal) * 1.3);
+    border-color: var(--fourcat-accent);
+    color: var(--bright);
+    background: var(--fourcat-accent);
+}
+
+.processor-preview-new-hint > .journey-marker-preview i {
+    /** sized on the icon rather than the button: --preview-marker-y is in em, so
+        the button' own font size has to stay the tree font size **/
+    font-size: calc(var(--preview-marker-size) * 0.5);
+    line-height: 1;
+}
+
+.processor-preview-new-hint .processor-preview-box::after {
+    /** nothing is nested below the 'new processor' box **/
+    display: none;
+}
+
+.processor-preview-children > .processor-preview-item::before {
+    /** curve away from the trunk and into this box' marker **/
+    content: '';
+    display: block;
+    position: absolute;
+    top: 0;
+    left: calc((var(--preview-branch) + var(--preview-line-x)) * -1);
+    width: calc(var(--preview-branch) + var(--preview-line-x) - var(--stroke));
+    height: calc(var(--preview-marker-y) - (var(--stroke) / 2));
+    border: 0 solid var(--panel-bg-3);
     border-left-width: var(--stroke);
     border-bottom-width: var(--stroke);
     border-bottom-left-radius: var(--radius);
 }
 
-.processor-preview-children > .processor-preview-item:not(:last-child)::after {
-    /** trunk continuing past this box towards the next sibling below it **/
-    content: '';
-    display: block;
-    position: absolute;
-    top: calc(var(--spacing-small) * -1);
-    bottom: 0;
-    left: calc(var(--spacing-regular) * -1);
-    border-left: var(--stroke-heavy) solid var(--panel-bg-2);
+.processor-preview-tree > ul > .processor-preview-item > .processor-preview-children > .processor-preview-item::before {
+    /** the first box' trunk needs no curve: it is already above the marker **/
+    left: calc((var(--preview-marker-size) / 2) - (var(--stroke) / 2));
+    width: 0;
+    border-bottom-width: 0;
+    border-bottom-left-radius: 0;
 }
 
 /* header row: title stretches, caret + pop-out controls sit on the right */
@@ -107,20 +188,15 @@
 }
 
 .processor-preview-box.is-current {
-    background-color: var(--panel-bg-3);
 }
 
 .processor-preview-box.is-current .processor-preview-label {
     color: var(--bright);
 }
 
-.processor-preview-new-hint {
+.processor-preview-new-hint .processor-preview-box {
     background-color: var(--bright);
     color: var(--dark);
-}
-
-.processor-preview-new-hint i {
-    color: var(--fourcat-accent);
 }
 
 /* the preview loads inside the box, beneath the title */
@@ -129,8 +205,14 @@
 }
 
 .processor-preview-box.dataset-preview--big {
+    /** repeated from preview.css: the selectors there are less specific **/
+    position: fixed;
     padding: 0;
     border: none;
+}
+
+.processor-preview-box.dataset-preview--big::after {
+    display: none;
 }
 
 .processor-preview-box.dataset-preview--big .processor-preview-box-header {
@@ -140,4 +222,8 @@
 
 .processor-preview-box.dataset-preview--big .dataset-preview-body {
     margin-top: 0;
+}
+
+.processor-preview-tree #preview-spinner {
+    color: var(--bright);
 }

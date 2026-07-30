@@ -23,6 +23,12 @@
         or _ext in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp", "mp4")
         or (_processor and _processor.map_item)) %}
 <li class="processor-preview-item">
+    {# the top parent has no line arriving at it, so it gets no marker #}
+    {% if index > 0 %}
+    <button class="journey-marker-preview">
+        <span></span>
+    </button>
+    {% endif %}
     <div class="processor-preview-box {% if is_last %} is-current{% endif %}"
          {% if _previewable %}x-data="{ open: false, big: false, loaded: false }"
          :class="{ 'dataset-preview--big': big }"
@@ -55,10 +61,11 @@
             {% with index = index + 1 %}{% include "components/processor-preview-tree-item.html" %}{% endwith %}
         {% else %}
         <li class="processor-preview-item processor-preview-new-hint">
+            <button class="journey-marker-preview">
+                <i class="fa-solid fa-star-of-life" aria-hidden="true"></i>
+            </button>
             <div class="processor-preview-box">
-                <span class="processor-preview-label add-new">
-                    <i class="fa-solid fa-star-of-life" aria-hidden="true"></i> Adding new processor
-                </span>
+                <span class="processor-preview-label add-new">Adding new processor</span>
             </div>
         </li>
         {% endif %}
