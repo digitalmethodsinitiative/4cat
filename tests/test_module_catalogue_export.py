@@ -341,6 +341,27 @@ def test_a_named_release_tag_is_taken_at_its_word(export, monkeypatch):
     assert source["release_tag"] == "v1.56"
 
 
+def test_provenance_can_be_supplied_rather_than_asked_of_git(export, monkeypatch):
+    """
+    A release is exported inside a container built from a shallow checkout, where git
+    knows almost nothing -- no tags, and sometimes no repository at all. Everything
+    recorded about the source can therefore be passed in instead, worked out where
+    git does have the full history.
+    """
+    monkeypatch.setattr(export, "git", lambda *arguments, default="": default)
+    source = export.describe_source(version="1.56", release_tag="v1.56", commit="d" * 40,
+                                    generated_at="2026-07-29T15:41:03+02:00",
+                                    git_describe="v1.56")
+    assert source == {
+        "kind": "release",
+        "fourcat_version": "1.56",
+        "release_tag": "v1.56",
+        "git_describe": "v1.56",
+        "git_commit": "d" * 40,
+        "generated_at": "2026-07-29T15:41:03+02:00",
+    }
+
+
 def test_the_page_says_which_release_it_is_showing(bundle):
     """Both wordings live in the page, so it can name a release or own up to being
     a snapshot without the export having to write different pages."""

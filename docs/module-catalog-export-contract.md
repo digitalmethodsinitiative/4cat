@@ -62,6 +62,16 @@ backend container. Serve the result with any static file server to review it —
 opening `index.html` from disk will not work, because browsers block `fetch()` on
 `file://` URLs.
 
+The export also needs a `config/config.ini`, like any other 4CAT command: loading
+the data sources imports `common/lib/helpers.py`, which reads the configuration as
+it is imported. Starting 4CAT normally writes that file — under Docker the
+entrypoint generates it from `.env` — so a running instance already has one, which
+is why the release workflow starts 4CAT rather than running the exporter against a
+bare image. A container started without that setup has no `config.ini` at all, since
+the file is never committed; copying `config/config.ini-example` over it is enough
+to make the import work. Nothing in it reaches the catalogue either way, because the
+exporter supplies its own paths.
+
 For a release, name the tag explicitly:
 
 ```bash
@@ -72,6 +82,13 @@ Without `--release-tag`, a release is claimed only when the commit carries a tag
 exactly. **A CI checkout is usually shallow and has no tags**, so a genuine release
 left to work it out from git would publish itself as a development snapshot. Release
 automation should always pass the tag.
+
+The same applies to the rest of the provenance. A release is exported inside a
+container built from that shallow checkout, so `--commit`, `--generated-at` and
+`--git-describe` should be worked out on the machine that has the full history and
+passed in, rather than left for the container's git to guess. See the
+`module_catalogue` job in
+[`.github/workflows/docker_new_release.yml`](../.github/workflows/docker_new_release.yml).
 
 ## Bundle shape
 

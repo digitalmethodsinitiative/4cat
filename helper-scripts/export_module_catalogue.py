@@ -156,7 +156,8 @@ def git(*arguments, default=""):
     return result.stdout.strip() if result.returncode == 0 else default
 
 
-def describe_source(version=None, release_tag=None, commit=None, generated_at=None):
+def describe_source(version=None, release_tag=None, commit=None, generated_at=None,
+                    git_describe=None):
     """
     Work out what exactly is being published, and say so plainly.
 
@@ -172,7 +173,8 @@ def describe_source(version=None, release_tag=None, commit=None, generated_at=No
 
     Note for automation: a shallow checkout has no tags, so `describe` finds nothing
     and even a real release would look like a snapshot. Release builds should pass
-    --release-tag rather than relying on what git can work out.
+    every one of these in rather than relying on what git can work out, because the
+    export usually runs inside a container built from such a checkout.
     """
     tag = release_tag if release_tag is not None else git("describe", "--exact-match", "--tags", "HEAD")
     tag = tag.strip() or None
@@ -186,7 +188,7 @@ def describe_source(version=None, release_tag=None, commit=None, generated_at=No
         "kind": "release" if tag else "development_snapshot",
         "fourcat_version": version or "unknown",
         "release_tag": tag,
-        "git_describe": git("describe", "--tags", "--always", default="unknown"),
+        "git_describe": git_describe or git("describe", "--tags", "--always", default="unknown"),
         "git_commit": commit or git("rev-parse", "HEAD", default="unknown"),
         # the commit's own date, so exporting a release again reproduces it exactly
         "generated_at": generated_at or git("show", "-s", "--format=%cI", "HEAD")
@@ -520,10 +522,14 @@ def main():
     parser.add_argument("--commit", help="the commit this describes (default: asked of git)")
     parser.add_argument("--generated-at", help="timestamp to record (default: the commit's own date, "
                                                "so re-exporting a release reproduces it exactly)")
+    parser.add_argument("--git-describe", help="where this commit sits relative to the last tag, for "
+                                               "the record (default: asked of git, which needs the "
+                                               "tags a shallow checkout does not have)")
     arguments = parser.parse_args()
 
     source = describe_source(version=arguments.version, release_tag=arguments.release_tag,
-                             commit=arguments.commit, generated_at=arguments.generated_at)
+                             commit=arguments.commit, generated_at=arguments.generated_at,
+                             git_describe=arguments.git_describe)
 
     try:
         result = export(arguments.output, source)
