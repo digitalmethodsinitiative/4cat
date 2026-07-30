@@ -6,10 +6,29 @@ name: Publish new release to Docker Hub
 on:
   release:
     types: [published]
+  # A workflow can only be started by hand if it offers workflow_dispatch on the
+  # default branch -- once it does, a run can be pointed at any branch. This is here
+  # so that changes to this workflow can be tried out on a branch before they are
+  # merged, and the inputs below are the ones those branches expect. Nothing on this
+  # branch acts on them yet.
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Publish the catalogue as this release tag (e.g. v1.56). Leave empty to build a development snapshot of this commit, which must not replace the public catalogue.'
+        type: string
+        default: ''
+      open_pull_request:
+        description: 'Open a pull request against 4cat-site. Off by default for manual runs; the bundle is always attached to the run as an artifact.'
+        type: boolean
+        default: false
 
 jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub
+    # Only an actual release publishes an image. A run started by hand is for trying
+    # out a branch's version of this workflow, and must never push an image or move
+    # the `stable` tag that installations pull.
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
