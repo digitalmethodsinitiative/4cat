@@ -675,12 +675,6 @@ config_definition = {
         "help": "4CAT home page",
         "default": "about"
     },
-    "ui.inline_preview": {
-        "type": UserInput.OPTION_TOGGLE,
-        "help": "Show inline preview",
-        "default": False,
-        "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
-    },
     "ui.offer_anonymisation": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Offer anonymisation options",

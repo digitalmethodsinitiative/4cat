@@ -1,16 +1,112 @@
 [x-cloak] { display: none !important; }
 
-/* Preview body embedded in a processor-preview box (components/preview.html).
-   The header/controls live on .processor-preview-box; see
-   components/processor-preview-tree.css. */
+/* Inline dataset preview (components/preview.html): a panel that slides open
+   directly below whatever 'view' button opened it - a dataset card header, a
+   module card in the analysis tree, or a box in the processor slideout's
+   lineage tree. It renders as a light 'document' panel in all of those, dark
+   surroundings included. */
+.dataset-preview {
+    position: relative;
+    background: var(--bright);
+    color: var(--dark);
+    /** single-row grid, so the panel can be animated open to the height of its
+        content (0fr -> 1fr) rather than to a guessed one **/
+    display: grid;
+    grid-template-rows: 1fr;
+}
+
+.preview-slide {
+    transition: grid-template-rows 0.2s ease-out, opacity 0.2s ease-out;
+    overflow: hidden;
+}
+
+.preview-slide-collapsed {
+    grid-template-rows: 0fr;
+    opacity: 0;
+}
+
+.preview-slide-expanded {
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+
+/* in an analysis tree card the preview slots in between the card header and the
+   status row, so it has to carry the card's side borders itself */
+.module-card > .dataset-preview {
+    border: var(--stroke-light) solid var(--dark);
+    border-top: 0;
+    border-bottom: 0;
+}
+
+.preview-toggle {
+    font: inherit;
+    cursor: pointer;
+}
+
+/* the label flips between 'view' and 'hide' and the icon between an eye, a
+   spinner and a caret, so both are given a fixed footprint: the button must not
+   resize while it is being clicked */
+.preview-toggle .preview-toggle-label {
+    display: inline-block;
+    min-width: 3.5em;
+    text-align: center;
+}
+
+.preview-toggle.small {
+    border: none;
+    background: transparent;
+    color: inherit;
+}
+
+/* floats over the top right corner of the preview, and stays there while the
+   body below it scrolls */
+.dataset-preview-fullscreen {
+    position: absolute;
+    top: var(--spacing-small);
+    right: var(--spacing-small);
+    z-index: var(--z-button);
+    padding: var(--spacing-tiny) var(--spacing-small);
+    border: var(--stroke) solid var(--panel-bg-2);
+    border-radius: var(--radius);
+    background: var(--panel-bg-0);
+    color: var(--dark);
+    font: inherit;
+    cursor: pointer;
+}
+
+.dataset-preview-fullscreen:hover {
+    background: var(--button-bg-regular);
+    color: var(--bright);
+}
+
+/* padding lives on the content rather than here, so that the panel really does
+   collapse to zero height when it slides shut */
 .dataset-preview-body {
+    position: relative;
+    min-height: 0;
     max-height: 60vh;
     overflow: auto;
+}
+
+.dataset-preview-content {
     padding: var(--spacing-regular);
 }
 
 .dataset-preview-body .preview-content {
     overflow-x: auto;
+}
+
+/* 'only the first n items are shown' notice at the top of a preview; the old
+   stylesheet that used to style this is not loaded on these pages */
+.preview-content .warning-text {
+    position: sticky;
+    left: 0;
+    margin: 0 0 var(--spacing-regular) 0;
+    padding: var(--spacing-small);
+    border-left: var(--stroke-heavy) solid var(--fourcat-accent);
+    background: var(--panel-bg-0);
+    color: var(--dark);
+    font-size: var(--font-normal);
 }
 
 .dataset-preview-body pre {
@@ -26,10 +122,6 @@
 }
 
 /* iframe-based previews (arbitrary HTML, interactive GEXF) fill the body */
-.dataset-preview-body:has(.dataset-preview-frame) {
-    padding: 0;
-}
-
 .dataset-preview-frame {
     display: block;
     width: 100%;
@@ -89,11 +181,15 @@
     max-height: 80vh;
 }
 
-/* Full-screen "pop out" mode */
+/* Full-screen "pop out" mode: the preview leaves the flow of its card and fills
+   the viewport, over the slideout it may have been opened from */
 .dataset-preview--big {
     position: fixed;
     inset: 0;
-    z-index: 1100;
+    z-index: var(--z-preview-fullscreen);
+    /** its host may have sized or indented it; the viewport is the frame now **/
+    margin: 0;
+    max-width: none;
     border: none;
     border-radius: 0;
     display: flex;

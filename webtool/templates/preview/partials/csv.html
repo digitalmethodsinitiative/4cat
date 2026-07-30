@@ -19,8 +19,8 @@
                 {% endif %}
             {% endif %}
             <t{% if outer_loop.index == 1 %}h{% else %}d{% endif %}
-                    {% if column == "missing_fields" %} class="missing-field-meta tooltip-trigger" aria-controls="tooltip-missing-field-explainer"
-                    {% elif column in row.missing_fields %} class="missing-field tooltip-trigger" aria-controls="tooltip-missing-field"{% endif %}
+                    {% if column == "missing_fields" %} class="missing-field-meta" x-tooltip="These columns were not available in the source data, but may be available when visiting the source directly or when collecting the data with a different method."
+                    {% elif column in row.missing_fields %} class="missing-field" x-tooltip="This field is missing from the source data and has been filled with a default value, or left empty."{% endif %}
             >
             {% autoescape false %}
                 {{ cell|e|replace("\n","<br>\n")|add_ahref(ellipsiate=50)|add_colour|safe }}
@@ -30,10 +30,4 @@
         </tr>
     {% endfor %}
 </table>
-
-<p role="tooltip" class="multiple" id="tooltip-missing-field-explainer" aria-hidden="true">These columns were not
-    available in the source data, but may be available when visiting the source directly or when collecting the data
-    with a different method.</p>
-<p role="tooltip" class="multiple" id="tooltip-missing-field" aria-hidden="true">This field is missing from the source
-    data and has been filled with a default value, or left empty.</p>
 </div>

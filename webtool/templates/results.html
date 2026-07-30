@@ -56,8 +56,9 @@
             <ol>
                 {% for dataset in datasets %}{% if dataset.key_parent in ("", None) %}
                     <li id="{{ dataset.key }}"
-                        class="result{% if dataset.is_finished() %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% else %} dataset-unfinished{% endif %}"
-                        data-numrows="{{ dataset.num_rows }}" data-dataset-key="{{ dataset.key }}">
+                        class="result dataset-preview-host{% if dataset.is_finished() %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% else %} dataset-unfinished{% endif %}"
+                        data-numrows="{{ dataset.num_rows }}" data-dataset-key="{{ dataset.key }}"
+                        x-data="datasetPreview">
                         {% with lite_header=True %}
                             {% include "dataset-page/dataset-card.html" %}
                         {% endwith %}

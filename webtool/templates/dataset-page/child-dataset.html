@@ -17,7 +17,7 @@
             {# todo: make this based on last visit, not just the timestamp #}
             {% if dataset.timestamp_finished and dataset.timestamp_finished > (__now - 3600) %}<p class="new-notice">New!</p>{% endif %}
         </aside>
-        <div class="module-card">
+        <div class="module-card dataset-preview-host" x-data="datasetPreview">
             {% set has_processors = dataset.is_finished() and (dataset.get_children() or (dataset.num_rows > 0 and current_user.is_authenticated and dataset.get_available_processors(config=__config, exclude_hidden=True))) %}
             {% if has_processors %}
             <aside class="run-child-processor">

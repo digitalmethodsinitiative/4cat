@@ -3,6 +3,11 @@ set: lite_header = True for a header included on another page as a clickable ent
                         into the dataset (e.g. dataset overview page)
 set: main_header = True for a header at the top of the analyiss tree (e.g. on the dataset
                         result page)
+
+The header's 'view' button and the preview it slides open beneath it share the
+Alpine scope of whatever wraps this card (x-data="datasetPreview": the
+.module-card, .dataset-metadata or overview list item), so a card is always
+included inside one.
 #}
 {% set deprecated = (dataset.type not in processors) %}
 <header class="card-header dataset-header{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}">
@@ -50,9 +55,26 @@ set: main_header = True for a header at the top of the analyiss tree (e.g. on th
         </nav>
     {% endif %}
     <nav class="actions">
+        {% if lite_header %}
+        <ul class="dataset-fetch">
+            <li>
+                <a class="button-like" href="{{ url_for("dataset.show_result", key=dataset.key) }}">Analyze</a>
+            </li>
+        </ul>
+        {% endif %}
+        {# slides the preview below this header open; see components/preview.html #}
+        {% if dataset|previewable %}
+        <ul class="dataset-fetch">
+            <li>
+                {% include "components/preview-toggle.html" %}
+            </li>
+        </ul>
+        {% endif %}
         {% include "dataset-page/dropdown-button.html" %}
     </nav>
 </header>
+
+{% include 'components/preview.html' %}
 
 <section class="card-content status">
     <dl class="badge-list dataset-status">

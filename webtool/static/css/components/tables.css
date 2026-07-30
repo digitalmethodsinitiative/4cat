@@ -7,7 +7,6 @@ table {
 
 table th {
     border: none;
-    text-transform: uppercase;
     padding-bottom: var(--spacing-small);
 }
 

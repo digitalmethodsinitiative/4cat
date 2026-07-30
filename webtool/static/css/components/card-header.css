@@ -34,6 +34,7 @@
 
 .card-header nav.actions {
     justify-content: end;
+    column-gap: 1em;
 }
 
 .card-header > i {

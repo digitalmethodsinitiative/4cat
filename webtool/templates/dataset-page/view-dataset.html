@@ -10,7 +10,7 @@
          x-effect="document.body.classList.toggle('slideout-open', slideoutActive)"
          @processor-queued.document="slideoutActive = false; selectedProcessorType = null; pendingScrollKey = $event.detail.key"
          @htmx:after:settle.document="if (pendingScrollKey) { const el = document.getElementById('child-' + pendingScrollKey); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); pendingScrollKey = null; } }">
-        <section class="dark dataset-metadata" data-dataset-key="{{ dataset.key }}">
+        <section class="dark dataset-metadata dataset-preview-host" data-dataset-key="{{ dataset.key }}" x-data="datasetPreview">
             <nav>
                 <ul>
                 {% if current_user.is_authenticated and current_user.can_access_dataset(dataset) %}
@@ -129,7 +129,8 @@
                             </li>
                         </template>
                         <li>
-                            <button class="button-like" @click="slideoutActive = false; selectedProcessorType = null"><i class="fa-solid fa-xmark"></i></button>
+                            <button
+                                    class="button-like" @click="slideoutActive = false; selectedProcessorType = null; processorSearch = '';"><i class="fa-solid fa-xmark"></i></button>
                         </li>
                     </ul>
                 </div>

@@ -268,6 +268,33 @@ def _jinja2_filter_extension_to_noun(ext):
 def _jinja2_filter_ellipsiate(*args, **kwargs):
     return ellipsiate(*args, **kwargs)
 
+@current_app.template_filter("previewable")
+def _jinja2_filter_previewable(dataset):
+    """
+    Can this dataset be previewed inline?
+
+    Mirrors what views_dataset.preview_items() knows how to render. Templates
+    use this to decide whether to offer the 'view' button and render
+    components/preview.html.
+
+    :param DataSet dataset:  Dataset to check
+    :return bool:  Whether an inline preview is available
+    """
+    if not dataset.is_finished() or not dataset.num_rows:
+        return False
+
+    extension = dataset.get_extension()
+    if extension == "zip":
+        # media archives are previewed as a carousel
+        return dataset.get_media_type() in ("image", "video", "audio")
+
+    if extension in ("html", "gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp", "mp4"):
+        return True
+
+    # anything else needs to be mappable to be rendered as a table
+    processor = dataset.get_own_processor()
+    return bool(processor and processor.map_item)
+
 @current_app.template_filter('chan_image')
 def _jinja2_filter_chan_image(tim, ext, board):
 

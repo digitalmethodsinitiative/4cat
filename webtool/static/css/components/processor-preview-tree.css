@@ -44,11 +44,17 @@
     padding-left: 0;
 }
 
+/** the padding sits on the box' rows rather than on the box itself, so that an
+    expanded preview can line up flush with its borders **/
 .processor-preview-tree .processor-preview-box {
     position: relative;
-    padding: var(--spacing-tiny) calc(var(--spacing-regular) - 5px);
     border: var(--stroke) solid var(--panel-bg-3);
     line-height: 1;
+}
+
+.processor-preview-box-header,
+.processor-preview-box > .processor-preview-label {
+    padding: var(--spacing-tiny) calc(var(--spacing-regular) - 5px);
 }
 
 .journey-marker-preview {
@@ -144,7 +150,7 @@
     border-bottom-left-radius: 0;
 }
 
-/* header row: title stretches, caret + pop-out controls sit on the right */
+/* header row: title stretches, the 'view' toggle sits on the right */
 .processor-preview-box-header {
     display: flex;
     align-items: center;
@@ -162,15 +168,6 @@
     display: flex;
     align-items: center;
     column-gap: var(--spacing-tiny);
-}
-
-.processor-preview-control {
-    padding: 0 var(--spacing-tiny);
-    border: none;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
 }
 
 .processor-preview-label {
@@ -199,31 +196,8 @@
     color: var(--dark);
 }
 
-/* the preview loads inside the box, beneath the title */
-.processor-preview-box .dataset-preview-body {
-    margin-top: var(--spacing-small);
-}
-
-.processor-preview-box.dataset-preview--big {
-    /** repeated from preview.css: the selectors there are less specific **/
-    position: fixed;
-    padding: 0;
-    border: none;
-}
-
-.processor-preview-box.dataset-preview--big::after {
-    display: none;
-}
-
-.processor-preview-box.dataset-preview--big .processor-preview-box-header {
-    padding: var(--spacing-small) var(--spacing-regular);
-    background: var(--panel-bg-0);
-}
-
-.processor-preview-box.dataset-preview--big .dataset-preview-body {
-    margin-top: 0;
-}
-
-.processor-preview-tree #preview-spinner {
-    color: var(--bright);
+/* the preview slides open inside the box, beneath the title, flush with the
+   box' borders - the padding that used to be in the way is on the header now */
+.processor-preview-box > .dataset-preview {
+    margin: 0;
 }
