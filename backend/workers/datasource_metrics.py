@@ -10,8 +10,6 @@ Two types of metrics are currently calculated:
 """
 import os
 
-from datetime import datetime, time, timezone
-
 from backend.lib.worker import BasicWorker
 
 

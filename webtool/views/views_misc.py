@@ -9,13 +9,12 @@ import markdown2
 import traceback
 
 from pathlib import Path
-from datetime import datetime
 
 from flask import Blueprint, request, render_template, jsonify, Response, redirect, url_for, g, current_app
 from flask_login import login_required
 from werkzeug.exceptions import HTTPException, InternalServerError
 
-from webtool.lib.helpers import pad_interval, error
+from webtool.lib.helpers import error
 
 from common.lib.helpers import get_datasource_example_keys
 
@@ -180,8 +179,6 @@ def data_overview(datasource=None):
 
         datasource_id = datasource
         worker_class = g.modules.workers.get(datasource_id + "-search")
-        # Database IDs may be different from the Datasource ID (e.g. the datasource "4chan" became "fourchan" but the database ID remained "4chan")
-        database_db_id = worker_class.prefix if hasattr(worker_class, "prefix") else datasource_id
 
         # Get description
         description_path = Path(datasources[datasource_id].get("path"), "DESCRIPTION.md")
