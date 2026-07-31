@@ -1,0 +1,23 @@
+{# 'View' button that slides the inline preview of a dataset (components/preview.html)
+   open and shut. The two are rendered as siblings and share the Alpine scope
+   their host declares (x-data="datasetPreview", see js/alpine.preview.js).
+
+   While the preview is being fetched the button spins; icon and label both have
+   a fixed footprint so that it does not resize as its state changes.
+
+   Only render this when `dataset|previewable`; the preview itself checks the
+   same filter.
+
+   Expects:
+     dataset  the DataSet being previewed
+     small    (optional) compact variant, for the processor slideout's tree
+#}
+<button type="button" class="preview-toggle{% if small %} small{% else %} button-like{% endif %}"
+        @click="toggle()"
+        :aria-expanded="open ? 'true' : 'false'"
+        :aria-busy="loading ? 'true' : 'false'"
+        {% if small %}x-tooltip="Toggle preview"{% endif %}>
+    <i class="fa fa-fw" aria-hidden="true"
+       :class="loading ? 'fa-circle-notch fa-spin' : (open ? 'fa-chevron-up' : 'fa-eye')"></i>
+    <span class="preview-toggle-label" x-text="open ? 'Hide' : 'View'">View</span>
+</button>
