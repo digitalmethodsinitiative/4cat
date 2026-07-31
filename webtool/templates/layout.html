@@ -47,11 +47,11 @@
                 {% if __user_config("privileges.can_create_dataset") %}
                     <li class="emphasis"><a class="button-like" href="{{ url_for("dataset.create_dataset") }}">Create Dataset</a></li>
                 {% endif %}
-                <li><a href="{{ url_for("dataset.show_results") }}">My Datasets</a></li>
-                <li><a href="{{ url_for("misc.module_catalog") }}">Module catalog</a></li>
-                <li><a href="{{ url_for("misc.show_about") }}">About</a></li>
+                <a href="{{ url_for("dataset.show_results") }}"><li>My Datasets</li></a>
+                <a href="{{ url_for("misc.module_catalog") }}"><li>Module catalog</li></a>
+                <a href="{{ url_for("misc.show_about") }}"><li>About</li></a>
                 {% if __user_cp_access %}
-                    <li><a href="{{ url_for("admin.frontpage") }}">Control Panel</a></li>
+                    <a href="{{ url_for("admin.frontpage") }}"><li>Control Panel</li></a>
                 {% endif %}
             </ul>
         </nav>
