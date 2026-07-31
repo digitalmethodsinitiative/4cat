@@ -59,12 +59,12 @@
         <div class="user-panel">
             <ul>
 		        {% if current_user.is_authenticated %}
-                    <li><a href="#">{{ current_user.get_name() }}</a></li>
+                    <a href="#"><li>{{ current_user.get_name() }}</li></a>
                     {% if not current_user.is_special %}
-                        <li><a href="{{ url_for("user.logout") }}">Log out</a></li>
+                        <a href="{{ url_for("user.logout") }}"><li>Log out</li></a>
                     {% endif %}
                 {% else %}
-                    <li><a href="{{ url_for("user.show_login") }}">Log in</a></li>
+                    <a href="{{ url_for("user.show_login") }}"><li>Log in</li></a>
                 {% endif %}
             </ul>
         </div>

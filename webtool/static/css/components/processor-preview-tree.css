@@ -21,7 +21,7 @@
     down from the bottom of the box itself. **/
 .processor-preview-tree {
     --preview-marker-size: calc(var(--font-normal) * 0.75);
-    --preview-marker-gap: var(--spacing-regular);
+    --preview-marker-gap: var(--spacing-smaller);
     /** centre of a marker, measured from the top of the box it belongs to **/
     --preview-marker-y: calc(var(--spacing-small) + 0.6em);
     /** box edge -> trunk, so that trunk and markers share a centre line **/
@@ -49,7 +49,6 @@
 .processor-preview-tree .processor-preview-box {
     position: relative;
     border: var(--stroke) solid var(--panel-bg-3);
-    line-height: 1;
 }
 
 .processor-preview-box-header,
@@ -103,21 +102,18 @@
 
 .processor-preview-new-hint > .processor-preview-box {
     border: var(--stroke) solid var(--bright);
+    margin-left: var(--spacing-smaller);
 }
 
 .processor-preview-new-hint > .journey-marker-preview {
-    /** the line ends in the 'run a processor' marker of the analysis tree
-        (cf. .run-processor-button): a star of life in an accented circle. Sized
-        via the marker variable so that it stays centred on the line **/
     --preview-marker-size: calc(var(--font-normal) * 1.3);
     border-color: var(--fourcat-accent);
     color: var(--bright);
     background: var(--fourcat-accent);
+    margin-left: -.2rem;
 }
 
 .processor-preview-new-hint > .journey-marker-preview i {
-    /** sized on the icon rather than the button: --preview-marker-y is in em, so
-        the button' own font size has to stay the tree font size **/
     font-size: calc(var(--preview-marker-size) * 0.5);
     line-height: 1;
 }
