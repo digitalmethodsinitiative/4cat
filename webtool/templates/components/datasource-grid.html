@@ -1,0 +1,14 @@
+{# The module grid, filled with the data sources a new dataset can be created
+   from. `grid_sections` is built in dataset.datasource_grid. #}
+{% with card_template = "components/datasource-card.html", noun = "data sources",
+        request_label = "Missing a data source? Request one here." %}
+    {% include "components/module-grid.html" %}
+{% endwith %}
+
+{% if not grid_sections %}
+    <p class="no-results">
+        No data sources are available. {% if __user_config("privileges.admin.can_manage_settings") %}You can enable
+        them in the <a href="{{ url_for('admin.manipulate_settings') }}">settings</a>.{% else %}Ask an administrator to
+        enable one.{% endif %}
+    </p>
+{% endif %}

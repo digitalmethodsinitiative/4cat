@@ -1,0 +1,41 @@
+{# Grid of modules to pick from, swapped into #module-grid when the slideout is
+   opened. Modules are grouped into sections; sections whose modules are all
+   filtered out by the search box hide themselves along with their heading.
+
+   Expects:
+     grid_sections  list of {"header": str|None, "modules": {id: module},
+                    "note": str|None}; a header of None renders that section
+                    without a heading
+     card_template  template rendering one module as a card, called with
+                    `module_id` and `module` from the loop
+     noun           plural noun for the 'nothing found' message
+     request_url    (optional) link to the GitHub issue form for requesting a
+                    module of this kind
+     request_label  (optional) wording of that link
+#}
+{% set section_visible = "!moduleSearch.trim() || [...$el.querySelectorAll('.module-card')].some(c => c.dataset.search.includes(moduleSearch.toLowerCase().trim()))" %}
+{% for section in grid_sections %}
+    <div class="module-grid-section" x-show="{{ section_visible }}">
+        {% if section.header %}<h2 class="module-grid-header">{{ section.header }}</h2>{% endif %}
+        {% if section.note %}<p class="module-grid-note">{{ section.note }}</p>{% endif %}
+        <div class="module-grid">
+            {% for module_id, module in section.modules.items() %}
+                {% include card_template %}
+            {% endfor %}
+        </div>
+    </div>
+{% endfor %}
+{# always present, but steps forward when a search comes up empty - that is
+   exactly the moment someone wants to ask for what is missing #}
+<div class="module-grid-footer" :class="{ 'is-empty': noModuleResults() }">
+    <p class="module-grid-footer-message" style="display: none" x-show="noModuleResults()">
+        No {{ noun if noun else "modules" }} match <strong x-text="moduleSearch"></strong>.
+    </p>
+    {% if request_url %}
+        <p class="module-request">
+            <a href="{{ request_url }}" target="_blank" rel="noopener">
+                <i class="fa-brands fa-github" aria-hidden="true"></i>
+                {{ request_label if request_label else "Request a new module" }}</a>
+        </p>
+    {% endif %}
+</div>

@@ -1,0 +1,92 @@
+name: Processor request
+description: Ask for a new analysis step that can be run on a 4CAT dataset.
+title: "[Processor] "
+labels: ["module-request", "processor"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you start:
+
+        - Check the [list of available processors](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-processors)
+          and the open [processor requests](https://github.com/digitalmethodsinitiative/4cat/issues?q=is%3Aissue+label%3Aprocessor)
+          first — it may already exist.
+        - Processors take one dataset and produce another. If what you want is a different way of *collecting* data,
+          open a data source request instead.
+        - If you want to write it yourself, see
+          [How to make a processor](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor). It
+          does not have to live in 4CAT itself — processors can also be distributed as an extension.
+        - The clearer the input and output below, the more likely someone can pick this up and build it.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What should it do?
+      description: >
+        One or two sentences, starting with a verb — the way a processor describes itself in the interface.
+      placeholder: e.g. Calculate the lexical diversity of each post and add it as a column.
+    validations:
+      required: true
+
+  - type: textarea
+    id: input
+    attributes:
+      label: What should it run on?
+      description: >
+        Which datasets should this be available for — all csv datasets, any dataset with text, only datasets from a 
+        specific data source, only the output of another processor? Name that processor if so.
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: What should it produce?
+      description: >
+        The output format (CSV, NDJSON, an image, a network file, …) and what is in it. For a table, list the columns
+        and what one row represents.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: >
+        Anything the user should be able to configure before running it — thresholds, columns to work on, a language, a
+        model to use. Include sensible defaults if you have them in mind.
+    validations:
+      required: false
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference implementation
+      description: >
+        A paper, method, library, script, or an equivalent feature in another tool. If there is code that already does
+        this, linking to it is the most useful thing you can add.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: requirements
+    attributes:
+      label: Does it need anything beyond plain Python?
+      options:
+        - "No — it can be computed from the dataset itself"
+        - "A Python library that 4CAT does not ship yet"
+        - "A machine learning model (running locally)"
+        - "A GPU"
+        - "An external API or paid service"
+        - "I don't know"
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: What would you use this for?
+      description: >
+        A sentence or two on the research you have in mind. This helps us get the output shape right the first time.
+    validations:
+      required: true
