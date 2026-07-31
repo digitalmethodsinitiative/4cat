@@ -1,0 +1,26 @@
+{# Title bar of the module options slideout, swapped into #module-metadata when
+   a module is selected in the grid. Mirrors the module card's header.
+
+   Expects the same `module`, `icon`, `tags`, `info_url` and `code_url` as
+   components/module-card.html.
+#}
+<div class="module-metadata-text">
+    <ul>
+        {% if icon %}
+            <li>
+                {% include 'components/module-icon.html' %}
+            </li>
+        {% endif %}
+        <li>
+            <h2>{{ module.title }}</h2>
+        </li>
+        <li>
+            {% include 'components/module-card-actions.html' %}
+        </li>
+        {% if tags %}
+        <li>
+            {% include 'components/module-tags.html' %}
+        </li>
+        {% endif %}
+    </ul>
+</div>

@@ -1,0 +1,79 @@
+{# Two-level slideout panel for picking a module and configuring it.
+
+   The first level holds a grid of modules (processors, data sources); picking
+   one slides the second level over it with that module's options form. Both
+   levels are filled in by htmx: the button that opens the slideout targets
+   #module-grid, the cards in the grid target #module-options and
+   #module-metadata. Nothing here knows which kind of module it is showing.
+
+   Must be rendered inside an element with `x-data="moduleSlideout"` (see
+   js/alpine.slideout.js), which also carries the button(s) opening it.
+
+   Expects:
+     search_placeholder  (optional) placeholder for the grid's search box
+     search_label        (optional) accessible label for that search box
+     preview_template    (optional) template rendered between the header and
+                         the grid, e.g. the dataset lineage on a dataset page
+#}
+<div class="module-panel slideout slideout-root"
+     x-show="slideoutActive"
+     x-transition:enter="slide-enter"
+     x-transition:enter-start="slide-from"
+     x-transition:enter-end="slide-to"
+     x-transition:leave="slide-enter"
+     x-transition:leave-start="slide-to"
+     x-transition:leave-end="slide-from"
+>
+    <div class="module-panel-header slideout-header">
+        <div class="slideout-header-title">
+            <ul x-show="slideoutTitle">
+                <li>
+                    <h1 x-text="slideoutTitle"></h1>
+                </li>
+            </ul>
+        </div>
+        <div class="slideout-header-controls">
+            <ul>
+                <template x-if="!selectedModuleType">
+                    <li class="search-box">
+                        <input type="search" x-model="moduleSearch"
+                               placeholder="{{ search_placeholder if search_placeholder else "Search modules…" }}"
+                               aria-label="{{ search_label if search_label else "Search modules by title, description or category" }}">
+                    </li>
+                </template>
+                <li>
+                    <button class="button-like" @click="closeSlideout()" aria-label="Close">
+                        <i class="fa-solid fa-xmark"></i></button>
+                </li>
+            </ul>
+        </div>
+    </div>
+    {% if preview_template %}{% include preview_template %}{% endif %}
+    <div class="module-panel-contents slideout-contents">
+        <div class="slideout-body-wrap">
+            <div id="module-grid" class="slideout-body">
+            </div>
+            {% with spinner_id = "module-grid-spinner" %}{% include "components/spinner.html" %}{% endwith %}
+        </div>
+        <div class="module-options slideout"
+             x-show="selectedModuleType"
+             x-transition:enter="slide-enter"
+             x-transition:enter-start="slide-from"
+             x-transition:enter-end="slide-to"
+             x-transition:leave="slide-enter"
+             x-transition:leave-start="slide-to"
+             x-transition:leave-end="slide-from">
+            <div class="slideout-header narrow">
+                <div id="module-metadata" class="slideout-header-title"></div>
+                <div class="slideout-header-controls">
+                    <button class="button-like" @click="closeOptions()" aria-label="Back to overview">
+                        <i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="slideout-body-wrap">
+                <div id="module-options" class="slideout-body"></div>
+                {% with spinner_id = "module-options-spinner" %}{% include "components/spinner.html" %}{% endwith %}
+            </div>
+        </div>
+    </div>
+</div>

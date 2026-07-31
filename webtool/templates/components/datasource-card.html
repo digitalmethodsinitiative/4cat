@@ -1,0 +1,18 @@
+{# Maps a data source onto the generic module card. `module_id` and `module`
+   come from the loop in components/module-grid.html; `module` is the dict built
+   in dataset.datasource_grid.
+
+   Data sources without dataset parameters (the Zeeschuimer-fed ones) get no
+   options form and so no select button: leaving `options_url` unset is what
+   module-card.html keys on. #}
+{% with icon = module.icon,
+        search_terms = module.title ~ ' ' ~ module.description ~ ' ' ~ module_id,
+        options_url = url_for('dataset.datasource_options', datasource_id=module_id) if module.selectable else None,
+        metadata_url = url_for('dataset.datasource_metadata', datasource_id=module_id) if module.selectable else None,
+        info_url = url_for('misc.data_overview', datasource=module_id),
+        info_label = "How is this data collected?",
+        code_url = module.code_url,
+        code_label = "View data source code",
+        card_extra = "components/datasource-card-hints.html" %}
+    {% include "components/module-card.html" %}
+{% endwith %}

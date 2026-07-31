@@ -1,0 +1,16 @@
+{# Data source-specific footer of a module card: how the data gets into 4CAT,
+   and any status labels the search worker declares (e.g. 'unstable'). For a
+   Zeeschuimer data source this is the whole story the card can tell, since
+   there is nothing to configure here. #}
+<dl class="badge-list output-hints">
+    <div>
+        <dt>Collected via</dt>
+        <dd>{{ "Zeeschuimer" if module.importable else "4CAT" }}</dd>
+    </div>
+    {% if module.status %}
+    <div>
+        <dt>Status</dt>
+        {% for label in module.status %}<dd>{{ label }}</dd>{% endfor %}
+    </div>
+    {% endif %}
+</dl>

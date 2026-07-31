@@ -1,45 +1,15 @@
-<div class="module-card processor-card"
-     data-search="{{ (processor.title ~ ' ' ~ processor.description ~ ' ' ~ processor.category)|lower }}"
-     x-show="!processorSearch.trim() || $el.dataset.search.includes(processorSearch.toLowerCase().trim())">
-    <header class="card-header processor-header">{% if processor.icon %}{% set icon = processor.icon %}{% endif %}
-    {% include 'components/module-icon.html' %}
-    <h3>{{ processor.title }}</h3>
-        {% include 'components/processor-card-actions.html' %}
-        {# todo: change to tag list #}
-        {% set tags = processor.category %}
-        {% include 'components/module-tags.html' %}
-        <nav class="actions">
-            <button
-                class="button-like"
-                hx-get="{{ url_for('dataset.processor_options', key=dataset.key, processor=processor.type) }}"
-                hx-target="#processor-options"
-                hx-swap="innerHTML"
-                hx-indicator="#processor-options-spinner"
-                @click='selectedProcessorType = "{{ processor.type }}";
-                    htmx.ajax("GET", "{{ url_for('dataset.processor_metadata', key=dataset.key, processor=processor.type) }}", "#processor-metadata")'>Select</button>
-        </nav>
-    </header>
-    <section class="card-content">
-        <div class="processor-card-content">
-            <div class="card-description">
-                {{ processor.description }}
-            </div>
-            <dl class="badge-list output-hints">
-                <div><dt>Output</dt><dd>{{ processor.extension }}</dd></div>
-                {% if processor.compatibility %}
-                <div class="followup-hints">
-                    <dt>Follow-ups</dt>
-                    {% if processor.compatibility.preferred_followups %}
-                        {% for followup in (processor.compatibility.preferred_followups|list)[:3] %}
-                            <a href="{{ url_for('misc.module_catalog') }}/{{ followup }}"><dd>{{ followup }}</dd></a>
-                        {% endfor %}
-                    {% endif %}
-                    <ul>
-                        <li class="button-secondary"><a href="{{ url_for('misc.module_catalog') }}/{{ processor.type }}">See all</a></li>
-                    </ul>
-                </div>
-                {% endif %}
-            </dl>
-        </div>
-    </section>
-</div>
+{# Maps a processor onto the generic module card. `module_id` and `module` come
+   from the loop in components/module-grid.html; `dataset` from the grid's
+   render context (see dataset.processor_grid). #}
+{% with icon = module.icon,
+        search_terms = module.title ~ ' ' ~ module.description ~ ' ' ~ module.category,
+        tags = module.category,
+        options_url = url_for('dataset.processor_options', key=dataset.key, processor=module_id),
+        metadata_url = url_for('dataset.processor_metadata', key=dataset.key, processor=module_id),
+        info_url = url_for('misc.module_catalog') ~ '/' ~ module_id,
+        info_label = "More information about this processor",
+        code_url = module.get_repo_link(__config),
+        code_label = "View processor code",
+        card_extra = "components/processor-card-hints.html" %}
+    {% include "components/module-card.html" %}
+{% endwith %}

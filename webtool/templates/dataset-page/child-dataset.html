@@ -23,11 +23,11 @@
             <aside class="run-child-processor">
                 <button class="no-style run-processor-button hint--right" x-tooltip:side="Run processor"
                     hx-get="{{ url_for('dataset.processor_grid', key=dataset.key) }}"
-                            hx-target="#processor-grid"
+                            hx-target="#module-grid"
                             hx-swap="innerHTML"
-                            hx-indicator="#processor-grid-spinner"
+                            hx-indicator="#module-grid-spinner"
                             hx-trigger="click"
-                            @click="slideoutActive = true; selectedDatasetType = '{{ dataset.type }}'; selectedDatasetLabel = '{{ processors[dataset.type].title if dataset.type in processors else dataset.type }}';"
+                            @click='openSlideout({{ ("Processors for " ~ (processors[dataset.type].title if dataset.type in processors else dataset.type))|tojson }})'
                         >
                     <i class="fa-solid fa-star-of-life" aria-hidden="true"></i> <span class="sr-only">Run processor on this dataset</span>
                 </button>

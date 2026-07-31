@@ -13,15 +13,15 @@
     box-sizing: border-box;
 }
 
-.processor-card .badge-list {
+.module-grid .module-card .badge-list {
     margin: 0;
 }
 
-.processor-grid-section + .processor-grid-section {
+.module-grid-section + .module-grid-section {
     margin-top: var(--spacing-large);
 }
 
-.processor-grid-header {
+.module-grid-header {
     margin: 0 0 var(--spacing-regular) 0;
 }
 
@@ -29,4 +29,43 @@
     padding: var(--spacing-large);
     text-align: center;
     color: var(--semidark);
+}
+.module-grid-note {
+    margin: 0 0 var(--spacing-regular) 0;
+    color: var(--semidark);
+}
+
+/* Sits below the grid at all times, quietly. When a search matches nothing the
+   grid above it is empty, so it moves to the middle of the panel and speaks up:
+   that is the moment someone wants to ask for what is not there. */
+.module-grid-footer {
+    margin-top: var(--spacing-large);
+    padding-top: var(--spacing-regular);
+    border-top: var(--stroke-light) dashed var(--panel-bg-2);
+    text-align: center;
+    color: var(--semidark);
+}
+
+.module-grid-footer p {
+    margin: 0;
+}
+
+.module-grid-footer.is-empty {
+    margin-top: 0;
+    padding: var(--spacing-large);
+    border-top: 0;
+    font-size: var(--font-h3);
+}
+
+.module-grid-footer .module-grid-footer-message {
+    margin-bottom: var(--spacing-regular);
+}
+
+.module-grid-footer .module-request a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.module-grid-footer .module-request a:hover {
+    color: var(--fourcat-accent);
 }

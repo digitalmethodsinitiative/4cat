@@ -59,3 +59,7 @@
 .dataset-metadata p.notice a {
     text-decoration: underline;
 }
+
+.dataset-metadata > .dataset-card-host > .dataset-header {
+    margin-top: var(--spacing-regular);
+}

@@ -1,40 +1,65 @@
 {% extends "layout.html" %}
 
 {% block title %}Create dataset{% endblock %}
-{% block body_class %}plain-page frontpage {% endblock %}
+{% block body_class %}result-page {% endblock %}
 {% block breadcrumbs %}{% set navigation.current = "create-dataset" %}{% endblock %}
 {% block body %}
 <script src="{{ url_for('static', filename='js/lib/zip.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/query-form.js') }}"></script>
-<article>
-    <section>
-        <div>
-            <h2>Create dataset</h2>
-        </div>
-        <div>
-            <p>
-                Datasets can be created here or imported via 4CAT companion tools
-                <a href="https://github.com/digitalmethodsinitiative/zeeschuimer" target="_blank">Zeeschuimer</a>
-                (browser-based scraping) and
-                <a href="https://github.com/digitalmethodsinitiative/webjutter" target="_blank">Webjutter</a>
-                (large and continuous archives).
-            </p>
-            {% if __user_config("privileges.can_") %}
-                <p>You can enable/disable data sources in the <a href="{{ url_for('admin.manipulate_settings') }}">settings</a>.</p>
-            {% else %}
-                <p>The administrators can enable data sources.</p>
-            {% endif %}
-            <p>Browse the <a href="{{ url_for("misc.module_catalog") }}">module catalog</a> to get information on all data sources.</p>
-        </div>
-        <form id="query-form" action="{{ url_for('toolapi.queue_dataset') }}" method="POST"
-              enctype="multipart/form-data" x-data="userinputForm">
-            <fieldset class="datasource-form userinput-form">
-                {% include 'components/user-inputs/datasource-select.html' %}
-            </fieldset>
-
-            <div id="datasource-form">
+<article id="main-content">
+    <div class="dataset-container create-dataset-container"
+         x-data="moduleSlideout"
+         @dataset-queued.document="closeSlideout()">
+        <section class="dark dataset-metadata"
+                 x-data="{ queued: null }"
+                 @dataset-queued.document="queued = $event.detail; setTimeout(() => window.location.href = queued.url, 900)"
+                 @pageshow.window="if ($event.persisted) queued = null">
+            <div x-show="!queued">
+                <p>
+                    Datasets can be created here or imported via 4CAT companion tools
+                    <a href="https://github.com/digitalmethodsinitiative/zeeschuimer" target="_blank">Zeeschuimer</a>
+                    (browser-based scraping) and
+                    <a href="https://github.com/digitalmethodsinitiative/webjutter" target="_blank">Webjutter</a>
+                    (large and continuous archives).
+                </p>
+                {% if __user_config("privileges.admin.can_manage_settings") %}
+                    <p>You can enable/disable data sources in the <a href="{{ url_for('admin.manipulate_settings') }}">settings</a>.</p>
+                {% else %}
+                    <p>The administrators can enable data sources.</p>
+                {% endif %}
+                {% if request_url %}
+                    <p>You can also <a href="{{ request_url }}" target="_blank" rel="noopener">request new data sources here</a>.</p>
+                {% endif %}
             </div>
-        </form>
-    </section>
+            <nav x-show="!queued">
+                <ul>
+                    <li>
+                        <button class="button-like"
+                                hx-get="{{ url_for('dataset.datasource_grid') }}"
+                                hx-target="#module-grid"
+                                hx-swap="innerHTML"
+                                hx-indicator="#module-grid-spinner"
+                                hx-trigger="click"
+                                @click="openSlideout('Data sources')">Select data source</button>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="dataset-queued" x-show="queued" x-cloak>
+                <p>
+                    <i class="fa fa-circle-notch fa-spin" aria-hidden="true"></i>
+                    Dataset is being created. Taking you to it&hellip;
+                </p>
+                <p class="dataset-queued-fallback">
+                    <a class="button-like" :href="queued ? queued.url : '#'">Go to dataset</a>
+                </p>
+            </div>
+        </section>
+
+        {% with search_placeholder = "Search data sources…",
+                search_label = "Search data sources by name or description" %}
+            {% include 'components/module-slideout.html' %}
+        {% endwith %}
+    </div>
 </article>
 {% endblock %}

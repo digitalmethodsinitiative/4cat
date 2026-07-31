@@ -308,7 +308,7 @@ def datasource_form(datasource_id):
 
 @component.route("/api/import-dataset/", methods=["POST"])
 @login_required
-@current_app.limiter.limit("5 per minute")
+@current_app.limiter.limit("10 per minute")
 @current_app.openapi.endpoint("tool")
 @setting_required("privileges.can_create_dataset")
 def import_dataset():
@@ -409,7 +409,7 @@ def import_dataset():
 @component.route("/api/queue-query/", methods=["POST"])
 @login_required
 @setting_required("privileges.can_create_dataset")
-@current_app.limiter.limit("5 per minute")
+@current_app.limiter.limit("10 per minute")
 @current_app.openapi.endpoint("tool")
 def queue_dataset():
 	"""

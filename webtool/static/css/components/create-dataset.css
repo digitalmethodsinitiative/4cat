@@ -1,14 +1,36 @@
-#query-form, #datasource-form {
-    margin-top: var(--spacing-large);
+/* The create-dataset page reuses the dataset page's dark metadata box: instead
+   of describing a dataset, it holds the buttons that open the module slideout
+   to pick a data source, and, once the dataset is queued, the hand-off to its
+   page. */
+.create-dataset-container > .dataset-metadata {
+    color: var(--bright);
 }
 
-#datasource-form .submit-container {
+.create-dataset-container .dataset-metadata p {
+    margin: 0 0 var(--spacing-small) 0;
 }
 
-#datasource-form #datasource-form-submit {
-    margin: var(--spacing-large) auto 0;
+.create-dataset-container .dataset-metadata a:not(.button-like) {
+    color: inherit;
+    text-decoration: underline;
 }
 
-#datasource-form-submit {
-    margin-top: 1rem;
+.create-dataset-container .dataset-metadata > nav {
+    margin-top: var(--spacing-regular);
+}
+
+/* stand-in for the dataset card the user is about to land on */
+.create-dataset-container .dataset-queued {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-regular);
+    flex-wrap: wrap;
+}
+
+.create-dataset-container .dataset-queued p {
+    margin: 0;
+}
+
+.create-dataset-container .dataset-queued-fallback {
+    margin-left: auto;
 }

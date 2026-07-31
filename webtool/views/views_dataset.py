@@ -24,6 +24,31 @@ component = Blueprint("dataset", __name__)
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
+def available_datasources():
+    """
+    Enabled data sources, whether or not a dataset can be created from them
+
+    :return dict:  Data source metadata, by data source ID
+    """
+    return {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
+            metadata["has_worker"] and datasource in g.config.get("datasources.enabled", {})}
+
+
+def module_request_url(kind):
+    """
+    Link to the GitHub issue form for requesting a new module
+
+    :param str kind:  `datasource` or `processor`; matches the file name of the
+                      issue form in .github/ISSUE_TEMPLATE/
+    :return str|None:  URL to the pre-selected issue form
+    """
+    repository = g.config.get("4cat.github_url")
+    if not repository:
+        return None
+
+    return "%s/issues/new?template=%s_request.yml" % (repository.rstrip("/"), kind)
+
+
 @component.route('/create-dataset/')
 @login_required
 @setting_required("privileges.can_create_dataset")
@@ -31,30 +56,68 @@ def create_dataset():
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"] and datasource in g.config.get(
-                       "datasources.enabled", {})}
-
-    return render_template('create-dataset.html', datasources=datasources)
+    return render_template('create-dataset.html', datasources=available_datasources(),
+                           request_url=module_request_url("datasource"))
 
 
-@component.route('/create-dataset/datasource-form/')
+@component.route('/create-dataset/datasources/')
 @login_required
 @setting_required("privileges.can_create_dataset")
-def datasource_form_component():
+def datasource_grid():
+    """
+    Get the data sources to create a dataset from, as a module grid
+
+    Counterpart to `processor_grid`: fills the module slideout on the
+    create-dataset page. Data sources are split by how the data gets into 4CAT
+    - collected by 4CAT itself, or captured with Zeeschuimer and imported -
+    since that determines what the user needs to do next. Only the former can
+    be selected; the latter are listed at the end for reference.
+    """
+    modules = {}
+    for datasource_id, metadata in available_datasources().items():
+        worker = g.modules.workers[datasource_id + "-search"]
+        status = worker.get_status()
+        modules[datasource_id] = {
+            "title": metadata["name"],
+            "description": worker.description,
+            "icon": getattr(worker, "icon", None),
+            "status": list(status) if isinstance(status, (list, tuple, set)) else ([status] if status else []),
+            "importable": metadata["importable"],
+            "selectable": metadata["has_options"],
+            "code_url": worker.get_repo_link(g.config),
+        }
+
+    collected = {k: v for k, v in modules.items() if not v["importable"]}
+    imported = {k: v for k, v in modules.items() if v["importable"]}
+
+    if collected and imported:
+        grid_sections = [
+            {"header": "Collected by 4CAT", "modules": collected},
+            {"header": "Captured through Zeeschuimer", "modules": imported,
+             "note": "Use Zeeschuimer to collect and upload data from these sources to 4CAT"},
+        ]
+    elif modules:
+        grid_sections = [{"header": None, "modules": modules}]
+    else:
+        grid_sections = []
+
+    return render_template("components/datasource-grid.html", grid_sections=grid_sections,
+                           request_url=module_request_url("datasource"))
+
+
+@component.route('/create-dataset/datasource/<string:datasource_id>/options/')
+@login_required
+@setting_required("privileges.can_create_dataset")
+def datasource_options(datasource_id):
     """
     Get the query form for a data source as an HTML fragment
 
     htmx-facing counterpart to the JSON `toolapi.datasource_form` endpoint.
-    Returns the rendered dataset parameter options for the data source
-    selected in the create-dataset form, plus the form's notice area and
-    submit button.
-    """
-    datasource_id = request.args.get("datasource", "")
-    if not datasource_id:
-        # no data source selected (e.g. the placeholder option)
-        return ""
+    Returns the rendered dataset parameter options for the data source picked
+    in the module slideout, as a form that js/query-form.js submits.
 
+    :param str datasource_id:  Data source to show options for
+    """
     result = datasource_form(datasource_id)
     if not result.is_json or result.status_code != 200:
         message = result.json.get("message", "This data source is not available.") \
@@ -64,6 +127,32 @@ def datasource_form_component():
     return render_template("components/datasource-form.html", options_html=result.json["html"],
                            datasource_id=datasource_id,
                            common_options=common_dataset_options(g.config, current_user))
+
+
+@component.route('/create-dataset/datasource/<string:datasource_id>/metadata/')
+@login_required
+@setting_required("privileges.can_create_dataset")
+def datasource_metadata(datasource_id):
+    """
+    Get the header for a data source's options in the module slideout
+
+    :param str datasource_id:  Data source to show metadata for
+    """
+    datasources = available_datasources()
+    if datasource_id not in datasources:
+        return error(404, error="This data source is not available.")
+
+    worker = g.modules.workers[datasource_id + "-search"]
+
+    return render_template(
+        "components/module-metadata.html",
+        module={"title": datasources[datasource_id]["name"]},
+        icon=getattr(worker, "icon", None),
+        info_url=url_for("misc.data_overview", datasource=datasource_id),
+        info_label="How is this data collected?",
+        code_url=worker.get_repo_link(g.config),
+        code_label="View data source code",
+    )
 
 
 @component.route('/results/', defaults={'page': 1})
@@ -691,6 +780,34 @@ def show_result(key):
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, breadcrumbs=breadcrumbs,
                            datasources=datasources, merge_sources=merge_sources, copy_source=copy_source)
 
+@component.route('/results/<string:key>/dataset-card/')
+@login_required
+def dataset_card_component(key):
+    """
+    Render the top-level dataset card as a partial
+
+    Polled by the card itself while the dataset is still being created.
+
+    :param str key:  Key of the dataset to re-render
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    return render_template(
+        "dataset-page/dataset-progress-update.html",
+        dataset=dataset,
+        processors=g.modules.processors,
+        # as in show_result: all data sources, so a dataset from a since-disabled
+        # one still links to its overview
+        datasources=g.modules.datasources,
+    )
+
+
 @component.route('/results/<string:key>/processor-grid/')
 @login_required
 def processor_grid(key):
@@ -720,12 +837,20 @@ def processor_grid(key):
         if processor_type not in preferred_processors
     }
 
+    if preferred_processors:
+        grid_sections = [
+            {"header": "Custom follow-ups", "modules": preferred_processors},
+            {"header": "All available processors", "modules": other_processors},
+        ]
+    else:
+        grid_sections = [{"header": None, "modules": other_processors}]
+
     return render_template(
         "components/processor-grid.html",
         dataset=dataset,
-        processors=other_processors,
-        preferred_processors=preferred_processors,
+        grid_sections=grid_sections,
         genealogy=dataset.get_genealogy(),
+        request_url=module_request_url("processor"),
     )
 
 @component.route('/results/<string:key>/processor-options/<string:processor>/')
@@ -776,10 +901,18 @@ def processor_metadata(key, processor):
     if processor not in available_processors:
         return error(404, error="This processor is not available for this dataset.")
 
+    module = available_processors[processor]
+
     return render_template(
-        "components/processor-metadata.html",
-        dataset=dataset,
-        processor=available_processors[processor],
+        "components/module-metadata.html",
+        module=module,
+        module_id=processor,
+        icon=module.icon,
+        tags=module.category,
+        info_url=url_for("misc.module_catalog") + "/" + processor,
+        info_label="More information about this processor",
+        code_url=module.get_repo_link(g.config),
+        code_label="View processor code",
     )
 
 @component.route('/results/<string:key>/child-dataset/')
@@ -877,7 +1010,7 @@ def queue_processor_component(key):
         notice += result.json.get("html", "")
 
     response = make_response(notice)
-    response.headers["HX-Retarget"] = "#processor-options-notice"
+    response.headers["HX-Retarget"] = "#module-options-notice"
     response.headers["HX-Reswap"] = "innerHTML"
     return response
 

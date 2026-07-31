@@ -1,0 +1,18 @@
+{# Processor-specific footer of a module card: what the processor outputs, and
+   which processors are meant to follow it. `module` is the processor. #}
+<dl class="badge-list output-hints">
+    <div><dt>Output</dt><dd>{{ module.extension }}</dd></div>
+    {% if module.compatibility %}
+    <div class="followup-hints">
+        <dt>Follow-ups</dt>
+        {% if module.compatibility.preferred_followups %}
+            {% for followup in (module.compatibility.preferred_followups|list)[:3] %}
+                <a href="{{ url_for('misc.module_catalog') }}/{{ followup }}"><dd>{{ followup }}</dd></a>
+            {% endfor %}
+        {% endif %}
+        <ul>
+            <li class="button-secondary"><a href="{{ url_for('misc.module_catalog') }}/{{ module_id }}">See all</a></li>
+        </ul>
+    </div>
+    {% endif %}
+</dl>

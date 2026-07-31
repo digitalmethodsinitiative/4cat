@@ -104,3 +104,18 @@
 .progress-97 { background: linear-gradient(90deg, var(--panel-bg-1) 0%, var(--panel-bg-1) 97%, var(--panel-bg-0) 97%, var(--panel-bg-0) 100%) !important; }
 .progress-98 { background: linear-gradient(90deg, var(--panel-bg-1) 0%, var(--panel-bg-1) 98%, var(--panel-bg-0) 98%, var(--panel-bg-0) 100%) !important; }
 .progress-99 { background: linear-gradient(90deg, var(--panel-bg-1) 0%, var(--panel-bg-1) 99%, var(--panel-bg-0) 99%, var(--panel-bg-0) 100%) !important; }
+/* A dataset's status bar doubles as its progress bar while the dataset is
+   being created: `--progress` is set inline to the worker's progress as a 0-1
+   fraction (see dataset-page/dataset-card.html), and fills the bar from the
+   left. Subtle on purpose - the bar still has to read as the status text it
+   also is. */
+.badge-list.dataset-status.in-progress {
+    --progress-fill: var(--darken-8);
+    background-image: linear-gradient(90deg,
+        var(--progress-fill) calc(var(--progress, 0) * 100%),
+        transparent calc(var(--progress, 0) * 100%));
+}
+
+.dark .badge-list.dataset-status.in-progress {
+    --progress-fill: var(--brighten-25);
+}

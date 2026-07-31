@@ -1,19 +1,19 @@
-#processor-options {
+#module-options {
     padding: var(--spacing-large);
     max-width: var(--max-width);
     margin: 0 auto;
 }
 
-#processor-options .processor-description {
+#module-options .module-description {
     font-size: 1rem;
     margin-top: 0;
 }
 
-.processor-header .quick-links {
+.module-header .quick-links {
     flex-grow: 0;
 }
 
-.processor-header .actions {
+.module-header .actions {
     margin-left: auto;
 }
 
@@ -21,6 +21,6 @@ fieldset {
     border: none;
 }
 
-#processor-options .processor-queue-button {
+#module-options .module-queue-button {
     margin-top: var(--spacing-regular);
 }

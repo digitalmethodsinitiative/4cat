@@ -245,7 +245,7 @@
     left: calc((-1 * var(--spacing-xlarge)) - (2 * var(--stroke-journey)));
 }
 
-.analysis-results .module-card > .card-header::after, .big-processor-button::after {
+.analysis-results .module-card > .card-header::after, .big-module-button::after {
     /** cover for outline on top of curve (break in stroke otherwise) **/
     content: '';
     position: absolute;
@@ -319,7 +319,7 @@ aside.run-child-processor button:hover {
     font-style: normal;
 }
 
-.big-processor-button, .run-hint p {
+.big-module-button, .run-hint p {
     border-radius: var(--radius);
     border: var(--stroke-light) solid var(--dark);
     border-bottom-width: var(--stroke-journey);
@@ -330,16 +330,16 @@ aside.run-child-processor button:hover {
     width: 100%;
 }
 
-.big-processor-button:hover {
+.big-module-button:hover {
     cursor: pointer;
     background: var(--button-bg-regular);
 }
 
-.big-processor-button:hover, .big-processor-button:hover em {
+.big-module-button:hover, .big-module-button:hover em {
     color: var(--bright);
 }
 
-.big-processor-button .byline {
+.big-module-button .byline {
     margin: var(--spacing-tiny) 0 0 0;
     font-size: var(--font-normal)
 }
@@ -350,12 +350,12 @@ aside.run-child-processor button:hover {
     line-height: calc(var(--font-body) * 1.5);
 }
 
-.big-processor-button:hover .run-processor-button {
+.big-module-button:hover .run-processor-button {
     border-color: var(--bright);
     color: var(--bright);
 }
 
-.big-processor-button::before {
+.big-module-button::before {
     /** curve towards button **/
     content: '';
     display: block;
@@ -371,7 +371,7 @@ aside.run-child-processor button:hover {
     outline: var(--stroke-journey) solid var(--bright);
 }
 
-.big-processor-button::after {
+.big-module-button::after {
     left: 0;
 }
 

@@ -1,16 +1,22 @@
 /**
  * Create-dataset form handling
  *
- * The data source options themselves are loaded into the form via htmx when a
- * data source is selected; `requires` relations between options are handled
- * by Alpine (see alpine.form.js). This script handles what neither can:
- * the two-phase submission of the form.
+ * The form for the selected data source is loaded into the module slideout via
+ * htmx (see components/datasource-form.html); `requires` relations between
+ * options are handled by Alpine (see alpine.form.js). This script handles what
+ * neither can: the two-phase submission of the form. Because the form itself is
+ * swapped in after page load, everything here is bound to the document rather
+ * than to the form.
  *
  * Queries are validated before they are run for real. For file uploads, only
  * a small snippet of the file (or, for zip archives, a listing of its
  * contents) is submitted for validation, so that invalid parameters do not
  * incur a potentially huge upload. Only when the server says the parameters
  * are valid is the form re-submitted in full.
+ *
+ * On success a `dataset-queued` event is dispatched on the document; the
+ * create-dataset page listens for it to collapse the slideout and move on to
+ * the new dataset's page.
  */
 (function () {
     const SNIPPET_SIZE = 128 * 1024;  // 128K ought to be enough for everybody
@@ -29,7 +35,7 @@
     }
 
     function get_notice() {
-        return document.getElementById('query-form-notice');
+        return document.getElementById('module-options-notice');
     }
 
     function show_notice(html) {
@@ -110,6 +116,9 @@
      */
     async function submit(extra_data = null, for_real = false) {
         const form = get_form();
+        if (!form) {
+            return;
+        }
 
         // an explicitly confirmed submission (via the notice checkbox after
         // the server asked for confirmation) skips the validation phase, as
@@ -154,9 +163,13 @@
                     extra.className = 'datasource-extra-input flash-once';
                     extra.innerHTML = response.html;
                     get_notice().before(extra);
+                    extra.scrollIntoView({behavior: 'smooth', block: 'center'});
                 } else if (response.status === 'success') {
-                    // dataset was queued: go look at it
-                    window.location.href = response.url;
+                    // dataset was queued; the page takes it from here (slides
+                    // the slideout down and goes to the new dataset)
+                    document.dispatchEvent(new CustomEvent('dataset-queued', {
+                        detail: {key: response.key, url: response.url}
+                    }));
                     return;
                 }
                 set_busy(false);
@@ -221,42 +234,51 @@
         });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('submit', (e) => {
+        if (e.target.id !== 'query-form') {
+            return;
+        }
+        e.preventDefault();
+        submit();
+    });
+
+    document.addEventListener('change', (e) => {
+        if (!e.target.closest || !e.target.closest('#query-form')) {
+            return;
+        }
+
+        if (e.target.id === 'forminput-search_scope') {
+            handle_density();
+        } else if (e.target.id === 'forminput-board') {
+            handle_board_options();
+        } else if (e.target.id === 'forminput-data_upload') {
+            // a new file may make previously requested extra input fields obsolete
+            document.querySelectorAll('.datasource-extra-input').forEach(el => el.remove());
+        }
+    });
+
+    // when the options for a data source have been loaded into the slideout,
+    // fill in cached values and apply data source-specific tweaks
+    document.addEventListener('htmx:after:settle', (e) => {
+        if (!e.target || e.target.id !== 'module-options') {
+            return;
+        }
+
         const form = get_form();
         if (!form) {
             return;
         }
 
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            submit();
-        });
-
-        form.addEventListener('change', (e) => {
-            if (e.target.id === 'forminput-search_scope') {
-                handle_density();
-            } else if (e.target.id === 'forminput-board') {
-                handle_board_options();
-            } else if (e.target.id === 'forminput-data_upload') {
-                // a new file may make previously requested extra input fields obsolete
-                document.querySelectorAll('.datasource-extra-input').forEach(el => el.remove());
+        const options = form.querySelector('fieldset[data-datasource]');
+        const datasource = options ? options.getAttribute('data-datasource') : '';
+        form.querySelectorAll('.cacheable input').forEach(input => {
+            const cached = localStorage.getItem(datasource + '.' + input.getAttribute('name'));
+            if (cached !== null && cached !== 'undefined') {
+                input.value = cached;
             }
         });
 
-        // when the options for a data source have been loaded, fill in
-        // cached values and apply data source-specific tweaks
-        document.getElementById('datasource-form').addEventListener('htmx:after:settle', () => {
-            const options = form.querySelector('fieldset[data-datasource]');
-            const datasource = options ? options.getAttribute('data-datasource') : '';
-            form.querySelectorAll('.cacheable input').forEach(input => {
-                const cached = localStorage.getItem(datasource + '.' + input.getAttribute('name'));
-                if (cached !== null && cached !== 'undefined') {
-                    input.value = cached;
-                }
-            });
-
-            handle_density();
-            handle_board_options();
-        });
+        handle_density();
+        handle_board_options();
     });
 })();

@@ -24,6 +24,8 @@
     --button-bg-regular: #525252;
 
     --brighten-12: #FFFFFF1E;
+    --brighten-25: #FFFFFF40;
+    --darken-8: #00000014;
 
     --panel-bg-0: hsl(0, 0%, 92%);
     --panel-bg-1: hsl(0, 0%, 84%);

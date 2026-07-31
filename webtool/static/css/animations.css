@@ -42,3 +42,19 @@
 .htmx-request.htmx-indicator {
     opacity: 1;
 }
+
+/* Reveal for content that appears while the user is watching, rather than on
+   page load - e.g. the analysis tree the moment a dataset finishes collecting. */
+.reveal-enter {
+    transition: opacity 0.4s ease-in, transform 0.4s ease-out;
+}
+
+.reveal-from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+}
+
+.reveal-to {
+    opacity: 1;
+    transform: translateY(0);
+}

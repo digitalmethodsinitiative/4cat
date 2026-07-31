@@ -10,7 +10,7 @@ Alpine scope of whatever wraps this card (x-data="datasetPreview": the
 included inside one.
 #}
 {% set deprecated = (dataset.type not in processors) %}
-<header class="card-header dataset-header{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}">
+<header class="card-header dataset-header">
     {% if dataset.get_own_processor().icon %}{% set icon = dataset.get_own_processor().icon %}{% endif %}
     {% include 'components/module-icon.html' %}
     <{% if main_header %}h1{% else %}h3{% endif %}>
@@ -77,7 +77,8 @@ included inside one.
 {% include 'components/preview.html' %}
 
 <section class="card-content status">
-    <dl class="badge-list dataset-status">
+    <dl class="badge-list dataset-status{% if not dataset.is_finished() %} in-progress{% endif %}"
+        {% if not dataset.is_finished() %}style="--progress: {{ dataset.progress if dataset.progress else 0 }}"{% endif %}>
         <div class="status-badge-annotated status-{% if not dataset.is_finished() %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
             <dt>{% if not dataset.is_finished() %}Processing{% elif dataset.num_rows %}Completed{% else %}No
                 results{% endif %}{% if dataset.num_rows %} ({{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %}){% endif %}</dt>
