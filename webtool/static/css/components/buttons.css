@@ -7,7 +7,7 @@ button.no-style {
   background: none
 }
 
-.button-like, input[type=submit], .plain-page button:not(.module-tag) {
+.button-like, input[type=submit], .plain-page button:not(.self-styled) {
     text-transform: uppercase;
 
     color: var(--button-bg-regular);
@@ -82,7 +82,7 @@ a.button-like, button {
 
 }
 
-a.button-like, .button-like button, button.button-like, .plain-page button:not(.module-tag), input[type=submit] {
+a.button-like, .button-like button, button.button-like, .plain-page button:not(.self-styled), input[type=submit] {
     padding: 8px 18px;
 }
 
@@ -184,4 +184,59 @@ a.button-like, .button-like button, button.button-like, .plain-page button:not(.
 
 .with-dropdown:hover ul li {
     display: block;
+}
+
+/* Toggle button with two text options */
+button.toggle {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    max-width: 24rem;
+    padding: 0;
+    overflow: hidden;
+    font: inherit;
+    text-transform: uppercase;
+    background: transparent;
+    border: var(--stroke) solid var(--button-bg-regular);
+    border-radius: var(--radius);
+    cursor: pointer;
+    container-type: inline-size;
+}
+
+/* the option that is not picked; the picked one is called out below */
+button.toggle > span {
+    flex: 1 1 50%;
+    min-width: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px clamp(4px, 4cqi, 18px);
+    line-height: 1.2;
+    text-align: center;
+    background: var(--semidark);
+    color: var(--button-grey);
+    font-size: clamp(0.6rem, 4.5cqi, 1em);
+    overflow-wrap: anywhere;
+}
+
+button.toggle > span + span {
+    border-left: var(--stroke) solid var(--button-bg-regular);
+}
+
+button.toggle[aria-checked="false"] > span:first-child,
+button.toggle[aria-checked="true"] > span:last-child {
+    background: var(--bright);
+    color: var(--button-bg-regular);
+}
+
+button.toggle[aria-checked="true"]:hover > span:first-child,
+button.toggle[aria-checked="false"]:hover > span:last-child {
+    background: var(--button-bg-regular);
+    color: var(--bright);
+}
+
+button.toggle:focus-visible {
+    outline: var(--stroke) solid var(--fourcat-accent);
+    outline-offset: var(--stroke);
 }

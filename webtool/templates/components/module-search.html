@@ -15,7 +15,7 @@
            placeholder="{{ search_placeholder if search_placeholder else "Search modules…" }}"
            aria-label="{{ search_label if search_label else "Search modules by title, description or category" }}">
     {# only worth showing once there is something to clear #}
-    <button type="button" class="search-box-clear" x-cloak x-show="moduleSearch"
+    <button type="button" class="search-box-clear self-styled" x-cloak x-show="moduleSearch"
             @click="moduleSearch = ''" aria-label="Clear search">
         <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 </li>
