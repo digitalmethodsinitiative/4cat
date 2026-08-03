@@ -20,9 +20,8 @@ class ThreadMetadata(BasicProcessor):
 
     type = "thread-metadata"  # job type ID
     description = ProcessorDescription(
-        title="Thread metadata",
-        category="Metrics",
-        tags=["counts", "time-series"],
+        title="Calculate thread metadata",
+        tags=["counting", "metadata"],
         description="Extract metadata for each thread in the dataset, such as the first and last post timestamps, thread age, subject, author, and post and image counts.",
         info=[
             "Metadata is derived only from the items present in the dataset, so incomplete threads yield partial figures.",

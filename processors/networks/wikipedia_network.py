@@ -26,8 +26,7 @@ class WikiURLCoLinker(BasicProcessor):
 	type = "wiki-category-network"  # job type ID
 	description = ProcessorDescription(
 		title="Wikipedia category network",
-		category="Networks",
-		tags=["network", "urls"],
+		tags=["networks", "urls"],
 		description="Create a network of linked-to Wikipedia pages connected to the categories they belong to. Wikipedia links are extracted from the post body and looked up through Wikipedia to find their categories.",
 		warnings=[
 			"Only English Wikipedia is supported, and only the first 10,000 links found are used.",

@@ -40,8 +40,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     type = "histwords-vectspace"  # job type ID
     description = ProcessorDescription(
         title="Chart diachronic nearest neighbours",
-        category="Visual",
-        tags=["chart", "similarity", "time-series"],
+        tags=["text analysis", "chart", "machine learning"],
         description="Chart how the nearest neighbours of a query word shift across a set of word embedding models. Reduces the word vectors to two dimensions with t-SNE, PCA, or truncated SVD, plots the neighbours per model, and links each query word's positions across models. Based on the 'HistWords' algorithm by Hamilton et al.",
         references=[
             "HistWords: [Hamilton, W. L., Leskovec, J., & Jurafsky, D. (2016). Diachronic word embeddings reveal statistical laws of semantic change. *arXiv preprint** arXiv:1605.09096.](https://arxiv.org/pdf/1605.09096.pdf)",

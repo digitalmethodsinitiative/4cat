@@ -34,8 +34,7 @@ class YouTubeMetadata(BasicProcessor):
 	type = "youtube-metadata"  # job type ID
 	description = ProcessorDescription(
 		title="Fetch YouTube metadata",
-		category="Metrics",
-		tags=["urls", "external service", "api key required"],
+		tags=["data source", "urls", "metadata", "external service"],
 		description="Collect metadata from YouTube videos, channels, and playlists linked to in the dataset, using the YouTube Data API. Return one row per link with details such as title, view count, and upload date, and optionally save these as annotations on the source dataset.",
 		references=[
 			"[YouTube v3 API documentation](https://developers.google.com/youtube/v3)",

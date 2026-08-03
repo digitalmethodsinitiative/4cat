@@ -32,8 +32,7 @@ class VideoSceneFrames(BasicProcessor):
     type = "video-scene-frames"  # job type ID
     description = ProcessorDescription(
         title="Extract key frames from each scene",
-        category="Visual",
-        tags=["extract"],
+        tags=["visual", "video", "download media"],
         description="Extract one key frame from each detected scene and save the frames as an image archive. Choose the first, middle, or last frame of each scene, optionally resized to a fixed size.",
         icon="photo-film",
     )

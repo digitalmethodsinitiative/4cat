@@ -24,8 +24,7 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 	type = "convert-ndjson-csv"  # job type ID
 	description = ProcessorDescription(
 		title="Convert NDJSON file to CSV",
-		category="Conversion",
-		tags=["convert format"],
+		tags=["conversion"],
 		description="Create a CSV file from an NDJSON dataset, flattening nested fields into separate columns.",
 		icon="file-csv",
 	)

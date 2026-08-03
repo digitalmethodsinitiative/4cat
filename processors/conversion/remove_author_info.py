@@ -30,8 +30,7 @@ class AuthorInfoRemover(BasicProcessor):
     filter = True  # to indicate we're filtering the top dataset
     description = ProcessorDescription(
         title="Pseudonymise or anonymise",
-        category="Conversion",
-        tags=["anonymise", "authors"],
+        tags=["authors", "override"],
         description="Remove or replace values in fields that hold personal information, such as author and user columns. Choose to replace values with 'REDACTED' or with a unique identifier that hides the value while still marking equal values as equal.",
         info=[
             "This processor targets fields that contain \"author\" or \"user\" in their name, but you can also specify other fields to process.",

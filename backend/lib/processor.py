@@ -41,7 +41,7 @@ class ProcessorDescription:
     """
     title: str
     description: str
-    category: str = ""
+    category: str = ""  # for backwards compatability
     tags: typing.List[str] = field(default_factory=list)
     references: typing.List[str] = field(default_factory=list)
     info: typing.List[str] = field(default_factory=list)
@@ -49,12 +49,9 @@ class ProcessorDescription:
     icon: str = ""
 
     def __post_init__(self):
-        # Normalise casing so processors don't have to: categories always start
-        # with a capital, tags are always lower-case. This keeps the two
-        # consistent however a processor happens to spell them.
         if self.category:
             self.category = self.category[0].upper() + self.category[1:]
-        self.tags = [tag.lower() for tag in self.tags]
+        self.tags = [tag.strip() for tag in self.tags]
 
         # `category` is kept as the first entry of `tags` (as its lower-case
         # tag form), so 4CAT can move to tags (which allow several per processor
@@ -139,9 +136,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
     #: directly, or set the individual attributes below; both are normalised
     #: into `_processor_description` when the class is defined.
     _processor_description = ProcessorDescription(
-        title="", 
-        category="Other", 
-        description="No description available", 
+        title="",
+        description="No description available",
         references=[],
         info=[],
         warnings=[],
@@ -1111,10 +1107,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         Filters do not produce their own dataset but replace the source_dataset dataset
         instead.
 
-        :todo: Make this a bit more robust than sniffing the processor category
+        :todo: Make this a bit more robust than sniffing the processor tags
         :return bool:
         """
-        return (hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()) or (hasattr(cls, "filter") and cls.filter)
+        return (hasattr(cls, "tags") and cls.tags and "filtering" in [tag.lower() for tag in cls.tags]) or (hasattr(cls, "filter") and cls.filter)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:

@@ -17,7 +17,7 @@ class TwitterHashtagStats(TwitterStatsBase):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-hashtag-stats"  # job type ID
-    category = "Twitter analysis"  # category
+    tags = ["hashtags", "counting", "statistics"]  # tags
     title = "Hashtag statistics"  # title displayed in UI
     description = "Lists by hashtag how many tweets contain hashtags, how many times those tweets have been retweeted/replied to/liked/quoted, and information about unique users and hashtags used alongside each hashtag.\nFor retweets and quotes, hashtags from the original tweet are included in the retweet/quote."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI

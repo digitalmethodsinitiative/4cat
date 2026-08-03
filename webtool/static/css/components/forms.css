@@ -246,12 +246,20 @@ input[type=search] {
     color: var(--gray);
     border-bottom: var(--stroke) solid var(--semidark);
     line-height: 1.5rem;
+    /* the rule below only colours in; keeping the width put means the field
+       does not shift by a pixel when it is focused */
+    transition: border-color 0.15s ease-in;
 }
 
 input[type=search]:active,
 input[type=search]:focus {
     outline: none;
-    border-bottom: var(--stroke-heavy) solid var(--semidark);
+    border-bottom-color: var(--fourcat-accent);
+}
+
+/* the browser's own clear button, replaced by .search-box-clear below */
+input[type=search]::-webkit-search-cancel-button {
+    display: none;
 }
 
 .search-box {
@@ -270,6 +278,28 @@ input[type=search]:focus {
     pointer-events: none;
 }
 
+/* room for the magnifying glass on one side, the clear button on the other */
 .search-box input[type="search"] {
     padding-left: calc(var(--spacing-small) * 2 + 1em);
+    padding-right: calc(var(--spacing-small) * 2 + 1em);
+}
+
+/* Mirrors the magnifying glass above, but is only there while there is
+   something to clear. Needs the element in the selector to out-specify
+   `.plain-page button`, which would otherwise make it button-like. */
+.search-box button.search-box-clear {
+    position: absolute;
+    right: var(--spacing-small);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0;
+    border: 0;
+    background: none;
+    line-height: 1;
+    color: var(--semidark);
+    cursor: pointer;
+}
+
+.search-box button.search-box-clear:hover {
+    color: var(--fourcat-accent);
 }

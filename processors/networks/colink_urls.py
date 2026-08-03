@@ -31,8 +31,7 @@ class URLCoLinker(BasicProcessor):
 	type = "url-network"  # job type ID
 	description = ProcessorDescription(
 		title="Create URL co-link network",
-		category="Networks",
-		tags=["urls", "network"],
+		tags=["urls", "networks"],
 		description="Build a network of URLs that appear together in the same post or thread. Each URL is a node, and edges connect URLs that co-occur. Choose whether to use full URLs or only domain names, and whether to count co-occurrence per post or per thread.",
 		icon="circle-nodes",
 	)

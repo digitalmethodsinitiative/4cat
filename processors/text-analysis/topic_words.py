@@ -23,7 +23,7 @@ class TopicModelWordExtractor(BasicProcessor):
     type = "topic-model-words"  # job type ID
     description = ProcessorDescription(
         title="Top words per topic",
-        category="Text analysis",
+        tags=["text analysis", "machine learning"],
         description="Extract the top tokens (words) per topic from a topic model, along with their weights. Use the 'Tokens per topic' option to set how many words are kept for each topic.",
         icon="ranking-star",
     )

@@ -23,8 +23,7 @@ class ColumnFilter(BaseFilter):
     type = "column-filter"  # job type ID
     description = ProcessorDescription(
         title="Filter by value",
-        category="Filtering",
-        tags=["filter"],
+        tags=["filtering"],
         description="Retain items whose value in a chosen column matches a requirement, such as equals, contains, is before or after a date, is greater or less than a number, or is in the top or bottom results. Match against one or several comma-separated values. This creates a new dataset.",
     )
 
@@ -320,8 +319,7 @@ class ColumnProcessorFilter(ColumnFilter):
     type = "column-processor-filter"  # job type ID
     description = ProcessorDescription(
         title="Filter by value",
-        category="Filtering",
-        tags=["filter"],
+        tags=["filtering"],
         description="Retain items whose value in a chosen column matches a requirement, such as equals, contains, is before or after a date, is greater or less than a number, or is in the top or bottom results. Match against one or several comma-separated values. This creates a new dataset.",
     )
 

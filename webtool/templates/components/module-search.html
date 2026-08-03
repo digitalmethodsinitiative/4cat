@@ -1,0 +1,21 @@
+{# Search box filtering a module grid.
+
+   Binds to `moduleSearch` in the grid's Alpine scope (moduleGrid /
+   moduleSlideout, see js/alpine.slideout.js), which the cards filter
+   themselves against. Rendered as a list item, so it drops into the <ul> of a
+   panel header (components/panel-header markup) next to whatever other
+   controls that header holds.
+
+   Expects:
+     search_placeholder  (optional) placeholder for the search box
+     search_label        (optional) accessible label for the search box
+#}
+<li class="search-box">
+    <input type="search" x-model="moduleSearch"
+           placeholder="{{ search_placeholder if search_placeholder else "Search modules…" }}"
+           aria-label="{{ search_label if search_label else "Search modules by title, description or category" }}">
+    {# only worth showing once there is something to clear #}
+    <button type="button" class="search-box-clear" x-cloak x-show="moduleSearch"
+            @click="moduleSearch = ''" aria-label="Clear search">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+</li>

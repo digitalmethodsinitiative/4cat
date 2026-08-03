@@ -9,11 +9,14 @@
      card_template  template rendering one module as a card, called with
                     `module_id` and `module` from the loop
      noun           plural noun for the 'nothing found' message
+     grid_tags      (optional) every tag in this grid; renders a tag filter
+                    above the grid
      request_url    (optional) link to the GitHub issue form for requesting a
                     module of this kind
      request_label  (optional) wording of that link
 #}
-{% set section_visible = "!moduleSearch.trim() || [...$el.querySelectorAll('.module-card')].some(c => c.dataset.search.includes(moduleSearch.toLowerCase().trim()))" %}
+{% if grid_tags %}{% include "components/tag-filter.html" %}{% endif %}
+{% set section_visible = "[...$el.querySelectorAll('.module-card')].some(card => moduleVisible(card))" %}
 {% for section in grid_sections %}
     <div class="module-grid-section" x-show="{{ section_visible }}">
         {% if section.header %}<h2 class="module-grid-header">{{ section.header }}</h2>{% endif %}
@@ -25,11 +28,11 @@
         </div>
     </div>
 {% endfor %}
-{# always present, but steps forward when a search comes up empty - that is
-   exactly the moment someone wants to ask for what is missing #}
+{# always present, but steps forward when a search comes up empty #}
 <div class="module-grid-footer" :class="{ 'is-empty': noModuleResults() }">
     <p class="module-grid-footer-message" style="display: none" x-show="noModuleResults()">
-        No {{ noun if noun else "modules" }} match <strong x-text="moduleSearch"></strong>.
+        No {{ noun if noun else "modules" }} match
+        <strong x-text="moduleSearch.trim() || selectedTag"></strong>.
     </p>
     {% if request_url %}
         <p class="module-request">

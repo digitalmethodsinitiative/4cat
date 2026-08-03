@@ -37,8 +37,7 @@ class ImageDownloader(BasicProcessor):
     type = "image-downloader"  # job type ID
     description = ProcessorDescription(
         title="Download images",
-        category="Visual",
-        tags=["download media", "urls"],
+        tags=["visual", "download media", "urls"],
         description="Extract image URLs from a chosen column and download the images into a ZIP file. For Imgur galleries only the first image is saved, and for animated GIFs only the first frame.",
         info=[
             "A JSON metadata file recording the download outcome per image is included in the archive."

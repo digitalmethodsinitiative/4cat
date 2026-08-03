@@ -22,8 +22,7 @@ class VectoriseByCategory(BasicProcessor):
 	type = "vectorise-tokens-by-category"  # job type ID
 	description = ProcessorDescription(
 		title="Count words by category",
-		category="Text analysis",
-		tags=["counts", "grouping"],
+		tags=["counting", "text analysis"],
 		description="Count how often each token appears within each category, using a chosen column of the parent dataset as the category. Optionally split multi-value categories by comma, separate counts per time interval, and filter by word or number of occurrences.",
 		icon="list-ol",
 	)

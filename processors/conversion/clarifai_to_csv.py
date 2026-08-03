@@ -26,7 +26,7 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
     type = "convert-clarifai-vision-to-csv"  # job type ID
     description = ProcessorDescription(
         title="Convert Clarifai results to CSV",
-        category="Conversion",
+        tags=["visual", "annotation", "machine learning", "classification", "external service"],
         description="Convert the Clarifai API output to a simplified CSV file.",
         icon="file-csv",
     )

@@ -21,8 +21,7 @@ class Stringify(BasicProcessor):
 	type = "stringify-posts"  # job type ID
 	description = ProcessorDescription(
 		title="Merge texts",
-		category="Conversion",
-		tags=["clean text"],
+		tags=["conversion", "preprocessing"],
 		description="Merge the text from the body column of every item into a single continuous text file. Optionally strip URLs, numbers, or punctuation, and convert the text to lowercase.",
 		info=[
 			"The output works well as input for word clouds, word trees, and similar text visualisations.",

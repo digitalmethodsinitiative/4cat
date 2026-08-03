@@ -205,7 +205,7 @@ def test_processors(logger, fourcat_modules, mock_job, mock_job_queue, mock_data
             assert issubclass(processor_class, BasicProcessor), f"{processor_name} is not a subclass of BasicProcessor"
 
             # Check if required attributes are implemented
-            required_attributes = ["type", "category", "title", "description", "extension"]
+            required_attributes = ["type", "tags", "title", "description", "extension"]
             for attr in required_attributes:
                 assert hasattr(processor_class, attr), f"{processor_name} is missing required attribute: {attr}"
                 assert getattr(processor_class, attr), f"{processor_name} has an empty value for attribute: {attr}"

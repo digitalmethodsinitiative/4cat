@@ -23,8 +23,7 @@ class QuoteNetworkGrapher(BasicProcessor):
 	type = "quote-network"  # job type ID
 	description = ProcessorDescription(
 		title="Reply network",
-		category="Networks",
-		tags=["network"],
+		tags=["networks"],
 		description="Create a network of posts replying to each other. Each reference to another post creates an edge between the two posts.",
 		icon="circle-nodes",
 	)

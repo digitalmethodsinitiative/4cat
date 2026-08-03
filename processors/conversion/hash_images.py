@@ -27,8 +27,7 @@ class ImageHasher(BasicProcessor):
     type = "image-hasher"  # job type ID
     description = ProcessorDescription(
         title="Hash images",
-        category="Conversion",
-        tags=["similarity"],
+        tags=["conversion", "visual"],
         description="Calculate a perceptual hash for each image so near-duplicate images can be compared. Choose a perceptual, wavelet, or crop-resistant hash, and optionally group visually similar images together using a similarity threshold.",
         references=[
             "[Imagehash library](https://github.com/JohannesBuchner/imagehash?tab=readme-ov-file)",

@@ -22,8 +22,7 @@ class VisionTagNetworker(BasicProcessor):
     type = "vision-label-network"  # job type ID
     description = ProcessorDescription(
         title="Google Vision co-label network",
-        category="Networks",
-        tags=["network"],
+        tags=["networks", "visual"],
         description="Create a network from annotations returned by the Google Vision API. Labels returned by the API are nodes. An edge connects two labels when they occur on the same image, weighted by how often they co-occur.",
         icon="circle-nodes",
     )

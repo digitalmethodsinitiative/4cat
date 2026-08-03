@@ -28,9 +28,8 @@ class DebateMetrics(BasicProcessor):
 	"""
 	type = "debate_metrics"  # job type ID
 	description = ProcessorDescription(
-		title="Debate metrics",
-		category="Thread metrics",
-		tags=["counts"],
+		title="Get debate metrics",
+		tags=["counting", "metadata"],
 		description="Calculate debate metrics for each thread in the dataset, such as the number of posts, the number of images, and the length of the opening post.",
 		icon="circle-info",
 	)

@@ -21,8 +21,7 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     type = "preset-bipartite-user-tag-network"  # job type ID
     description = ProcessorDescription(
         title="Author-tag network",
-        category="Networks",
-        tags=["network", "authors", "hashtags"],
+        tags=["networks", "authors", "hashtags"],
         description="Create a bipartite network of authors and the (hash)tags they use, based on co-occurrence. An author and a tag are linked when the author wrote a post with that tag, and the link grows stronger the more often they appear together. Tag nodes are weighted by how often they occur, and author nodes by how many posts they made.",
         icon="circle-nodes",
     )

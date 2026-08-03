@@ -21,8 +21,7 @@ class OvertimeAnalysis(BasicProcessor):
     type = "overtime-vocabulary"  # job type ID
     description = ProcessorDescription(
         title="Count words over time",
-        category="Metrics",
-        tags=["counts", "time-series"],
+        tags=["counting", "time series"],
         description="Count how often a chosen set of words or phrases occurs in the dataset over time. Use the built-in OILab extreme speech lexicons or supply your own comma-separated word list, per year, month, week, or day.",
         references=[
             "[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",

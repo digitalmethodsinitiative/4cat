@@ -29,8 +29,7 @@ class ImageGrapher(BasicProcessor):
     type = "image-bipartite-network"  # job type ID
     description = ProcessorDescription(
         title="Bipartite image-item network",
-        category="Networks",
-        tags=["network", "authors"],
+        tags=["networks", "visual"],
         description="Create a network with a bipartite network of images and a data field (for example author) of the dataset the images were sourced from. Suitable for use with Gephi's Image Preview plugin.",
         info=[
             "Optionally merge similar images into a single node using file hashing or perceptual hashing.",

@@ -41,8 +41,7 @@ class TelegramVideoDownloader(BasicProcessor):
     type = "video-downloader-telegram"  # job type ID
     description = ProcessorDescription(
         title="Download Telegram videos",
-        category="Visual",
-        tags=["download media", "external service"],
+        tags=["visual", "download media", "external service"],
         description="Download the videos attached to Telegram messages and store them in a ZIP file.",
         info=[
             "A JSON metadata file recording the download outcome per message is included in the archive."

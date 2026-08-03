@@ -29,8 +29,7 @@ class TelegramImageDownloader(TelegramVideoDownloader):
     type = "image-downloader-telegram"  # job type ID
     description = ProcessorDescription(
         title="Download Telegram images",
-        category="Visual",
-        tags=["download media", "external service"],
+        tags=["visual", "download media", "external service"],
         description="Download the images attached to Telegram messages and store them in a ZIP file. Video and link preview thumbnails can optionally be included.",
         info=[
             "A JSON metadata file recording the download outcome per message is included in the archive."

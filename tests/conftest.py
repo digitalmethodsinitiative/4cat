@@ -2,7 +2,7 @@
 Shared pytest fixtures.
 
 These mirror the fixtures in test_modules.py so that other test modules (e.g.
-test_processor_map.py) can build the real module set without a database. Defining
+test_module_map.py) can build the real module set without a database. Defining
 them here makes them available session-wide; test_modules.py keeps its own local
 copies, which simply override these for its own tests (standard pytest behaviour),
 so nothing about that file changes.

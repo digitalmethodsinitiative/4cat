@@ -25,8 +25,7 @@ class AccentFoldingFilter(BasicProcessor):
     type = "accent-folder"  # job type ID
     description = ProcessorDescription(
         title="Convert accents and non-Latin characters",
-        category="Filtering",
-        tags=["clean text"],
+        tags=["filtering", "preprocessing"],
         description="Replace accented and non-Latin characters with their closest ASCII equivalent, converting for example 'á' to 'a' and 'ç' to 'c'. Fold only accented Latin characters, or transliterate all non-ASCII characters. Optionally convert all text to lowercase. This creates a new dataset.",
         icon="language",
     )

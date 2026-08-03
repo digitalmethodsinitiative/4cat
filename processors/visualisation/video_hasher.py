@@ -34,8 +34,7 @@ class VideoHasherPreset(ProcessorAdvancedPreset):
     type = "preset-video-hashes"  # job type ID
     description = ProcessorDescription(
         title="Find near-duplicate videos with hashes",
-        category="Visual",
-        tags=["similarity", "needs ffmpeg", "network"],
+        tags=["visual", "video", "networks"],
         description="Run the full pipeline to detect near-duplicate videos: extract frames, build a 64-bit hash per video, and produce a similarity network and matrix. Two videos are linked when their hashes are at least the chosen percentage similar. Only the video content is used.",
         warnings=[
             "This can take a very long time depending on the number of videos, their length, and the frames per second used.",
@@ -140,8 +139,7 @@ class VideoHasher(BasicProcessor):
     type = "video-hasher-1"  # job type ID
     description = ProcessorDescription(
         title="Create video collages",
-        category="Visual",
-        tags=["similarity", "needs ffmpeg"],
+        tags=["visual", "chart"],
         description="Sample frames from each video with ffmpeg and combine them into a single collage image, then derive a 64-bit hash from the collage. These hashes can be compared to find near-duplicate videos. Optionally save each video's hash back to the source dataset as an annotation.",
         warnings=[
             "For short videos, a higher frame rate reduces false matches but takes longer to process.",
@@ -354,8 +352,7 @@ class VideoHashNetwork(BasicProcessor):
     type = "video-hash-network"  # job type ID
     description = ProcessorDescription(
         title="Create video hash network",
-        category="Visual",
-        tags=["similarity", "network"],
+        tags=["networks", "visual"],
         description="Build a network of videos linked by the similarity of their hashes. Each video is a node, and an edge is drawn between two videos when their hashes are at least the chosen percentage similar. Run this on the output of 'Create video collages'.",
         references=[
             "[Video Hash](https://github.com/akamhy/videohash#readme)",
@@ -472,8 +469,7 @@ class VideoHashSimilarities(BasicProcessor):
     type = "video-hash-similarity-matrix"  # job type ID
     description = ProcessorDescription(
         title="Group videos by hash similarity",
-        category="Visual",
-        tags=["similarity", "grouping"],
+        tags=["visual", "classification"],
         description="Compare video hashes and assign each video to a similarity group. Videos are grouped when their hashes are at least the chosen percentage similar, and groups can chain together when videos overlap. Run this on the output of 'Create video collages'.",
         references=[
             "[Video Hash](https://github.com/akamhy/videohash#readme)",

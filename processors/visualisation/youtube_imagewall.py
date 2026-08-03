@@ -31,7 +31,7 @@ class YouTubeImageWall(BasicProcessor):
     type = "youtube-imagewall"  # job type ID
     description = ProcessorDescription(
         title="Make image wall from YouTube thumbnails",
-        category="Visual",
+        tags=["visual", "chart"],
         description="Arrange downloaded YouTube video thumbnails into a single grid image. Optionally overlay each thumbnail with a colour for its video category and add a category legend.",
         icon="panorama",
     )

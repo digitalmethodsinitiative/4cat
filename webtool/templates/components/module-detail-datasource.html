@@ -1,0 +1,70 @@
+{# The data source-specific part of a module's detail: what used to be the
+   data-overview page. Only rendered for modules that are a data source's search
+   worker.
+
+   Expects `datasource`, built by misc.datasource_detail. #}
+<section class="module-detail-datasource">
+    {% if datasource.description %}
+        <div class="module-detail-datasource-description">
+            {{ datasource.description|markdown|safe }}
+        </div>
+    {% else %}
+        <p class="module-detail-muted">
+            No description set. Data source descriptions can be added with a <code>DESCRIPTION.md</code> file in the
+            data source folder.
+        </p>
+    {% endif %}
+
+    <dl class="metadata-wrapper">
+        <div class="fullwidth">
+            <dt>Type</dt>
+            <dd>
+                <ul class="nobullet">
+                    {% if datasource.importable %}
+                        <li>Data for this data source is captured with
+                            <a href="https://github.com/digitalmethodsinitiative/zeeschuimer" rel="external" target="_blank">Zeeschuimer</a>
+                            and uploaded from there.</li>
+                    {% else %}
+                        <li>Data for this data source is collected by 4CAT itself.</li>
+                    {% endif %}
+                    {% if not datasource.configurable %}
+                        <li>This data source has no dataset parameters, so a dataset cannot be started for it from the
+                            create-dataset page.</li>
+                    {% endif %}
+                    {% if not datasource.enabled %}
+                        <li>This data source is not enabled on this 4CAT instance.
+                            {% if __user_config("privileges.admin.can_manage_settings") %}
+                                You can enable it in the <a href="{{ url_for('admin.manipulate_settings') }}">settings</a>.
+                            {% endif %}
+                        </li>
+                    {% endif %}
+                </ul>
+            </dd>
+        </div>
+
+        {% if datasource.expiration %}
+            <div class="fullwidth">
+                <dt>Dataset expiration</dt>
+                <dd>After {{ datasource.expiration|timify_long|safe }}</dd>
+            </div>
+        {% endif %}
+
+        {% if datasource.source_url %}
+            <div class="fullwidth">
+                <dt>Source code &amp; technical info</dt>
+                <dd><a href="{{ datasource.source_url }}" rel="external" target="_blank">GitHub link</a></dd>
+            </div>
+        {% endif %}
+
+        {% if datasource.example_keys %}
+            <div class="fullwidth">
+                <dt>Dataset items</dt>
+                <dd>
+                    {% for key in datasource.example_keys %}
+                        <span class="inline-label property-badge">{{ key }}</span>
+                    {% endfor %}
+                </dd>
+            </div>
+        {% endif %}
+    </dl>
+</section>

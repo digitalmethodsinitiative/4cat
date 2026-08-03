@@ -24,22 +24,18 @@
      x-transition:leave-start="slide-to"
      x-transition:leave-end="slide-from"
 >
-    <div class="module-panel-header slideout-header">
-        <div class="slideout-header-title">
+    <div class="module-panel-header panel-header">
+        <div class="panel-header-title">
             <ul x-show="slideoutTitle">
                 <li>
                     <h1 x-text="slideoutTitle"></h1>
                 </li>
             </ul>
         </div>
-        <div class="slideout-header-controls">
+        <div class="panel-header-controls">
             <ul>
                 <template x-if="!selectedModuleType">
-                    <li class="search-box">
-                        <input type="search" x-model="moduleSearch"
-                               placeholder="{{ search_placeholder if search_placeholder else "Search modules…" }}"
-                               aria-label="{{ search_label if search_label else "Search modules by title, description or category" }}">
-                    </li>
+                    {% include "components/module-search.html" %}
                 </template>
                 <li>
                     <button class="button-like" @click="closeSlideout()" aria-label="Close">
@@ -63,9 +59,9 @@
              x-transition:leave="slide-enter"
              x-transition:leave-start="slide-to"
              x-transition:leave-end="slide-from">
-            <div class="slideout-header narrow">
-                <div id="module-metadata" class="slideout-header-title"></div>
-                <div class="slideout-header-controls">
+            <div class="panel-header narrow">
+                <div id="module-metadata" class="panel-header-title"></div>
+                <div class="panel-header-controls">
                     <button class="button-like" @click="closeOptions()" aria-label="Back to overview">
                         <i class="fa-solid fa-xmark"></i></button>
                 </div>

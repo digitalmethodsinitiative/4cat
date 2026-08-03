@@ -24,8 +24,7 @@ class ClassificationEvaluation(BasicProcessor):
     type = "classification_evaluation"  # job type ID
     description = ProcessorDescription(
         title="Evaluate classification labels",
-        category="Statistics",
-        tags=["counts", "classify"],
+        tags=["classification", "statistics", "counting"],
         description="Compare true and predicted labels in two columns and calculate accuracy, precision, recall, F1, and Cohen's Kappa. Produces overall and per-label metrics, and supports multiple labels per cell.",
         info=[
             "For multiple labels per cell, enable the multi-label option and separate the labels with commas.",

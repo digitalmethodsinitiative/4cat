@@ -23,8 +23,7 @@ class UniqueImageFilter(BasicProcessor):
     type = "image-downloader-unique"  # job type ID
     description = ProcessorDescription(
         title="Filter for unique images",
-        category="Visual",
-        tags=["filter", "similarity"],
+        tags=["filtering", "visual"],
         description="Keep only one copy of each image, detecting duplicates with an exact file hash or with a perceptual, colour, average, or difference hash. The remaining images are saved as a new image archive.",
         info=[
             "The file hash only matches byte-for-byte identical files; the perceptual, colour, average, and difference hashes also match visually similar images such as crops or re-saves.",

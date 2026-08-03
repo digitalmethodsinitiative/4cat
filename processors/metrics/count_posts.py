@@ -20,8 +20,7 @@ class CountPosts(BasicProcessor):
     type = "count-posts"  # job type ID
     description = ProcessorDescription(
         title="Count items per date",
-        category="Metrics",
-        tags=["counts", "time-series"],
+        tags=["counting", "time series"],
         description="Count how many items are in the dataset, grouped by date or counted overall.",
         info=[
             "Enable 'Include dates with zero items' to keep the timeline continuous when some dates have no data.",

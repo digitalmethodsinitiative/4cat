@@ -27,8 +27,7 @@ class StableDiffusionImageGenerator(BasicProcessor):
     type = "image-downloader-stable-diffusion"  # job type ID
     description = ProcessorDescription(
         title="Generate images from text prompts",
-        category="Visual",
-        tags=["generate media", "external service"],
+        tags=["visual", "machine learning", "genAI", "external service"],
         description="Generate images from a column of text prompts using the Stable Diffusion XL model. Each prompt produces one image, with an optional negative prompt to steer the model away from unwanted content.",
         references=[
             "[Stable Diffusion XL 1.0 model card](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)",

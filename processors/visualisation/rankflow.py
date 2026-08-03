@@ -37,8 +37,7 @@ class RankFlowRenderer(BasicProcessor):
     type = "render-rankflow"  # job type ID
     description = ProcessorDescription(
         title="RankFlow diagram",
-        category="Visual",
-        tags=["rank", "time-series", "chart"],
+        tags=["time series", "counting", "chart"],
         description="Create an interactive RankFlow diagram showing how the rank and prevalence of items change over time. Each period is drawn as a column of ranked boxes, connected by flows to the same items in adjacent periods. Boxes can be coloured and sized by value or by change between periods.",
         references=[
             "[Rieder, B. RankFlow. *The Politics of Systems*](https://labs.polsys.net/tools/rankflow/)",

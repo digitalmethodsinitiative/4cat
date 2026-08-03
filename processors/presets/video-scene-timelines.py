@@ -15,8 +15,7 @@ class VideoSceneTimelineCreator(ProcessorPreset):
     type = "preset-scene-timelines"  # job type ID
     description = ProcessorDescription(
         title="Create scene-by-scene timelines",
-        category="Visual",
-        tags=["needs ffmpeg"],
+        tags=["video", "visual", "time series"],
         description="Build a horizontal timeline for each video, showing one frame per detected scene. Scenes are detected automatically, and the per-video timelines are stacked into a single SVG file.",
         icon="film",
     )

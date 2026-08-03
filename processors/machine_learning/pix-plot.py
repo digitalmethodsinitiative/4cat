@@ -31,8 +31,7 @@ class PixPlotGenerator(BasicProcessor):
     type = "pix-plot"  # job type ID
     description = ProcessorDescription(
         title="Create PixPlot visualisation",
-        category="Visual",
-        tags=["similarity", "web page", "external service"],
+        tags=["visual", "external service"],
         description="Arrange the images in an archive into a PixPlot: an explorable map where images are grouped by visual similarity. Use the neighbours and minimum distance options to control how tightly images cluster.",
         references=[
             "[PixPlot](https://pixplot.io/)",

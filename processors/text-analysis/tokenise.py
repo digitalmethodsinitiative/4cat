@@ -33,8 +33,7 @@ class Tokenise(BasicProcessor):
     type = "tokenise-posts"  # job type ID
     description = ProcessorDescription(
         title="Tokenise text",
-        category="Text analysis",
-        tags=["clean text", "extract"],
+        tags=["text analysis", "preprocessing"],
         description="Split item texts into separate tokens (words) for use in later text analysis. Optionally stem "
                     "or lemmatise tokens, remove stop words, and group tokens per item or per sentence and per "
                     "timeframe. The output is a list of lists, each list holding the tokens for one item or sentence.",

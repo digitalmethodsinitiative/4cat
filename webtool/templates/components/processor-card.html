@@ -2,11 +2,12 @@
    from the loop in components/module-grid.html; `dataset` from the grid's
    render context (see dataset.processor_grid). #}
 {% with icon = module.icon,
-        search_terms = module.title ~ ' ' ~ module.description ~ ' ' ~ module.category,
-        tags = module.category,
+        tags = module.tags,
+        search_terms = module.title ~ ' ' ~ module.description ~ ' ' ~ module.tags|join(' '),
+        select_template = "components/module-select-slideout.html",
         options_url = url_for('dataset.processor_options', key=dataset.key, processor=module_id),
         metadata_url = url_for('dataset.processor_metadata', key=dataset.key, processor=module_id),
-        info_url = url_for('misc.module_catalog') ~ '/' ~ module_id,
+        info_url = url_for('misc.module_catalog', module_type=module_id),
         info_label = "More information about this processor",
         code_url = module.get_repo_link(__config),
         code_label = "View processor code",

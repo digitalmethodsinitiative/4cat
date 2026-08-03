@@ -32,22 +32,38 @@
     --panel-bg-2: hsl(0, 0%, 76%);
     --panel-bg-3: hsl(0, 0%, 50%);
 
-    /* module category tags */
-    --tag1: #9351a7;
-    --tag2: #59b05a;
-    --tag3: #d381d1;
-    --tag4: #95a548;
-    --tag5: #6074cf;
-    --tag6: #c8a039;
-    --tag7: #8286b5;
-    --tag8: #c3503f;
-    --tag9: #519cb4;
-    --tag10: #c6477b;
-    --tag11: #6fb89c;
-    --tag12: #d98f5f;
-    --tag13: #54784b;
-    --tag14: #ba7c8b;
-    --tag15: #8f6f43;
+    /* module tags */
+    --tag1: #92e23e;
+    --tag2: #712ed5;
+    --tag3: #6cdc76;
+    --tag4: #c845cc;
+    --tag5: #dac93c;
+    --tag6: #6d5cd4;
+    --tag7: #6ea035;
+    --tag8: #562a7a;
+    --tag9: #ccd885;
+    --tag10: #cc3c82;
+    --tag11: #6adfba;
+    --tag12: #dc4338;
+    --tag13: #71c3d6;
+    --tag14: #db893a;
+    --tag15: #6685cf;
+    --tag16: #947d36;
+    --tag17: #c77dc4;
+    --tag18: #43652e;
+    --tag19: #d26d7a;
+    --tag20: #589e6f;
+    --tag21: #702938;
+    --tag22: #bfd3b8;
+    --tag23: #31203a;
+    --tag24: #dcaa89;
+    --tag25: #62577f;
+    --tag26: #984726;
+    --tag27: #4e7b87;
+    --tag28: #c7b2d2;
+    --tag29: #383a25;
+    --tag30: #8c7264;
+    --tag31: #7a7a7a;
 
     --max-width: 68rem; /** viewport width **/
 

@@ -22,7 +22,7 @@ class TwitterAggregatedStats(BasicProcessor):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-aggregated-stats"  # job type ID
-    category = "Twitter analysis"  # category
+    tags = ["counting", "metadata"]  # tags
     title = "Aggregated statistics"  # title displayed in UI
     description = "Group tweets by category and count tweets per timeframe and then calculate aggregate group statistics (i.e. min, max, average, Q1, median, Q3, and trimmed mean): number of tweets, urls, hashtags, mentions, etc. \nUse for example to find the distribution of the number of tweets per author and compare across time."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
@@ -256,7 +256,7 @@ class TwitterAggregatedStatsVis(TwitterAggregatedStats):
     Collect Twitter statistics and create boxplots to visualise.
     """
     type = "twitter-aggregated-stats-vis"  # job type ID
-    category = "Twitter Analysis"  # category
+    tags = ["statistics", "chart"] # category
     title = "Aggregated Statistics Visualization"  # title displayed in UI
     description = "Gathers Aggregated Statistics data and creates Box Plots visualising the spread of intervals. A large number of intervals will not properly display. "  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI

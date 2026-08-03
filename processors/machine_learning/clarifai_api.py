@@ -30,8 +30,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
     type = "clarifai-api"  # job type ID
     description = ProcessorDescription(
         title="Label images with Clarifai",
-        category="Machine learning",
-        tags=["classify", "api key required", "external service"],
+        tags=["machine learning", "visual", "classification", "external service"],
         description="Use the Clarifai API to tag and label images with machine learning. One request is made per "
                     "image for each model you select.",
         references=[

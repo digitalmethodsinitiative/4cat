@@ -26,9 +26,8 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     """
     type = "convert-google-vision-to-csv"  # job type ID
     description = ProcessorDescription(
-        title="Convert Vision results to CSV",
-        category="Conversion",
-        tags=["convert format"],
+        title="Convert Google Vision results to CSV",
+        tags=["conversion"],
         description="Convert the Google Vision API output from NDJSON to a simplified CSV file, flattening detected labels, logos, landmarks, objects, and text into columns. Optionally write the results back as annotations on the original dataset.",
         info=[
             "Some detail is lost when flattening, so keep the original NDJSON dataset if you need the full output.",

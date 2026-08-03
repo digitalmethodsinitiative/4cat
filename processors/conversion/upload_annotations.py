@@ -26,8 +26,7 @@ class UploadAnnotations(BasicProcessor):
 	type = "upload-annotations"  # job type ID
 	description = ProcessorDescription(
 		title="Upload annotations",
-		category="Conversion",
-		tags=["annotate"],
+		tags=["conversion", "annotation", "override"],
 		description="Add annotations to the dataset from a CSV file or pasted text. The first column holds item IDs matching items in the dataset, and each further column becomes an annotation field.",
 		warnings=[
 			"Only rows whose item ID matches an item in the dataset are used; other rows are skipped.",

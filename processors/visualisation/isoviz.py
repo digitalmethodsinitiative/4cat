@@ -34,8 +34,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	type = "render-graphs-isometric"  # job type ID
 	description = ProcessorDescription(
 		title="Side-by-side area graphs",
-		category="Visual",
-		tags=["time-series", "chart"],
+		tags=["time series", "chart"],
 		description="Generate an area graph per item showing its prevalence over time. The graphs are projected side by side on an isometric plane for comparison. Values can optionally be normalised to 0-100% and smoothed into curves.",
 		icon="chart-area",
 	)

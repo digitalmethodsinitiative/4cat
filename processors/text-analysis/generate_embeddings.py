@@ -27,8 +27,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 	type = "generate-embeddings"  # job type ID
 	description = ProcessorDescription(
 		title="Generate word embedding models",
-		category="Text analysis",
-		tags=["similarity"],
+		tags=["text analysis", "machine learning"],
 		description="Train word2vec or FastText word embedding models from tokens, either for the whole dataset or per time interval. Each word is assigned a position in a multi-dimensional vector space based on the words it appears alongside, so words used in similar contexts end up close together. These models can then be used to find words with similar contexts or to track how word usage shifts over time.",
 		references=[
 			"word2vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",

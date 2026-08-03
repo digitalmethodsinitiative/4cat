@@ -1,0 +1,13 @@
+{# Select button for a module card in the module slideout: loads the module's
+   options over the grid, and its header into the options level's title bar.
+
+   Expects `module_id`, `options_url`, `metadata_url` and optionally
+   `select_label` - see components/module-card.html. #}
+<button
+    class="button-like"
+    hx-get="{{ options_url }}"
+    hx-target="#module-options"
+    hx-swap="innerHTML"
+    hx-indicator="#module-options-spinner"
+    @click='selectedModuleType = {{ module_id|tojson }};
+        htmx.ajax("GET", {{ metadata_url|tojson }}, "#module-metadata")'>{{ select_label if select_label else "Select" }}</button>

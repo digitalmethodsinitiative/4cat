@@ -29,8 +29,7 @@ class TikTokImageDownloader(BasicProcessor):
     type = "image-downloader-tiktok"  # job type ID
     description = ProcessorDescription(
         title="Download TikTok images",
-        category="Visual",
-        tags=["download media"],
+        tags=["visual", "download media"],
         description="Download video thumbnails, music thumbnails, or author avatars for TikTok posts. Refreshes TikTok data through the scraper when a thumbnail URL has expired. Saves the images to a zip archive.",
         info=[
             "Choose which image to download per post: video thumbnail, music thumbnail, or author avatar.",

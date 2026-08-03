@@ -19,8 +19,7 @@ class ConvertCSVToJSON(BasicProcessor):
 	type = "convert-csv"  # job type ID
 	description = ProcessorDescription(
 		title="Convert to JSON",
-		category="Conversion",
-		tags=["convert format"],
+		tags=["conversion"],
 		description="Convert a CSV file to a JSON file, writing one JSON list with one object per row.",
 		warnings=["This processor will read the entire CSV file and write it to a single JSON file. This may take a long time and use a lot of memory for large datasets."],
 		icon="square-js",

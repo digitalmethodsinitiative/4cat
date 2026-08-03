@@ -24,7 +24,7 @@ class ThreadSplitter(BasicProcessor):
 	type = "split-threads"  # job type ID
 	description = ProcessorDescription(
 		title="Split by thread",
-		category="Conversion",
+		tags=["conversion"],
 		description="Split the dataset into one file per thread, keeping only the posts in each thread.",
 		icon="scissors",
 	)

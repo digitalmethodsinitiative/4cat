@@ -19,8 +19,7 @@ class Perspective(BasicProcessor):
 	type = "perspective"  # job type ID
 	description = ProcessorDescription(
 		title="Score text toxicity with Perspective",
-		category="Machine learning",
-		tags=["classify", "api key required", "external service", "annotate"],
+		tags=["machine learning", "classification", "external service", "annotation"],
 		description="Use Google Jigsaw's Perspective API to score the 'body' text of each item on attributes such as toxicity, severe toxicity, identity attack, insult, profanity, and threat. Each attribute is returned as a value between 0 and 1.",
 		references=[
 			"[Perspective API documentation](https://developers.perspectiveapi.com/s/about-the-api)",

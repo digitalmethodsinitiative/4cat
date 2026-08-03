@@ -9,12 +9,14 @@
     flex-grow: 1;
     flex-shrink: 1;
     flex-basis: calc((100% - 2 * var(--spacing-regular)) / 3);
-    min-width: min(35rem, 100%);
+    min-width: min(30rem, 100%);
     box-sizing: border-box;
 }
 
 .module-grid .module-card .badge-list {
     margin: 0;
+    overflow-x: scroll;
+    margin-right: var(--spacing-regular);
 }
 
 .module-grid-section + .module-grid-section {
@@ -67,5 +69,51 @@
 }
 
 .module-grid-footer .module-request a:hover {
+    color: var(--fourcat-accent);
+}
+
+/* Tag filter above a module grid. The chips reuse the .module-tag colours, so a
+   tag looks the same here as it does on a card. All of them keep their colour
+   until one is picked; the rest then dim rather than disappear, so the whole
+   vocabulary stays visible while filtering. */
+.tag-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--spacing-regular);
+    row-gap: var(--spacing-small);
+    margin-bottom: var(--spacing-regular);
+    padding-bottom: var(--spacing-regular);
+    border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
+.tag-filter-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-tiny);
+}
+
+.tag-filter .module-tag.is-dimmed {
+    filter: grayscale(1);
+    opacity: 0.4;
+}
+
+/* a link, not a button, wherever the grid is shown; the element is in the
+   selector to out-specify `.plain-page button`, which would otherwise make
+   this button-like on the catalogue page but not in the slideout */
+.tag-filter button.tag-filter-reset {
+    font: inherit;
+    font-size: var(--font-body);
+    text-transform: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--semidark);
+    text-decoration: underline;
+    cursor: pointer;
+    margin-left: auto;
+}
+
+.tag-filter button.tag-filter-reset:hover {
     color: var(--fourcat-accent);
 }

@@ -22,8 +22,7 @@ class QuoteRanker(BasicProcessor):
 	type = "quote-ranker"  # job type ID
 	description = ProcessorDescription(
 		title="Sort by most replied-to",
-		category="Metrics",
-		tags=["rank", "counts"],
+		tags=["counting"],
 		description="Sort posts by how often they were replied to by other posts in the dataset, adding a column with the number of replies each post received.",
 		icon="comments",
 	)

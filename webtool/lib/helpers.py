@@ -13,6 +13,7 @@ from flask_login import current_user
 from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
 
+from common.lib.module_map import ModuleMap
 from common.lib.user_input import UserInput
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -80,6 +81,76 @@ class Pagination(object):
 					yield None
 				yield num
 				last = num
+
+
+# Cache the built module map per modules object. `g.modules`
+# (app.fourcat_modules) is a single process-global, replaced only on a full
+# reload, so its identity is a safe cache key -- a new identity forces a
+# rebuild.
+# NOTE: config is NOT part of the key: the ModuleMap does not gate edges on
+# per-user config today. Per-user maps would need the config (or user) in the key.
+_MODULE_MAP_CACHE = {}  # id(modules) -> (modules, ModuleMap)
+
+
+def module_map():
+	"""
+	The module map for the currently loaded modules
+
+	Built lazily and cached, since building it walks every processor's
+	compatibility spec.
+
+	:return ModuleMap:
+	"""
+	modules = g.modules
+	cached = _MODULE_MAP_CACHE.get(id(modules))
+	if cached is None or cached[0] is not modules:
+		_MODULE_MAP_CACHE.clear()
+		_MODULE_MAP_CACHE[id(modules)] = (modules, ModuleMap(modules, g.config, logger=g.log))
+
+	return _MODULE_MAP_CACHE[id(modules)][1]
+
+
+def collect_grid_tags(grid_sections):
+	"""
+	Every tag present in a module grid, for its tag filter
+
+	The modules in a grid are whatever the grid's view put there - processor
+	classes in the processor grid, plain dicts elsewhere - so both are read.
+
+	:param list grid_sections:  `grid_sections` as passed to components/module-grid.html
+	:return list:  Sorted, de-duplicated tags
+	"""
+	tags = set()
+	for section in grid_sections:
+		for module in section["modules"].values():
+			module_tags = module.get("tags") if isinstance(module, dict) else getattr(module, "tags", None)
+			tags.update(module_tags or [])
+
+	return sorted(tags)
+
+
+def module_request_url(kind):
+	"""
+	Link to the GitHub issue form for requesting a new module
+
+	Follows the configured repository, so an instance running its own fork
+	sends requests there rather than upstream. Returns None if no repository is
+	configured, in which case the front-end omits the link rather than
+	rendering a broken one.
+
+	:param str kind:  `datasource` or `processor`; matches the file name of the
+	                  issue form in .github/ISSUE_TEMPLATE/. None where both
+	                  kinds are in view, which lands on the form picker instead.
+	:return str|None:  URL to the issue form
+	"""
+	repository = g.config.get("4cat.github_url")
+	if not repository:
+		return None
+
+	if not kind:
+		return "%s/issues/new/choose" % repository.rstrip("/")
+
+	return "%s/issues/new?template=%s_request.yml" % (repository.rstrip("/"), kind)
 
 
 def error(code=200, **kwargs):

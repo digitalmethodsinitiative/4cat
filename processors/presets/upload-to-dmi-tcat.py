@@ -14,8 +14,7 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     type = "preset-upload-tcat"  # job type ID
     description = ProcessorDescription(
         title="Upload to DMI-TCAT",
-        category="Combined processors",
-        tags=["convert format", "external service"],
+        tags=["combined", "conversion", "external service"],
         description="Convert the dataset to a DMI-TCAT-compatible format and upload it to a configured DMI-TCAT server.",
         warnings=[
             "This sends the dataset to a DMI-TCAT server, an external service.",

@@ -93,7 +93,7 @@ included inside one.
                 <dt>Created from</dt>
                 <dd>
                     {% if dataset.parameters.datasource in datasources %}
-                        <a href="{{ url_for("misc.data_overview", datasource=dataset.parameters.datasource) }}">
+                        <a href="{{ url_for("misc.module_catalog", module_type=dataset.parameters.datasource ~ "-search") }}">
                     {% endif %}
                     {{ dataset.parameters.datasource }}
                     {% if dataset.parameters.datasource in datasources %}

@@ -23,8 +23,7 @@ class TopicModelWordExtractor(BasicProcessor):
     type = "document_count"  # job type ID
     description = ProcessorDescription(
         title="Count documents per topic",
-        category="Text analysis",
-        tags=["counts", "grouping"],
+        tags=["text analysis", "counting"],
         description="Assign each item or sentence to the topic model topic it fits best and count how many documents fall under each topic per time interval. Each document is placed in the topic with the highest probability, and documents that fit two topics equally are skipped. The result also lists the top five words for each topic.",
         icon="file-circle-question",
     )

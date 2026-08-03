@@ -29,8 +29,7 @@ class URLFetcher(BasicProcessor):
     type = "url-metadata"  # job type ID
     description = ProcessorDescription(
         title="Fetch URL metadata",
-        category="Metrics",
-        tags=["urls"],
+        tags=["urls", "counting", "metadata"],
         description="Fetch the page title, final URL, domain name, and HTTP status for each URL referenced in the dataset. Make one request per URL, optionally following HTTP redirects.",
         warnings=[
             "This visits every URL in the dataset live, which can be slow for large datasets."

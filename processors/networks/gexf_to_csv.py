@@ -22,8 +22,7 @@ class GexfToCsv(BasicProcessor):
     type = "gexf-to-csv"
     description = ProcessorDescription(
         title="Convert network to CSV",
-        category="Networks",
-        tags=["convert format"],
+        tags=["conversion", "networks"],
         description="Convert a GEXF network file to a CSV file, with one row per edge. Each row lists the source and target nodes, their attributes, and the edge attributes. Edges are sorted by weight, from most to least frequent.",
         icon="file-csv",
     )

@@ -26,8 +26,7 @@ class CategorizeImagesCLIP(BasicProcessor):
     type = "image-to-categories"  # job type ID
     description = ProcessorDescription(
         title="Categorize images with CLIP",
-        category="Visual",
-        tags=["classify", "external service"],
+        tags=["visual", "classification", "external service"],
         description="Classify images into your own list of categories with OpenAI's CLIP model. For each image it estimates the likelihood of each category, with the values across all categories adding up to 100%.",
         warnings=[
             "This runs the CLIP model through the DMI Service Manager, which must be set up with a GPU by an administrator.",

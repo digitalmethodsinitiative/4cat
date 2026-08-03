@@ -21,8 +21,7 @@ class LexicalFilter(BaseFilter):
     type = "lexical-filter"  # job type ID
     description = ProcessorDescription(
         title="Filter by words or phrases",
-        category="Filtering",
-        tags=["filter"],
+        tags=["filtering"],
         description=("Retain only items whose text contains one of the given words or phrases. Accepts a custom "
                     "comma-separated list, built-in word lists, and regular expressions."),
         references=[

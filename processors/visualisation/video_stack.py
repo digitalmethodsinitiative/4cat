@@ -33,8 +33,7 @@ class VideoStack(BasicProcessor):
     type = "video-stack"  # job type ID
     description = ProcessorDescription(
         title="Stack videos",
-        category="Visual",
-        tags=["similarity"],
+        tags=["video", "chart"],
         description="Layer the videos in the dataset on top of each other transparently into a single combined video to reveal similarities. Videos are ordered by length, with the longest at the bottom of the stack.",
         warnings=[
             "This works best with a dozen or fewer videos; more than that becomes hard to read.",

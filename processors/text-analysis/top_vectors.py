@@ -22,8 +22,7 @@ class VectorRanker(BasicProcessor):
 	type = "vector-ranker"  # job type ID
 	description = ProcessorDescription(
 		title="Extract top words",
-		category="Metrics",
-		tags=["rank", "counts"],
+		tags=["counting", "text analysis", "time series"],
 		description="Rank the most-used tokens per token set, either overall or per timeframe. Return up to 100 of the "
 					"most-used tokens.",
 		icon="ranking-star",

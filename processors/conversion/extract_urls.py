@@ -30,8 +30,7 @@ class ExtractURLs(BasicProcessor):
     type = "extract-urls-filter"  # job type ID
     description = ProcessorDescription(
         title="Extract URLs",
-        category="Conversion",
-        tags=["urls", "extract"],
+        tags=["conversion", "urls"],
         description="Extract URLs from selected columns into a new table listing each item's unique URLs. Optionally expand shortened URLs to their final destination, and resolve CrowdTangle's inline links.",
         warnings=[
             "Expanding shortened URLs sends a request per URL and is slow; it is not recommended on datasets larger than 10,000 items.",

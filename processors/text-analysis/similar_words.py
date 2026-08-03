@@ -24,8 +24,7 @@ class SimilarWord2VecWords(BasicProcessor):
 	type = "similar-word2vec"  # job type ID
 	description = ProcessorDescription(
 		title="Extract similar words",
-		category="Text analysis",
-		tags=["similarity"],
+		tags=["text analysis", "machine learning"],
 		description="Use a word2vec model to find words that appear in similar contexts to the words you provide. "
 					"Set a similarity threshold and a crawl depth to also follow the neighbours of neighbours.",
 		icon="language",

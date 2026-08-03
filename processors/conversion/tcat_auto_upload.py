@@ -26,8 +26,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     type = "tcat-auto-upload"  # job type ID
     description = ProcessorDescription(
         title="Upload to DMI-TCAT",
-        category="Conversion",
-        tags=["external service"],
+        tags=["conversion", "external service"],
         description="Send a TCAT-ready JSON file to a configured DMI-TCAT server, where it is imported as a new tweet bin. The result is an HTML page that redirects to the dataset on the TCAT server.",
         warnings=[
             "The dataset is sent to an external DMI-TCAT server, which must be configured in the settings.",

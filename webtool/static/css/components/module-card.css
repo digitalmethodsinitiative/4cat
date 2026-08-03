@@ -53,7 +53,10 @@
     padding: var(--spacing-small) var(--spacing-regular);
 }
 
-.module-card .badge-list dd {
+/* the card's own badges are outlined; module tags are not, so a tag looks the
+   same on a card as it does in a grid's tag filter (see .module-tag in
+   badges.css) */
+.module-card .badge-list dd:not(.module-tag) {
     border: var(--stroke) solid var(--button-grey);
     box-sizing: content-box;
 }

@@ -26,8 +26,7 @@ class HashSimilarityNetworker(BasicProcessor):
     type = "hash-similarity-network"
     description = ProcessorDescription(
         title="Hash similarity network",
-        category="Networks",
-        tags=["similarity", "network"],
+        tags=["networks"],
         description="Compare bit hashes and create a network linking similar items. Each pair of hashes is compared bit by bit, and an edge is added when they are at least as similar as the chosen threshold. Useful for finding near-duplicate images or videos.",
         warnings=[
             "Only bit hashes are supported, such as those produced by the video hasher.",

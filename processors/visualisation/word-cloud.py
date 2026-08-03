@@ -23,7 +23,7 @@ class MakeWordCloud(BasicProcessor):
 	type = "wordcloud"  # job type ID
 	description = ProcessorDescription(
 		title="Create word cloud",
-		category="Visual",
+		tags=["text analysis", "chart"],
 		description="Draw a word cloud from a word column and a count column, sizing each word by its count. Optionally lower-case the words and limit how many are shown.",
 		info=[
 			"This works best on the output of a word frequency processor, such as tf-idf, collocations, or word counts.",

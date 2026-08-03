@@ -28,8 +28,7 @@ class TopicModeler(BasicProcessor):
     type = "topic-modeller"  # job type ID
     description = ProcessorDescription(
         title="Generate topic models",
-        category="Text analysis",
-        tags=["grouping", "similarity"],
+        tags=["text analysis", "machine learning"],
         description="Create topic models per token set using Latent Dirichlet Allocation (LDA). For a given number of topics, tokens are assigned a relevance weight per topic. Use these weights to find clusters of related words.",
         references=[
             'Blei, David M., Andrew Y. Ng, and Michael I. Jordan (2003). "Latent dirichlet allocation." the *Journal of machine Learning research* 3: 993-1022.',

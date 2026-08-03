@@ -3,10 +3,13 @@
     align-items: center;
     justify-content: space-between;
     background: var(--brighten-12);
-    color: var(--bright);
     align-content: center;
     padding: var(--spacing-regular);
     box-sizing: border-box;
+}
+
+.dataset-preview-host .card-header {
+    color: var(--bright);
 }
 
 .card-header h3, .card-header h1 {
@@ -39,4 +42,9 @@
 
 .card-header > i {
     font-size: calc(var(--font-h1) * 1.5);
+}
+
+.module-detail .card-header {
+    justify-content: left;
+    column-gap: var(--spacing-tiny);
 }

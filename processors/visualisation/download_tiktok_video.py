@@ -24,8 +24,7 @@ class TikTokVideoDownloader(ProcessorPreset):
     type = "video-downloader-tiktok"  # job type ID
     description = ProcessorDescription(
         title="Download TikTok videos",
-        category="Visual",
-        tags=["download media"],
+        tags=["video", "download media"],
         description="Download the full videos for TikTok posts and store them in a zip archive. Retrieves fresh video URLs before downloading, so it also works on older datasets whose links have expired.",
         info=[
             "A JSON metadata file recording the download outcome per post is included in the archive."
@@ -132,8 +131,7 @@ class TikTokVideoMetadata(BasicProcessor):
     type = "tiktok-video-downloader-metadata"  # job type ID
     description = ProcessorDescription(
         title="Update TikTok video URLs",
-        category="Visual",
-        tags=["internal"],
+        tags=["urls", "internal"],
         description="Retrieve fresh video download URLs from TikTok for a set of post IDs. Used internally as a step before downloading TikTok videos.",
     )
     extension = "csv"

@@ -18,8 +18,7 @@ class SimilarWords(ProcessorPreset):
 	type = "preset-similar-words"  # job type ID
 	description = ProcessorDescription(
 		title="Find similar words",
-		category="Combined processors",
-		tags=["similarity", "extract"],
+		tags=["combined", "text analysis", "machine learning"],
 		description="Train a word2vec model on the dataset to find words used in a context similar to the words you enter.",
 		warnings=[
 			"This only produces useful results on large datasets, roughly 100,000 items or more.",

@@ -21,9 +21,8 @@ class RandomFilter(BaseFilter):
 	"""
 	type = "random-filter"  # job type ID
 	description = ProcessorDescription(
-		title="Random sample",
-		category="Filtering",
-		tags=["sample"],
+		title="Create random sample",
+		tags=["filtering"],
 		description="Retain a pseudo-random sample of a chosen number of items from the dataset. This creates a new dataset containing the sampled items.",
 	)
 
@@ -132,8 +131,7 @@ class RandomProcessorFilter(RandomFilter):
     type = "random-processor-filter"  # job type ID
     description = ProcessorDescription(
         title="Random sample",
-        category="Filtering",
-        tags=["sample"],
+        tags=["filtering", "sampling"],
         description="Retain a pseudo-random sample of a chosen number of items from the dataset. This creates a new dataset containing the sampled items.",
     )
 

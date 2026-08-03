@@ -21,8 +21,7 @@ class CoTaggerPreset(ProcessorPreset):
     type = "preset-cotag-network"  # job type ID
     description = ProcessorDescription(
         title="Co-tag network",
-        category="Networks",
-        tags=["hashtags", "network"],
+        tags=["hashtags", "networks"],
         description="Create a network of tags co-occurring in items. Edges are weighted by how often two tags co-occur; nodes are weighted by how often a tag appears in the dataset.",
         icon="circle-nodes",
     )

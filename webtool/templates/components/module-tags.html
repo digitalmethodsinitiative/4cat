@@ -1,5 +1,13 @@
-{# todo: change to list #}
+{# The tags of a module, as badges. A processor's category is always its first
+   tag (see backend/lib/processor.py), so this renders the category plus
+   whatever else it declares.
+
+   Expects:
+     tags  a list of tags, or a single tag as a string
+#}
+{% set tag_list = [tags] if tags is string else tags %}
 <dl class="badge-list module-tags">
-    {% set tag = tags %}
-    <dd class="module-tag tag-{{ tag | idify }}">{{ tag }}</dd>
+    {% for tag in tag_list | sort %}
+        <dd class="module-tag tag-{{ tag|idify }}">{{ tag }}</dd>
+    {% endfor %}
 </dl>

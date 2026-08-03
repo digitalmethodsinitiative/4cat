@@ -21,8 +21,7 @@ class UniqueFilter(BaseFilter):
     type = "unique-filter"  # job type ID
     description = ProcessorDescription(
         title="Filter for unique items",
-        category="Filtering",
-        tags=["filter"],
+        tags=["filtering"],
         description="Keep only the first item for each unique combination of the selected columns, removing later duplicates. This creates a new dataset.",
         info=[
             "Choose which columns define uniqueness, and whether to treat items as duplicates when all selected values match or when any single value matches.",

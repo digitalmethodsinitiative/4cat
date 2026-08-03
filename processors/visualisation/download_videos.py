@@ -92,8 +92,7 @@ class VideoDownloaderPlus(BasicProcessor):
     type = "video-downloader"  # job type ID
     description = ProcessorDescription(
         title="Download videos",
-        category="Visual",
-        tags=["download media", "urls"],
+        tags=["video", "download media", "urls"],
         description="Find video links in a column and download the videos to a zip archive. Tries a direct download first and falls back to yt-dlp, which supports YouTube and many other video hosts.",
         info=[
             "A JSON metadata file recording the download outcome per video is included in the archive.",

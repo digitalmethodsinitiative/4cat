@@ -17,7 +17,7 @@ class SearchDouyin(Search):
     type = "douyin-search"  # job ID
     category = "Search"  # category
     title = "Import scraped Douyin data"  # title displayed in UI
-    description = "Import Douyin data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    description = "Import Douyin data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     # the tag column the co-tag and hashtag networks look for
     output = Datasource(columns={"hashtags"})

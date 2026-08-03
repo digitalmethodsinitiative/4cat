@@ -24,8 +24,7 @@ class RegressionEvaluation(BasicProcessor):
     type = "regression_evaluation"  # job type ID
     description = ProcessorDescription(
         title="Evaluate regression predictions",
-        category="Statistics",
-        tags=["counts"],
+        tags=["statistics", "counting"],
         description="Compare true and predicted numerical values in two columns and report regression error metrics. Calculates mean absolute error, mean squared error, root mean squared error, and R-squared, according to which metrics are selected. Rows with missing or non-numeric values can be skipped or treated as an error.",
         icon="table-columns",
     )

@@ -31,8 +31,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     type = "google-vision-api"  # job type ID
     description = ProcessorDescription(
         title="Label images with Google Vision",
-        category="Machine learning",
-        tags=["classify", "api key required", "external service"],
+        tags=["visual", "classification", "machine learning", "external service"],
         description="Use the Google Vision API to detect labels, text, faces, landmarks, logos, and other features in images. One request is made per image for each feature type you select.",
         references=[
             "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",

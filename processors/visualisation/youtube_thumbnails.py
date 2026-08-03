@@ -28,8 +28,7 @@ class YouTubeThumbnails(BasicProcessor):
 	type = "youtube-thumbnails"  # job type ID
 	description = ProcessorDescription(
 		title="Download YouTube thumbnails",
-		category="Cross-platform",
-		tags=["download media", "api key required", "external service"],
+		tags=["download media", "external service"],
 		description="Download the thumbnail image of each YouTube video in the dataset through the YouTube Data API.",
 		warnings=[
 			"This uses the YouTube Data API, which requires an API key and counts against your daily quota.",

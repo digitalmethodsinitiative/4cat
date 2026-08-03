@@ -20,8 +20,7 @@ class UpdateTikTok(BasicProcessor):
     type = "tiktok-update-filter"  # job type ID
     description = ProcessorDescription(
         title="Recollect TikTok data",
-        category="Filtering",
-        tags=["filter"],
+        tags=["filtering", "override", "external service"],
         description="Re-query the TikTok URLs in the dataset to refresh their metadata, such as video URLs or like counts.",
         warnings=[
             "This re-fetches every item from TikTok, so it can be slow on large datasets.",

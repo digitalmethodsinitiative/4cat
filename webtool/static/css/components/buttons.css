@@ -7,7 +7,7 @@ button.no-style {
   background: none
 }
 
-.button-like, input[type=submit], .plain-page button {
+.button-like, input[type=submit], .plain-page button:not(.module-tag) {
     text-transform: uppercase;
 
     color: var(--button-bg-regular);
@@ -82,7 +82,7 @@ a.button-like, button {
 
 }
 
-a.button-like, .button-like button, button.button-like, .plain-page button, input[type=submit] {
+a.button-like, .button-like button, button.button-like, .plain-page button:not(.module-tag), input[type=submit] {
     padding: 8px 18px;
 }
 

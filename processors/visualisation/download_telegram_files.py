@@ -37,8 +37,7 @@ class TelegramFileDownloader(TelegramVideoDownloader):
     type = "file-downloader-telegram"  # job type ID
     description = ProcessorDescription(
         title="Download Telegram files",
-        category="Visual",
-        tags=["download media", "external service"],
+        tags=["visual", "download media", "external service"],
         description="Download the audio, documents, stickers, and other non-video, non-photo file attachments of Telegram messages and store them in a ZIP file.",
         info=[
             "A JSON metadata file recording the download outcome per message is included in the archive."

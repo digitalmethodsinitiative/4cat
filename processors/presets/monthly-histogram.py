@@ -15,8 +15,7 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	type = "preset-histogram"  # job type ID
 	description = ProcessorDescription(
 		title="Create a histogram of items over time",
-		category="Combined processors",
-		tags=["time-series", "chart", "counts"],
+		tags=["combined", "time series", "counting", "chart"],
 		description="Count items per day, week, month, or year and render the totals as a bar chart in an SVG file.",
 		icon="square-poll-vertical",
 	)

@@ -36,7 +36,7 @@ class VideoTimelines(BasicProcessor):
     type = "video-timelines"  # job type ID
     description = ProcessorDescription(
         title="Create video timelines",
-        category="Visual",
+        tags=["video", "visual", "chart"],
         description="Arrange extracted video frames into a timeline for each video, laying the frames out in sequence as a horizontal strip. The per-video timelines are stacked vertically into a single image, with each video labelled underneath.",
         icon="photo-film",
     )

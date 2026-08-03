@@ -1,8 +1,8 @@
 .badge-list {
     display: flex;
-    column-gap: var(--spacing-regular);
     font-size: var(--font-body);
     position: relative;
+    column-gap: var(--spacing-tiny);
 }
 
 .badge-list.no-overflow {
@@ -156,26 +156,55 @@
     border: var(--stroke) solid var(--yellow-light);
 }
 
-/* Tags for modules */
+/* Tags for modules. The single definition of what a tag looks like, wherever it
+   is rendered: as a <dd> on a module card (components/module-tags.html) or as a
+   <button> in a grid's tag filter (components/tag-filter.html). Only the colour
+   varies, per tag, below. */
 .module-tag {
+    font-size: var(--font-body);
     text-transform: uppercase;
+    white-space: nowrap;
+    padding: var(--spacing-tiny) var(--spacing-small);
+    border: 0;
+    border-radius: var(--radius);
     background-color: var(--tag1);
     color: var(--bright);
     cursor: pointer;
 }
 
-.module-tag.tag-text-analysis        { background-color: var(--tag1); }
-.module-tag.tag-visual,
-.module-tag.tag-visualisation         { background-color: var(--tag2); }
-.module-tag.tag-networks              { background-color: var(--tag3); }
-.module-tag.tag-machine-learning      { background-color: var(--tag4); }
-.module-tag.tag-filtering             { background-color: var(--tag5); }
-.module-tag.tag-metrics,
-.module-tag.tag-thread-metrics        { background-color: var(--tag6); }
-.module-tag.tag-conversion            { background-color: var(--tag7); }
-.module-tag.tag-twitter-analysis,
-.module-tag.tag-username              { background-color: var(--tag8); }
-.module-tag.tag-statistics            { background-color: var(--tag9); }
-.module-tag.tag-audio                 { background-color: var(--tag10); }
-.module-tag.tag-cross-platform        { background-color: var(--tag3); }
-.module-tag.tag-combined-processors   { background-color: var(--tag9); }
+/* .badge-list dd sets its own background, which would otherwise win over the
+   fallback above for a tag that has no colour of its own yet */
+.badge-list .module-tag             { background-color: var(--tag1); }
+
+.module-tag.tag-data-source            { background-color: var(--tag1); }
+.module-tag.tag-text-analysis         { background-color: var(--tag2); }
+.module-tag.tag-visual                { background-color: var(--tag3); }
+.module-tag.tag-networks              { background-color: var(--tag4); }
+.module-tag.tag-machine-learning      { background-color: var(--tag5); }
+.module-tag.tag-filtering,
+.module-tag.tag-sampling              { background-color: var(--tag6); }
+.module-tag.tag-counting              { background-color: var(--tag7); }
+.module-tag.tag-conversion            { background-color: var(--tag8); }
+.module-tag.tag-authors               { background-color: var(--tag9); }
+.module-tag.tag-statistics            { background-color: var(--tag10); }
+.module-tag.tag-audio                 { background-color: var(--tag11); }
+.module-tag.tag-video                 { background-color: var(--tag12); }
+.module-tag.tag-combined              { background-color: var(--tag13); }
+.module-tag.tag-classification        { background-color: var(--tag14); }
+.module-tag.tag-urls                  { background-color: var(--tag15); }
+.module-tag.tag-preprocessing         { background-color: var(--tag16); }
+.module-tag.tag-time-series           { background-color: var(--tag17); }
+.module-tag.tag-chart                 { background-color: var(--tag18); }
+.module-tag.tag-anonymise             { background-color: var(--tag19); }
+.module-tag.tag-override              { background-color: var(--tag20); }
+.module-tag.tag-transcribe            { background-color: var(--tag21); }
+.module-tag.tag-external-service      { background-color: var(--tag22); }
+.module-tag.tag-hashtags              { background-color: var(--tag23); }
+.module-tag.tag-annotation            { background-color: var(--tag24); }
+.module-tag.tag-metadata              { background-color: var(--tag25); }
+.module-tag.tag-download-media        { background-color: var(--tag26); }
+.module-tag.tag-genai                 { background-color: var(--tag27); }
+.module-tag.tag-search                { background-color: var(--tag28); }
+.module-tag.tag-annotations           { background-color: var(--tag29); }
+.module-tag.tag-merging               { background-color: var(--tag30); }
+.module-tag.tag-internal              { background-color: var(--tag31); }

@@ -22,8 +22,7 @@ class SplitSentences(BasicProcessor):
     type = "sentence-split"  # job type ID
     description = ProcessorDescription(
         title="Split text into sentences",
-        category="Text analysis",
-        tags=["extract"],
+        tags=["text analysis", "preprocessing", "conversion"],
         description="Split the text in a chosen column into separate sentences. The output has one row per sentence, "
                     "with the sentence and its item ID. Sentences shorter than a chosen number of words can be "
                     "dropped.",

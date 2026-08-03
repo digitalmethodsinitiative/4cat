@@ -24,8 +24,7 @@ class TopImageCounter(BasicProcessor):
     type = "top-images"  # job type ID
     description = ProcessorDescription(
         title="Rank image URLs",
-        category="Metrics",
-        tags=["urls", "rank"],
+        tags=["urls", "counting", "annotation"],
         description="Extract all image URLs from the dataset and rank them by how often they occur. Optionally save the extracted URLs back to the source dataset as annotations.",
         icon="arrow-up-1-9",
     )

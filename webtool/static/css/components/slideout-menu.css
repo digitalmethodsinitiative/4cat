@@ -18,45 +18,9 @@ body.slideout-open {
     overflow: hidden;
 }
 
-.slideout-header {
-    flex: 0 0 auto;
-    display: flex;
-    flex-wrap: wrap;
-    column-gap: 20px;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-regular);
-    background: var(--panel-bg-0);
-    border-bottom: var(--stroke) solid var(--panel-bg-1);
-}
-
-.slideout-header.narrow {
-    padding: var(--spacing-small);
-    padding-left: var(--spacing-regular);
-    padding-right: var(--spacing-regular);
-}
-
-.slideout-header .slideout-header-title {
-    flex-grow: 1;
-}
-
-.slideout-header h1, .slideout-header h2, .slideout-header h3, .slideout-header h4  {
-    font-family: Chivo, sans-serif;
-    font-weight: normal;
-    margin: 0;
-    line-height: 1;
-}
-
-.slideout-header ul {
-    display: flex;
-    column-gap: var(--spacing-regular);
-    flex-grow: 1;
-    align-items: center;
-}
-
-.slideout-header.narrow ul {
-    column-gap: var(--spacing-small);
-}
+/* the header strip of a slideout is not slideout-specific - the module
+   catalogue shows the same one over the same grid - so it lives in
+   components/panel-header.css as .panel-header */
 
 .slideout-contents {
     position: relative;   /* nested .slideout resolves inset:0 against this,

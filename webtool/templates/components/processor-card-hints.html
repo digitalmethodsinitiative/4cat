@@ -7,11 +7,11 @@
         <dt>Follow-ups</dt>
         {% if module.compatibility.preferred_followups %}
             {% for followup in (module.compatibility.preferred_followups|list)[:3] %}
-                <a href="{{ url_for('misc.module_catalog') }}/{{ followup }}"><dd>{{ followup }}</dd></a>
+                <a href="{{ url_for('misc.module_catalog', module_type=followup) }}"><dd>{{ followup }}</dd></a>
             {% endfor %}
         {% endif %}
         <ul>
-            <li class="button-secondary"><a href="{{ url_for('misc.module_catalog') }}/{{ module_id }}">See all</a></li>
+            <li class="button-secondary"><a href="{{ url_for('misc.module_catalog', module_type=module_id) }}">See all</a></li>
         </ul>
     </div>
     {% endif %}

@@ -20,8 +20,7 @@ class CowordNetworker(ProcessorPreset):
     type = "preset-coword-network"  # job type ID
     description = ProcessorDescription(
         title="Co-word network",
-        category="Networks",
-        tags=["network"],
+        tags=["networks", "text analysis"],
         description="Create a network of word co-occurrences. Edges connect words that appear close to each other. Edges and nodes are weighted by how often the words co-occur.",
         icon="circle-nodes",
     )

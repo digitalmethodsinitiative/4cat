@@ -16,8 +16,7 @@ class TopHashtags(ProcessorPreset):
     type = "preset-top-hashtags"  # job type ID
     description = ProcessorDescription(
         title="Top hashtags",
-        category="Combined processors",  # 'Combined processors' are always listed first in the UI
-        tags=["hashtags", "counts", "rank"],
+        tags=["combined", "hashtags", "counting"],
         description="Count how often each hashtag occurs in the dataset and rank them from most to least frequent.",
         icon="hashtag",
     )

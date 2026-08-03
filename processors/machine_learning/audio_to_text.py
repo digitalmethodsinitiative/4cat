@@ -27,8 +27,7 @@ class AudioToText(BasicProcessor):
     type = "audio-to-text"  # job type ID
     description = ProcessorDescription(
         title="Transcribe audio to text",
-        category="Audio",
-        tags=["transcribe", "external service"],
+        tags=["audio", "machine learning", "transcribe", "external service"],
         description="Transcribe speech in audio files to text with OpenAI's Whisper or GPT models. Run Whisper locally through the DMI Service Manager, or send the audio to the OpenAI API, which can also translate to English or separate speakers.",
         warnings=[
             "Using an OpenAI model sends your audio to OpenAI, a paid external service that bills the owner of the API key.",

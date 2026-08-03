@@ -37,8 +37,7 @@ class VideoSceneDetector(BasicProcessor):
 	type = "video-scene-detector"  # job type ID
 	description = ProcessorDescription(
 		title="Detect scenes in video",
-		category="Visual",
-		tags=["extract"],
+		tags=["video", "visual", "time series", "machine learning"],
 		description="Detect distinct scenes in videos and record their boundaries as a table. Scenes are found with an ffmpeg threshold filter or one of PySceneDetect's content, adaptive, or threshold detectors, based on changes in colour, intensity, or cuts and fades to black. Each row lists a scene's start and end frame, timecode, and duration.",
 		references=[
 			"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",

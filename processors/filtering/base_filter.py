@@ -25,8 +25,7 @@ class BaseFilter(BasicProcessor):
     type = "column-filter"  # job type ID
     description = ProcessorDescription(
         title="Base filter",
-        category="Filtering",
-        tags=["internal"],
+        tags=["filtering", "internal"],
         description="Abstract base class for filters that re-emit a parent dataset's rows. Not runnable on its own.",
         icon="filter",
     )

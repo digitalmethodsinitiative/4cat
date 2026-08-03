@@ -3,14 +3,16 @@
    in dataset.datasource_grid.
 
    Data sources without dataset parameters (the Zeeschuimer-fed ones) get no
-   options form and so no select button: leaving `options_url` unset is what
+   options form and so no action button: leaving `select_template` unset is what
    module-card.html keys on. #}
 {% with icon = module.icon,
-        search_terms = module.title ~ ' ' ~ module.description ~ ' ' ~ module_id,
-        options_url = url_for('dataset.datasource_options', datasource_id=module_id) if module.selectable else None,
-        metadata_url = url_for('dataset.datasource_metadata', datasource_id=module_id) if module.selectable else None,
-        info_url = url_for('misc.data_overview', datasource=module_id),
-        info_label = "How is this data collected?",
+        tags = module.tags,
+        search_terms = module.title ~ ' ' ~ module.description ~ ' ' ~ module_id ~ ' ' ~ module.tags|join(' '),
+        select_template = "components/module-select-slideout.html" if module.selectable else None,
+        options_url = url_for('dataset.datasource_options', datasource_id=module_id),
+        metadata_url = url_for('dataset.datasource_metadata', datasource_id=module_id),
+        info_url = url_for('misc.module_catalog', module_type=module.worker_type),
+        info_label = "More information about this data source",
         code_url = module.code_url,
         code_label = "View data source code",
         card_extra = "components/datasource-card-hints.html" %}

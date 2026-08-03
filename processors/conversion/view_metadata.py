@@ -25,8 +25,8 @@ class ViewMetadata(BasicProcessor):
 	"""
 	type = "metadata-viewer"  # job type ID
 	description = ProcessorDescription(
-		title="View media metadata",
-		category="Conversion",
+		title="Extract media metadata",
+		tags=["conversion"],
 		description="Read the .metadata.json file produced by an image or video downloader and turn it into a flat table, with one row per downloaded item. Optionally include items whose download failed.",
 		icon="circle-info",
 	)

@@ -21,8 +21,7 @@ class GetCollocations(BasicProcessor):
 	type = "collocations"  # job type ID
 	description = ProcessorDescription(
 		title="Extract co-words",
-		category="Text analysis",
-		tags=["extract", "counts"],
+		tags=["text analysis", "counting"],
 		description="Find pairs or triplets of words that appear close together in a set of tokens, along with how often each combination occurs. A window size sets how near words must be to count as co-words. Results can be limited to combinations containing a required word, filtered by a minimum frequency, and optionally saved as annotations.",
 		icon="timeline",
 	)

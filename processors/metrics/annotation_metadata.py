@@ -15,8 +15,7 @@ class AnnotationMetadata(BasicProcessor):
 	type = "annotation-metadata"  # job type ID
 	description = ProcessorDescription(
 		title="Export annotations",
-		category="Conversion",
-		tags=["convert format", "annotate"],
+		tags=["conversion", "annotation", "metadata"],
 		description="Export the annotations made on this dataset along with their metadata, such as the annotation author, timestamp, and type.",
 		info=[
 			"Only datasets that have annotations can be processed.",

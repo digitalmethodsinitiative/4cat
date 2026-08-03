@@ -20,8 +20,7 @@ class HashGrouper(BasicProcessor):
     type = "image-hash-grouper"  # job type ID
     description = ProcessorDescription(
         title="Group similar hashes",
-        category="Conversion",
-        tags=["similarity", "grouping"],
+        tags=["counting", "visual", "preprocessing"],
         description="Group image hashes into clusters of visually similar images, based on a similarity threshold you set. Runs on the output of the image hasher and rewrites the 'group' column with the new clusters.",
         icon="hashtag",
     )

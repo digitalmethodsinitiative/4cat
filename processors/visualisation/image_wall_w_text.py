@@ -34,7 +34,7 @@ class ImageTextWallGenerator(BasicProcessor):
     type = "image-text-wall"  # job type ID
     description = ProcessorDescription(
         title="Image wall with captions",
-        category="Visual",
+        tags=["visual", "chart"],
         description="Combine downloaded images and their captions into a single wall-like image. Each image is tiled and labelled with its caption text below it. Works with datasets that pair images and captions, such as generated images with prompts or images with their extracted text.",
         icon="panorama",
     )

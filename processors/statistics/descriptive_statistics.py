@@ -23,8 +23,7 @@ class DescriptiveStatistics(BasicProcessor):
     type = "descriptive_statistics"  # job type ID
     description = ProcessorDescription(
         title="Calculate descriptive statistics",
-        category="Statistics",
-        tags=["counts"],
+        tags=["statistics", "counting", "metadata"],
         description="Calculate descriptive statistics for selected numerical columns, including count, mean, standard deviation, minimum, maximum, range, quartiles, interquartile range, variance, median, and mode. Rows with missing or non-numeric values can be skipped or treated as an error.",
         icon="table-columns",
     )

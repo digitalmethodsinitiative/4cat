@@ -19,8 +19,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
     type = "convert-ndjson-for-tcat"  # job type ID
     description = ProcessorDescription(
         title="Convert to TCAT JSON",
-        category="Conversion",
-        tags=["convert format"],
+        tags=["conversion"],
         description="Convert a Twitter/X (API v2) dataset to the JSON format that DMI-TCAT's import-jsondump.php can read. The result can then be uploaded to a TCAT server.",
         icon="square-js",
     )

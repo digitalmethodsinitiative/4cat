@@ -1,0 +1,185 @@
+{# Everything the catalogue knows about one module, shown at the top of the
+   module catalogue when a module is selected: what it is, how you get to a
+   dataset it can run on, and what its output unlocks. For a data source it also
+   carries what the data-overview page used to show.
+
+   Expects (all from misc.module_detail_context):
+     module        the module map's full bundle for this module
+     module_type   its type
+     requirements  the conditions on its input, as plain phrases
+     datasource    (data sources only) the data source-specific detail
+#}
+
+{# A row of modules as chips, each opening that module's detail. A link the map
+   is only unsure about is flagged rather than hidden: the specs can't promise
+   it applies, only that it might. #}
+{% macro chips(steps, extra_class="") %}
+    {% if steps %}
+        <div class="module-chips">
+            {% for step in steps %}
+                {% set uncertain = step.certainty == "maybe" %}
+                <button class="module-chip {{ extra_class }}{% if uncertain %} is-uncertain{% endif %}"
+                        hx-get="{{ url_for('misc.module_detail', module_type=step.type) }}"
+                        hx-target="#module-detail"
+                        hx-swap="innerHTML"
+                        hx-indicator="#module-detail-spinner"
+                        hx-push-url="{{ url_for('misc.module_catalog', module_type=step.type) }}"
+                        @click="$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))"
+                        {% if uncertain %}x-tooltip="Might apply — not confirmed from the specs alone"{% endif %}>
+                    {{ step.title }}{% if uncertain %} <span class="module-chip-marker">?</span>{% endif %}
+                </button>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="module-detail-muted">None.</p>
+    {% endif %}
+{% endmacro %}
+
+{% macro notices(items, kind) %}
+    {% for item in items %}
+        <p class="module-notice notice notice-{{ kind }}">
+            <i class="fa-solid fa-{{ "triangle-exclamation" if kind == "warning" else "circle-info" }}" aria-hidden="true"></i>
+            <span>{{ item }}</span>
+        </p>
+    {% endfor %}
+{% endmacro %}
+
+<div class="module-detail-card">
+    <header class="card-header module-header">
+        {% with icon = module.icon %}{% include 'components/module-icon.html' %}{% endwith %}
+        <h1>{{ module.title }}</h1>
+        {% with tags = module.tags %}{% include 'components/module-tags.html' %}{% endwith %}
+
+            {% with info_url = none,
+                    code_url = module.repo_url,
+                    code_label = "View this module's code" %}
+                {% include 'components/module-card-actions.html' %}
+            {% endwith %}
+
+    </header>
+
+    <section class="card-content">
+        {% if module.description %}<p class="module-detail-description">{{ module.description }}</p>{% endif %}
+        {{ notices(module.warnings, "warning") }}
+        {{ notices(module.info, "info") }}
+
+        <dl class="badge-list module-detail-facts">
+            <div><dt>Type</dt><dd><code>{{ module_type }}</code></dd></div>
+            {% if module.output_shape and module.output_shape.extension and module.output_shape.extension != "unknown" %}
+                <div><dt>Produces</dt><dd>{{ module.output_shape.extension }}</dd></div>
+            {% endif %}
+            {% if module.is_filter %}<div><dt>Filter</dt><dd>keeps its input's format</dd></div>{% endif %}
+            {% if module.has_override %}
+                <div><dt>Compatibility</dt><dd>custom — connections below are approximate</dd></div>
+            {% endif %}
+        </dl>
+
+        {% if module.references %}
+            <div class="module-detail-references">
+                <h3>Documentation and literature</h3>
+                <ul class="nobullet">
+                    {% for reference in module.references %}<li>{{ reference|markdown|safe }}</li>{% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </section>
+</div>
+
+{% if datasource %}
+    {% include "components/module-detail-datasource.html" %}
+{% endif %}
+
+<details class="module-detail-section">
+    <summary>How to run this</summary>
+    <div class="module-detail-section-body">
+        {% set how = module.how_to_run or {} %}
+        {% if how.is_filter %}
+            {% for note in how.notes %}<p>{{ note }}</p>{% endfor %}
+        {% else %}
+            {% if not module.is_datasource %}
+                <h3>Example ways to reach this</h3>
+                {% if how.examples %}
+                    {% for example in how.examples %}
+                        <div class="module-chain">
+                            <button class="module-chip is-source"
+                                    hx-get="{{ url_for('misc.module_detail', module_type=example.datasource) }}"
+                                    hx-target="#module-detail" hx-swap="innerHTML"
+                                    hx-indicator="#module-detail-spinner"
+                                    hx-push-url="{{ url_for('misc.module_catalog', module_type=example.datasource) }}"
+                                    @click="$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))">{{ example.title }}</button>
+                            {% for step in example.then %}
+                                <span class="module-chain-arrow" aria-hidden="true">→</span>
+                                <button class="module-chip"
+                                        hx-get="{{ url_for('misc.module_detail', module_type=step.type) }}"
+                                        hx-target="#module-detail" hx-swap="innerHTML"
+                                        hx-indicator="#module-detail-spinner"
+                                        hx-push-url="{{ url_for('misc.module_catalog', module_type=step.type) }}"
+                                        @click="$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))">{{ step.title }}</button>
+                            {% endfor %}
+                            <span class="module-chain-arrow" aria-hidden="true">→</span>
+                            <span class="module-chip is-current">{{ module.title }}</span>
+                        </div>
+                    {% endfor %}
+                    <p class="module-detail-note">A few of the shortest ways in — examples, not the only routes. Most
+                        modules can be reached other ways too; select any step to explore from there.</p>
+                {% else %}
+                    <p class="module-detail-note">No data source reaches this by confirmed steps — likely an
+                        over-strict requirement or a missing link between processors.</p>
+                {% endif %}
+
+                <h3>Needs a dataset that…</h3>
+                {% if requirements %}
+                    <div class="module-chips">
+                        {% for requirement in requirements %}
+                            <span class="module-chip is-requirement">{{ requirement }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="module-detail-muted">Runs on almost any dataset.</p>
+                {% endif %}
+
+                {% if how.accepts and how.accepts.from_processors %}
+                    <details class="module-detail-collapse">
+                        <summary>Runs on the output of ({{ how.accepts.from_processors|length }})</summary>
+                        {{ chips(how.accepts.from_processors) }}
+                    </details>
+                {% endif %}
+            {% endif %}
+            {% for note in how.notes %}<p class="module-detail-note">{{ note }}</p>{% endfor %}
+        {% endif %}
+    </div>
+</details>
+
+<details class="module-detail-section">
+    <summary>What can run on this</summary>
+    <div class="module-detail-section-body">
+        {% set followups = module.followups or {} %}
+        {% set has_followups = followups.preferred or followups.filters or followups.others_by_category %}
+        {% if has_followups %}
+            {% if followups.preferred %}
+                <h3>Suggested next</h3>
+                {{ chips(followups.preferred, "is-preferred") }}
+            {% endif %}
+            {% if followups.filters %}
+                <h3>Filters — narrow the data, keep the format</h3>
+                {{ chips(followups.filters) }}
+            {% endif %}
+            {% for category, items in (followups.others_by_category or {}).items() %}
+                <h3>{{ category }}</h3>
+                {{ chips(items) }}
+            {% endfor %}
+            {% if followups.note %}<p class="module-detail-note">{{ followups.note }}</p>{% endif %}
+        {% else %}
+            <p class="module-detail-muted">Nothing runs on this output.</p>
+        {% endif %}
+    </div>
+</details>
+
+{% if module.compatibility %}
+    <details class="module-detail-section">
+        <summary>Compatibility (declared)</summary>
+        <div class="module-detail-section-body">
+            <pre class="module-detail-spec">{{ module.compatibility|tojson(indent=2) }}</pre>
+        </div>
+    </details>
+{% endif %}

@@ -197,7 +197,7 @@ class MakeWordtree(BasicProcessor):
     type = "word-trees"  # job type ID
     description = ProcessorDescription(
         title="Word tree",
-        category="Visual",
+        tags=["text analysis", "chart"],
         description="Build a word tree around a search phrase, a graphical version of the keyword-in-context method (Wattenberg & Viégas, 2008). Words that follow or precede the phrase branch out into a tree, sized by how often they occur. You can set the phrase, window size, tokeniser, and how many branches to show per level.",
         references=[
             "Wattenberg, M., & Viégas, F. B. (2008). [The Word Tree, an Interactive Visual Concordance](https://doi.org/10.1109/TVCG.2008.172). IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228.",

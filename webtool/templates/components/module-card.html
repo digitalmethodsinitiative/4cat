@@ -1,28 +1,28 @@
-{# A single module in the slideout's grid (components/module-grid.html).
+{# A single module in a module grid (components/module-grid.html).
 
-   Selecting the module loads its options form into the second slideout level
-   and its header into that level's title bar; `selectedModuleType` slides that
-   level into view. What a 'module' is - a processor, a data source - is
-   entirely up to the caller, which supplies the endpoints to load.
+   The card itself is context-free: what selecting a module does is delegated to
+   `select_template`, since it means different things in different places - in
+   the slideout it slides the module's options over the grid, in the module
+   catalogue it loads the module's detail into the top of the page.
 
    Expects:
-     module        the module itself; only `title` and `description` are read
-     module_id     identifier, used as `selectedModuleType`
-     search_terms  lower-case haystack the grid's search box filters on
-     options_url   endpoint rendering the options form (-> #module-options);
-                   omit for a module that cannot be selected, and the card is
-                   rendered without a select button
-     metadata_url  endpoint rendering the options header (-> #module-metadata)
-     icon          (optional) Font Awesome icon name
-     tags          (optional) label rendered as a tag on the card
-     info_url      (optional) 'more information' quick link
-     code_url      (optional) 'view source code' quick link
-     card_extra    (optional) template rendered below the description
-     select_label  (optional) label for the select button
+     module         the module itself; only `title` and `description` are read
+     module_id      identifier of the module
+     search_terms   lower-case haystack the grid's search box filters on
+     tags           (optional) list of tags; rendered as badges on the card and
+                    matched against the grid's tag filter
+     select_template  template rendering this card's action button; omit for a
+                    card with no action at all
+     icon           (optional) Font Awesome icon name
+     info_url       (optional) 'more information' quick link
+     code_url       (optional) 'view source code' quick link
+     card_extra     (optional) template rendered below the description
+     select_label   (optional) label for the action button
 #}
 <div class="module-card"
      data-search="{{ search_terms|lower }}"
-     x-show="!moduleSearch.trim() || $el.dataset.search.includes(moduleSearch.toLowerCase().trim())">
+     data-tags="{{ (tags if tags is not string else [tags])|join('|') if tags }}"
+     x-show="moduleVisible($el)">
     <header class="card-header module-header">
         {% include 'components/module-icon.html' %}
         <h3>{{ module.title }}</h3>
@@ -30,16 +30,8 @@
         {% if tags %}{% include 'components/module-tags.html' %}{% endif %}
 
         <nav class="actions">
-            {% if options_url %}
-            <button
-                class="button-like"
-                hx-get="{{ options_url }}"
-                hx-target="#module-options"
-                hx-swap="innerHTML"
-                hx-indicator="#module-options-spinner"
-                @click='selectedModuleType = {{ module_id|tojson }};
-                    htmx.ajax("GET", {{ metadata_url|tojson }}, "#module-metadata")'>{{ select_label if select_label else "Select" }}</button>
-
+            {% if select_template %}
+                {% include select_template %}
             {% endif %}
         </nav>
     </header>

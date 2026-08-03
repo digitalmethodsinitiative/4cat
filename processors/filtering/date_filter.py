@@ -24,8 +24,7 @@ class DateFilter(BaseFilter):
     type = "date-filter"  # job type ID
     description = ProcessorDescription(
         title="Filter by date",
-        category="Filtering",
-        tags=["filter", "time-series"],
+        tags=["filtering", "time series"],
         description="Retain items whose timestamp falls between a given start and end date. Choose which column holds the date; values can be Unix timestamps or 'YYYY-MM-DD HH:MM:SS' strings. This creates a new dataset.",
         info=[
             "Items with a missing or unreadable date are skipped and counted as invalid.",

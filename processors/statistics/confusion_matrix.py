@@ -24,8 +24,7 @@ class ConfusionMatrix(BasicProcessor):
     type = "confusion-matrix"  # job type ID
     description = ProcessorDescription(
         title="Create a confusion matrix",
-        category="Statistics",
-        tags=["counts", "chart"],
+        tags=["statistics", "chart", "classification", "counting"],
         description="Build a confusion matrix comparing true labels and predicted labels from two columns. The result is a rendered image cross-tabulating how often each true category was predicted as each category. Supports up to 500 unique labels.",
         info=[
             "Best used to evaluate a classifier by comparing its predictions against known correct labels.",

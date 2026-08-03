@@ -22,9 +22,8 @@ class ConvertText(BasicProcessor):
     """
     type = "convert-text"  # job type ID
     description = ProcessorDescription(
-        title="Replace text",
-        category="Conversion",
-        tags=["clean text"],
+        title="Find and replace text",
+        tags=["conversion", "preprocessing"],
         description="Find text in selected columns, replace matching parts, and write the result to a new dataset.",
         info=[
             "Matches can be plain text or a regular expression.", 

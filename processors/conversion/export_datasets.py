@@ -25,7 +25,7 @@ class ExportDatasets(BasicProcessor):
 	type = "export-datasets"  # job type ID
 	description = ProcessorDescription(
 		title="Export dataset and processor results",
-		category="Conversion",
+		tags=["conversion", "metadata"],
 		description="Create a ZIP file containing the dataset and all of its processor results. The ZIP can be uploaded to another 4CAT instance. Filters are not included.",
 		warnings=[
 			"This dataset expires after one day. You will need to run this processor again to get a new export file.",

@@ -28,8 +28,7 @@ class DatasetMerger(BasicProcessor):
     type = "merge-datasets"  # job type ID
     description = ProcessorDescription(
         title="Merge datasets",
-        category="Conversion",
-        tags=["combine data"],
+        tags=["merging"],
         description="Combine this dataset with other datasets of the same format into a new dataset. Provide the URLs of the datasets to merge, and choose whether to keep or remove items that share an item ID across datasets.",
         warnings=[
             "All datasets must have the same format and columns, or the merge fails.",

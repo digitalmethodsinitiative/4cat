@@ -22,8 +22,7 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
     type = "vision-bipartite-network"  # job type ID
     description = ProcessorDescription(
         title="Google Vision bipartite annotation network",
-        category="Networks",
-        tags=["network"],
+        tags=["networks", "visual"],
         description="Create a network from annotations returned by the Google Vision API. Image file names and the labels returned for them are nodes. An edge connects a file name to a label when that label occurs for that image.",
         icon="circle-nodes",
     )

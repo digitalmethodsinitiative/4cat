@@ -25,8 +25,7 @@ class ColumnNetworker(BasicProcessor):
     type = "column-network"
     description = ProcessorDescription(
         title="Custom network",
-        category="Networks",
-        tags=["network"],
+        tags=["networks"],
         description="Create a network of linked values between two chosen columns (for example 'author' and 'subreddit'). Nodes and edges are weighted by frequency. Optionally make the network dynamic over time and detect communities.",
         references=[
             "Utilises [Networkx](https://networkx.org/).",

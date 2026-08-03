@@ -1,5 +1,5 @@
 """
-Tests for the compatibility check, the output-description helper, and the processor-map
+Tests for the compatibility check, the output-description helper, and the module map
 query layer.
 
 Two halves:
@@ -269,10 +269,10 @@ def test_describe_spec_covers_every_compatibility_axis():
 
 # --- the map builds and answers --------------------------------------------
 
-def test_processor_map_builds_and_answers(logger, fourcat_modules):
-    from common.lib.processor_map import ProcessorMap
+def test_module_map_builds_and_answers(logger, fourcat_modules):
+    from common.lib.module_map import ModuleMap
 
-    pmap = ProcessorMap(fourcat_modules, config=None, logger=logger)
+    pmap = ModuleMap(fourcat_modules, config=None, logger=logger)
 
     assert set(pmap.processors) == set(fourcat_modules.processors)  # nothing silently dropped
 
@@ -291,7 +291,7 @@ def test_processor_map_builds_and_answers(logger, fourcat_modules):
         assert edge["certainty"] in ("definite", "maybe")
 
     sample = next(iter(pmap.processors))
-    info = pmap.processor(sample)
+    info = pmap.module(sample)
     assert {"how_to_run", "followups", "compatibility", "output_shape"} <= set(info)
     how_to_run = info["how_to_run"]
     assert "notes" in how_to_run
@@ -304,9 +304,9 @@ def test_processor_map_builds_and_answers(logger, fourcat_modules):
 
 def test_datasources_are_roots_not_consumers(logger, fourcat_modules):
     """Collectors produce but never consume -- they have no incoming edges."""
-    from common.lib.processor_map import ProcessorMap
+    from common.lib.module_map import ModuleMap
 
-    pmap = ProcessorMap(fourcat_modules, config=None, logger=logger)
+    pmap = ModuleMap(fourcat_modules, config=None, logger=logger)
     for ptype, is_root in pmap._collector.items():
         if is_root:
             assert not pmap._pred.get(ptype), f"datasource {ptype} has incoming edges"

@@ -18,10 +18,12 @@
 @import url('components/dataset-overview.css');
 @import url('components/footer.css');
 @import url('components/analysis-tree.css');
+@import url('components/panel-header.css');
 @import url('components/slideout-menu.css');
 @import url('components/module-grid.css');
 @import url('components/module-card.css');
 @import url('components/module-options.css');
+@import url('components/module-detail.css');
 @import url('components/processor-preview-tree.css');
 @import url('components/preview.css');
 @import url('components/progress.css');

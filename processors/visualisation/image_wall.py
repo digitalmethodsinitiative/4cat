@@ -29,8 +29,7 @@ class ImageWallGenerator(VideoWallGenerator):
     type = "image-wall"
     description = ProcessorDescription(
         title="Image wall",
-        category="Visual",
-        tags=["needs ffmpeg"],
+        tags=["visual", "chart"],
         description="Combine all images into a single wall, placed side by side. Images can be sorted by dominant or average colour and resized to a set height. Uses ffmpeg to assemble the wall, and can take the first frame of each video when run on a video dataset.",
         icon="panorama",
     )

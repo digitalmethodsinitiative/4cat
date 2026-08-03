@@ -30,8 +30,7 @@ class AudioExtractor(BasicProcessor):
     type = "audio-extractor"  # job type ID
     description = ProcessorDescription(
         title="Extract audio from videos",
-        category="Audio",
-        tags=["extract", "needs ffmpeg"],
+        tags=["audio", "download media"],
         description="Extract the audio track from each video and save the results as WAV files in a ZIP archive. Uses ffmpeg to convert audio to 16 kHz.",
         icon="closed-captioning",
     )

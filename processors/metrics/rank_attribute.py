@@ -29,8 +29,7 @@ class AttributeRanker(BasicProcessor):
     type = "attribute-frequencies"  # job type ID
     description = ProcessorDescription(
         title="Count values",
-        category="Metrics",
-        tags=["counts", "rank", "urls", "hashtags", "time-series"],
+        tags=["counting", "time series"],
         description="Count how often values occur in one or more dataset columns, overall or per timeframe. Optionally extract URLs, domain names, hashtags, or emoji from the column before counting, and filter values with a regular expression.",
         references=[
             "[regex010](https://regex101.com/)",

@@ -25,8 +25,7 @@ class TopicModelWordExtractor(BasicProcessor):
     type = "document_topic_matrix"  # job type ID
     description = ProcessorDescription(
         title="Match items to topics",
-        category="Text analysis",
-        tags=["classify"],
+        tags=["text analysis", "machine learning", "classification"],
         description="Use Latent Dirichlet Allocation to predict which topics each item or sentence belongs to. "
                     "Produce a table where each row is one document. If tokens are grouped per item and only one "
                     "column is used, there is one row per item, otherwise an item spans several rows, one per "

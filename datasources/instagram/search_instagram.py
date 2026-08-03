@@ -21,7 +21,7 @@ class SearchInstagram(Search):
     type = "instagram-search"  # job ID
     category = "Search"  # category
     title = "Import scraped Instagram data"  # title displayed in UI
-    description = "Import Instagram data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    description = "Import Instagram data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     # the tag column the co-tag and hashtag networks look for
     output = Datasource(columns={"hashtags"})

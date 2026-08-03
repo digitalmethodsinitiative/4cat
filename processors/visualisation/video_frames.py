@@ -29,8 +29,7 @@ class VideoFrames(BasicProcessor):
 	type = "video-frames"  # job type ID
 	description = ProcessorDescription(
 		title="Extract frames from videos",
-		category="Visual",
-		tags=["extract", "needs ffmpeg"],
+		tags=["video", "visual", "download media"],
 		description="Use ffmpeg to extract still frames from each video and save them as images in an archive. You can set how many frames to capture per second and resize them to a fixed dimension. Use a frame interval of 0 to capture only the first frame of each video.",
 		icon="photo-film",
 	)

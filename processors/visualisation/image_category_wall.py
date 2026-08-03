@@ -35,7 +35,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
     type = "image-category-wall"  # job type ID
     description = ProcessorDescription(
         title="Visualise images by category",
-        category="Visual",
+        tags=["visual", "chart"],
         description="Arrange downloaded images into a single wall grouped by the values in a category column. Each category becomes a row, images are sorted within it, and numeric categories are grouped into ranges. Runs on datasets that pair images with a category, such as image classification results.",
         icon="panorama",
     )

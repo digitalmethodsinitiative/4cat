@@ -27,8 +27,7 @@ class SVGHistogramRenderer(BasicProcessor):
 	type = "histogram"  # job type ID
 	description = ProcessorDescription(
 		title="Histogram",
-		category="Visual",
-		tags=["time-series", "chart"],
+		tags=["time series", "counting", "chart"],
 		description="Generate a bar chart showing how a value changes over time, using an over-time frequency analysis as input. Each interval becomes one bar, sized by its value. Intervals without a date, such as \"unknown_date\", are dropped.",
 		icon="square-poll-vertical",
 	)

@@ -1,5 +1,5 @@
 """
-Query layer for the processor map: turn the declarative Compatibility + Output specs
+Query layer for the module map: turn the declarative Compatibility + Output specs
 into the questions a user-facing catalogue asks -- browse/search, "how do I run this
 one" (what it accepts + where to start), and "what can run on its output".
 
@@ -33,6 +33,52 @@ from common.lib.compatibility import (
 from common.lib.outputs import describe_output, Filter
 
 _DEFAULT_SPEC = Compatibility(top_dataset_only=True)
+
+#: Each condition a processor can declare, as a short plain phrase. A key not
+#: listed here falls back to a generic "key: value" (see describe_requirements).
+_REQUIREMENT_LABELS = {
+    "types": lambda value: "type is %s" % _listed(value),
+    "type_prefixes": lambda value: "type starts with %s" % _listed(value),
+    "media_types": lambda value: "media is %s" % _listed(value),
+    "datasources": lambda value: "from data source %s" % _listed(value),
+    "is_collector": lambda value: "must be a data source",
+    "extensions": lambda value: "format is %s" % _listed(value),
+    "top_dataset_only": lambda value: "top-level dataset only",
+    "child_only": lambda value: "must be a derived dataset",
+    "excluded_types": lambda value: "not %s" % _listed(value),
+    "rankable": lambda value: "must be rankable" if value else "must not be rankable",
+    "requires_all_columns": lambda value: "has columns %s" % _listed(value),
+    "requires_any_columns": lambda value: "has a column %s" % _listed(value),
+    "required_settings": lambda value: "setting: %s" % _listed(value),
+    "required_packages": lambda value: "package: %s" % _listed(value),
+}
+
+
+def _listed(value):
+    """Render a requirement's value for display, joining a list into a phrase."""
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return ", ".join(str(item) for item in value)
+
+    return str(value)
+
+
+def describe_requirements(requirement):
+    """
+    The conditions a processor puts on its input, as plain phrases
+
+    The keys of a `how_to_run` requirement are terse spec field names; this
+    turns them into something readable, so a front-end can list them without
+    knowing what the fields mean.
+
+    :param dict requirement:  A requirement as returned by `ModuleMap.how_to_run`
+    :return list:  Phrases, empty when the processor declares no conditions
+    """
+    if not requirement:
+        return []
+
+    return [_REQUIREMENT_LABELS[key](value) if key in _REQUIREMENT_LABELS
+            else "%s: %s" % (key.replace("_", " "), _listed(value))
+            for key, value in requirement.items()]
 
 
 def _is_filter(processor):
@@ -90,7 +136,7 @@ def _shape_dict(shape):
     }
 
 
-class ProcessorMap:
+class ModuleMap:
     """
     Built once from the loaded modules; answers the catalogue's questions about how
     processors connect, from their declared compatibility + output alone.
@@ -117,7 +163,7 @@ class ProcessorMap:
                 spec = getattr(processor, "compatibility", None)
                 if spec is not None and not isinstance(spec, Compatibility):
                     self.log.error(
-                        "processor map: processor '%s' has a 'compatibility' that is "
+                        "module map: processor '%s' has a 'compatibility' that is "
                         "%s, not a Compatibility -- treating it as undeclared. The "
                         "spec needs fixing (most likely in a custom extension)."
                         % (ptype, type(spec).__name__))
@@ -127,7 +173,7 @@ class ProcessorMap:
                 declarative = is_declaratively_compatible(processor)
                 is_filter = _is_filter(processor)
             except Exception as e:
-                self.log.error("processor map: processor '%s' could not be read and "
+                self.log.error("module map: processor '%s' could not be read and "
                                "is omitted from the map: %s" % (ptype, e))
                 continue
             self.processors[ptype] = processor
@@ -156,7 +202,7 @@ class ProcessorMap:
                 try:
                     outcome = self._match_spec[qtype].check(shape)  # "yes" / "maybe" / "no"
                 except Exception as e:
-                    self.log.warning("processor map: edge %s -> %s skipped: %s" % (ptype, qtype, e))
+                    self.log.warning("module map: edge %s -> %s skipped: %s" % (ptype, qtype, e))
                     continue
                 if outcome != "no":
                     self._succ[ptype].append(qtype)
@@ -178,12 +224,27 @@ class ProcessorMap:
             "warnings": list(getattr(processor, "warnings", []) or []),
             "references": list(getattr(processor, "references", []) or []),
             "icon": getattr(processor, "icon", "") or "",
+            "repo_url": self._repo_link(processor),
             "is_datasource": self._collector[ptype],
             "is_filter": self._filter[ptype],
             "has_override": not self._declarative[ptype],
             "requires_dataset_result_file": bool(
                 spec is not None and getattr(spec, "requires_dataset_result_file", False)),
         }
+
+    def _repo_link(self, processor):
+        """
+        Link to a module's source code, when the map was built with a config
+
+        :return str|None:  URL to the module's file in the configured repository
+        """
+        if self.config is None:
+            return None
+
+        try:
+            return processor.get_repo_link(self.config)
+        except Exception:
+            return None
 
     def catalogue(self):
         """Every processor (and datasource), each with display metadata + flags."""
@@ -212,7 +273,7 @@ class ProcessorMap:
 
     # -- one processor --
 
-    def processor(self, ptype):
+    def module(self, ptype):
         """Full bundle for one processor: metadata, spec, how-to-run, follow-ups."""
         if ptype not in self.processors:
             return None

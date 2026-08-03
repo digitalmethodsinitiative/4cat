@@ -21,8 +21,7 @@ class Vectorise(BasicProcessor):
 	type = "vectorise-tokens"  # job type ID
 	description = ProcessorDescription(
 		title="Count words",
-		category="Text analysis",
-		tags=["counts"],
+		tags=["counting", "text analysis"],
 		description="Count how often each token appears in the dataset, producing a bag of words per token set. The counts are sorted from most to least frequent.",
 		icon="list-ol",
 	)

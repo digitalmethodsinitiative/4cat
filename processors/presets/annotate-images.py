@@ -16,8 +16,7 @@ class AnnotateImages(ProcessorPreset):
     type = "preset-annotate-images"  # job type ID
     description = ProcessorDescription(
         title="Annotate images with Google Vision",
-        category="Combined processors",  # 'Combined processors' are always listed first in the UI.
-        tags=["classify", "caption", "api key required", "external service"],
+        tags=["combined", "classification", "transcribe", "external service"],
         description="Download the most-linked images from the dataset and use the Google Vision API to detect labels, text, faces, landmarks, logos, and other features in them.",
         references=[
             "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",

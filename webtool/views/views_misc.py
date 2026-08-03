@@ -14,7 +14,9 @@ from flask import Blueprint, request, render_template, jsonify, Response, redire
 from flask_login import login_required
 from werkzeug.exceptions import HTTPException, InternalServerError
 
-from webtool.lib.helpers import error
+from webtool.lib.helpers import collect_grid_tags, error, module_map, module_request_url
+
+from common.lib.module_map import describe_requirements
 
 from common.lib.helpers import get_datasource_example_keys
 
@@ -139,65 +141,178 @@ def favicon():
     """
     return redirect(url_for('static', filename='img/favicon/favicon.ico'))
 
+def datasource_ids_by_worker():
+    """
+    Map a data source's search worker type onto its data source ID
+
+    The module map is keyed by module type (`bsky-search`), while data source
+    metadata is keyed by data source ID (`bsky`).
+
+    :return dict:  {worker type: data source ID}
+    """
+    return {"%s-search" % datasource: datasource for datasource in g.modules.datasources}
+
+
+def datasource_detail(datasource_id):
+    """
+    The data source-specific part of a module's detail in the catalogue
+
+    This is what used to live on the (now redirected) data-overview page: the
+    data source's own DESCRIPTION.md, what kind of source it is, how long its
+    datasets are kept, and which fields its items have.
+
+    :param str datasource_id:  Data source to describe
+    :return dict:  Detail context for components/module-detail-datasource.html
+    """
+    metadata = g.modules.datasources[datasource_id]
+    worker = g.modules.workers.get("%s-search" % datasource_id)
+
+    description = None
+    description_path = Path(metadata.get("path"), "DESCRIPTION.md")
+    if description_path.exists():
+        with description_path.open(encoding="utf-8") as description_file:
+            description = description_file.read()
+
+    # the fields items from this data source have; skipped for uploads, whose
+    # fields are whatever the uploaded file happens to contain
+    example_keys = None
+    if datasource_id not in ("upload",):
+        example_keys = get_datasource_example_keys(db=g.db, modules=g.modules,
+                                                   dataset_type="%s-search" % datasource_id)
+
+    expiration = metadata.get("expire-datasets") or {}
+    github_url = (g.config.get("4cat.github_url") or "").rstrip("/")
+
+    return {
+        "id": datasource_id,
+        "name": metadata["name"],
+        "description": description,
+        "enabled": datasource_id in g.config.get("datasources.enabled", {}),
+        "importable": bool(metadata["importable"]),
+        "configurable": bool(metadata["has_options"]),
+        "expiration": expiration.get("timeout") or None,
+        "example_keys": example_keys,
+        "references": getattr(worker, "references", None),
+        "source_url": "%s/tree/master/datasources/%s" % (github_url, metadata["id"]) if github_url else None,
+    }
+
+
+def module_detail_context(module_type):
+    """
+    Everything the catalogue shows about one module
+
+    :param str module_type:  Module to describe
+    :return dict|None:  Render context, or None if there is no such module
+    """
+    module = module_map().module(module_type)
+    if module is None:
+        return None
+
+    datasource_id = datasource_ids_by_worker().get(module_type) if module["is_datasource"] else None
+    module["tags"] = (["data source"] if module["is_datasource"] else []) + module["tags"]
+
+    requirement = (module.get("how_to_run") or {}).get("accepts", {}).get("requirement")
+
+    return {
+        "module": module,
+        "module_type": module_type,
+        "requirements": describe_requirements(requirement),
+        "datasource": datasource_detail(datasource_id) if datasource_id else None,
+    }
+
+
+def module_catalog_sections():
+    """
+    Every module in the catalog, grouped for the module grid
+
+    Data sources lead - they are where every analysis starts - followed by the
+    processors.
+
+    :return list:  `grid_sections` for components/module-grid.html
+    """
+    catalogue = module_map().catalogue()
+    datasource_ids = datasource_ids_by_worker()
+
+    for entry in catalogue:
+        entry["datasource_id"] = datasource_ids.get(entry["type"]) if entry["is_datasource"] else None
+        # data sources are labelled as such, so they can be told apart at a
+        # glance and found by searching for 'data source'
+        entry["tags"] = (["data source"] if entry["is_datasource"] else []) + entry["tags"]
+
+    def by_title(entries):
+        return {entry["type"]: entry for entry in
+                sorted(entries, key=lambda entry: (entry["title"] or entry["type"]).lower())}
+
+    sections = []
+    datasources = [entry for entry in catalogue if entry["is_datasource"]]
+    if datasources:
+        sections.append({"header": "Data sources", "modules": by_title(datasources)})
+
+    processors = [entry for entry in catalogue if not entry["is_datasource"]]
+
+    if processors:
+        sections.append({"header": "Processors", "modules": by_title(processors)})
+
+    return sections
+
+
 @component.route("/module-catalog/")
 @component.route("/module-catalog/<module_type>")
 @login_required
 def module_catalog(module_type=None):
-    """Render the module catalog.
-
-    With a processor type in the path, the page opens with that processor's detail
-    already loaded, so a direct link lands on it instead of the visitor having to
-    find and click it.
     """
-    return render_template("module-catalog.html", module_type=module_type)
+    Render the module catalog
+
+    Lists every module 4CAT knows - data sources and processors alike - as
+    module cards. With a module type in the path the page opens with that
+    module's detail already loaded, so a direct link lands on it instead of the
+    visitor having to find and click it.
+
+    :param str module_type:  Module to open the catalogue on
+    """
+    grid_sections = module_catalog_sections()
+
+    return render_template("module-catalog.html", grid_sections=grid_sections,
+                           grid_tags=collect_grid_tags(grid_sections),
+                           detail=module_detail_context(module_type) if module_type else None,
+                           # the catalogue holds both kinds, so let the requester pick a form
+                           request_url=module_request_url(None))
+
+
+@component.route("/module-catalog/<module_type>/detail/")
+@login_required
+def module_detail(module_type):
+    """
+    Render one module's full detail as a partial
+
+    Swapped into the top of the module catalogue when a module is selected.
+
+    :param str module_type:  Module to describe
+    """
+    detail = module_detail_context(module_type)
+    if detail is None:
+        return error(404, error="This module cannot be found.")
+
+    return render_template("components/module-detail.html", **detail)
+
 
 @component.route('/data-overview/')
 @component.route('/data-overview/<string:datasource>')
 @login_required
 def data_overview(datasource=None):
     """
-    Main tool frontend
+    Redirect to the module catalogue
+
+    The data source overview has been folded into the module catalogue, which
+    shows the same information as part of a data source's module detail. Kept as
+    a redirect so existing links and bookmarks keep working.
+
+    :param str datasource:  Data source that was being looked at
     """
-    datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
-                   metadata["has_worker"] and datasource in g.config.get("datasources.enabled")}
+    if datasource and datasource in g.modules.datasources:
+        return redirect(url_for("misc.module_catalog", module_type="%s-search" % datasource))
 
-    if datasource not in datasources:
-        datasource = None
-
-    github_url = g.config.get("4cat.github_url")
-
-    # Get information for a specific data source
-    datasource_id = None
-    description = None
-    total_counts = None
-    daily_counts = None
-    references = None
-    labels = None
-    example_keys = None
-
-    if datasource:
-
-        datasource_id = datasource
-        worker_class = g.modules.workers.get(datasource_id + "-search")
-
-        # Get description
-        description_path = Path(datasources[datasource_id].get("path"), "DESCRIPTION.md")
-        if description_path.exists():
-            with description_path.open(encoding="utf-8") as description_file:
-                description = description_file.read()
-
-        # Status labels to display in query form
-        labels = []
-        if hasattr(worker_class, "is_from_zeeschuimer"):
-            labels.append("zeeschuimer")
-
-        # Get example keys for the datasource
-        if datasource_id not in ["upload"]:  # ignore upload as keys are variable
-            example_keys = get_datasource_example_keys(db=g.db, modules=g.modules, dataset_type=datasource_id + "-search")
-
-        references = worker_class.references if hasattr(worker_class, "references") else None        
-
-    return render_template('data-overview.html', datasources=datasources, datasource_id=datasource_id, description=description, labels=labels, total_counts=total_counts, daily_counts=daily_counts, github_url=github_url, references=references, example_keys=example_keys)
+    return redirect(url_for("misc.module_catalog"))
 
 @component.route('/get-boards/<string:datasource>/')
 @login_required

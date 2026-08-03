@@ -30,8 +30,7 @@ class LLMPrompter(BasicProcessor):
     type = "llm-prompter"  # job type ID
     description = ProcessorDescription(
         title="Prompt a large language model",
-        category="Machine learning",
-        tags=["classify", "extract", "external service", "annotate"],
+        tags=["text analysis", "visual", "audio", "classification", "genAI", "annotations"],
         description="Run a prompt against a large language model for each item in a dataset, using a local model or a third-party API such as OpenAI, Google, Anthropic, Mistral, or DeepSeek. Insert column values into the prompt with brackets, attach images or other media, and optionally return structured JSON.",
         references=[
             "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307.13106)",

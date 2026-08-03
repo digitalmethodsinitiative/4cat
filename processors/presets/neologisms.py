@@ -16,8 +16,7 @@ class NeologismExtractor(ProcessorPreset):
     type = "preset-neologisms"  # job type ID
     description = ProcessorDescription(
         title="Extract neologisms",
-        category="Combined processors",
-        tags=["extract", "clean text"],
+        tags=["combined", "text analysis"],
         description="Find uncommon terms by removing every word that appears in dictionary and stopword lists. Uses a Google Books English word list and the stopwords-iso English list as filters.",
         warnings=[
             "This assumes the data is in English; for other languages start with the Tokenise posts processor and use a different word list.",

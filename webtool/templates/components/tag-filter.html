@@ -1,0 +1,27 @@
+{# Tag filter for a module grid.
+
+   Every tag present in the grid, as a chip in its own colour. Picking one
+   filters the grid down to the modules carrying that tag, and dims the other
+   chips so the active filter is obvious. Picking a different tag replaces the
+   filter; picking the active one again clears it, as does 'Show all tags'.
+
+   State lives in the grid's Alpine scope (moduleGrid / moduleSlideout, see
+   js/alpine.slideout.js), so the cards filter themselves against it.
+
+   Expects:
+     grid_tags  sorted list of every tag in this grid
+#}
+<div class="tag-filter" role="group" aria-label="Filter modules by tag">
+    <ul class="tag-filter-tags">
+        {% for tag in grid_tags %}
+            <li>
+                <button type="button" class="module-tag tag-{{ tag|idify }}"
+                        :class='{ "is-dimmed": tagDimmed({{ tag|tojson }}) }'
+                        :aria-pressed='tagSelected({{ tag|tojson }}) ? "true" : "false"'
+                        @click='toggleTag({{ tag|tojson }})'>{{ tag }}</button>
+            </li>
+        {% endfor %}
+    </ul>
+    <span type="button" class="tag-filter-reset" x-cloak x-show="selectedTag"
+            @click="clearTagFilter()">Show all tags</span>
+</div>

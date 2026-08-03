@@ -27,8 +27,7 @@ class ConsolidateURLs(BasicProcessor):
     type = "consolidate-urls"  # job type ID
     description = ProcessorDescription(
         title="Consolidate URLs",
-        category="Conversion",
-        tags=["urls", "clean text"],
+        tags=["conversion", "urls"],
         description="Reduce URLs in a column to a shorter form, keeping only the domain or applying per-site rules for Facebook, Instagram, YouTube, and other platforms. Optionally expand shortened URLs first. Useful for building networks that link authors to the domains they share.",
         warnings=[
             "Expanding shortened URLs is slow and not recommended for datasets larger than 10,000 items.",

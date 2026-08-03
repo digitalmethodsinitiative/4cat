@@ -13,7 +13,8 @@ from flask import (Blueprint, current_app, render_template, request, redirect, s
                    get_flashed_messages, url_for, stream_with_context, g, make_response)
 from flask_login import login_required, current_user
 
-from webtool.lib.helpers import Pagination, error, setting_required, common_dataset_options
+from webtool.lib.helpers import (Pagination, error, setting_required, common_dataset_options,
+                                 collect_grid_tags, module_request_url)
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor, datasource_form
 
 from common.lib.dataset import DataSet
@@ -32,21 +33,6 @@ def available_datasources():
     """
     return {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
             metadata["has_worker"] and datasource in g.config.get("datasources.enabled", {})}
-
-
-def module_request_url(kind):
-    """
-    Link to the GitHub issue form for requesting a new module
-
-    :param str kind:  `datasource` or `processor`; matches the file name of the
-                      issue form in .github/ISSUE_TEMPLATE/
-    :return str|None:  URL to the pre-selected issue form
-    """
-    repository = g.config.get("4cat.github_url")
-    if not repository:
-        return None
-
-    return "%s/issues/new?template=%s_request.yml" % (repository.rstrip("/"), kind)
 
 
 @component.route('/create-dataset/')
@@ -81,10 +67,13 @@ def datasource_grid():
             "title": metadata["name"],
             "description": worker.description,
             "icon": getattr(worker, "icon", None),
+            "tags": list(getattr(worker, "tags", []) or []),
             "status": list(status) if isinstance(status, (list, tuple, set)) else ([status] if status else []),
             "importable": metadata["importable"],
             "selectable": metadata["has_options"],
             "code_url": worker.get_repo_link(g.config),
+            # the module catalogue is keyed by worker type, not data source ID
+            "worker_type": worker.type,
         }
 
     collected = {k: v for k, v in modules.items() if not v["importable"]}
@@ -102,6 +91,7 @@ def datasource_grid():
         grid_sections = []
 
     return render_template("components/datasource-grid.html", grid_sections=grid_sections,
+                           grid_tags=collect_grid_tags(grid_sections),
                            request_url=module_request_url("datasource"))
 
 
@@ -148,7 +138,7 @@ def datasource_metadata(datasource_id):
         "components/module-metadata.html",
         module={"title": datasources[datasource_id]["name"]},
         icon=getattr(worker, "icon", None),
-        info_url=url_for("misc.data_overview", datasource=datasource_id),
+        info_url=url_for("misc.module_catalog", module_type="%s-search" % datasource_id),
         info_label="How is this data collected?",
         code_url=worker.get_repo_link(g.config),
         code_label="View data source code",
@@ -849,6 +839,7 @@ def processor_grid(key):
         "components/processor-grid.html",
         dataset=dataset,
         grid_sections=grid_sections,
+        grid_tags=collect_grid_tags(grid_sections),
         genealogy=dataset.get_genealogy(),
         request_url=module_request_url("processor"),
     )
@@ -909,7 +900,7 @@ def processor_metadata(key, processor):
         module_id=processor,
         icon=module.icon,
         tags=module.category,
-        info_url=url_for("misc.module_catalog") + "/" + processor,
+        info_url=url_for("misc.module_catalog", module_type=processor),
         info_label="More information about this processor",
         code_url=module.get_repo_link(g.config),
         code_label="View processor code",

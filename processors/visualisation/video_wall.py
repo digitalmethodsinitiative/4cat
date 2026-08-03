@@ -33,7 +33,7 @@ class VideoWallGenerator(BasicProcessor):
     type = "video-wall"  # job type ID
     description = ProcessorDescription(
         title="Create video wall",
-        category="Visual",
+        tags=["video", "visual", "chart"],
         description="Combine the videos in the dataset into a single grid, playing side by side. Videos can be sorted by length or at random, resized to a chosen tile size, and arranged to a chosen aspect ratio.",
         warnings=[
             "Rendering can be slow and heavy for large datasets or long videos; set a length limit to keep run times reasonable.",

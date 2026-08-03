@@ -25,8 +25,7 @@ class CategorizeImagesCLIP(BasicProcessor):
     type = "image-captions"  # job type ID
     description = ProcessorDescription(
         title="Caption images with BLIP-2",
-        category="Visual",
-        tags=["caption", "external service"],
+        tags=["visual", "classification", "transcribe", "external service"],
         description="Generate a caption for each image with the BLIP-2 model, which combines an image encoder with a language model. You can also supply a prompt to get a text response about each image instead of a plain caption.",
         warnings=[
             "This runs the BLIP-2 model through the DMI Service Manager, which must be set up with a GPU by an administrator.",

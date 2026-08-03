@@ -28,8 +28,7 @@ class ImageTextDetector(BasicProcessor):
     type = "text-from-images"  # job type ID
     description = ProcessorDescription(
         title="Extract text from images",
-        category="Conversion",
-        tags=["extract", "transcribe", "external service"],
+        tags=["machine learning", "visual", "transcribe", "external service"],
         description="Use optical character recognition (OCR) to detect and read text in images. Detected words are grouped by their position in the image and returned per image.",
         references=[
             "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
