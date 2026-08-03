@@ -98,10 +98,10 @@
     opacity: 0.4;
 }
 
-/* a link, not a button, wherever the grid is shown; the element is in the
-   selector to out-specify `.plain-page button`, which would otherwise make
-   this button-like on the catalogue page but not in the slideout */
-.tag-filter button.tag-filter-reset {
+/* a link, not a button, wherever the grid is shown; keep .self-styled on it if
+   it is ever a <button> again, or `.plain-page button` makes it button-like on
+   the catalogue page but not in the slideout */
+.tag-filter .tag-filter-reset {
     font: inherit;
     font-size: var(--font-body);
     text-transform: none;
@@ -114,6 +114,6 @@
     margin-left: auto;
 }
 
-.tag-filter button.tag-filter-reset:hover {
+.tag-filter .tag-filter-reset:hover {
     color: var(--fourcat-accent);
 }

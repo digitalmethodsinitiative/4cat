@@ -1,0 +1,43 @@
+{# Confirmation for an annotation field change that destroys annotations.
+
+   Deleting a field, or changing what kind of field it is, deletes the
+   annotations that belong to it. Only the server knows how many that comes to,
+   so it says so here, and re-posts exactly what was submitted with `confirm`
+   set when the answer is yes.
+
+   Expects: dataset, impact, form (the submitted form, replayed as hidden inputs)
+#}
+<form class="annotation-fields-confirm"
+      hx-post="{{ url_for('explorer.save_annotation_fields', key=dataset.key) }}"
+      hx-target="#annotation-fields-editor"
+      hx-swap="innerHTML"
+      hx-indicator="#annotation-fields-spinner">
+
+    {% for name in form %}
+        {% for value in form.getlist(name) %}
+            <input type="hidden" name="{{ name }}" value="{{ value }}">
+        {% endfor %}
+    {% endfor %}
+    <input type="hidden" name="confirm" value="1">
+
+    <p class="annotation-fields-warning" role="alert">
+        <i class="fa fa-warning" aria-hidden="true"></i>
+        Saving these fields deletes annotations that have already been made:
+    </p>
+    <ul class="annotation-fields-impact">
+        {% for entry in impact %}
+            <li>
+                <strong>{{ entry.label }}</strong> &mdash; {{ entry.reason }},
+                {{ entry.annotations|commafy }} annotation{{ "" if entry.annotations == 1 else "s" }} deleted
+            </li>
+        {% endfor %}
+    </ul>
+
+    <div class="annotation-fields-actions">
+        <button type="button" class="button-like"
+                hx-get="{{ url_for('explorer.annotation_fields_editor', key=dataset.key) }}"
+                hx-target="#annotation-fields-editor"
+                hx-swap="innerHTML">Cancel</button>
+        <button type="submit" class="button-like button-destructive">Delete them and save</button>
+    </div>
+</form>

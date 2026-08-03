@@ -284,10 +284,10 @@ input[type=search]::-webkit-search-cancel-button {
     padding-right: calc(var(--spacing-small) * 2 + 1em);
 }
 
-/* Mirrors the magnifying glass above, but is only there while there is
-   something to clear. Needs the element in the selector to out-specify
-   `.plain-page button`, which would otherwise make it button-like. */
-.search-box button.search-box-clear {
+/* mirrors the magnifying glass above, but is only there while there is
+   something to clear; keep .self-styled on it, or `.plain-page button` makes
+   it button-like */
+.search-box-clear {
     position: absolute;
     right: var(--spacing-small);
     top: 50%;
@@ -300,6 +300,6 @@ input[type=search]::-webkit-search-cancel-button {
     cursor: pointer;
 }
 
-.search-box button.search-box-clear:hover {
+.search-box-clear:hover {
     color: var(--fourcat-accent);
 }

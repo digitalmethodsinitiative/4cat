@@ -1,0 +1,110 @@
+{# One annotation on one item.
+
+   The input saves itself: it posts its own value to the annotation endpoint,
+   which reads what kind of field this is from the dataset rather than from the
+   request. Nothing is collected or serialised in the browser, and there is no
+   save button - the state chip says where the value stands.
+
+   The input is never swapped out by the response (the endpoint answers 204), so
+   the field someone is typing in is never replaced under their hands.
+
+   Expects: field_id, field, annotation (may be None), item_id, dataset,
+            can_annotate, from_datasets, processors
+#}
+{% set type = field.type %}
+{% set value = annotation.value if annotation else "" %}
+{% set editable = can_annotate and not field.from_dataset %}
+{% set post_url = url_for('explorer.save_annotation', key=dataset.key) %}
+{% set identity = {"field_id": field_id, "item_id": item_id}|tojson %}
+
+<div class="item-annotation type-{{ type }}"
+     x-data="annotationValue"
+     @htmx:before:request="saving()"
+     @htmx:after:request="settle($event)">
+    <label class="annotation-label" {% if editable %}for="annotation-{{ item_id }}-{{ field_id }}"{% endif %}>
+        <i class="fa-solid fa-tag" aria-hidden="true"></i>
+        {% if field.from_dataset %}
+            <a href="{{ url_for('dataset.show_result', key=field.from_dataset) }}" target="_blank"
+               rel="noopener" class="from-dataset-link">{{ field.label }}</a>
+        {% else %}
+            {{ field.label }}
+        {% endif %}
+    </label>
+
+    <div class="item-annotation-value">
+        {% if not editable %}
+            {# processor-generated, or this user may only read: show the value as it stands #}
+            <div class="item-annotation-input is-readonly">{{ value|join(", ") if value is not string else value }}</div>
+
+        {% elif type == "textarea" %}
+            <textarea class="item-annotation-input" name="value"
+                      id="annotation-{{ item_id }}-{{ field_id }}"
+                      hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                      hx-trigger="input delay:800ms, blur"
+                      hx-swap="none" hx-sync="closest .item-annotation:replace">{{ value }}</textarea>
+
+        {% elif type == "dropdown" %}
+            <select class="item-annotation-input" name="value"
+                    id="annotation-{{ item_id }}-{{ field_id }}"
+                    hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                    hx-trigger="change"
+                    hx-swap="none" hx-sync="closest .item-annotation:replace">
+                <option value=""></option>
+                {% for option_id, option_label in field.get("options", {}).items() %}
+                    <option value="{{ option_label }}" {% if option_label == value %}selected{% endif %}>{{ option_label }}</option>
+                {% endfor %}
+            </select>
+
+        {% elif type == "checkbox" %}
+            {# every box posts the whole group, so unchecking the last one still
+               says 'nothing is checked' rather than saying nothing at all #}
+            <div class="item-annotation-options">
+                {% for option_id, option_label in field.get("options", {}).items() %}
+                    <div class="item-annotation-checkbox">
+                        <input type="checkbox" name="value" value="{{ option_label }}"
+                               id="annotation-{{ item_id }}-{{ field_id }}-{{ option_id }}"
+                               {% if value and option_label in value %}checked{% endif %}
+                               hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                               hx-trigger="change"
+                               hx-include="closest .item-annotation-options"
+                               hx-swap="none" hx-sync="closest .item-annotation:replace">
+                        <label for="annotation-{{ item_id }}-{{ field_id }}-{{ option_id }}">{{ option_label }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+
+        {% else %}
+            <input type="text" class="item-annotation-input" name="value" value="{{ value }}"
+                   id="annotation-{{ item_id }}-{{ field_id }}"
+                   hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                   hx-trigger="input delay:800ms, blur"
+                   hx-swap="none" hx-sync="closest .item-annotation:replace">
+        {% endif %}
+
+        {% if editable %}
+            <span class="annotation-state" x-cloak x-show="state !== 'idle'"
+                  :class="'is-' + state" aria-live="polite">
+                <template x-if="state === 'saving'"><i class="fa fa-circle-notch fa-spin" aria-hidden="true"></i></template>
+                <template x-if="state === 'saved'"><span><i class="fa fa-check" aria-hidden="true"></i> Saved</span></template>
+                <template x-if="state === 'error'"><span><i class="fa fa-warning" aria-hidden="true"></i> Not saved</span></template>
+            </span>
+        {% endif %}
+    </div>
+
+    {% if field.from_dataset and annotation %}
+        {# where a processor-made value came from, so it stays traceable #}
+        {% set from_dataset_item = from_datasets.get(field.from_dataset) %}
+        {% if from_dataset_item and from_dataset_item != "deleted" %}
+            <p class="item-annotation-origin">
+                Generated by
+                <a href="{{ url_for('dataset.show_result', key=from_dataset_item.key) }}" target="_blank" rel="noopener">
+                    {{ processors[from_dataset_item.type].title if from_dataset_item.type in processors else from_dataset_item.type }}</a>
+            </p>
+        {% endif %}
+    {% elif annotation and annotation.author %}
+        <p class="item-annotation-origin">
+            {{ annotation.author }}{% if annotation.timestamp %},
+            {{ annotation.timestamp|datetime(fmt="%d %b %Y, %H:%M")|safe }}{% endif %}
+        </p>
+    {% endif %}
+</div>

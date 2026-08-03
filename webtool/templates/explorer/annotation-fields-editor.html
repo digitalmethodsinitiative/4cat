@@ -1,0 +1,48 @@
+{# The annotation field editor.
+
+   A plain form: one row per field, posted whole. The rows are rendered by the
+   server, both the saved ones here and the blank one the 'Add field' button
+   fetches, so there is one definition of what a field row looks like rather
+   than one in Jinja and another in JavaScript.
+
+   `field-order` is what the server reads to know which fields were submitted
+   and in what order; the rows keep it in step as they are moved and removed.
+
+   Expects: dataset, annotation_fields, from_datasets, processors, can_annotate
+            warning (optional) a message from a save that was refused
+#}
+<form class="annotation-fields-editor"
+      hx-post="{{ url_for('explorer.save_annotation_fields', key=dataset.key) }}"
+      hx-target="#annotation-fields-editor"
+      hx-swap="innerHTML"
+      hx-indicator="#annotation-fields-spinner">
+
+    {% if warning %}
+        <p class="annotation-fields-warning" role="alert">
+            <i class="fa fa-warning" aria-hidden="true"></i> {{ warning }}
+        </p>
+    {% endif %}
+
+    <ol class="annotation-field-list" id="annotation-field-list">
+        {% for field_id, field in annotation_fields.items() %}
+            {% include "explorer/annotation-field.html" %}
+        {% endfor %}
+    </ol>
+
+    {% if can_annotate %}
+        <div class="annotation-fields-actions">
+            <button type="button" class="button-like"
+                    hx-get="{{ url_for('explorer.new_annotation_field', key=dataset.key) }}"
+                    hx-target="#annotation-field-list"
+                    hx-swap="beforeend"
+                    hx-indicator="#annotation-fields-spinner">
+                <i class="fa fa-plus" aria-hidden="true"></i> Add field
+            </button>
+            <button type="submit" class="button-like">
+                <i class="fa fa-check" aria-hidden="true"></i> Save fields
+            </button>
+        </div>
+    {% else %}
+        <p class="annotation-fields-note">You do not have permission to change the annotation fields of this dataset.</p>
+    {% endif %}
+</form>

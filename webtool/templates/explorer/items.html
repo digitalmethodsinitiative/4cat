@@ -1,0 +1,41 @@
+{# One page of dataset items, with the pagination that goes with it.
+
+   Swapped into #explorer-body when paging or sorting, and included directly by
+   explorer/pane.html for the first page. Both the list and the pagination
+   change per page, so they travel together and nothing needs an out-of-band
+   swap.
+
+   Expects the context built by explorer.explorer_pane.
+#}
+{% set shown_count = item_count if item_count < max_items else max_items %}
+{% if item_count > max_items %}
+    <p class="explorer-notice">
+        <i class="fa fa-warning" aria-hidden="true"></i>
+        Large dataset &mdash; only the first {{ max_items|commafy }} items can be shown here. Use a filter processor to
+        narrow it down.
+    </p>
+{% endif %}
+
+{# .explorer-content-container / .explorer-content / .items is the structure
+   every data source's Explorer stylesheet is written against - see
+   datasources/*/[name]-explorer.css - so it is kept as it was #}
+<div class="explorer-content-container">
+    <div class="explorer-content">
+        <ol class="items" id="explorer-items">
+            {% for item in items %}
+                {% set item_index = loop.index - 1 %}
+                {% if not (datasource == "media-import" and item.id == ".metadata.json") %}
+                    {% include "explorer/item.html" %}
+                {% endif %}
+            {% endfor %}
+        </ol>
+    </div>
+</div>
+
+<div class="explorer-footer">
+    <p class="explorer-count">
+        Item {{ (offset + 1)|commafy }}&ndash;{{ (shown_count if (offset + items_per_page) > shown_count else (offset + items_per_page))|commafy }}
+        of {{ shown_count|commafy }}
+    </p>
+    {% include "explorer/pagination.html" %}
+</div>

@@ -120,4 +120,21 @@ included inside one.
             {% include "dataset-page/dataset-parameters.html" %}
         </dl>
     {% endif %}
+    {# the Explorer is a pane on this page, so its controls only belong on the
+       page that has it: the top-level card, not the cards in the analysis tree
+       or on the dataset overview #}
+    {% if main_header and dataset.is_finished() and __user_config("privileges.can_use_explorer") %}
+        <dl class="badge-list annotation-fields">
+            {% include "explorer/annotation-fields-box.html" %}
+        </dl>
+        <nav class="analyze-or-explore">
+            <button type="button" class="toggle self-styled" role="switch"
+                    aria-checked="{{ "true" if explore else "false" }}"
+                    aria-label="Switch between analysing and annotating this dataset"
+                    x-data="toggleButton" @click="flip()" :aria-checked="checked">
+                <span>Analyze</span>
+                <span>Annotate &amp; Explore</span>
+            </button>
+        </nav>
+    {% endif %}
 </section>

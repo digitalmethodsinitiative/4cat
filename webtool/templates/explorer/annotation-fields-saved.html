@@ -1,0 +1,17 @@
+{# The editor, after a successful save.
+
+   The chips in the metadata box are swapped out of band alongside it, so the
+   summary agrees with what was just saved. The marker at the bottom announces
+   the save to the rest of the page: the Explorer pane, if it is open, listens
+   for it and reloads its items, which now have different fields to fill in.
+
+   Expects: the annotation field context, freshly read back after saving
+#}
+{% include "explorer/annotation-fields-editor.html" %}
+
+{% with oob = True %}{% include "explorer/annotation-fields-chips.html" %}{% endwith %}
+
+<div class="annotation-fields-saved" x-data
+     x-init="$dispatch('annotation-fields-saved')" role="status">
+    <i class="fa fa-check" aria-hidden="true"></i> Annotation fields saved
+</div>

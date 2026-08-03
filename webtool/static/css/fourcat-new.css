@@ -24,6 +24,8 @@
 @import url('components/module-card.css');
 @import url('components/module-options.css');
 @import url('components/module-detail.css');
+@import url('components/explorer.css');
+@import url('components/annotations.css');
 @import url('components/processor-preview-tree.css');
 @import url('components/preview.css');
 @import url('components/progress.css');

@@ -153,6 +153,66 @@ def module_request_url(kind):
 	return "%s/issues/new?template=%s_request.yml" % (repository.rstrip("/"), kind)
 
 
+def can_annotate_dataset(dataset):
+	"""
+	Whether the current user may write annotations on a dataset
+
+	Reading a dataset is enough to see its annotations; writing them needs the
+	same standing as running a processor on it.
+
+	:param dataset:  The DataSet in question
+	:return bool:
+	"""
+	return bool(
+		g.config.get("privileges.can_run_processors")
+		and g.config.get("privileges.can_use_explorer")
+		and (g.config.get("privileges.admin.can_manipulate_all_datasets")
+			 or dataset.is_accessible_by(current_user, "owner"))
+	)
+
+
+def annotation_context(dataset):
+	"""
+	Context for anything rendering a dataset's annotation fields
+
+	The fields as the Explorer shows them - so without the ones processors keep
+	to themselves - plus, for processor-generated fields, the dataset that
+	generated them, since those are shown attributed to their origin.
+
+	Both the dataset page and the Explorer's own endpoints render annotation
+	fields, so both need this.
+
+	:param dataset:  The DataSet whose fields to describe
+	:return dict:  Template context
+	"""
+	# imported here: common.lib.dataset imports from this module's package, and
+	# only this function needs it
+	from common.lib.dataset import DataSet
+	from common.lib.exceptions import DataSetException
+
+	annotation_fields = {
+		field_id: field
+		for field_id, field in dataset.annotation_fields.items()
+		if not field.get("hide_in_explorer")
+	}
+
+	from_datasets = {}
+	for field in annotation_fields.values():
+		if field.get("from_dataset"):
+			child_key = field["from_dataset"]
+			try:
+				from_datasets[child_key] = DataSet(key=child_key, db=g.db, modules=g.modules)
+			except DataSetException:
+				# can be absent if this dataset is a filter and the original was deleted
+				from_datasets[child_key] = "deleted"
+
+	return {
+		"annotation_fields": annotation_fields,
+		"from_datasets": from_datasets,
+		"can_annotate": can_annotate_dataset(dataset),
+	}
+
+
 def error(code=200, **kwargs):
 	"""
 	Custom HTTP response

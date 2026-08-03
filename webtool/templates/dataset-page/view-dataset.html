@@ -71,7 +71,27 @@
             {% endif %}
         </section>
 
-        {% include "dataset-page/analysis-tree.html" %}
+        {# the two things a finished dataset can be doing: run processors on it,
+           or read and annotate its items. The toggle in the dataset card
+           dispatches `toggle-change`; the Explorer pane fills itself in the
+           first time it is shown. #}
+        <div class="dataset-panes" x-data='datasetPanes({{ ("explore" if explore else "analyze")|tojson }})'
+             @toggle-change.window="exploring = $event.detail.checked">
+            <div x-show="!exploring">
+                {% include "dataset-page/analysis-tree.html" %}
+            </div>
+
+            {% if dataset.is_finished() and __user_config("privileges.can_use_explorer") %}
+                <div class="explorer-pane-host" x-show="exploring" x-cloak>
+                    <section class="explorer-pane center-stage" id="explorer-pane"
+                             hx-get="{{ url_for('explorer.explorer_pane', key=dataset.key, page=request.args.get('page'), sort=request.args.get('sort'), order=request.args.get('order')) }}"
+                             hx-trigger="explore-open once from:'closest .dataset-panes', annotation-fields-saved from:body"
+                             hx-swap="innerHTML"
+                             hx-indicator="#explorer-spinner"></section>
+                    {% with spinner_id = "explorer-spinner" %}{% include "components/spinner.html" %}{% endwith %}
+                </div>
+            {% endif %}
+        </div>
 
         {% with genealogy = dataset.get_genealogy(),
                 preview_template = 'components/processor-preview-tree.html',

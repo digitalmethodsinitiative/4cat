@@ -1,0 +1,246 @@
+/* Annotations: the fields a dataset can be annotated with, shown as a row in
+   its metadata box, and the inputs for them on the items in the Explorer.
+
+   Annotation inputs save themselves as they are edited, so the chip next to
+   one is the only feedback there is that a value has landed - it is styled to
+   be noticeable without being loud, since it appears on every keystroke pause. */
+
+/* --- the fields row in the dataset metadata box --- */
+
+.annotation-fields-box .annotation-fields-summary {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    text-transform: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.annotation-fields-box .annotation-fields-summary:hover {
+    color: var(--fourcat-accent);
+}
+
+.annotation-fields-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-tiny);
+}
+
+.annotation-field-chip {
+    padding: var(--spacing-tiny) var(--spacing-small);
+    border-radius: var(--radius);
+    background: var(--panel-bg-1);
+    color: var(--semidark);
+    font-size: var(--font-body);
+    white-space: nowrap;
+}
+
+/* a field a processor made, not a person: shown, but not something to edit */
+.annotation-field-chip.is-generated {
+    background: transparent;
+    border: var(--stroke-light) dashed var(--panel-bg-3);
+}
+
+.annotation-fields-empty {
+    color: var(--semidark);
+    font-style: italic;
+}
+
+.annotation-fields-editor-host {
+    position: relative;
+}
+
+/* --- the field editor --- */
+
+.annotation-fields-editor,
+.annotation-fields-confirm {
+    margin-top: var(--spacing-regular);
+    padding: var(--spacing-regular);
+    background: var(--bright);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: var(--radius);
+    color: var(--dark);
+}
+
+.annotation-field-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-small);
+}
+
+.annotation-field {
+    padding: var(--spacing-small);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: var(--radius);
+}
+
+.annotation-field.is-generated {
+    border-style: dashed;
+}
+
+.annotation-field-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-small);
+}
+
+.annotation-field-label {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+
+.annotation-field-origin {
+    margin: 0;
+    color: var(--semidark);
+    font-size: var(--font-body);
+}
+
+.annotation-field-controls {
+    display: flex;
+    gap: var(--spacing-tiny);
+    margin-left: auto;
+}
+
+.annotation-field-controls button {
+    background: none;
+    border: 0;
+    padding: var(--spacing-tiny);
+    color: var(--semidark);
+    cursor: pointer;
+}
+
+.annotation-field-controls button:hover {
+    color: var(--fourcat-accent);
+}
+
+.annotation-field-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-small);
+    margin: var(--spacing-small) 0 0 var(--spacing-regular);
+}
+
+.annotation-field-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-tiny);
+}
+
+.annotation-field-option button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--semidark);
+    cursor: pointer;
+}
+
+.annotation-field-option button:hover {
+    color: var(--red);
+}
+
+.annotation-fields-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-small);
+    margin-top: var(--spacing-regular);
+}
+
+.annotation-fields-warning {
+    margin: 0 0 var(--spacing-regular) 0;
+    color: var(--red);
+}
+
+.annotation-fields-impact {
+    margin: 0 0 var(--spacing-regular) var(--spacing-regular);
+    list-style: disc;
+}
+
+.annotation-fields-note {
+    margin: var(--spacing-small) 0 0 0;
+    color: var(--semidark);
+    font-style: italic;
+}
+
+.annotation-fields-saved {
+    margin-top: var(--spacing-small);
+    color: var(--green);
+    font-size: var(--font-body);
+}
+
+/* --- annotations on an item --- */
+
+.item-annotations {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-small);
+    margin-top: var(--spacing-regular);
+    padding-top: var(--spacing-small);
+    border-top: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
+.annotation-label {
+    display: block;
+    color: var(--semidark);
+    font-size: var(--font-body);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.item-annotation-value {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-small);
+}
+
+.item-annotation-input {
+    flex: 1 1 16rem;
+    min-width: 0;
+    max-width: 100%;
+}
+
+textarea.item-annotation-input {
+    min-height: 4em;
+}
+
+.item-annotation-input.is-readonly {
+    flex: 1 1 auto;
+    color: var(--dark);
+}
+
+.item-annotation-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-small);
+}
+
+.item-annotation-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-tiny);
+}
+
+.item-annotation-origin {
+    margin: var(--spacing-tiny) 0 0 0;
+    color: var(--semidark);
+    font-size: var(--font-body);
+}
+
+/* where a value stands: appears while saving, then settles into a tick that
+   stays, so it is clear the value is safe without a save button existing */
+.annotation-state {
+    flex: 0 0 auto;
+    font-size: var(--font-body);
+    color: var(--semidark);
+}
+
+.annotation-state.is-saved {
+    color: var(--green);
+}
+
+.annotation-state.is-error {
+    color: var(--red);
+}

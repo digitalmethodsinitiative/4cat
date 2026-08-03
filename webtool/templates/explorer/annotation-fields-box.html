@@ -1,0 +1,36 @@
+{# The annotation fields of a dataset, as a row in its metadata box.
+
+   Collapsed by default: the fields as chips, or an invitation to make one. The
+   editor beneath is fetched by htmx on the first click - one click both opens
+   the row and loads it, so a dataset page nobody annotates never pays for it.
+
+   Always present once the dataset is finished, whichever pane is showing: the
+   fields describe the dataset, not the Explorer.
+
+   Expects: dataset, annotation_fields, can_annotate
+#}
+<div class="annotation-fields-box" id="annotation-fields-box" x-data="{ open: false }">
+    <dt>
+        <button type="button" class="annotation-fields-summary self-styled"
+                @click="open = !open" :aria-expanded="open ? 'true' : 'false'"
+                aria-controls="annotation-fields-editor"
+                hx-get="{{ url_for('explorer.annotation_fields_editor', key=dataset.key) }}"
+                hx-target="#annotation-fields-editor"
+                hx-swap="innerHTML"
+                hx-trigger="click once"
+                hx-indicator="#annotation-fields-spinner">
+            <i class="fa fa-fw" :class="open ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true"></i>
+            Annotation fields
+        </button>
+    </dt>
+    <dd>
+        <div class="annotation-fields-chips" id="annotation-fields-chips">
+            {% include "explorer/annotation-fields-chips.html" %}
+        </div>
+
+        <div class="annotation-fields-editor-host">
+            <div id="annotation-fields-editor" x-show="open" x-cloak></div>
+            {% with spinner_id = "annotation-fields-spinner" %}{% include "components/spinner.html" %}{% endwith %}
+        </div>
+    </dd>
+</div>

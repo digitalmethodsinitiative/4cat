@@ -13,8 +13,8 @@ from flask import (Blueprint, current_app, render_template, request, redirect, s
                    get_flashed_messages, url_for, stream_with_context, g, make_response)
 from flask_login import login_required, current_user
 
-from webtool.lib.helpers import (Pagination, error, setting_required, common_dataset_options,
-                                 collect_grid_tags, module_request_url)
+from webtool.lib.helpers import (Pagination, annotation_context, error, setting_required,
+                                 common_dataset_options, collect_grid_tags, module_request_url)
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor, datasource_form
 
 from common.lib.dataset import DataSet
@@ -764,11 +764,16 @@ def show_result(key):
             "label": dataset.get_label()
         }]
 
+    # the dataset page opens on the Explorer when asked to - the Explorer's old
+    # address redirects here, and its page links push URLs of this shape
+    explore = request.args.get("view") == "explore"
+
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=g.modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, breadcrumbs=breadcrumbs,
-                           datasources=datasources, merge_sources=merge_sources, copy_source=copy_source)
+                           datasources=datasources, merge_sources=merge_sources, copy_source=copy_source,
+                           explore=explore, **annotation_context(dataset))
 
 @component.route('/results/<string:key>/dataset-card/')
 @login_required
@@ -795,6 +800,9 @@ def dataset_card_component(key):
         # as in show_result: all data sources, so a dataset from a since-disabled
         # one still links to its overview
         datasources=g.modules.datasources,
+        # the last poll of a finishing dataset renders the card with the
+        # annotation fields box in it, so it needs the same context
+        **annotation_context(dataset),
     )
 
 

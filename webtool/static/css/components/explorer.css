@@ -1,0 +1,117 @@
+/* The Explorer pane on the dataset page: the dataset's own items, laid out to
+   be read rather than processed. The items themselves are styled by the data
+   source's own stylesheet, injected scoped to .explorer-items, so nothing here
+   reaches inside one. */
+
+#explorer-pane {
+    margin-top: var(--spacing-regular);
+}
+
+.explorer-pane {
+    background: var(--bright);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: var(--radius);
+    overflow: hidden;  /* keeps the controls strip inside the rounded corners */
+}
+
+.explorer-pane-host {
+    position: relative;
+}
+
+.explorer-body {
+}
+
+/* --- controls --- */
+
+.explorer-sort ul {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-small);
+}
+
+.explorer-sort label {
+    color: var(--semidark);
+    font-size: var(--font-body);
+}
+
+.explorer-note {
+    color: var(--semidark);
+}
+
+/* --- items --- */
+
+/* Deliberately almost nothing: what an item looks like is the data source's
+   business, styled by its own stylesheet (datasources/[name]-explorer.css,
+   or css/explorer-generic.css when it has none) and injected scoped to
+   .explorer-content-container. Only the things that stylesheet cannot know
+   about - that it sits in a pane of a certain width - belong here. */
+.explorer-content-container {
+    overflow-wrap: anywhere;
+}
+
+.explorer-notice,
+.explorer-empty {
+    margin: 0 0 var(--spacing-regular) 0;
+    padding: var(--spacing-regular);
+    color: var(--semidark);
+    text-align: center;
+}
+
+/* --- footer: what is being shown, and the other pages of it --- */
+
+.explorer-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-regular);
+    margin-top: var(--spacing-large);
+    padding-top: var(--spacing-regular);
+    border-top: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
+.explorer-count {
+    margin: 0;
+    color: var(--semidark);
+    font-size: var(--font-body);
+}
+
+.explorer-pagination {
+    margin-left: auto;
+}
+
+.explorer-pagination ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-tiny);
+}
+
+.explorer-pagination li {
+    display: block;
+}
+
+.explorer-pagination a,
+.explorer-pagination .current {
+    display: block;
+    padding: var(--spacing-tiny) var(--spacing-small);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: var(--radius);
+    font-size: var(--font-body);
+    cursor: pointer;
+}
+
+.explorer-pagination a:hover {
+    border-color: var(--fourcat-accent);
+    color: var(--fourcat-accent);
+}
+
+.explorer-pagination .current {
+    background: var(--fourcat-accent);
+    border-color: var(--fourcat-accent);
+    color: var(--bright);
+}
+
+.explorer-pagination .ellipsis {
+    color: var(--semidark);
+    padding: 0 var(--spacing-tiny);
+}

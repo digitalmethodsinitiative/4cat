@@ -15,7 +15,8 @@
     <ul class="tag-filter-tags">
         {% for tag in grid_tags %}
             <li>
-                <button type="button" class="module-tag tag-{{ tag|idify }}"
+                {# .self-styled: a tag looks like a tag, not like a button #}
+                <button type="button" class="module-tag self-styled tag-{{ tag|idify }}"
                         :class='{ "is-dimmed": tagDimmed({{ tag|tojson }}) }'
                         :aria-pressed='tagSelected({{ tag|tojson }}) ? "true" : "false"'
                         @click='toggleTag({{ tag|tojson }})'>{{ tag }}</button>

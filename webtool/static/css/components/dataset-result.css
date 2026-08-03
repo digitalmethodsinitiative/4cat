@@ -4,7 +4,7 @@
 
 .dataset-metadata {
     background: var(--semidark);
-    padding: var(--spacing-large) 0;
+    padding: var(--spacing-regular) 0;
 }
 
 .dataset-metadata > * {
@@ -61,5 +61,9 @@
 }
 
 .dataset-metadata > .dataset-card-host > .dataset-header {
+    margin-top: var(--spacing-regular);
+}
+
+.dataset-metadata .analyze-or-explore {
     margin-top: var(--spacing-regular);
 }
