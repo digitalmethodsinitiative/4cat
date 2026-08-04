@@ -293,7 +293,7 @@ def _jinja2_filter_previewable(dataset):
 
     # anything else needs to be mappable to be rendered as a table
     processor = dataset.get_own_processor()
-    return bool(processor and processor.map_item)
+    return bool(processor and getattr(processor, "map_item", None) and callable(processor.map_item))
 
 @current_app.template_filter('chan_image')
 def _jinja2_filter_chan_image(tim, ext, board):
