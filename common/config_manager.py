@@ -106,6 +106,8 @@ class ConfigManager(BaseConfigReader):
         module_config = self.load_cache_file(config_path.joinpath("module_config.bin"))
         if module_config:
             self.config_definition.update(module_config)
+        else:
+            raise ConfigException("No module_config.bin file exists! This is created by the back-end on boot, so the back-end must be started first.")
 
         # provenance (which module declared which setting) lives in a separate
         # file on purpose - see ModuleCollector.__init__ for why they are not
@@ -142,7 +144,13 @@ class ConfigManager(BaseConfigReader):
             except Exception:  # a number of exceptions, all with the same recovery path
                 time.sleep(0.1)
 
-        raise ConfigException(f"Failed to read module config cache file {path} after 3 attempts")
+        # not fatal: a missing definition means settings fall back to their
+        # defaults, which is better than refusing to start
+        if self.logger:
+            self.logger.warning(f"Could not read {path.name} - module-defined settings are unavailable until the "
+                                f"back-end writes it again.")
+
+        return None
 
     def load_core_settings(self):
         """
