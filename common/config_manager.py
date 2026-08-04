@@ -338,6 +338,81 @@ class ConfigManager(BaseConfigReader):
         self.set("flask.tag_order", tag_order)
         self.db.commit()
 
+    def record_declarations(self, degraded=False):
+        """
+        Record which module declares each setting, and when it was last seen
+
+        Run after the ModuleCollector, since it needs the provenance the
+        collector works out while loading modules. Every setting in the config
+        definition gets a row: module-declared ones are attributed to the worker
+        that declared them, everything else to core.
+
+        A setting in the `settings` table with *no* row here is one that nothing
+        currently declares. That alone is not grounds to remove it - it may
+        belong to an extension that is uninstalled or disabled - which is why
+        this only ever writes rows and never deletes them.
+
+        :param bool degraded:  True if some modules failed to import this boot.
+        Declarations are still recorded (what loaded really was seen), but the
+        clean-scan marker is not advanced, so nothing can age into looking
+        obsolete while an import is broken.
+        :return int:  Number of declarations recorded
+        """
+        self.with_db()
+        now = int(time.time())
+
+        declarations = []
+        for setting, definition in self.config_definition.items():
+            declared = self.setting_provenance.get(setting, {})
+
+            try:
+                # definitions can hold values JSON cannot represent (core has a
+                # lambda in one), and this is only ever read back for display
+                last_definition = json.dumps(definition, default=str)
+            except (TypeError, ValueError):
+                last_definition = None
+
+            declarations.append((
+                setting,
+                declared.get("declared_by", "core:config_definition"),
+                declared.get("kind", "core"),
+                declared.get("extension_id"),
+                definition.get("category", setting.split(".")[0]),
+                definition.get("category_label"),
+                definition.get("sort_order"),
+                bool(definition.get("managed", False)),
+                now,
+                now,
+                last_definition
+            ))
+
+        if declarations:
+            # note first_seen is deliberately absent from the update list: it
+            # records when a setting was first known, so it must survive
+            self.db.execute_many("""
+                INSERT INTO settings_declarations
+                    (name, declared_by, owner_kind, extension_id, category, category_label, sort_order, is_managed,
+                     first_seen, last_seen, last_definition)
+                VALUES %s
+                ON CONFLICT (name) DO UPDATE SET
+                    declared_by = EXCLUDED.declared_by,
+                    owner_kind = EXCLUDED.owner_kind,
+                    extension_id = EXCLUDED.extension_id,
+                    category = EXCLUDED.category,
+                    category_label = EXCLUDED.category_label,
+                    sort_order = EXCLUDED.sort_order,
+                    is_managed = EXCLUDED.is_managed,
+                    last_seen = EXCLUDED.last_seen,
+                    last_definition = EXCLUDED.last_definition
+            """, replacements=declarations, commit=False)
+
+        if not degraded:
+            self.set("4cat.declarations_last_clean_scan", now)
+
+        self.db.commit()
+
+        return len(declarations)
+
     def get_all_setting_names(self, with_core=True):
         """
         Get names of all settings

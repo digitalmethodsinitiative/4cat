@@ -82,6 +82,18 @@ def run(as_daemon=True, log_level="INFO"):
 	# load 4CAT modules and cache the results
 	modules = ModuleCollector(config=config, write_cache=True)
 
+	# record which module declares which setting. Has to happen here rather than
+	# in ensure_database() above, which runs before the modules are loaded and
+	# so only ever sees the previous boot's cache.
+	degraded = bool(modules.missing_modules)
+	recorded = config.record_declarations(degraded=degraded)
+	if degraded:
+		log.warning(f"Recorded {recorded} setting declarations, but {len(modules.missing_modules)} module(s) failed to "
+					f"import. Not marking this as a clean scan: settings belonging to the failed modules are "
+					f"unreachable, not obsolete.")
+	else:
+		log.debug(f"Recorded {recorded} setting declarations.")
+
 	# make it happen
 	# this is blocking until the back-end is shut down
 	WorkerManager(logger=log, database=db, queue=queue, modules=modules, as_daemon=as_daemon)

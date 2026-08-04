@@ -223,6 +223,17 @@ config_definition = {
                    "should be no need to change this manually.",
         "global": True
     },
+    "4cat.declarations_last_clean_scan": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 0,
+        "help": "Last clean settings scan",
+        "tooltip": "Timestamp of the last back-end boot on which every module imported successfully, so the record of "
+                   "which module declares which setting could be trusted as complete. Anything judging a setting to be "
+                   "obsolete must measure against this, not against the current time: while an import is broken, the "
+                   "settings of the module that failed look abandoned when they are merely unreachable.",
+        "global": True,
+        "indirect": True
+    },
     "4cat.layout_hue": {
         "type": UserInput.OPTION_HUE,
         "default": 356,

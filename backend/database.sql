@@ -15,6 +15,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_setting
     name, tag
   );
 
+-- which module declared each setting, and when it was last seen declared
+-- a setting in the settings table with no row here is one nothing currently
+-- declares; that is not enough to delete it, since its extension may merely be
+-- uninstalled or disabled.
+CREATE TABLE IF NOT EXISTS settings_declarations (
+  name                   TEXT PRIMARY KEY,
+  declared_by            TEXT DEFAULT '' NOT NULL,
+  owner_kind             TEXT DEFAULT 'core' NOT NULL,
+  extension_id           TEXT DEFAULT NULL,
+  category               TEXT DEFAULT '' NOT NULL,
+  category_label         TEXT DEFAULT NULL,
+  sort_order             INTEGER DEFAULT NULL,
+  is_managed             BOOLEAN DEFAULT FALSE,
+  first_seen             INTEGER DEFAULT 0,
+  last_seen              INTEGER DEFAULT 0,
+  last_definition        TEXT DEFAULT NULL
+);
+
+-- settings are moved here rather than deleted, so removing one is reversible
+CREATE TABLE IF NOT EXISTS settings_archive (
+  name                   TEXT DEFAULT '' NOT NULL,
+  value                  TEXT DEFAULT '{}' NOT NULL,
+  tag                    TEXT DEFAULT '' NOT NULL,
+  declared_by            TEXT DEFAULT NULL,
+  archived_at            INTEGER DEFAULT 0,
+  archived_by            TEXT DEFAULT NULL
+);
+
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
   id                     BIGSERIAL PRIMARY KEY,
