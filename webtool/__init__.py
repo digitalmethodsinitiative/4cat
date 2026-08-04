@@ -40,7 +40,11 @@ from webtool.lib.openapi_collector import OpenAPICollector  # noqa: E402
 
 # make a web app!
 app = Flask(__name__)
-config = ConfigManager()
+# the front-end refuses to serve without module-defined settings: it would show
+# them as untyped text fields and saving that form would write text over values
+# that should be JSON. wait-for-backend.sh guarantees the back-end has booted -
+# and therefore written the cache - before this runs.
+config = ConfigManager(require_module_config=True)
 
 # set up logger for error logging etc
 log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))

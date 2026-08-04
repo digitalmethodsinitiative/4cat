@@ -45,10 +45,15 @@ class ConfigManager(BaseConfigReader):
     # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
     _memcache_tls = threading.local()
 
-    def __init__(self, db=None):
+    def __init__(self, db=None, require_module_config=False):
+        """
+        :param db:  Database object
+        :param bool require_module_config:  Refuse to initialise if
+        module-defined settings are unavailable. See `load_user_settings()`.
+        """
         # ensure core settings (including database config) are loaded
         self.load_core_settings()
-        self.load_user_settings()
+        self.load_user_settings(require_module_config=require_module_config)
         # Do not create a memcache client here; get_memcache() will lazily create per-thread.
 
         # establish database connection if none available
@@ -88,12 +93,27 @@ class ConfigManager(BaseConfigReader):
         """
         self.logger = logger
 
-    def load_user_settings(self):
+    def load_user_settings(self, require_module_config=False):
         """
         Load settings configurable by the user
 
         Does not load the settings themselves, but rather the definition so
         values can be validated, etc
+
+        Without the module definitions, module-defined settings have no `type`,
+        no `default` and no `global` flag. Stored values are still read from the
+        database, so nothing breaks immediately - but the settings page then
+        renders those settings as plain text fields, and saving that form writes
+        the text back over values that should have been JSON. That is why a
+        serving front-end refuses to start without them.
+
+        The back-end cannot make the same demand: it *writes* the cache, so on a
+        first boot it necessarily starts without one. Neither can `migrate.py`,
+        `docker_setup` or the helper scripts, which all run before the back-end
+        has ever booted. Those pass `require_module_config=False` (the default).
+
+        :param bool require_module_config:  Raise if module-defined settings
+        could not be loaded, instead of continuing with core settings only
         """
         # basic 4CAT settings
         self.config_definition.update(config_definition)
@@ -103,11 +123,20 @@ class ConfigManager(BaseConfigReader):
         # instead, this is cached on startup and then loaded here
         config_path = self.get("PATH_CONFIG")
 
-        module_config = self.load_cache_file(config_path.joinpath("module_config.bin"))
-        if module_config:
+        module_config_path = config_path.joinpath("module_config.bin")
+        module_config = self.load_cache_file(module_config_path)
+        if module_config is not None:
+            # note: an empty mapping is valid (no module declares a setting) and
+            # is not the same as a failed read
             self.config_definition.update(module_config)
-        else:
-            raise ConfigException("No module_config.bin file exists! This is created by the back-end on boot, so the back-end must be started first.")
+        elif require_module_config:
+            if module_config_path.exists():
+                raise ConfigException(f"{module_config_path.name} exists but could not be read. Refusing to start: "
+                                      f"module-defined settings would silently fall back to their defaults, which can "
+                                      f"overwrite stored values when settings are saved from the web interface.")
+
+            raise ConfigException(f"No {module_config_path.name} file exists! It is written by the back-end when it "
+                                  f"boots, so the back-end must be started first.")
 
         # provenance (which module declared which setting) lives in a separate
         # file on purpose - see ModuleCollector.__init__ for why they are not
@@ -144,8 +173,8 @@ class ConfigManager(BaseConfigReader):
             except Exception:  # a number of exceptions, all with the same recovery path
                 time.sleep(0.1)
 
-        # not fatal: a missing definition means settings fall back to their
-        # defaults, which is better than refusing to start
+        # whether this is fatal is the caller's decision - see
+        # load_user_settings(require_module_config=...)
         if self.logger:
             self.logger.warning(f"Could not read {path.name} - module-defined settings are unavailable until the "
                                 f"back-end writes it again.")

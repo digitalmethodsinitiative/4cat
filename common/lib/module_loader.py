@@ -90,8 +90,10 @@ class ModuleCollector:
                 "collisions": collisions
             })
 
-        # load from cache
-        self.config.load_user_settings()
+        # load from cache. If we just wrote it, insist it can be read back -
+        # that turns a silently failed write into an error at boot rather than
+        # a back-end running on default values.
+        self.config.load_user_settings(require_module_config=write_cache)
 
     def collect_module_config(self):
         """
