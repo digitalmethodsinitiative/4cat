@@ -3,16 +3,42 @@
 
    Annotation inputs save themselves as they are edited, so the chip next to
    one is the only feedback there is that a value has landed - it is styled to
-   be noticeable without being loud, since it appears on every keystroke pause. */
+   be noticeable without being loud, since it appears on every keystroke pause.
+
+   What the inputs themselves look like is not decided here: the boxes that
+   hold them carry .form-controls, so they get the same chrome as any other
+   4CAT input (see 'shared input chrome' in forms.css). This file only says how
+   those controls are laid out and sized inside an annotation box. */
 
 /* --- the fields row in the dataset metadata box --- */
+.badge-list .annotation-fields-box {
+    flex: 1 1 auto;
+    min-width: 0;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+}
+
+.annotation-fields-box > dd {
+    min-width: 0;
+    white-space: normal;
+    background: none;
+}
+
+/* the toggle fills its cell, so the whole of the left-hand column responds to
+   the pointer rather than just the words in it */
+.annotation-fields-box > dt {
+    padding: 0;
+    margin-right: var(--spacing-small);
+}
 
 .annotation-fields-box .annotation-fields-summary {
+    display: block;
+    width: 100%;
     font: inherit;
     color: inherit;
     background: none;
     border: 0;
-    padding: 0;
+    padding: var(--spacing-tiny);
     text-transform: inherit;
     text-align: left;
     cursor: pointer;
@@ -29,6 +55,7 @@
 }
 
 .annotation-field-chip {
+    flex: 0 0 auto;
     padding: var(--spacing-tiny) var(--spacing-small);
     border-radius: var(--radius);
     background: var(--panel-bg-1);
@@ -54,13 +81,8 @@
 
 /* --- the field editor --- */
 
-.annotation-fields-editor,
-.annotation-fields-confirm {
-    margin-top: var(--spacing-regular);
-    padding: var(--spacing-regular);
-    background: var(--bright);
-    border: var(--stroke-light) solid var(--panel-bg-2);
-    border-radius: var(--radius);
+.annotation-fields-editor {
+    padding-top: var(--spacing-regular);
     color: var(--dark);
 }
 
@@ -72,12 +94,8 @@
 
 .annotation-field {
     padding: var(--spacing-small);
-    border: var(--stroke-light) solid var(--panel-bg-2);
+    background: var(--brighten-12);
     border-radius: var(--radius);
-}
-
-.annotation-field.is-generated {
-    border-style: dashed;
 }
 
 .annotation-field-main {
@@ -87,8 +105,17 @@
     gap: var(--spacing-small);
 }
 
+/* the label takes whatever room the type picker leaves. Both set a flex basis,
+   which is what decides their width - the shared chrome's width:100% only
+   applies where a control is not a flex item with a basis of its own */
 .annotation-field-label {
     flex: 1 1 12rem;
+    min-width: 0;
+    max-width: 30rem;
+}
+
+.annotation-field-type {
+    flex: 0 1 12rem;
     min-width: 0;
 }
 
@@ -98,54 +125,52 @@
     font-size: var(--font-body);
 }
 
+/* the row's controls sit at its end, past the label and the type picker */
 .annotation-field-controls {
     display: flex;
+    flex: 0 0 auto;
     gap: var(--spacing-tiny);
     margin-left: auto;
-}
-
-.annotation-field-controls button {
-    background: none;
-    border: 0;
-    padding: var(--spacing-tiny);
-    color: var(--semidark);
-    cursor: pointer;
-}
-
-.annotation-field-controls button:hover {
-    color: var(--fourcat-accent);
 }
 
 .annotation-field-options {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--spacing-small);
     margin: var(--spacing-small) 0 0 var(--spacing-regular);
+    row-gap: var(--spacing-regular);
 }
 
+.annotation-field-options dd {
+    background: none;
+}
+
+.annotation-field-options dd {
+    background: none;
+}
+
+/* an option is a text box plus its remove button. The option box gets the
+   width, so the input inside it has something definite to fill */
 .annotation-field-option {
     display: flex;
+    flex: 0 1 10rem;
     align-items: center;
     gap: var(--spacing-tiny);
 }
 
-.annotation-field-option button {
-    background: none;
-    border: 0;
-    padding: 0;
-    color: var(--semidark);
-    cursor: pointer;
+.annotation-field-option input {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
-.annotation-field-option button:hover {
-    color: var(--red);
-}
-
+/* add/save stay together at the left edge */
 .annotation-fields-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--spacing-small);
-    margin-top: var(--spacing-regular);
+    margin-top: var(--spacing-small);
 }
 
 .annotation-fields-warning {
@@ -211,16 +236,11 @@ textarea.item-annotation-input {
     color: var(--dark);
 }
 
-.item-annotation-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-small);
-}
-
-.item-annotation-checkbox {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-tiny);
+/* a checkbox field renders as .option-tags (forms.css); it only needs to be
+   told to take the room the input of any other field type would */
+.item-annotation-value > .option-tags {
+    flex: 1 1 16rem;
+    min-width: 0;
 }
 
 .item-annotation-origin {

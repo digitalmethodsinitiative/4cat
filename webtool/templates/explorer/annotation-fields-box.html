@@ -4,12 +4,19 @@
    editor beneath is fetched by htmx on the first click - one click both opens
    the row and loads it, so a dataset page nobody annotates never pays for it.
 
+   A dataset with no fields yet has nothing to show while the editor is closed,
+   so the right-hand cell stays out of the way until there is either a field or
+   an open editor. `hasFields()` reads the chips rather than a flag because they
+   are swapped in out of band when fields are saved; it is re-evaluated whenever
+   `open` changes, which is the only moment the answer can matter.
+
    Always present once the dataset is finished, whichever pane is showing: the
    fields describe the dataset, not the Explorer.
 
    Expects: dataset, annotation_fields, can_annotate
 #}
-<div class="annotation-fields-box" id="annotation-fields-box" x-data="{ open: false }">
+<div class="annotation-fields-box" id="annotation-fields-box"
+     x-data="{ open: false, hasFields() { return !!this.$el.querySelector('.annotation-field-chip') } }">
     <dt>
         <button type="button" class="annotation-fields-summary self-styled"
                 @click="open = !open" :aria-expanded="open ? 'true' : 'false'"
@@ -23,7 +30,8 @@
             Annotation fields
         </button>
     </dt>
-    <dd>
+    {# hidden server-side too, so an empty row does not flash before Alpine runs #}
+    <dd x-show="open || hasFields()"{% if not annotation_fields %} style="display: none"{% endif %}>
         <div class="annotation-fields-chips" id="annotation-fields-chips">
             {% include "explorer/annotation-fields-chips.html" %}
         </div>

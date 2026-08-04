@@ -1,7 +1,24 @@
-<div class="multichoice-wrapper{% if settings.inline %} inline{% endif %}">
-    <select name="{{ field_name }}" id="forminput-{{ option }}" multiple="multiple">
+{# A multiple-choice option, as a row of tags.
+
+   Every option posts its own value, so the control needs no JavaScript to be
+   submitted: UserInput.parse_value() takes either the list a form like this
+   produces or the comma-separated string the API sends.
+
+   The label in components/form-option.html points at the first option, a group
+   of checkboxes having no single control to name.
+
+   See '.option-tags' in css/components/forms.css.
+#}
+<ul class="option-tags">
     {% for choice in settings.options %}
-        <option value="{{ choice }}"{% if settings.default and choice in settings.default %} selected="selected"{% endif %}>{% if settings.inline %}{{ settings.options[choice]|truncate(30, True, "...", 0) }}{% else %}{{ settings.options[choice] }}{% endif %}</option>
+        <li>
+            {# .module-tag: an option looks like a tag looks anywhere else #}
+            <label class="module-tag option-tag">
+                <input type="checkbox" name="{{ field_name }}" value="{{ choice }}"
+                       {%- if loop.first %} id="forminput-{{ option }}"{% endif %}
+                       {%- if settings.default and choice in settings.default %} checked{% endif %}>
+                {% if settings.inline %}{{ settings.options[choice]|truncate(30, True, "...", 0) }}{% else %}{{ settings.options[choice] }}{% endif %}
+            </label>
+        </li>
     {% endfor %}
-    </select>
-</div>
+</ul>

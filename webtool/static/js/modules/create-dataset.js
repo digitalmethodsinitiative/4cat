@@ -577,8 +577,9 @@ export const query = {
 
                 // Render custom multiple choice fields
                 // should also be rendered dynamically if processor options are expanded.
-                if ($('.multichoice-wrapper').length || $('.multi-select-wrapper').length) {
-                    multichoice.makeMultichoice();
+                // (`multi` options need nothing: they are rendered as tags
+                //  server-side, see components/user-inputs/multi.html)
+                if ($('.multi-select-wrapper').length) {
                     multichoice.makeMultiSelect();
                 }
             },

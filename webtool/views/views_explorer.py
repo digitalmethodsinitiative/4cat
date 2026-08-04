@@ -3,7 +3,7 @@
 
 The Explorer shows a dataset's items in a legible way and lets people annotate
 them. It is not a page of its own: it is a pane on the dataset page, below the
-dataset metadata, swapped in by htmx when the 'Annotate & Explore' toggle is
+dataset metadata, swapped in by htmx when the 'Explore & Annotate' toggle is
 flipped. Everything here therefore renders a partial, not a document.
 
 Annotation *values* are saved one at a time, by the input that changed; the
@@ -21,6 +21,7 @@ from flask import Blueprint, current_app, request, render_template, g, redirect,
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import annotation_context, can_annotate_dataset, error, setting_required
+from common.lib.annotation import ANNOTATION_TYPES
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, AnnotationException
 
@@ -166,7 +167,7 @@ def explorer_pane(key: str):
     """
     The Explorer pane for a dataset, as a partial
 
-    Loaded into the dataset page the first time the 'Annotate & Explore' toggle
+    Loaded into the dataset page the first time the 'Explore & Annotate' toggle
     is flipped. Holds the controls, the items and the pagination; paging and
     sorting afterwards only replace the latter two.
 
@@ -387,8 +388,13 @@ def save_annotation_fields(key: str):
     if not request.form.get("confirm"):
         impact = annotation_field_impact(dataset, old_fields, new_fields)
         if impact:
+            # asked in a popup rather than in place of the editor, so saying no
+            # leaves the editor exactly as it was; the request came from the
+            # editor, so the response has to say where it really belongs
             return render_template("explorer/annotation-fields-confirm.html", dataset=dataset,
-                                   impact=impact, form=request.form)
+                                   impact=impact, form=request.form), 200, {
+                                       "HX-Retarget": "#popup-host",
+                                       "HX-Reswap": "innerHTML"}
 
     try:
         dataset.save_annotation_fields(new_fields)
@@ -434,7 +440,7 @@ def parse_annotation_field_form(form, old_fields: dict) -> dict:
             field = {**old_field, "label": label}
         else:
             field_type = form.get("type-%s" % field_id, "text")
-            if field_type not in ("text", "textarea", "dropdown", "checkbox"):
+            if field_type not in ANNOTATION_TYPES:
                 raise AnnotationException("'%s' is not a valid annotation field type." % field_type)
 
             field = {"type": field_type, "label": label}

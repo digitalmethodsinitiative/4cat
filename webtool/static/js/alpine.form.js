@@ -72,19 +72,27 @@ document.addEventListener('alpine:init', () => {
          * Current value of a named form field
          *
          * @param {string} field  Field name (without 'option-' prefix)
-         * @returns {boolean|string|string[]|undefined}  boolean for
-         *   checkboxes, array for multi-selects, string otherwise; undefined
+         * @returns {boolean|string|string[]|undefined}  boolean for toggles,
+         *   array for multi-selects and tag lists, string otherwise; undefined
          *   if the field does not exist in the form
          */
         _field_value(field) {
             const form = this.$el.closest('form') || this.$el;
-            const element = form.querySelector("[name='option-" + field + "']");
-            if (!element) {
+            const elements = form.querySelectorAll("[name='option-" + field + "']");
+            if (!elements.length) {
                 return undefined;
             }
 
+            const element = elements[0];
             if (element.getAttribute('type') === 'checkbox') {
-                return element.checked;
+                // a toggle is one checkbox with nothing to say but yes or no; a
+                // `multi` option is a group of them, each with its own value
+                // (see components/user-inputs/multi.html), and reads as the
+                // list of the ones that are picked
+                if (!element.hasAttribute('value')) {
+                    return element.checked;
+                }
+                return Array.from(elements).filter(e => e.checked).map(e => e.value);
             } else if (element.multiple) {
                 return Array.from(element.selectedOptions).map(o => o.value);
             } else {

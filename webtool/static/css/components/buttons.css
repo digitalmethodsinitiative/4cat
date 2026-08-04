@@ -23,6 +23,18 @@ button.no-style {
     border-color: var(--button-grey);
 }
 
+/* the button that goes through with something that cannot be undone; it has to
+   read differently from the one next to it that does nothing */
+.button-like.button-destructive {
+    color: var(--red);
+    border-color: var(--red);
+}
+
+.button-like.button-destructive:hover {
+    background: var(--red);
+    color: var(--red-light);
+}
+
 a.button-like, button {
     display: block;
 }
@@ -36,6 +48,10 @@ a.button-like, button {
     font: inherit;
     cursor: pointer;
     text-transform: uppercase;
+}
+
+button.no-border {
+    border: none;
 }
 
 .button-secondary {
@@ -83,7 +99,7 @@ a.button-like, button {
 }
 
 a.button-like, .button-like button, button.button-like, .plain-page button:not(.self-styled), input[type=submit] {
-    padding: 8px 18px;
+    padding: 8px;
 }
 
 .action-button-wrap {

@@ -21,7 +21,8 @@
      x-data="annotationValue"
      @htmx:before:request="saving()"
      @htmx:after:request="settle($event)">
-    <label class="annotation-label" {% if editable %}for="annotation-{{ item_id }}-{{ field_id }}"{% endif %}>
+    {# a checkbox field is a group of controls, not one, so nothing to point at #}
+    <label class="annotation-label" {% if editable and type != "checkbox" %}for="annotation-{{ item_id }}-{{ field_id }}"{% endif %}>
         <i class="fa-solid fa-tag" aria-hidden="true"></i>
         {% if field.from_dataset %}
             <a href="{{ url_for('dataset.show_result', key=field.from_dataset) }}" target="_blank"
@@ -31,7 +32,8 @@
         {% endif %}
     </label>
 
-    <div class="item-annotation-value">
+    {# form-controls: the inputs look like any other 4CAT input (forms.css) #}
+    <div class="item-annotation-value form-controls">
         {% if not editable %}
             {# processor-generated, or this user may only read: show the value as it stands #}
             <div class="item-annotation-input is-readonly">{{ value|join(", ") if value is not string else value }}</div>
@@ -56,22 +58,26 @@
             </select>
 
         {% elif type == "checkbox" %}
-            {# every box posts the whole group, so unchecking the last one still
-               says 'nothing is checked' rather than saying nothing at all #}
-            <div class="item-annotation-options">
+            {# the same tag list as a `multi` user input ('.option-tags' in
+               forms.css), but each box saves itself rather than waiting for a
+               submit. Every box posts the whole group, so unchecking the last
+               one still says 'nothing is checked' rather than saying nothing #}
+            <ul class="option-tags">
                 {% for option_id, option_label in field.get("options", {}).items() %}
-                    <div class="item-annotation-checkbox">
-                        <input type="checkbox" name="value" value="{{ option_label }}"
-                               id="annotation-{{ item_id }}-{{ field_id }}-{{ option_id }}"
-                               {% if value and option_label in value %}checked{% endif %}
-                               hx-post="{{ post_url }}" hx-vals='{{ identity }}'
-                               hx-trigger="change"
-                               hx-include="closest .item-annotation-options"
-                               hx-swap="none" hx-sync="closest .item-annotation:replace">
-                        <label for="annotation-{{ item_id }}-{{ field_id }}-{{ option_id }}">{{ option_label }}</label>
-                    </div>
+                    <li>
+                        <label class="module-tag option-tag">
+                            <input type="checkbox" name="value" value="{{ option_label }}"
+                                   id="annotation-{{ item_id }}-{{ field_id }}-{{ option_id }}"
+                                   {% if value and option_label in value %}checked{% endif %}
+                                   hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                                   hx-trigger="change"
+                                   hx-include="closest .option-tags"
+                                   hx-swap="none" hx-sync="closest .item-annotation:replace">
+                            {{ option_label }}
+                        </label>
+                    </li>
                 {% endfor %}
-            </div>
+            </ul>
 
         {% else %}
             <input type="text" class="item-annotation-input" name="value" value="{{ value }}"

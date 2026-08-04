@@ -15,9 +15,5 @@
             <i class="fa-solid fa-tag" aria-hidden="true"></i> {{ field.label }}
         </span>
     {% endfor %}
-{% else %}
-    <span class="annotation-fields-empty">
-        No annotation fields yet{% if can_annotate %} &mdash; add one to start annotating{% endif %}.
-    </span>
 {% endif %}
 {% if oob %}</div>{% endif %}

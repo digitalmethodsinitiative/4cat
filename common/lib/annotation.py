@@ -8,6 +8,15 @@ import json
 
 from common.lib.database import Database
 from common.lib.exceptions import AnnotationException
+from common.lib.user_input import UserInput
+
+# Which UserInput option each annotation field type corresponds to.
+ANNOTATION_TYPES = {
+    "text": UserInput.OPTION_TEXT,
+    "textarea": UserInput.OPTION_TEXT_LARGE,
+    "dropdown": UserInput.OPTION_CHOICE,
+    "checkbox": UserInput.OPTION_MULTI,
+}
 
 
 class Annotation:

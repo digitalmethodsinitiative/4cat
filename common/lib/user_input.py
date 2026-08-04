@@ -407,12 +407,15 @@ class UserInput:
 
         elif input_type in (UserInput.OPTION_MULTI, UserInput.OPTION_ANNOTATIONS):
             # any number of values out of a list of possible values
-            # comma-separated during input, returned as a list of valid options
+            # the form posts one value per picked option, which parse_all()
+            # collects into a list; the API sends them comma-separated
             if not choice:
                 return settings.get("default", [])
 
-            chosen = choice.split(",")
-            return [item for item in chosen if item in settings.get("options", [])]
+            if type(choice) is str:
+                choice = choice.split(",")
+
+            return [item for item in choice if item in settings.get("options", [])]
 
         elif input_type == UserInput.OPTION_MULTI_SELECT:
             # multiple number of values out of a dropdown list of possible values

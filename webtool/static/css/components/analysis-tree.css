@@ -217,7 +217,9 @@
 }
 
 .analysis-results .module-card::before {
-    /** dotted line connecting card to journey marker **/
+    /** line connecting card to journey marker. A single box rather than a pair
+        of half-width borders, so that the stroke is snapped to the pixel grid
+        in one piece instead of each half rounding on its own **/
     content: '';
     display: block;
     position: absolute;

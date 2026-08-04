@@ -3,10 +3,12 @@ export const multichoice = {
      * Set up multichoice events via event listeners
      */
     init: function () {
-        // Multichoice inputs need to be loaded dynamically
+        // Multi-select inputs need to be loaded dynamically. `multi` options
+        // used to be built here too; they are a list of tags rendered by the
+        // server now (components/user-inputs/multi.html), so there is nothing
+        // left to enhance.
         $(document).on('click', '.toggle-button, .processor-queue-button', function () {
-            if ($(".multichoice-wrapper, .multi-select-wrapper").length > 0) {
-                multichoice.makeMultichoice();
+            if ($(".multi-select-wrapper").length > 0) {
                 multichoice.makeMultiSelect();
             }
         });
@@ -14,35 +16,6 @@ export const multichoice = {
         // Filter multichoice on search
         $(document).on('input', '.multi-select-search > input', multichoice.filterMultiChoice);
         $(document).on('click', '.multi-select-selected > span', multichoice.removeMultiChoiceOption);
-    },
-
-    /**
-     * Make multichoice select boxes so
-     */
-    makeMultichoice: function () {
-        //more user-friendly select multiple
-        $('.multichoice-wrapper').each(function () {
-
-            let wrapper = $(this);
-            let select = $(this).find('select');
-            let name = select.attr('name');
-            let input = $('<input type="hidden" name="' + name + '">');
-
-            wrapper.append(input);
-
-            select.find('option').each(function () {
-                let selected = $(this).is(':selected');
-                let checkbox_choice = $('<label><input type="checkbox" name="' + name + ':' + $(this).attr('value') + '"' + (selected ? ' checked="checked"' : '') + '> ' + $(this).text() + '</label>');
-                checkbox_choice.find('input').on('change', function () {
-                    let checked = wrapper.find('input:checked').map(function () {
-                        return $(this).attr('name').split(':')[1];
-                    }).get();
-                    input.val(checked.join(','));
-                });
-                wrapper.append(checkbox_choice);
-            });
-            select.remove();
-        });
     },
 
     /**

@@ -20,7 +20,8 @@
                                 "options": field.get("options", {}).values()|list}|tojson }})'>
     <input type="hidden" name="field-order" value="{{ field_id }}">
 
-    <div class="annotation-field-main">
+    {# form-controls: the inputs look like any other 4CAT input (forms.css) #}
+    <div class="annotation-field-main form-controls">
         <label class="sr-only" for="annotation-field-label-{{ field_id }}">Field label</label>
         <input type="text" class="annotation-field-label" id="annotation-field-label-{{ field_id }}"
                name="label-{{ field_id }}" value="{{ field.label }}" placeholder="Label"
@@ -47,37 +48,40 @@
                     {% if not can_annotate %}disabled{% endif %}>
                 <option value="text">Text</option>
                 <option value="textarea">Text (large)</option>
-                <option value="dropdown">Single choice</option>
-                <option value="checkbox">Multiple choice</option>
+                <option value="dropdown">Single option</option>
+                <option value="checkbox">Multiple options</option>
             </select>
         {% endif %}
 
         {% if can_annotate %}
             <div class="annotation-field-controls">
-                <button type="button" class="button-secondary self-styled" @click="moveUp()"
+                <button type="button" class="button-like" @click="moveUp()"
                         x-tooltip="Move up"><i class="fa fa-fw fa-arrow-up" aria-hidden="true"></i></button>
-                <button type="button" class="button-secondary self-styled" @click="moveDown()"
+                <button type="button" class="button-like" @click="moveDown()"
                         x-tooltip="Move down"><i class="fa fa-fw fa-arrow-down" aria-hidden="true"></i></button>
-                <button type="button" class="button-secondary self-styled" @click="removeField()"
+                <button type="button" class="button-like" @click="removeField()"
                         x-tooltip="Delete this field and its annotations"><i class="fa fa-fw fa-trash" aria-hidden="true"></i></button>
             </div>
         {% endif %}
     </div>
 
     {% if not generated %}
-        <div class="annotation-field-options" x-show="hasOptions()" x-cloak>
-            <template x-for="option in options" :key="option.id">
-                <div class="annotation-field-option">
-                    <input type="text" :name="'option-{{ field_id }}'" x-model="option.value"
-                           placeholder="Option" aria-label="Option"
-                           @input="ensureBlank()" {% if not can_annotate %}disabled{% endif %}>
-                    {% if can_annotate %}
-                        <button type="button" class="button-secondary self-styled" @click="removeOption(option)"
-                                x-show="options.length > 1" aria-label="Remove option">
-                            <i class="fa fa-fw fa-xmark" aria-hidden="true"></i></button>
-                    {% endif %}
-                </div>
-            </template>
+        <div class="annotation-field-options form-controls" x-show="hasOptions()" x-cloak>
+            <dt class="options-notice">Options</dt>
+            <dd>
+                <template x-for="option in options" :key="option.id">
+                    <div class="annotation-field-option">
+                        <input type="text" :name="'option-{{ field_id }}'" x-model="option.value"
+                               placeholder="Option" aria-label="Option"
+                               @input="ensureBlank()" {% if not can_annotate %}disabled{% endif %}>
+                        {% if can_annotate %}
+                            <button type="button" class="button-like no-border" @click="removeOption(option)"
+                                    x-show="options.length > 1" aria-label="Remove option">
+                                <i class="fa fa-fw fa-xmark" aria-hidden="true"></i></button>
+                        {% endif %}
+                    </div>
+                </template>
+            </dd>
         </div>
     {% endif %}
 </li>

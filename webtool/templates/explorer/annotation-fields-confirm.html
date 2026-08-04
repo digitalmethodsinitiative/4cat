@@ -5,39 +5,48 @@
    so it says so here, and re-posts exactly what was submitted with `confirm`
    set when the answer is yes.
 
+   Shown as a popup over the editor rather than in place of it (the view sends
+   `HX-Retarget: #popup-host`), so the editor is still there, untouched, when
+   the answer is no - cancelling is closing the popup and nothing more.
+
    Expects: dataset, impact, form (the submitted form, replayed as hidden inputs)
 #}
-<form class="annotation-fields-confirm"
-      hx-post="{{ url_for('explorer.save_annotation_fields', key=dataset.key) }}"
-      hx-target="#annotation-fields-editor"
-      hx-swap="innerHTML"
-      hx-indicator="#annotation-fields-spinner">
+{% from "components/popup.html" import popup %}
 
-    {% for name in form %}
-        {% for value in form.getlist(name) %}
-            <input type="hidden" name="{{ name }}" value="{{ value }}">
+{% call popup("Delete annotations?") %}
+    <form class="annotation-fields-confirm"
+          hx-post="{{ url_for('explorer.save_annotation_fields', key=dataset.key) }}"
+          hx-target="#annotation-fields-editor"
+          hx-swap="innerHTML"
+          hx-indicator="#annotation-fields-spinner"
+          @htmx:after:request="dismiss()">
+
+        {% for name in form %}
+            {% for value in form.getlist(name) %}
+                <input type="hidden" name="{{ name }}" value="{{ value }}">
+            {% endfor %}
         {% endfor %}
-    {% endfor %}
-    <input type="hidden" name="confirm" value="1">
+        <input type="hidden" name="confirm" value="1">
 
-    <p class="annotation-fields-warning" role="alert">
-        <i class="fa fa-warning" aria-hidden="true"></i>
-        Saving these fields deletes annotations that have already been made:
-    </p>
-    <ul class="annotation-fields-impact">
-        {% for entry in impact %}
-            <li>
-                <strong>{{ entry.label }}</strong> &mdash; {{ entry.reason }},
-                {{ entry.annotations|commafy }} annotation{{ "" if entry.annotations == 1 else "s" }} deleted
-            </li>
-        {% endfor %}
-    </ul>
+        <div class="popup-body">
+            <p class="annotation-fields-warning" role="alert">
+                <i class="fa fa-warning" aria-hidden="true"></i>
+                Saving these fields deletes annotations that have already been made:
+            </p>
+            <ul class="annotation-fields-impact">
+                {% for entry in impact %}
+                    <li>
+                        <strong>{{ entry.label }}</strong> &mdash; {{ entry.reason }},
+                        {{ entry.annotations|commafy }} annotation{{ "" if entry.annotations == 1 else "s" }} deleted
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
 
-    <div class="annotation-fields-actions">
-        <button type="button" class="button-like"
-                hx-get="{{ url_for('explorer.annotation_fields_editor', key=dataset.key) }}"
-                hx-target="#annotation-fields-editor"
-                hx-swap="innerHTML">Cancel</button>
-        <button type="submit" class="button-like button-destructive">Delete them and save</button>
-    </div>
-</form>
+        <div class="popup-actions">
+            {# focused by default, so a stray Enter does not delete anything #}
+            <button type="button" class="button-like" autofocus @click="dismiss()">Cancel</button>
+            <button type="submit" class="button-like button-destructive">Delete them and save</button>
+        </div>
+    </form>
+{% endcall %}
