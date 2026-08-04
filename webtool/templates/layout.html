@@ -10,6 +10,7 @@
     <script defer src="{{ url_for("static", filename="js/alpine.slideout.js") }}"></script>
     <script defer src="{{ url_for("static", filename="js/alpine.toggle.js") }}"></script>
     <script defer src="{{ url_for("static", filename="js/alpine.explorer.js") }}"></script>
+    <script defer src="{{ url_for("static", filename="js/alpine.popup.js") }}"></script>
     <script defer src="{{ url_for("static", filename="js/lib/alpine.min.js") }}"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -102,6 +103,8 @@
 		<p>Welcome.</p>
 	{% endblock %}
 </article>
+
+<div id="popup-host"></div>
 
 <script>
     // keep --site-header-height in sync with the sticky site header, so

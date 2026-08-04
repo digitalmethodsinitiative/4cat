@@ -1,0 +1,42 @@
+{# A modal popup: a header strip, and whatever the caller puts below it.
+
+   Used as a macro, so the caller owns the contents - typically a .popup-body
+   with the text and a .popup-actions row with the buttons acting on it:
+
+     {% from "components/popup.html" import popup %}
+     {% call popup("Are you sure?") %}
+         <div class="popup-body"><p>...</p></div>
+         <div class="popup-actions">
+             <button type="button" class="button-like" @click="dismiss()">Cancel</button>
+             <button type="submit" class="button-like">Confirm</button>
+         </div>
+     {% endcall %}
+
+   The popup is meant to be delivered by htmx into #popup-host (in layout.html)
+   and opens itself once it lands: Alpine initialises `x-data` in swapped-in
+   markup on its own, so nothing has to be told the popup has arrived. Anything
+   inside it can call `dismiss()` to close it, the scope being the whole dialog.
+
+   A server rendering this in response to a request whose target is something
+   else should say so with an `HX-Retarget: #popup-host` header, so that what
+   the popup is asking about is left as it was underneath it.
+#}
+{% macro popup(title) %}
+<dialog class="popup" x-data="popup" aria-labelledby="popup-title">
+    <div class="panel-header narrow">
+        <div class="panel-header-title">
+            <h3 id="popup-title">{{ title }}</h3>
+        </div>
+        <div class="panel-header-controls">
+            <ul>
+                <li>
+                    <button type="button" class="button-like" @click="dismiss()" aria-label="Close">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+    {{ caller() }}
+</dialog>
+{% endmacro %}

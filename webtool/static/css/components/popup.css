@@ -1,0 +1,91 @@
+/* A modal popup: a .panel-header strip, a box of text under it, and the
+   buttons that act on it.
+
+   Rendered as a native <dialog> opened with showModal() (see js/alpine.popup.js
+   and components/popup.html). That puts it in the browser's top layer, so it
+   sits over the slideout and the sticky header without joining the z-index
+   conversation, and brings focus trapping, Esc to dismiss and an inert
+   background with it - none of which is worth rebuilding by hand. Centring is
+   what the user agent already does with a modal dialog's auto margins, so only
+   the width is decided here. */
+
+.popup {
+    width: min(34rem, calc(100vw - (2 * var(--spacing-large))));
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--bright);
+    color: var(--dark);
+}
+
+/* the header is flush with the popup's top corners */
+.popup > .panel-header {
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
+}
+
+/* The popup and its backdrop fade in together, the popup lifting slightly as
+   it does. `display` and `overlay` have to be told to animate discretely, or
+   the dialog would leave the top layer before the transition had a chance to
+   run and the exit would not be seen at all. */
+.popup,
+.popup::backdrop {
+    opacity: 0;
+    transition: opacity 0.15s ease,
+                transform 0.15s ease,
+                display 0.15s allow-discrete,
+                overlay 0.15s allow-discrete;
+}
+
+.popup {
+    transform: translateY(-0.5rem);
+}
+
+.popup[open],
+.popup[open]::backdrop {
+    opacity: 1;
+}
+
+.popup[open] {
+    transform: translateY(0);
+}
+
+/* where the transition starts from the first time round, the popup having had
+   no previous state to animate away from */
+@starting-style {
+    .popup[open],
+    .popup[open]::backdrop {
+        opacity: 0;
+    }
+
+    .popup[open] {
+        transform: translateY(-0.5rem);
+    }
+}
+
+.popup::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(3px);
+}
+
+/* the box of text between the header and the buttons */
+.popup-body {
+    padding: var(--spacing-regular);
+}
+
+.popup-body > :first-child {
+    margin-top: 0;
+}
+
+.popup-body > :last-child {
+    margin-bottom: 0;
+}
+
+/* the buttons acting on it, below */
+.popup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--spacing-small);
+    padding: 0 var(--spacing-regular) var(--spacing-regular);
+}
