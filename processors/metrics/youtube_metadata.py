@@ -54,19 +54,10 @@ class YouTubeMetadata(BasicProcessor):
 		"[4chan’s YouTube: A Fringe Perspective on YouTube’s Great Purge of 2019 - OILab.eu](https://oilab.eu/4chans-youtube-a-fringe-perspective-on-youtubes-great-purge-of-2019/)"
 	]
 
-	config = {
-		"api.youtube.key": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "YouTube API key",
-			"tooltip": "Can be created on https://developers.google.com/youtube/v3"
-		}
-	}
-
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
 
-		options = {
+		options = {	
 			"columns": {
 				"type": UserInput.OPTION_TEXT,
 				"help": "Columns with YouTube URLs",

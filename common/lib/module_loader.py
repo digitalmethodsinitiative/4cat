@@ -42,6 +42,11 @@ class ModuleCollector:
     processors = {}
     datasources = {}
 
+    # Namespaces reserved for core settings. A module-declared setting may never
+    # enter these, so an extension cannot squat a name 4CAT might add later and
+    # thereby own its definition (which controls `global`, `default` and `type`).
+    RESERVED_PREFIXES = ("privileges.", "flask.", "4cat.", "path.", "datasources.", "extensions.", "logging.")
+
     def __init__(self, config, write_cache=False):
         """
         Load data sources and workers
@@ -68,16 +73,148 @@ class ModuleCollector:
         # this covers datasource settings too: those are declared on the
         # datasource's search/import worker class, which is in self.workers
         if write_cache:
-            module_config = {}
-            for worker in self.workers.values():
-                if hasattr(worker, "config") and type(worker.config) is dict:
-                    module_config.update(worker.config)
+            module_config, provenance, collisions = self.collect_module_config()
+            config_path = config.get("PATH_CONFIG")
 
-            with config.get("PATH_CONFIG").joinpath("module_config.bin").open("wb") as outfile:
-                pickle.dump(module_config, outfile)
+            # two files, deliberately. module_config.bin's shape is merged
+            # straight into the config definition by every reader, including a
+            # front-end container that may still be running older code, so it
+            # is frozen as a plain {name: definition} mapping. Everything new
+            # goes in the sidecar, which has no legacy readers and can carry a
+            # format version. Do not merge these back together: that would put
+            # the combined shape back on the load-bearing path.
+            self.write_cache_file(config_path.joinpath("module_config.bin"), module_config)
+            self.write_cache_file(config_path.joinpath("module_config_provenance.bin"), {
+                "format": 1,
+                "provenance": provenance,
+                "collisions": collisions
+            })
 
         # load from cache
         self.config.load_user_settings()
+
+    def collect_module_config(self):
+        """
+        Collect module-declared settings, with provenance and collisions
+
+        Modules declare settings in a `config` dict on the worker class.
+
+        Collisions are refused rather than merged, on three rules:
+
+        - a key already defined in core `config_definition` is refused. The core
+          definition is authoritative; a module overriding it can change that
+          setting's `global` flag (which collapses per-tag resolution), its
+          `default` (reachable whenever no row exists) or its `type` (which
+          weakens validation).
+        - a key in a namespace reserved for core is refused outright, even if
+          core does not define it yet.
+        - between two modules, the first declarer wins. Workers are visited in
+          sorted order rather than filesystem order so this is reproducible
+          across machines.
+
+        :return tuple:  `(module_config, provenance, collisions)`
+        """
+        # safe to import here: config_definition pulls in user_input, neither of
+        # which imports this module
+        from common.lib.config_definition import config_definition as core_definition
+
+        module_config = {}
+        provenance = {}
+        collisions = []
+
+        for worker_type in sorted(self.workers):
+            worker = self.workers[worker_type]
+            worker_config = getattr(worker, "config", None)
+            if type(worker_config) is not dict:
+                continue
+
+            is_extension = bool(getattr(worker, "is_extension", False))
+            extension_id = getattr(worker, "extension_name", None) if is_extension else None
+
+            for setting, definition in worker_config.items():
+                if setting in core_definition:
+                    refusal = "it is already defined as a core setting"
+                elif setting.startswith(self.RESERVED_PREFIXES):
+                    refusal = "it uses a namespace reserved for core settings"
+                elif setting in module_config:
+                    if module_config[setting] is definition:
+                        # the very same definition object, i.e. the setting is
+                        # declared on a base class and this worker inherits it.
+                        # not a collision - just note the extra declarer.
+                        provenance[setting]["also_declared_by"].append(worker_type)
+                        continue
+
+                    refusal = f"it was already declared by {provenance[setting]['declared_by']}"
+                else:
+                    refusal = None
+
+                if refusal:
+                    collisions.append({
+                        "setting": setting,
+                        "declared_by": worker_type,
+                        "extension_id": extension_id,
+                        "reason": refusal
+                    })
+                    self.log_buffer += (f"Refusing setting '{setting}' declared by {worker_type}: {refusal}. The "
+                                        f"setting will not be registered and its declared definition is ignored.\n")
+                    continue
+
+                module_config[setting] = definition
+                provenance[setting] = {
+                    "declared_by": worker_type,
+                    "kind": "extension" if is_extension else "core",
+                    "extension_id": extension_id,
+                    # other workers inheriting the same definition; the setting
+                    # is live as long as any one of them loads
+                    "also_declared_by": []
+                }
+
+        return module_config, provenance, collisions
+
+    def write_cache_file(self, path, data):
+        """
+        Pickle data to a file, atomically
+
+        Written to a temporary file and moved into place, so a reader in the
+        other container never sees a half-written file.
+
+        A module can declare a setting whose definition cannot be pickled - core
+        itself puts a lambda in one definition, so an extension doing the same is
+        plausible. Rather than take down the back-end at boot, the offending
+        settings are identified, dropped and reported.
+
+        :param Path path:  File to write
+        :param data:  Picklable data
+        """
+        try:
+            payload = pickle.dumps(data)
+        except Exception:
+            # find the culprits so the log can name them, instead of failing
+            # with a traceback that points only at this line
+            if type(data) is dict:
+                unpicklable = []
+                for key, value in data.items():
+                    try:
+                        pickle.dumps({key: value})
+                    except Exception:
+                        unpicklable.append(key)
+
+                if unpicklable:
+                    self.log_buffer += (f"Could not cache these settings, they will be unavailable: "
+                                        f"{', '.join(sorted(unpicklable))}. Their definitions contain something that "
+                                        f"cannot be pickled (e.g. a lambda).\n")
+                    data = {k: v for k, v in data.items() if k not in unpicklable}
+                    payload = pickle.dumps(data)
+                else:
+                    raise
+            else:
+                raise
+
+        temp_path = path.with_name(path.name + ".tmp")
+        with temp_path.open("wb") as outfile:
+            outfile.write(payload)
+
+        os.replace(temp_path, path)
 
     @staticmethod
     def is_4cat_class(object, only_processors=False):

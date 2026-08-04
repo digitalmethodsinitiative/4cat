@@ -36,6 +36,11 @@ class ConfigManager(BaseConfigReader):
 
     core_settings = {}
     config_definition = {}
+    # who declared each module-defined setting, and any declarations refused for
+    # colliding with core or with another module. Populated from the sidecar
+    # cache file; empty on an instance whose back-end has not written one yet.
+    setting_provenance = {}
+    setting_collisions = []
     # Thread-local storage for a singleton memcache client per thread.
     # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
     _memcache_tls = threading.local()
@@ -96,34 +101,48 @@ class ConfigManager(BaseConfigReader):
         # module settings can't be loaded directly because modules need the
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
-        module_config_path = self.get("PATH_CONFIG").joinpath("module_config.bin")
-        if module_config_path.exists():
+        config_path = self.get("PATH_CONFIG")
+
+        module_config = self.load_cache_file(config_path.joinpath("module_config.bin"))
+        if module_config:
+            self.config_definition.update(module_config)
+
+        # provenance (which module declared which setting) lives in a separate
+        # file on purpose - see ModuleCollector.__init__ for why they are not
+        # one file. Absent on an instance that has not yet booted a back-end
+        # with this code, in which case every setting is simply unattributed.
+        sidecar = self.load_cache_file(config_path.joinpath("module_config_provenance.bin"))
+        if type(sidecar) is dict and sidecar.get("format") == 1:
+            self.setting_provenance = sidecar.get("provenance", {})
+            self.setting_collisions = sidecar.get("collisions", [])
+
+    def load_cache_file(self, path):
+        """
+        Read one of the module config cache files
+
+        If 4CAT runs as two containers (front-end and back-end) both may read
+        this while the back-end writes it. Writes are atomic, so a reader sees
+        either the old file or the new one - but a file being replaced can still
+        briefly fail to open, so a couple of retries are allowed.
+
+        Note the file must be reopened for each attempt: a failed `pickle.load`
+        leaves the handle partway through the stream, so retrying on the same
+        handle can never succeed.
+
+        :param Path path:  File to read
+        :return:  Unpickled contents, or `None` if unreadable
+        """
+        if not path.exists():
+            return None
+
+        for _ in range(3):
             try:
-                with module_config_path.open("rb") as infile:
-                    retries = 0
-                    module_config = None
-                    # if 4CAT is being run in two different containers
-                    # (front-end and back-end) they might both be running this
-                    # bit of code at the same time. If the file is half-written
-                    # loading it will fail, so allow for a few retries
-                    while retries < 3:
-                        try:
-                            module_config = pickle.load(infile)
-                            break
-                        except Exception:  # this can be a number of exceptions, all with the same recovery path
-                            time.sleep(0.1)
-                            retries += 1
-                            continue
+                with path.open("rb") as infile:
+                    return pickle.load(infile)
+            except Exception:  # a number of exceptions, all with the same recovery path
+                time.sleep(0.1)
 
-                    if module_config is None:
-                        # not really a way to gracefully recover from this, but
-                        # we can at least describe the error
-                        raise RuntimeError("Could not read module_config.bin. The 4CAT developers did a bad job of "
-                                           "preventing this. Shame on them!")
-
-                    self.config_definition.update(module_config)
-            except (ValueError, TypeError):
-                pass
+        raise ConfigException(f"Failed to read module config cache file {path} after 3 attempts")
 
     def load_core_settings(self):
         """
