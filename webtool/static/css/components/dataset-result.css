@@ -60,6 +60,10 @@
     text-decoration: underline;
 }
 
+.dataset-metadata .notice {
+    padding: var(--spacing-small);
+}
+
 .dataset-metadata > .dataset-card-host > .dataset-header {
     margin-top: var(--spacing-regular);
 }

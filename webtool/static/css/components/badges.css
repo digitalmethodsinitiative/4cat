@@ -24,7 +24,6 @@
     width: 50%;
     height: 100%;
     background: linear-gradient(90deg, transparent 0%, transparent 80%, var(--bright) 100%);
-    border-bottom-right-radius: var(--radius);
 }
 
 .dark .badge-list.with-overflow::before {
@@ -198,16 +197,11 @@
     opacity: 1;
 }
 
-/* the tag is the control as far as the eye is concerned, so it carries the
-   focus ring the checkbox inside it would otherwise have drawn out of sight */
 .option-tag:has(input:focus-visible) {
     outline: var(--stroke) solid var(--fourcat-accent);
     outline-offset: var(--stroke-light);
 }
 
-/* out of sight, but still focusable and still submitted. The specificity is
-   deliberate: it has to beat the shared checkbox chrome above wherever this
-   control is rendered, whatever the order the sheets end up in */
 .option-tags .option-tag input[type=checkbox] {
     position: absolute;
     width: 1px;
@@ -221,6 +215,31 @@
     appearance: none;
     background: none;
 }
+
+/* Annotation field badges */
+.annotation-fields-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-tiny);
+}
+
+.annotation-field-badge {
+    flex: 0 0 auto;
+    padding: var(--spacing-tiny) var(--spacing-small);
+    border-radius: var(--radius);
+    background: var(--panel-bg-1);
+    color: var(--semidark);
+    font-size: var(--font-body);
+    white-space: nowrap;
+    cursor: default;
+}
+
+/* a field a processor made, not a person: shown, but not something to edit */
+.annotation-field-badge.is-generated {
+    background: var(--panel-bg-3);
+    color: var(--bright);
+}
+
 
 /* .badge-list dd sets its own background, which would otherwise win over the
    fallback above for a tag that has no colour of its own yet */

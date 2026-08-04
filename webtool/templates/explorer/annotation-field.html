@@ -13,18 +13,32 @@
 
    Expects: dataset, field_id, field, from_datasets, processors, can_annotate
             is_new (optional) whether this row was just added
+            errors (optional) what a refused save found wrong, by field ID
+            saved_field_ids (optional) the fields that exist server-side; a row
+                            not among them has never been saved
 #}
 {% set generated = field.get("from_dataset") %}
+{% set field_errors = (errors or {}).get(field_id, {}) %}
 <li class="annotation-field{% if generated %} is-generated{% endif %}"
-    x-data='annotationField({{ {"type": field.get("type", "text"),
-                                "options": field.get("options", {}).values()|list}|tojson }})'>
+    x-data='annotationField({{ {"id": field_id,
+                                "type": field.get("type", "text"),
+                                "options": field.get("options", {}).values()|list,
+                                "invalidLabel": field_errors.get("label", False),
+                                "invalidOptions": field_errors.get("options", []),
+                                "optionsRequired": field_errors.get("options_required", False)}|tojson }})'
+    @input="edited()" @change="edited()">
     <input type="hidden" name="field-order" value="{{ field_id }}">
 
     {# form-controls: the inputs look like any other 4CAT input (forms.css) #}
     <div class="annotation-field-main form-controls">
         <label class="sr-only" for="annotation-field-label-{{ field_id }}">Field label</label>
-        <input type="text" class="annotation-field-label" id="annotation-field-label-{{ field_id }}"
-               name="label-{{ field_id }}" value="{{ field.label }}" placeholder="Label"
+        {# marked here rather than with `:class`: a class Alpine adds while
+           binding an element that arrived in an htmx swap is undone again as
+           the swap settles, and the value behind it never changes afterwards,
+           so the binding never re-applies it. Alpine only takes it off #}
+        <input type="text" placeholder="Label" id="annotation-field-label-{{ field_id }}"
+               class="annotation-field-label{% if field_errors.get("label") %} invalid{% endif %}"
+               name="label-{{ field_id }}" value="{{ field.label }}"
                {% if not can_annotate %}disabled{% endif %} {% if is_new %}autofocus{% endif %}>
 
         {% if generated %}
@@ -55,12 +69,35 @@
 
         {% if can_annotate %}
             <div class="annotation-field-controls">
+                {# folds this field away in the items below. The icon is the
+                   server's rather than a binding, for the same reason the
+                   invalid marks are: a class Alpine sets while binding an
+                   element that came in on an htmx swap does not survive it.
+                   syncAnnotationVisibility() keeps it in step from there #}
+                {% set field_hidden = field_id in (hidden_fields or []) %}
+                <button type="button" class="button-like" @click="toggleVisibility()"
+                        data-annotation-field-toggle="{{ field_id }}"
+                        aria-pressed="{{ "true" if field_hidden else "false" }}"
+                        x-tooltip="Show or hide this field in the items below"><i
+                        class="fa fa-fw {{ "fa-eye-slash" if field_hidden else "fa-eye" }}" aria-hidden="true"></i></button>
                 <button type="button" class="button-like" @click="moveUp()"
+                        :disabled="isFirst"
                         x-tooltip="Move up"><i class="fa fa-fw fa-arrow-up" aria-hidden="true"></i></button>
                 <button type="button" class="button-like" @click="moveDown()"
+                        :disabled="isLast"
                         x-tooltip="Move down"><i class="fa fa-fw fa-arrow-down" aria-hidden="true"></i></button>
-                <button type="button" class="button-like" @click="removeField()"
-                        x-tooltip="Delete this field and its annotations"><i class="fa fa-fw fa-trash" aria-hidden="true"></i></button>
+                {# a field that was never saved has nothing to delete server-side
+                   - the row is the whole of it, so the row is what goes #}
+                <button type="button" class="button-like"
+                        {% if field_id in (saved_field_ids or []) %}
+                        hx-delete="{{ url_for('explorer.delete_annotation_field', key=dataset.key, field_id=field_id) }}"
+                        hx-target="#annotation-fields-editor"
+                        hx-swap="innerHTML"
+                        hx-indicator="#annotation-fields-spinner"
+                        {% else %}
+                        @click="removeField()"
+                        {% endif %}
+                        x-tooltip="Delete this field"><i class="fa fa-fw fa-trash" aria-hidden="true"></i></button>
             </div>
         {% endif %}
     </div>
@@ -69,14 +106,15 @@
         <div class="annotation-field-options form-controls" x-show="hasOptions()" x-cloak>
             <dt class="options-notice">Options</dt>
             <dd>
-                <template x-for="option in options" :key="option.id">
+                <template x-for="(option, index) in options" :key="option.id">
                     <div class="annotation-field-option">
                         <input type="text" :name="'option-{{ field_id }}'" x-model="option.value"
                                placeholder="Option" aria-label="Option"
+                               :class="{invalid: optionInvalid(option)}"
                                @input="ensureBlank()" {% if not can_annotate %}disabled{% endif %}>
                         {% if can_annotate %}
-                            <button type="button" class="button-like no-border" @click="removeOption(option)"
-                                    x-show="options.length > 1" aria-label="Remove option">
+                            <button type="button" :disabled="index == options.length - 1" class="button-like no-border" @click="removeOption(option)"
+                                    aria-label="Remove option">
                                 <i class="fa fa-fw fa-xmark" aria-hidden="true"></i></button>
                         {% endif %}
                     </div>

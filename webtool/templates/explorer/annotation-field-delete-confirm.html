@@ -1,0 +1,28 @@
+{# Confirmation for deleting an annotation field that has annotations.
+
+   Expects: dataset, field_id, field, annotation_count
+#}
+{% from "components/popup.html" import popup %}
+
+{% call popup("Delete field?") %}
+    <form hx-post="{{ url_for('explorer.delete_annotation_field', key=dataset.key, field_id=field_id) }}"
+          hx-target="#annotation-fields-editor"
+          hx-swap="innerHTML"
+          hx-indicator="#annotation-fields-spinner"
+          @htmx:after:request="dismiss()">
+        <input type="hidden" name="confirm" value="1">
+
+        <div class="popup-body">
+            <p class="annotation-fields-warning" role="alert">
+                <i class="fa fa-warning" aria-hidden="true"></i>
+                Deleting <strong>{{ field.label }}</strong> also deletes
+                {{ annotation_count|commafy }} annotation{{ "" if annotation_count == 1 else "s" }}.
+            </p>
+        </div>
+
+        <div class="popup-actions">
+            <button type="button" class="button-like" autofocus @click="dismiss()">Cancel</button>
+            <button type="submit" class="button-like button-destructive">Delete field</button>
+        </div>
+    </form>
+{% endcall %}

@@ -5,13 +5,18 @@
    the save to the rest of the page: the Explorer pane, if it is open, listens
    for it and reloads its items, which now have different fields to fill in.
 
+   The confirmation goes away as soon as a field is edited: it says what was
+   saved, and once the editor holds something else it is no longer saying it.
+
    Expects: the annotation field context, freshly read back after saving
 #}
 {% include "explorer/annotation-fields-editor.html" %}
 
-{% with oob = True %}{% include "explorer/annotation-fields-chips.html" %}{% endwith %}
+{% with oob = True %}{% include "explorer/annotation-fields-badges.html" %}{% endwith %}
 
-<div class="annotation-fields-saved" x-data
-     x-init="$dispatch('annotation-fields-saved')" role="status">
+<div class="annotation-fields-saved notice notice-success" role="status"
+     x-data="{ shown: true }" x-show="shown"
+     x-init="$dispatch('annotation-fields-saved')"
+     @annotation-field-edited.window="shown = false">
     <i class="fa fa-check" aria-hidden="true"></i> Annotation fields saved
 </div>

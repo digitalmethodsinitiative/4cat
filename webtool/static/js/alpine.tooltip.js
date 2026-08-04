@@ -5,10 +5,55 @@ function abspos(el) {
 
 const TOOLTIP_GAP = 5;
 
+/**
+ * The tooltip currently on screen, as `{trigger, tooltip}`, and a watcher for
+ * its trigger going away.
+ *
+ * A tooltip does not live inside the thing it describes - it is a paragraph in
+ * `#tooltips`, which outlives any one page state - so nothing takes it down
+ * with its trigger. Hiding it on `mouseleave` alone leaves it stranded whenever
+ * the trigger stops being there to leave: htmx swapping the button away after
+ * it is clicked, or a slideout opening over it. Whatever is showing is
+ * therefore tracked, so it can be taken down by something other than the
+ * pointer.
+ */
+let active_tooltip = null;
+let trigger_watcher = null;
+
+function hide_active_tooltip() {
+    if (!active_tooltip) {
+        return;
+    }
+
+    active_tooltip.tooltip.classList.add('sr-only');
+    active_tooltip = null;
+    trigger_watcher?.disconnect();
+    trigger_watcher = null;
+}
+
+/**
+ * Is this trigger still something the pointer could be on?
+ *
+ * @param {Element} trigger  The element the tooltip describes
+ * @returns {boolean}  Whether it is still in the page and visible
+ */
+function trigger_is_gone(trigger) {
+    if (!trigger.isConnected) {
+        return true;
+    }
+
+    return trigger.checkVisibility ? !trigger.checkVisibility() : false;
+}
+
 document.addEventListener('alpine:init', () => {
     const tooltips = document.createElement('section');
     tooltips.id = 'tooltips';
     document.querySelector('body').appendChild(tooltips);
+
+    // a click is the start of whatever the button does - navigating, opening a
+    // slideout, asking htmx for something that replaces the button - and none
+    // of those leave the tooltip describing anything
+    document.addEventListener('click', hide_active_tooltip, true);
 
     Alpine.directive('tooltip', (el, { value, expression }) => {
         el.alpine_side = value;
@@ -53,8 +98,24 @@ function show_tooltip(e, parent = false) {
     const trigger = e.target;
     const tooltip_container_id = trigger.getAttribute('aria-describedby');
     const tooltip_container = document.getElementById(tooltip_container_id);
+
+    // whatever was showing is not what the pointer is on any more
+    hide_active_tooltip();
+
     tooltip_container.classList.remove('sr-only');
     tooltip_container.classList.remove('force-width');
+
+    active_tooltip = {trigger: trigger, tooltip: tooltip_container};
+    // only while something is showing, so the page is not watched for nothing
+    trigger_watcher = new MutationObserver(() => {
+        if (active_tooltip && trigger_is_gone(active_tooltip.trigger)) {
+            hide_active_tooltip();
+        }
+    });
+    trigger_watcher.observe(document.body, {
+        childList: true, subtree: true,
+        attributes: true, attributeFilter: ['class', 'style', 'hidden']
+    });
 
 
     const [trigger_x, trigger_y] = abspos(trigger);
@@ -95,5 +156,5 @@ function hide_tooltip(e) {
         return;
     }
 
-    document.getElementById(e.target.getAttribute('aria-describedby')).classList.add('sr-only');
+    hide_active_tooltip();
 }

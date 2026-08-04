@@ -77,6 +77,50 @@ included inside one.
 {% include 'components/preview.html' %}
 
 <section class="card-content status">
+    {% if dataset.is_expiring(config=__config) %}
+        <dl class="badge-list">
+            <span class="notice notice-warning">
+                <i class="fa fa-warning" aria-hidden="true"></i> <strong>Note:</strong> this dataset will no longer be
+                available
+                after {{ dataset.is_expiring(config=__config)|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You
+                can
+                <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+            </span>
+        </dl>
+    {% endif %}
+
+    {% if merge_sources %}
+        <dl class="badge-list">
+            <span class="notice notice-warning">
+                <i class="fa fa-arrows-to-dot" aria-hidden="true"></i> This dataset is a merger of
+                {% for source in merge_sources %}
+                    {% if source is string %}
+                        {{ source }}{% else %}
+                        <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% endif %}
+                {% if
+            loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
+                {% endfor %}.
+            </span>
+        </dl>
+    {% elif "copied_from" in dataset.parameters %}
+        <dl class="badge-list">
+            <span class="notice notice-warning">
+                <i class="fa fa-filter" aria-hidden="true"></i>
+                This dataset was generated from
+                {# `copy_source` is the dataset page's: it looked the source up
+                   so it can be named. A listing rendering this card has not,
+                   and should not look one up per card, so it links to the
+                   source without naming it - as it also does when the source
+                   is gone and only its key is left #}
+                {% if copy_source is defined and copy_source is not string %}
+                    the dataset '
+                    <a href="{{ url_for('dataset.show_result', key=copy_source.key) }}">{{ copy_source.get_label() }}</a>'.
+                {% else %}
+                    <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                {% endif %}
+            </span>
+        </dl>
+    {% endif %}
     <dl class="badge-list dataset-status{% if not dataset.is_finished() %} in-progress{% endif %}"
         {% if not dataset.is_finished() %}style="--progress: {{ dataset.progress if dataset.progress else 0 }}"{% endif %}>
         <div class="status-badge-annotated status-{% if not dataset.is_finished() %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">

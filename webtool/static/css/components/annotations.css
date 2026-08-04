@@ -44,30 +44,8 @@
     cursor: pointer;
 }
 
-.annotation-fields-box .annotation-fields-summary:hover {
+.annotation-fields-box .annotation-fields-summary:hover i {
     color: var(--fourcat-accent);
-}
-
-.annotation-fields-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-tiny);
-}
-
-.annotation-field-chip {
-    flex: 0 0 auto;
-    padding: var(--spacing-tiny) var(--spacing-small);
-    border-radius: var(--radius);
-    background: var(--panel-bg-1);
-    color: var(--semidark);
-    font-size: var(--font-body);
-    white-space: nowrap;
-}
-
-/* a field a processor made, not a person: shown, but not something to edit */
-.annotation-field-chip.is-generated {
-    background: transparent;
-    border: var(--stroke-light) dashed var(--panel-bg-3);
 }
 
 .annotation-fields-empty {
@@ -108,15 +86,10 @@
 /* the label takes whatever room the type picker leaves. Both set a flex basis,
    which is what decides their width - the shared chrome's width:100% only
    applies where a control is not a flex item with a basis of its own */
-.annotation-field-label {
+.annotation-field-label, .annotation-field-type {
     flex: 1 1 12rem;
     min-width: 0;
-    max-width: 30rem;
-}
-
-.annotation-field-type {
-    flex: 0 1 12rem;
-    min-width: 0;
+    max-width: 12rem;
 }
 
 .annotation-field-origin {
@@ -133,17 +106,18 @@
     margin-left: auto;
 }
 
+.annotation-field-controls button:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
 .annotation-field-options {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--spacing-small);
+    gap: var(--spacing-tiny);
     margin: var(--spacing-small) 0 0 var(--spacing-regular);
     row-gap: var(--spacing-regular);
-}
-
-.annotation-field-options dd {
-    background: none;
 }
 
 .annotation-field-options dd {
@@ -173,11 +147,6 @@
     margin-top: var(--spacing-small);
 }
 
-.annotation-fields-warning {
-    margin: 0 0 var(--spacing-regular) 0;
-    color: var(--red);
-}
-
 .annotation-fields-impact {
     margin: 0 0 var(--spacing-regular) var(--spacing-regular);
     list-style: disc;
@@ -189,10 +158,8 @@
     font-style: italic;
 }
 
-.annotation-fields-saved {
+.annotation-fields-saved, .annotation-fields-warning {
     margin-top: var(--spacing-small);
-    color: var(--green);
-    font-size: var(--font-body);
 }
 
 /* --- annotations on an item --- */
@@ -202,23 +169,32 @@
     flex-direction: column;
     gap: var(--spacing-small);
     margin-top: var(--spacing-regular);
-    padding-top: var(--spacing-small);
-    border-top: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
+.item-annotation {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    font-size: var(--font-body);
+}
+
+/* folded away by the eye button on that field in the editor. A way of reading
+   the items: the annotation is still there and still saved, just not shown */
+.item-annotation.is-hidden {
+    display: none;
 }
 
 .annotation-label {
-    display: block;
-    color: var(--semidark);
-    font-size: var(--font-body);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    flex: 0 0 auto;
+    padding-top: var(--spacing-tiny);
 }
 
 .item-annotation-value {
     display: flex;
-    flex-wrap: wrap;
+    flex: 1 1 0;
     align-items: center;
     gap: var(--spacing-small);
+    min-width: 0;
 }
 
 .item-annotation-input {
@@ -243,10 +219,8 @@ textarea.item-annotation-input {
     min-width: 0;
 }
 
-.item-annotation-origin {
-    margin: var(--spacing-tiny) 0 0 0;
-    color: var(--semidark);
-    font-size: var(--font-body);
+.item-annotation-info {
+    flex: 0 0 auto;
 }
 
 /* where a value stands: appears while saving, then settles into a tick that

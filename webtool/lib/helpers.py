@@ -210,6 +210,13 @@ def annotation_context(dataset):
 		"annotation_fields": annotation_fields,
 		"from_datasets": from_datasets,
 		"can_annotate": can_annotate_dataset(dataset),
+		# which fields the reader has folded away in the items below. Kept in the
+		# address so that it survives a refresh and can be linked to, and read
+		# back here so the items are rendered folded rather than folded by script
+		# once they are already on screen
+		"hidden_fields": {
+			field_id for field_id in request.args.get("hidden", "").split(",") if field_id
+		},
 	}
 
 

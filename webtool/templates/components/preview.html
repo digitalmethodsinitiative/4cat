@@ -54,8 +54,13 @@
                 class="dataset-preview-content"
                 hx-get="{{ _preview_url }}"
                 {# htmx parses ':' as a modifier separator, so the event name is
-                   hyphenated and the multi-word selector quoted #}
-                hx-trigger="preview-open once from:'closest .dataset-preview-host'"
+                   hyphenated and the multi-word selector quoted.
+
+                   Not `once`: the scope only dispatches this when it has nothing
+                   to show, which is the same one-fetch-per-preview `once` would
+                   buy, except that it can also decide what it has is stale (see
+                   `invalidate()`) and ask again #}
+                hx-trigger="preview-open from:'closest .dataset-preview-host'"
                 hx-swap="innerHTML"
                 @htmx:after:request="show()"
         ></div>

@@ -166,3 +166,8 @@ span.divider {
 .items .media-wrapper audio {
     width: 100%;
 }
+
+/* Annotations */
+.item-annotation .annotation-label {
+    min-width: 10rem;
+}

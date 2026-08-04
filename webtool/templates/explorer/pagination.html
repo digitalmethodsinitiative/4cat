@@ -1,44 +1,30 @@
 {# Page links for the Explorer.
 
-   Every link swaps the item list in place rather than loading a page, and
-   pushes its own URL, so a page can still be linked to and the back button
-   still works.
+   The bar itself is the shared one every paged listing renders
+   (components/pagination.html); only what a link *is* belongs here. Each one
+   swaps the item list in place rather than loading a page, and pushes its own
+   URL, so a page can still be linked to and the back button still works. The
+   href is what it pushes, and what happens without JavaScript.
+
+   Included above and below the items, so a long page can be paged from either
+   end; both are inside #explorer-body, so both are replaced along with them.
 
    Expects: dataset, page, item_count, items_per_page, max_items, sort, reverse
+            label (optional) what to call this bar, for screen readers
+            above (optional) whether this is the copy above the items
 #}
+{% from "components/pagination.html" import page_links %}
 {% set shown_count = item_count if item_count < max_items else max_items %}
 {% set pages = ((shown_count / items_per_page)|round(0, 'ceil'))|int %}
-{% if pages > 1 %}
-    {# every window onto the dataset keeps the sort it was opened with #}
-    {% set order = "reverse" if reverse else "regular" %}
-    {% set page_numbers = [1, pages] %}
-    {% for offset in [-2, -1, 0, 1, 2] %}
-        {% if 1 <= (page + offset) <= pages and (page + offset) not in page_numbers %}
-            {% set _ = page_numbers.append(page + offset) %}
-        {% endif %}
-    {% endfor %}
-    <nav class="explorer-pagination" aria-label="Item pages">
-        <ol>
-            {% set previous = namespace(number=0) %}
-            {% for number in page_numbers|sort %}
-                {% if number > previous.number + 1 %}
-                    <li class="ellipsis" aria-hidden="true">&hellip;</li>
-                {% endif %}
-                <li class="page">
-                    {% if number == page %}
-                        <strong class="current" aria-current="page">{{ number }}</strong>
-                    {% else %}
-                        <a href="{{ url_for('dataset.show_result', key=dataset.key, view='explore', page=number, sort=sort, order=order) }}"
-                           hx-get="{{ url_for('explorer.explorer_items', key=dataset.key, page=number, sort=sort, order=order) }}"
-                           hx-target="#explorer-body"
-                           hx-swap="innerHTML"
-                           hx-indicator="#explorer-spinner"
-                           hx-push-url="{{ url_for('dataset.show_result', key=dataset.key, view='explore', page=number, sort=sort, order=order) }}"
-                        >{{ number }}</a>
-                    {% endif %}
-                </li>
-                {% set previous.number = number %}
-            {% endfor %}
-        </ol>
-    </nav>
-{% endif %}
+{# every window onto the dataset keeps the sort it was opened with #}
+{% set order = "reverse" if reverse else "regular" %}
+{% call(number, link_label) page_links(page, pages, label|default("Item pages"),
+                                       "pagination above" if above else "pagination") %}
+    <a href="{{ url_for('dataset.show_result', key=dataset.key, view='explore', page=number, sort=sort, order=order) }}"
+       hx-get="{{ url_for('explorer.explorer_items', key=dataset.key, page=number, sort=sort, order=order) }}"
+       hx-target="#explorer-body"
+       hx-swap="innerHTML"
+       hx-indicator="#explorer-spinner"
+       hx-push-url="{{ url_for('dataset.show_result', key=dataset.key, view='explore', page=number, sort=sort, order=order) }}"
+    >{{ link_label }}</a>
+{% endcall %}

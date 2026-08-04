@@ -7,6 +7,51 @@
  * which pane is showing, how a field is being edited before it is saved, and
  * whether an annotation has made it to the database yet.
  */
+
+/**
+ * Which annotation fields the reader has folded away in the items.
+ *
+ * Kept in the address rather than in a scope, so that it survives a refresh and
+ * can be linked to; the server reads the same parameter and renders the items
+ * folded to begin with.
+ *
+ * @returns {string[]}  Field IDs, in no particular order
+ */
+function hiddenAnnotationFields() {
+    const hidden = new URL(window.location).searchParams.get('hidden');
+    return hidden ? hidden.split(',').filter(Boolean) : [];
+}
+
+/**
+ * Fold the items and the eye buttons to match the address.
+ *
+ * Run after anything the Explorer swaps in: the items that arrive when paging
+ * or sorting were asked for before the reader folded anything away, and the
+ * field editor is re-rendered by a request that does not carry the parameter at
+ * all. Rather than teaching every one of those requests to pass it along, what
+ * lands is brought into line with the address afterwards.
+ *
+ * The classes are set here rather than bound with `:class` on purpose - a class
+ * Alpine adds while binding an element that arrived in an htmx swap is undone
+ * as that swap settles, and never re-applied.
+ */
+function syncAnnotationVisibility() {
+    const hidden = hiddenAnnotationFields();
+
+    document.querySelectorAll('[data-annotation-field]').forEach(annotation => {
+        annotation.classList.toggle('is-hidden', hidden.includes(annotation.dataset.annotationField));
+    });
+
+    document.querySelectorAll('[data-annotation-field-toggle]').forEach(button => {
+        const folded = hidden.includes(button.dataset.annotationFieldToggle);
+        button.setAttribute('aria-pressed', folded ? 'true' : 'false');
+        button.querySelector('i')?.classList.toggle('fa-eye-slash', folded);
+        button.querySelector('i')?.classList.toggle('fa-eye', !folded);
+    });
+}
+
+document.addEventListener('htmx:after:settle', syncAnnotationVisibility);
+
 document.addEventListener('alpine:init', () => {
     /**
      * The two panes below the dataset metadata.
@@ -17,20 +62,42 @@ document.addEventListener('alpine:init', () => {
      * means. The Explorer pane is empty until it is first shown, so switching
      * to it the first time asks htmx to fill it.
      *
+     * Which pane is open is part of where you are, so it is kept in the address
+     * as `view=explore`. That is the same thing the page was rendered from, so
+     * a refresh or a shared link opens on what was being looked at.
+     *
      * @param {string} initial  Pane to open on: 'explore' or anything else
      */
     Alpine.data('datasetPanes', (initial = 'analyze') => ({
-        exploring: false,
+        exploring: initial === 'explore',
 
         init() {
             // fetches the pane as soon as it is shown, once - the same
-            // arrangement the inline dataset preview uses
-            this.$watch('exploring', showing => showing && this.$dispatch('explore-open'));
+            // arrangement the inline dataset preview uses. A pane that is open
+            // to begin with is filled by its own `load` trigger instead, so
+            // that it does not depend on this event arriving before htmx is
+            // listening for it
+            this.$watch('exploring', showing => {
+                if (showing) {
+                    this.$dispatch('explore-open');
+                }
+                this.rememberPane(showing);
+            });
+        },
 
-            if (initial === 'explore') {
-                // after this element is bound, so the watcher above is in place
-                // and htmx has processed the pane's trigger
-                this.$nextTick(() => this.exploring = true);
+        // replaced rather than pushed: flipping between the two panes is not
+        // somewhere you navigated to, and the back button should still lead
+        // away from the dataset rather than through every flip
+        rememberPane(exploring) {
+            const url = new URL(window.location);
+            if (exploring) {
+                url.searchParams.set('view', 'explore');
+            } else {
+                url.searchParams.delete('view');
+            }
+
+            if (url.href !== window.location.href) {
+                history.replaceState(history.state, '', url);
             }
         }
     }));
@@ -64,11 +131,30 @@ document.addEventListener('alpine:init', () => {
      * added to and removed from, and the field someone is typing in is not
      * re-created under them.
      *
-     * @param {object} field  `{type, options}` as the field is currently saved
+     * A refused save re-renders these rows as they were submitted, saying what
+     * was wrong with each; the marks that puts on the inputs at fault are the
+     * server's answer about what was sent, so they are dropped as soon as the
+     * row is edited and the answer no longer describes it.
+     *
+     * The label's mark is the server's own class rather than a binding, and is
+     * taken off by hand: a class Alpine adds while binding an element that
+     * arrived in an htmx swap is undone again as the swap settles, and since
+     * the value behind it never changes, the binding never re-applies it. The
+     * option inputs do not have that problem - Alpine makes them itself, well
+     * after the swap - so theirs stays a binding.
+     *
+     * @param {object} field  `{id, type, options}` as the field is currently
+     *                        saved, plus `{invalidOptions, optionsRequired}`
+     *                        from a save that was refused
      */
     Alpine.data('annotationField', (field = {}) => ({
+        id: field.id,
         type: field.type || 'text',
         options: [],
+        isFirst: false,
+        isLast: false,
+        invalidOptions: field.invalidOptions || [],
+        optionsRequired: !!field.optionsRequired,
 
         init() {
             this.options = (field.options || []).map(value => this.newOption(value));
@@ -76,6 +162,61 @@ document.addEventListener('alpine:init', () => {
 
             // a field that becomes a choice field needs something to choose from
             this.$watch('type', () => this.hasOptions() && this.ensureBlank());
+
+            this.updateBoundaries();
+            this.boundaryObserver = new MutationObserver(() => this.updateBoundaries());
+            this.boundaryObserver.observe(this.$root.parentNode, {childList: true});
+        },
+
+        destroy() {
+            this.boundaryObserver?.disconnect();
+        },
+
+        // what the last save said about this row stops being true the moment it
+        // is edited: the marks come off, and the editor's notice is told to go
+        // away, since it is about fields that are no longer what it describes
+        edited() {
+            this.$root.querySelector('.annotation-field-label')?.classList.remove('invalid');
+            this.invalidOptions = [];
+            this.optionsRequired = false;
+            this.$dispatch('annotation-field-edited');
+        },
+
+        // a field that was never saved has nothing to delete server-side, so
+        // its row is the whole of it and dropping the row is the deletion
+        removeField() {
+            this.$root.remove();
+        },
+
+        // folding a field away in the items is a way of reading them, not a
+        // change to the dataset, so it is written to the address and nowhere
+        // else - replaced rather than pushed, since it is not somewhere the
+        // back button should have to walk through
+        toggleVisibility() {
+            const hidden = new Set(hiddenAnnotationFields());
+            hidden.has(this.id) ? hidden.delete(this.id) : hidden.add(this.id);
+
+            const url = new URL(window.location);
+            if (hidden.size) {
+                url.searchParams.set('hidden', [...hidden].join(','));
+            } else {
+                url.searchParams.delete('hidden');
+            }
+            history.replaceState(history.state, '', url);
+
+            syncAnnotationVisibility();
+        },
+
+        // a blank option is only at fault when the field has no other - it is
+        // the empty box the option that is missing would be typed into
+        optionInvalid(option) {
+            const value = option.value.trim();
+            return value ? this.invalidOptions.includes(value) : this.optionsRequired;
+        },
+
+        updateBoundaries() {
+            this.isFirst = !this.$root.previousElementSibling;
+            this.isLast = !this.$root.nextElementSibling;
         },
 
         newOption(value = '') {
@@ -102,6 +243,7 @@ document.addEventListener('alpine:init', () => {
         // the order fields are saved in is the order their rows are in, so
         // moving a row is all it takes to reorder them
         moveUp() {
+            if (this.isFirst) return;
             const previous = this.$root.previousElementSibling;
             if (previous) {
                 this.$root.parentNode.insertBefore(this.$root, previous);
@@ -109,17 +251,11 @@ document.addEventListener('alpine:init', () => {
         },
 
         moveDown() {
+            if (this.isLast) return;
             const next = this.$root.nextElementSibling;
             if (next) {
                 this.$root.parentNode.insertBefore(next, this.$root);
             }
         },
-
-        // removing the row removes the field from the form, which is what tells
-        // the server it was deleted - it asks for confirmation before acting on
-        // that, so nothing is lost here
-        removeField() {
-            this.$root.remove();
-        }
     }));
 });

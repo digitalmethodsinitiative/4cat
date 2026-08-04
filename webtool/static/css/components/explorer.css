@@ -75,43 +75,5 @@
     font-size: var(--font-body);
 }
 
-.explorer-pagination {
-    margin-left: auto;
-}
-
-.explorer-pagination ol {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--spacing-tiny);
-}
-
-.explorer-pagination li {
-    display: block;
-}
-
-.explorer-pagination a,
-.explorer-pagination .current {
-    display: block;
-    padding: var(--spacing-tiny) var(--spacing-small);
-    border: var(--stroke-light) solid var(--panel-bg-2);
-    border-radius: var(--radius);
-    font-size: var(--font-body);
-    cursor: pointer;
-}
-
-.explorer-pagination a:hover {
-    border-color: var(--fourcat-accent);
-    color: var(--fourcat-accent);
-}
-
-.explorer-pagination .current {
-    background: var(--fourcat-accent);
-    border-color: var(--fourcat-accent);
-    color: var(--bright);
-}
-
-.explorer-pagination .ellipsis {
-    color: var(--semidark);
-    padding: 0 var(--spacing-tiny);
-}
+/* the page links themselves are the shared .pagination bar - see
+   components/pagination.css, which every paged listing uses */

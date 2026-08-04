@@ -50,6 +50,12 @@ a.button-like, button {
     text-transform: uppercase;
 }
 
+.button-like button:disabled, button.button-like:disabled {
+    opacity: 0.5;
+    color: var(--button-grey);
+    cursor: not-allowed;
+}
+
 button.no-border {
     border: none;
 }
@@ -94,8 +100,22 @@ button.no-border {
     height: var(--font-normal);
 }
 
-.button-secondary span {
+.button-success {
+    background: var(--green-light);
+    color: var(--green);
+    border-color: var(--green);
+}
 
+.button-warning {
+    background: var(--yellow-light);
+    color: var(--yellow);
+    border-color: var(--yellow);
+}
+
+.button-error {
+    background: var(--red-light);
+    color: var(--red);
+    border-color: var(--red);
 }
 
 a.button-like, .button-like button, button.button-like, .plain-page button:not(.self-styled), input[type=submit] {

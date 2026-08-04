@@ -75,6 +75,10 @@
     min-width: 0;
 }
 
+form .notice {
+    padding: var(--spacing-regular);
+}
+
 /* Shared form definition for UserInput fields and annotation fields */
 :is(.form-element, .form-controls) input:not([type=checkbox]):not([type=hidden]),
 :is(.form-element, .form-controls) textarea,
@@ -152,6 +156,7 @@
 
 :is(.form-element, .form-controls) input.invalid,
 :is(.form-element, .form-controls) input:user-invalid,
+:is(.form-element, .form-controls) input.invalid:not([type=checkbox]):not([type=hidden]),
 :is(.form-element, .form-controls) textarea.invalid,
 :is(.form-element, .form-controls) textarea:user-invalid {
     background: var(--red-light);

@@ -1,12 +1,12 @@
 {# The annotation fields of a dataset, as a row in its metadata box.
 
-   Collapsed by default: the fields as chips, or an invitation to make one. The
+   Collapsed by default: the fields as badges, or an invitation to make one. The
    editor beneath is fetched by htmx on the first click - one click both opens
    the row and loads it, so a dataset page nobody annotates never pays for it.
 
    A dataset with no fields yet has nothing to show while the editor is closed,
    so the right-hand cell stays out of the way until there is either a field or
-   an open editor. `hasFields()` reads the chips rather than a flag because they
+   an open editor. `hasFields()` reads the badges rather than a flag because they
    are swapped in out of band when fields are saved; it is re-evaluated whenever
    `open` changes, which is the only moment the answer can matter.
 
@@ -16,7 +16,7 @@
    Expects: dataset, annotation_fields, can_annotate
 #}
 <div class="annotation-fields-box" id="annotation-fields-box"
-     x-data="{ open: false, hasFields() { return !!this.$el.querySelector('.annotation-field-chip') } }">
+     x-data="{ open: false, hasFields() { return !!this.$el.querySelector('.annotation-field-badge') } }">
     <dt>
         <button type="button" class="annotation-fields-summary self-styled"
                 @click="open = !open" :aria-expanded="open ? 'true' : 'false'"
@@ -32,8 +32,8 @@
     </dt>
     {# hidden server-side too, so an empty row does not flash before Alpine runs #}
     <dd x-show="open || hasFields()"{% if not annotation_fields %} style="display: none"{% endif %}>
-        <div class="annotation-fields-chips" id="annotation-fields-chips">
-            {% include "explorer/annotation-fields-chips.html" %}
+        <div class="annotation-fields-badges" id="annotation-fields-badges">
+            {% include "explorer/annotation-fields-badges.html" %}
         </div>
 
         <div class="annotation-fields-editor-host">

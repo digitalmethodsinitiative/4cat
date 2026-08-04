@@ -9,7 +9,15 @@
          x-data="moduleSlideout"
          @processor-queued.document="closeSlideout(); scrollToAfterSettle('child-' + $event.detail.key)"
          @htmx:after:settle.document="settle()">
-        <section class="dark dataset-metadata dataset-preview-host" data-dataset-key="{{ dataset.key }}" x-data="datasetPreview">
+        {# annotating an item, or changing what the annotation fields are, changes
+           what this dataset holds - so a preview fetched before that is stale.
+           It is dropped rather than refetched; asking for it again is what says
+           a fresh one is wanted #}
+        <section class="dark dataset-metadata dataset-preview-host" data-dataset-key="{{ dataset.key }}"
+                 x-data="datasetPreview"
+                 @annotation-saved.window="invalidate()"
+                 @annotation-fields-saved.window="invalidate()">
+
             <nav>
                 <ul>
                 {% if current_user.is_authenticated and current_user.can_access_dataset(dataset) %}
@@ -35,40 +43,6 @@
 
             {% include "dataset-page/dataset-progress.html" %}
 
-            {% if dataset.is_expiring(config=__config) %}
-                <p class="notice">
-                    <i class="fa fa-warning" aria-hidden="true"></i> <strong>Note:</strong> this dataset will no longer be
-                    available
-                    after {{ dataset.is_expiring(config=__config)|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You
-                    can
-                    <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
-                </p>
-            {% endif %}
-
-            {% if merge_sources %}
-                <p class="notice">
-                    <i class="fa fa-arrows-to-dot" aria-hidden="true"></i> This dataset is a merger of
-                    {% for source in merge_sources %}
-                        {% if source is string %}
-                            {{ source }}{% else %}
-                            <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% endif %}
-                    {% if
-                loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
-                    {% endfor %}.
-                </p>
-            {% elif "copied_from" in dataset.parameters %}
-                <p class="notice">
-
-                    <i class="fa fa-filter" aria-hidden="true"></i>
-                    This dataset was generated from
-                    {% if copy_source is string %}
-                        <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
-                    {% else %}
-                        the dataset '
-                        <a href="{{ url_for('dataset.show_result', key=copy_source.key) }}">{{ copy_source.get_label() }}</a>'.
-                    {% endif %}
-                </p>
-            {% endif %}
         </section>
 
         {# the two things a finished dataset can be doing: run processors on it,
@@ -83,9 +57,14 @@
 
             {% if dataset.is_finished() and __user_config("privileges.can_use_explorer") %}
                 <div class="explorer-pane-host" x-show="exploring" x-cloak>
+                    {# a pane the address already asks for fills itself on load,
+                       rather than waiting for the toggle's event: that event is
+                       dispatched by Alpine, and whether htmx is listening for it
+                       yet is a question of which script got there first. One the
+                       toggle opens is still filled the first time it is shown #}
                     <section class="explorer-pane center-stage" id="explorer-pane"
-                             hx-get="{{ url_for('explorer.explorer_pane', key=dataset.key, page=request.args.get('page'), sort=request.args.get('sort'), order=request.args.get('order')) }}"
-                             hx-trigger="explore-open once from:'closest .dataset-panes', annotation-fields-saved from:body"
+                             hx-get="{{ url_for('explorer.explorer_pane', key=dataset.key, page=request.args.get('page'), sort=request.args.get('sort'), order=request.args.get('order'), hidden=request.args.get('hidden')) }}"
+                             hx-trigger="{% if explore %}load{% else %}explore-open once from:'closest .dataset-panes'{% endif %}, annotation-fields-saved from:body"
                              hx-swap="innerHTML"
                              hx-indicator="#explorer-spinner"></section>
                     {% with spinner_id = "explorer-spinner" %}{% include "components/spinner.html" %}{% endwith %}

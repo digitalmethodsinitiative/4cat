@@ -1,0 +1,61 @@
+/* Pagination: the bar of page links under (and sometimes over) a paged listing.
+
+   One look for everywhere pages are listed - the dataset overview, the control
+   panel's tables, the Explorer's items - so that paging is the same thing to
+   click wherever it appears. The markup all of them render is the macro in
+   templates/components/pagination.html; what a link *does* differs per listing
+   (a plain href, or an htmx swap), but that is not something to see.
+
+   Centred, because the bar reads as belonging to the whole list rather than to
+   either of its edges. */
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    margin: 0 auto;
+    padding: var(--spacing-regular) 0;
+}
+
+.pagination ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-tiny);
+}
+
+.pagination li {
+    display: block;
+}
+
+.pagination a,
+.pagination .current {
+    display: block;
+    padding: var(--spacing-tiny) var(--spacing-small);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: var(--radius);
+    font-size: var(--font-body);
+    cursor: pointer;
+}
+
+.pagination a:hover {
+    border-color: var(--fourcat-accent);
+    color: var(--fourcat-accent);
+}
+
+.pagination .current {
+    background: var(--fourcat-accent);
+    border-color: var(--fourcat-accent);
+    color: var(--bright);
+}
+
+.pagination .ellipsis {
+    color: var(--semidark);
+    padding: 0 var(--spacing-tiny);
+}
+
+/* the copy above a long list, which sits directly under that list's header and
+   needs to be told apart from it */
+.pagination.above {
+    margin-bottom: var(--spacing-regular);
+    border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
+}

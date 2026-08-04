@@ -7,10 +7,12 @@
    Expects the context built by explorer.explorer_pane.
 #}
 {% set sorting_disabled = dataset.num_rows > max_items %}
+{% set shown_count = item_count if item_count < max_items else max_items %}
 <div class="explorer-controls panel-header">
     <div class="panel-header-title">
         <ul>
-            <li><h2>{{ dataset.num_rows|commafy }} item{{ "" if dataset.num_rows == 1 else "s" }}</h2></li>
+            <li><h2>Item {{ (offset + 1)|commafy }}&ndash;{{ (shown_count if (offset + items_per_page) > shown_count else (offset + items_per_page))|commafy }}
+        of {{ shown_count|commafy }}</h2></li>
         </ul>
     </div>
     <div class="panel-header-controls">

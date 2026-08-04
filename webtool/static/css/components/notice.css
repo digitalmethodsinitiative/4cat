@@ -1,7 +1,4 @@
 /* Notices on info, warnings, and success */
-.notice {
-    padding: var(--spacing-regular);
-}
 .notice-info {
     background: var(--blue-light);
     color: var(--blue);
@@ -15,6 +12,13 @@
 }
 .notice-warning i {
     color: var(--yellow);
+}
+.notice-error {
+    background: var(--red-light);
+    color: var(--red)
+}
+.notice-error i {
+    color: var(--red);
 }
 .notice-success {
     background: var(--green-light);

@@ -1,22 +1,61 @@
+{# The pagination bar, for every paged listing there is.
 
-    <nav class="pagination">
-        <ol>
-            {% if pagination.has_prev %}
-                    <li><a href="{{ url_for(pagination.route, page=(pagination.page - 1), **pagination.route_args) }}?{{ filter|http_query }}&amp;depth={{ depth }}">&laquo; Previous</a></li>
+   Which pages to offer, where the gaps between them are and which one is
+   current is the same wherever pages are listed; what a page *link* is, is not.
+   On the dataset overview it is a plain href, in the Explorer it swaps the item
+   list in place. So this decides the pages, and the caller renders the links:
+
+     {% from "components/pagination.html" import page_links %}
+     {% call(number, label) page_links(page, pages) %}
+         <a href="...">{{ label }}</a>
+     {% endcall %}
+
+   The caller is handed the page number and the text to put in the link - the
+   number itself, or 'Previous'/'Next' for the step links, which are only shown
+   when `steps` is set. Nothing at all is rendered when there is one page, so a
+   listing that fits on one does not have to ask before including this.
+
+   Styled by components/pagination.css, which is what keeps the bar the same
+   thing to click wherever it turns up.
+
+   Params: page     the page being shown, 1-indexed
+           pages    how many there are
+           label    what the bar is called, for screen readers
+           classes  class on the <nav>; add 'above' for the copy over a list
+           steps    whether to offer previous/next either side of the numbers
+#}
+{% macro page_links(page, pages, label="Pages", classes="pagination", steps=False) %}
+    {% if pages > 1 %}
+        {# the first and last page, and two either side of where we are #}
+        {% set numbers = [1, pages] %}
+        {% for offset in [-2, -1, 0, 1, 2] %}
+            {% if 1 <= (page + offset) <= pages and (page + offset) not in numbers %}
+                {% set _ = numbers.append(page + offset) %}
             {% endif %}
-            {%- for page in pagination.iter_pages() %}
-                {% if page %}
-                    {% if page != pagination.page %}
-                        <li class="page"><a href="{{ url_for(pagination.route, page=page, **pagination.route_args) }}?{{ filter|http_query }}&amp;depth={{ depth }}">{{ page }}</a></li>
-                    {% else %}
-                        <li class="page"><strong class="current">{{ page }}</strong></li>
-                    {% endif %}
-                {% else %}
-                    <li class="ellipsis">…</li>
+        {% endfor %}
+        <nav class="{{ classes }}" aria-label="{{ label }}">
+            <ol>
+                {% if steps and page > 1 %}
+                    <li class="step">{{ caller(page - 1, "« Previous") }}</li>
                 {% endif %}
-            {%- endfor %}
-            {% if pagination.has_next %}
-                    <li><a href="{{ url_for(pagination.route, page=(pagination.page + 1), **pagination.route_args) }}?{{ filter|http_query }}&amp;depth={{ depth }}">Next &raquo;</a></li>
-            {% endif %}
-        </ol>
-    </nav>
+                {% set previous = namespace(number=0) %}
+                {% for number in numbers|sort %}
+                    {% if number > previous.number + 1 %}
+                        <li class="ellipsis" aria-hidden="true">&hellip;</li>
+                    {% endif %}
+                    <li class="page">
+                        {% if number == page %}
+                            <strong class="current" aria-current="page">{{ number }}</strong>
+                        {% else %}
+                            {{ caller(number, number) }}
+                        {% endif %}
+                    </li>
+                    {% set previous.number = number %}
+                {% endfor %}
+                {% if steps and page < pages %}
+                    <li class="step">{{ caller(page + 1, "Next »") }}</li>
+                {% endif %}
+            </ol>
+        </nav>
+    {% endif %}
+{% endmacro %}

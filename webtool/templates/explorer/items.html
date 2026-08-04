@@ -5,16 +5,23 @@
    change per page, so they travel together and nothing needs an out-of-band
    swap.
 
+   The pagination is shown twice, above the items and below them, so a page
+   that is longer than the screen can be paged without scrolling back. The one
+   above sits directly under the controls header.
+
    Expects the context built by explorer.explorer_pane.
 #}
-{% set shown_count = item_count if item_count < max_items else max_items %}
 {% if item_count > max_items %}
-    <p class="explorer-notice">
+    <p class="notice notice-warning">
         <i class="fa fa-warning" aria-hidden="true"></i>
         Large dataset &mdash; only the first {{ max_items|commafy }} items can be shown here. Use a filter processor to
         narrow it down.
     </p>
 {% endif %}
+
+{% with above = True, label = "Item pages, above the items" %}
+    {% include "explorer/pagination.html" %}
+{% endwith %}
 
 {# .explorer-content-container / .explorer-content / .items is the structure
    every data source's Explorer stylesheet is written against - see
@@ -33,9 +40,5 @@
 </div>
 
 <div class="explorer-footer">
-    <p class="explorer-count">
-        Item {{ (offset + 1)|commafy }}&ndash;{{ (shown_count if (offset + items_per_page) > shown_count else (offset + items_per_page))|commafy }}
-        of {{ shown_count|commafy }}
-    </p>
     {% include "explorer/pagination.html" %}
 </div>

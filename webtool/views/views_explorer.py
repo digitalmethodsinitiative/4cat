@@ -72,6 +72,9 @@ def annotation_field_context(dataset: DataSet) -> dict:
     context.update({
         "dataset": dataset,
         "processors": current_app.fourcat_modules.processors,
+        # which fields actually exist server-side, so the editor can tell a row
+        # it can ask the server to delete from one that was never saved
+        "saved_field_ids": set(dataset.annotation_fields),
     })
     return context
 
@@ -342,6 +345,66 @@ def new_annotation_field(key: str):
                            can_annotate=True, is_new=True)
 
 
+@component.route("/results/<string:key>/explorer/annotation-fields/<string:field_id>/delete", methods=["DELETE", "POST"])
+@api_ratelimit
+@login_required
+@setting_required("privileges.can_run_processors")
+@setting_required("privileges.can_use_explorer")
+def delete_annotation_field(key: str, field_id: str):
+    """
+    Delete a single annotation field immediately
+
+    If the field has annotations, the first request returns a confirmation
+    popup telling the user how many annotations will be lost. The second
+    request carries `confirm` and performs the deletion.
+
+    Deleting a field that is not there is not an error - the editor comes back
+    with the fields as they now are. A delete says what the fields should end up
+    like, and they already are: the double-click that sends the request twice
+    has nothing left to do the second time, and saying so with an error would
+    put it in the page in place of the editor.
+
+    :param str key:       Dataset key
+    :param str field_id:  ID of the field to delete
+
+    :return-error 403:  If this user may not annotate this dataset
+    """
+    dataset, denied = explorer_dataset(key)
+    if denied:
+        return denied
+
+    if not can_annotate_dataset(dataset):
+        return error(403, error="You cannot annotate this dataset.")
+
+    old_fields = dataset.annotation_fields
+    if field_id not in old_fields:
+        context = annotation_field_context(dataset)
+        context["can_annotate"] = True
+        return render_template("explorer/annotation-fields-editor.html", **context)
+
+    count = g.db.fetchone(
+        "SELECT COUNT(*) AS count FROM annotations WHERE dataset = %s AND field_id = %s",
+        (dataset.key, field_id))["count"]
+
+    if count and not request.values.get("confirm"):
+        # asked in a popup rather than in place of the editor, so saying no
+        # leaves the editor exactly as it was; the request came from the
+        # editor, so the response has to say where it really belongs
+        return render_template("explorer/annotation-field-delete-confirm.html", dataset=dataset,
+                               field_id=field_id, field=old_fields[field_id],
+                               annotation_count=count), 200, {
+                                   "HX-Retarget": "#popup-host",
+                                   "HX-Reswap": "innerHTML"}
+
+    dataset.save_annotation_fields({
+        other_id: field for other_id, field in old_fields.items() if other_id != field_id
+    })
+
+    context = annotation_field_context(dataset)
+    context["can_annotate"] = True
+    return render_template("explorer/annotation-fields-saved.html", **context)
+
+
 @component.route("/results/<string:key>/explorer/annotation-fields/", methods=["POST"])
 @api_ratelimit
 @login_required
@@ -360,6 +423,10 @@ def save_annotation_fields(key: str):
     to it. Only the server knows how many that is, so the first request comes
     back with a confirmation listing the damage; the second carries `confirm`.
 
+    A save that is refused comes back with the fields *as submitted* rather than
+    as they are stored, so that nobody loses what they typed to a rejected save;
+    the editor says what is wrong with them and where.
+
     :param str key:  Dataset key
 
     :return-error 400:  If the fields are not valid
@@ -373,14 +440,27 @@ def save_annotation_fields(key: str):
         return error(403, error="You cannot annotate this dataset.")
 
     old_fields = dataset.annotation_fields
-    try:
-        new_fields = parse_annotation_field_form(request.form, old_fields)
-    except AnnotationException as e:
+    fields = read_annotation_field_form(request.form, old_fields)
+
+    def refuse(warning: str, errors: dict = None):
+        """
+        Send the editor back with the submitted fields still in it
+
+        :param str warning:  What was wrong, for the editor's notice
+        :param dict errors:  Per-field detail, for marking the inputs at fault
+        """
         context = annotation_field_context(dataset)
-        context.update({"can_annotate": True, "warning": str(e)})
+        context.update({"annotation_fields": fields, "can_annotate": True,
+                        "warning": warning, "errors": errors if errors else {}})
         return render_template("explorer/annotation-fields-editor.html", **context), 400
 
-    # keep the fields the editor never got to see
+    warning, errors = validate_annotation_fields(fields)
+    if warning:
+        return refuse(warning, errors)
+
+    # keep the fields the editor never got to see. Only from here on, so that a
+    # refusal renders what the editor submitted and nothing besides
+    new_fields = {**fields}
     for field_id, field in old_fields.items():
         if field.get("hide_in_explorer"):
             new_fields[field_id] = field
@@ -399,9 +479,7 @@ def save_annotation_fields(key: str):
     try:
         dataset.save_annotation_fields(new_fields)
     except AnnotationException as e:
-        context = annotation_field_context(dataset)
-        context.update({"can_annotate": True, "warning": str(e)})
-        return render_template("explorer/annotation-fields-editor.html", **context), 400
+        return refuse(str(e))
 
     # the editor comes back re-rendered; the summary in the metadata box and the
     # items' annotation inputs are swapped out of band, since both now show
@@ -412,61 +490,108 @@ def save_annotation_fields(key: str):
     return render_template("explorer/annotation-fields-saved.html", **context)
 
 
-def parse_annotation_field_form(form, old_fields: dict) -> dict:
+def read_annotation_field_form(form, old_fields: dict) -> dict:
     """
-    Rebuild the annotation fields from the editor's form
+    Read the editor's form into annotation fields, as submitted
 
     The form is flat - `label-<field_id>`, `type-<field_id>`, and one
     `option-<field_id>` per choice - with `field-order` listing the field IDs in
     the order they are shown, which is the order they are saved in.
+
+    A lenient read: it says what the form said, valid or not, so that the editor
+    can be rendered back with someone's edits still in it when the save is
+    refused. `validate_annotation_fields()` is what decides whether it is fit to
+    save.
 
     Processor-generated fields are read back from the fields already saved: only
     their label is editable, so nothing else the form says about them is used.
 
     :param form:  The submitted form (`request.form`)
     :param dict old_fields:  The dataset's current annotation fields
-    :return dict:  Annotation fields, ready for `save_annotation_fields()`
+    :return dict:  Annotation fields, in the order they were submitted
     """
-    new_fields = {}
+    fields = {}
 
     for field_id in form.getlist("field-order"):
         label = form.get("label-%s" % field_id, "").strip()
-        if not label:
-            raise AnnotationException("Annotation fields must have a label.")
-
         old_field = old_fields.get(field_id, {})
+
         if old_field.get("from_dataset"):
             # only the label can be changed on these
-            field = {**old_field, "label": label}
-        else:
-            field_type = form.get("type-%s" % field_id, "text")
-            if field_type not in ANNOTATION_TYPES:
-                raise AnnotationException("'%s' is not a valid annotation field type." % field_type)
+            fields[field_id] = {**old_field, "label": label}
+            continue
 
-            field = {"type": field_type, "label": label}
+        field = {"type": form.get("type-%s" % field_id, "text"), "label": label}
 
-            if field_type in ("dropdown", "checkbox"):
-                options = [option.strip() for option in form.getlist("option-%s" % field_id) if option.strip()]
-                if not options:
-                    raise AnnotationException("Choice fields need at least one option (%s)." % label)
-                if len(options) != len(set(options)):
-                    raise AnnotationException("Options must be unique (%s)." % label)
-                # options keep the IDs they had, so existing annotations keep
-                # pointing at the same option; new ones get an ID that cannot
-                # collide with one already in use
-                old_options = {v: k for k, v in old_field.get("options", {}).items()}
-                field["options"] = {
-                    old_options.get(option, secrets.token_hex(4)): option
-                    for option in options
-                }
+        if field["type"] in ("dropdown", "checkbox"):
+            # options keep the IDs they had, so existing annotations keep
+            # pointing at the same option; new ones get an ID that cannot
+            # collide with one already in use
+            old_options = {v: k for k, v in old_field.get("options", {}).items()}
+            options = {}
+            for option in [option.strip() for option in form.getlist("option-%s" % field_id) if option.strip()]:
+                # a repeated option would otherwise collapse into the one it
+                # repeats, and disappear from an editor sent back to say so
+                option_id = secrets.token_hex(4) if option in options.values() \
+                    else old_options.get(option, secrets.token_hex(4))
+                options[option_id] = option
+            field["options"] = options
 
-        new_fields[field_id] = field
+        fields[field_id] = field
 
-    labels = [field["label"] for field in new_fields.values()]
-    if len(labels) != len(set(labels)):
-        raise AnnotationException("Annotation field labels must be unique.")
+    return fields
 
-    return new_fields
+
+def validate_annotation_fields(fields: dict) -> tuple:
+    """
+    What is wrong with these annotation fields, if anything
+
+    Everything wrong with them, not just the first thing: a refused save shows
+    all of it at once, so that fixing one fault does not merely uncover the
+    next.
+
+    :param dict fields:  Annotation fields, as `read_annotation_field_form()`
+                         read them
+    :return tuple:  `(warning, errors)`. `warning` is what to tell the user, or
+                    an empty string if the fields are fit to save. `errors` maps
+                    a field ID to what is at fault in it: `label` if its label
+                    is, `options` listing the option values that are, and
+                    `options_required` if it has none and needs one
+    """
+    warnings = []
+    errors = collections.defaultdict(dict)
+    labels = collections.Counter(field["label"] for field in fields.values() if field["label"])
+
+    for field_id, field in fields.items():
+        if not field["label"]:
+            errors[field_id]["label"] = True
+            warnings.append("Annotation fields must have a label.")
+        elif labels[field["label"]] > 1:
+            errors[field_id]["label"] = True
+            warnings.append("Annotation field labels must be unique.")
+
+        if field.get("from_dataset"):
+            # nothing else about these comes from the form
+            continue
+
+        if field["type"] not in ANNOTATION_TYPES:
+            warnings.append("'%s' is not a valid annotation field type." % field["type"])
+            continue
+
+        if field["type"] in ("dropdown", "checkbox"):
+            options = list(field.get("options", {}).values())
+            if not options:
+                errors[field_id]["options_required"] = True
+                warnings.append("Choice fields need at least one option (%s)." % (field["label"] or "unnamed field"))
+
+            repeated = [option for option, times in collections.Counter(options).items() if times > 1]
+            if repeated:
+                errors[field_id]["options"] = repeated
+                warnings.append("Options must be unique (%s)." % (field["label"] or "unnamed field"))
+
+    # the same fault in two fields is one thing to say, not two
+    warning = " ".join(dict.fromkeys(warnings))
+    return warning, dict(errors)
 
 
 def annotation_field_impact(dataset: DataSet, old_fields: dict, new_fields: dict) -> list:

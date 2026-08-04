@@ -259,8 +259,12 @@ def show_results(page):
         "url": url_for("dataset.show_results"),
         "label": "Datasets"
     }]
+    # the dataset card names a dataset after the processor that made it, and
+    # calls it deprecated when there is no such processor any more - so a page
+    # rendering cards needs the processors, or every one of them looks defunct
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites, breadcrumbs=breadcrumbs)
+                           datasets=filtered, pagination=pagination, favourites=favourites, breadcrumbs=breadcrumbs,
+                           processors=g.modules.processors)
 
 
 """

@@ -42,6 +42,24 @@ document.addEventListener('alpine:init', () => {
             this.open = true;
         },
 
+        /**
+         * Throw away what is being shown, because it is no longer what the
+         * dataset holds.
+         *
+         * A preview is fetched once and kept, which is wrong the moment the
+         * items behind it change - annotating one, or changing what the
+         * annotation fields are, leaves it showing values the dataset no longer
+         * has. Rather than quietly refetching it, the panel closes: someone who
+         * has just annotated is not reading the preview, and asking for it
+         * again is what says the new one is wanted.
+         */
+        invalidate() {
+            this.open = false;
+            this.big = false;
+            this.loaded = false;
+            this.loading = false;
+        },
+
         fullscreen() {
             this.big = !this.big;
         }
