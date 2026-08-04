@@ -32,6 +32,13 @@ class ModuleCollector:
     """
     ignore = []
     missing_modules = {}
+    # datasources whose package could not be imported at all. Kept apart from a
+    # folder that merely lacks DATASOURCE/init_datasource, which is not a
+    # failure - that is just a directory that is not a datasource (a leftover,
+    # say). This distinction matters: a datasource that fails to import is never
+    # added to self.datasources, so load_modules() never walks it for workers,
+    # so its settings go undeclared without anything landing in missing_modules.
+    failed_datasources = {}
     log_buffer = None
     config = None
 
@@ -362,6 +369,9 @@ class ModuleCollector:
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
+                # a real failure: this datasource's workers will not be found
+                # either, so its settings will look undeclared this boot
+                self.failed_datasources[module_name] = str(e)
                 self.log_buffer += "Could not import %s: %s\n" % (module_name, e)
                 return
 

@@ -85,12 +85,15 @@ def run(as_daemon=True, log_level="INFO"):
 	# record which module declares which setting. Has to happen here rather than
 	# in ensure_database() above, which runs before the modules are loaded and
 	# so only ever sees the previous boot's cache.
-	degraded = bool(modules.missing_modules)
-	recorded = config.record_declarations(degraded=degraded)
-	if degraded:
-		log.warning(f"Recorded {recorded} setting declarations, but {len(modules.missing_modules)} module(s) failed to "
-					f"import. Not marking this as a clean scan: settings belonging to the failed modules are "
-					f"unreachable, not obsolete.")
+	# both channels count. A datasource that fails to import is never walked for
+	# workers, so its settings go undeclared without anything reaching
+	# missing_modules - see ModuleCollector.failed_datasources.
+	incomplete = len(modules.missing_modules) + len(modules.failed_datasources)
+	recorded = config.record_declarations(degraded=bool(incomplete))
+	if incomplete:
+		log.warning(f"Recorded {recorded} setting declarations, but {incomplete} module(s) failed to import. Not "
+					f"marking this as a clean scan: settings belonging to the failed modules are unreachable, not "
+					f"obsolete, and must not age into looking removed.")
 	else:
 		log.debug(f"Recorded {recorded} setting declarations.")
 
