@@ -627,6 +627,24 @@ def manipulate_tags():
     return render_template("controlpanel/user-tags.html", tags=tags, num_admins=num_admins, flashes=get_flashed_messages())
 
 
+def setting_sort_position(option, settings, undeclared_position):
+    """
+    Where a setting goes in the settings interface
+
+    Settings are grouped by tab, and within a tab they appear in the order they
+    are written in the config definition. A setting that is in the database but
+    declared nowhere has no place in that order, so `undeclared_position` puts
+    it at the end. The name is only a tiebreak, so the order does not change
+    between requests.
+
+    :param str option:  Setting name
+    :param dict settings:  Setting definition, as prepared for the interface
+    :param int undeclared_position:  Position for settings nothing declares
+    :return tuple:  Sort key
+    """
+    return (settings["tabname"], settings.get("config_order", undeclared_position), option)
+
+
 @component.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
@@ -703,7 +721,9 @@ def manipulate_settings():
     options = {}
     changed_categories = set()
 
-    for option in {*all_settings.keys(), *definition.keys()}:
+    # sorted so that settings which sort equally below still come out in the same
+    # order on every request
+    for option in sorted({*all_settings.keys(), *definition.keys()}):
         tag_value = all_settings.get(option, definition.get(option, {}).get("default"))
         global_value = global_settings.get(option, definition.get(option, {}).get("default"))
         is_changed = tag and global_value != tag_value
@@ -713,22 +733,30 @@ def manipulate_settings():
         if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
             current_value = json.dumps(current_value)
 
-        # this is used for organising things in the UI
-        option_owner = option.split(".")[0]
+        # which tab a setting appears under. A setting may name its own category,
+        # which is how settings declared across several modules end up in one
+        # tab; if it does not, the first part of its name is used.
+        category = definition.get(option, {}).get("category") or option.split(".")[0]
+
         submenu = "other"
-        if option_owner in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
+        if category in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
                                     "logging", "ui", "extensions"):
             submenu = "core"
-        elif option_owner.endswith("-search"):
+        elif category.endswith("-search"):
             submenu = "datasources"
-        elif option_owner in g.modules.processors:
+        elif category in g.modules.processors:
             submenu = "processors"
 
-        tabname = config_definition.categories.get(option_owner)
+        # a setting may also supply its own label, which is the only way a
+        # category that core does not know about can be named - core's category
+        # list cannot be added to from an extension
+        tabname = definition.get(option, {}).get("category_label")
         if not tabname:
-            tabname = modules.get(option_owner)
+            tabname = config_definition.categories.get(category)
         if not tabname:
-            tabname = option_owner
+            tabname = modules.get(category)
+        if not tabname:
+            tabname = category
 
         options[option] = {
             **definition.get(option, {
@@ -739,26 +767,30 @@ def manipulate_settings():
             "submenu": submenu,
             "default": current_value,  # override default so this is the value displayed in the web UI
             "original_default": default,  # but also save the actual default
+            "category": category,
             "tabname": tabname,
             "is_changed": is_changed
         }
 
         if tag and is_changed:
-            changed_categories.add(option.split(".")[0])
+            changed_categories.add(category)
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 
-    # We are ordering the options based on how they are ordered in their dictionaries,
-    # and not the database order. To do so, we're adding a simple config order number
-    # and sort on this.
+    # settings appear in the order they are written in the config definition:
+    # for core settings the order of config_definition.py, for module settings
+    # the order the modules are collected in, which groups each module's
+    # settings together
     config_order = 0
     for k, v in definition.items():
         options[k]["config_order"] = config_order
         config_order += 1
 
+    undeclared = len(definition) + 1
+
     options = {
         k: options[k]
-        for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o].get("config_order", 0)))
+        for k in sorted(options, key=lambda o: setting_sort_position(o, options[o], undeclared))
         if not options[k].get("indirect")
     }
 

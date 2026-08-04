@@ -379,7 +379,6 @@ class ConfigManager(BaseConfigReader):
                 declared.get("extension_id"),
                 definition.get("category", setting.split(".")[0]),
                 definition.get("category_label"),
-                definition.get("sort_order"),
                 bool(definition.get("managed", False)),
                 now,
                 now,
@@ -391,7 +390,7 @@ class ConfigManager(BaseConfigReader):
             # records when a setting was first known, so it must survive
             self.db.execute_many("""
                 INSERT INTO settings_declarations
-                    (name, declared_by, owner_kind, extension_id, category, category_label, sort_order, is_managed,
+                    (name, declared_by, owner_kind, extension_id, category, category_label, is_managed,
                      first_seen, last_seen, last_definition)
                 VALUES %s
                 ON CONFLICT (name) DO UPDATE SET
@@ -400,7 +399,6 @@ class ConfigManager(BaseConfigReader):
                     extension_id = EXCLUDED.extension_id,
                     category = EXCLUDED.category,
                     category_label = EXCLUDED.category_label,
-                    sort_order = EXCLUDED.sort_order,
                     is_managed = EXCLUDED.is_managed,
                     last_seen = EXCLUDED.last_seen,
                     last_definition = EXCLUDED.last_definition

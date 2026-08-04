@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS settings_declarations (
   extension_id           TEXT DEFAULT NULL,
   category               TEXT DEFAULT '' NOT NULL,
   category_label         TEXT DEFAULT NULL,
-  sort_order             INTEGER DEFAULT NULL,
   is_managed             BOOLEAN DEFAULT FALSE,
   first_seen             INTEGER DEFAULT 0,
   last_seen              INTEGER DEFAULT 0,
