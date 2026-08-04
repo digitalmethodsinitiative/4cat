@@ -14,3 +14,8 @@ table td {
     padding: var(--spacing-small);
     border: var(--stroke-light) solid var(--dark);
 }
+
+table td.missing-field-meta {
+    background-color: var(--red-light);
+    border-color: var(--red);
+}
