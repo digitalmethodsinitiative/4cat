@@ -21,6 +21,10 @@
                 location manually.</p>
             <p>Extensions need to be enabled after installation to run. You can do so via the
                 <a href="{{ url_for("admin.manipulate_settings") }}">4CAT settings panel</a>.</p>
+            <p>Settings belonging to an extension are kept when it is switched off or uninstalled, so enabling or
+                re-installing it restores its configuration rather than reverting to defaults. They are listed under
+                <a href="{{ url_for("admin.manage_unused_settings") }}">unused settings</a> while the extension is not
+                loaded, and 4CAT will not remove them.</p>
             <br>
             <p><strong>WARNING:</strong> installing and uninstalling extensions will trigger a restart and interrupt any running processors. Ensure no important analyses are running via the Control Panel first.</p>
             <div class="user-panel">
@@ -70,7 +74,7 @@
                 </table>
 
                 <p role="tooltip" class="multiple" id="tooltip-uninstall" aria-hidden="true">Uninstall this
-                    extension</p>
+                    extension. Its settings are kept, so re-installing it restores its configuration</p>
                 <p role="tooltip" class="multiple" id="tooltip-enabled" aria-hidden="true">This extension is currently
                     enabled</p>
                 <p role="tooltip" class="multiple" id="tooltip-disabled" aria-hidden="true">This extension is currently

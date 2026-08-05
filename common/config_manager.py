@@ -44,6 +44,18 @@ class ConfigManager(BaseConfigReader):
     # how long a setting must go undeclared, across complete scans, before the
     # audit will call it removed rather than merely unseen
     ORPHAN_GRACE_PERIOD = 7 * 86400
+
+    # why a setting in each of the other audit states is not archivable
+    ARCHIVE_REFUSALS = {
+        "dormant": "it belongs to an extension that is installed, so switching that extension back on should restore "
+                   "its configuration.",
+        "absent_extension": "it belongs to an extension that is not installed. Re-installing it should restore its "
+                            "configuration rather than reverting to defaults.",
+        "recently_absent": "it has not been undeclared for long enough to be sure it is gone rather than in the middle "
+                           "of being moved. It may also be that the last start-up could not load every module.",
+        "unknown": "there is no record of anything ever declaring it, so there is no evidence it was removed rather "
+                   "than simply never recorded. Remove it by hand if you are sure."
+    }
     # Thread-local storage for a singleton memcache client per thread.
     # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
     _memcache_tls = threading.local()
@@ -523,6 +535,93 @@ class ConfigManager(BaseConfigReader):
             "last_clean_scan": last_clean_scan,
             "findings": findings
         }
+
+    def archive_setting(self, name, archived_by=None):
+        """
+        Move a setting out of use, reversibly
+
+        Every value for the setting - the global one and any stored against a
+        tag - moves to `settings_archive`, so nothing is destroyed and
+        `restore_setting()` can put it back.
+
+        Only a setting the audit calls `vanished` may be archived, and that is
+        checked here rather than trusted from the caller. Anything else is
+        either still in use, belongs to an extension that may come back, or has
+        no recorded history to judge it by.
+
+        :param str name:  Setting to archive
+        :param str archived_by:  Username, recorded so it is clear who did it
+        :return int:  Number of stored values moved
+        :raises ValueError:  If this setting is not one that may be archived
+        """
+        self.with_db()
+
+        finding = next((item for item in self.audit_settings()["findings"] if item["name"] == name), None)
+        if not finding:
+            raise ValueError(f"Setting '{name}' is in use, so cannot be archived.")
+
+        if finding["state"] != "vanished":
+            # This is for safety. We may want to allow archiving of other states in future, but for now it is
+            # only allowed for vanished settings.
+            raise ValueError(f"Setting '{name}' cannot be archived: {self.ARCHIVE_REFUSALS[finding['state']]}")
+
+        now = int(time.time())
+        stored = self.db.fetchall("SELECT * FROM settings WHERE name = %s", (name,))
+        for row in stored:
+            self.db.insert("settings_archive", {
+                "name": row["name"],
+                "value": row["value"],
+                "tag": row["tag"],
+                "declared_by": finding["declared_by"],
+                "archived_at": now,
+                "archived_by": archived_by
+            }, commit=False)
+
+        self.db.delete("settings", where={"name": name}, commit=False)
+        self.db.commit()
+
+        # values for this setting may be memcached under any tag, and there is
+        # no list of which, so clear the lot
+        self.clear_cache()
+
+        return len(stored)
+
+    def restore_setting(self, name):
+        """
+        Put an archived setting back
+
+        :param str name:  Setting to restore
+        :return int:  Number of stored values restored
+        :raises ValueError:  If nothing was archived under this name
+        """
+        self.with_db()
+
+        archived = self.db.fetchall("SELECT * FROM settings_archive WHERE name = %s", (name,))
+        if not archived:
+            raise ValueError(f"Setting '{name}' is not archived, so cannot be restored.")
+
+        for row in archived:
+            self.db.upsert("settings", {
+                "name": row["name"],
+                "value": row["value"],
+                "tag": row["tag"]
+            }, constraints=["name", "tag"], commit=False)
+
+        self.db.delete("settings_archive", where={"name": name}, commit=False)
+        self.db.commit()
+        self.clear_cache()
+
+        return len(archived)
+
+    def get_archived_settings(self):
+        """
+        Settings that have been archived, and can be put back
+
+        :return list:  Archived settings, most recently archived first
+        """
+        self.with_db()
+
+        return self.db.fetchall("SELECT * FROM settings_archive ORDER BY archived_at DESC, name ASC, tag ASC")
 
     def get_all_setting_names(self, with_core=True):
         """

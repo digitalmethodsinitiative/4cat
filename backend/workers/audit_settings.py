@@ -66,7 +66,7 @@ class SettingsAuditor(BasicWorker):
                       if finding["state"] == "vanished" and finding["has_tag_override"]]
 
         message = (f"{len(removed)} setting(s) are stored but no longer declared by 4CAT or any installed extension. "
-                   f"They are not in use and can be removed from the settings panel.")
+                   f"They are not in use and can be [reviewed and removed](/admin/settings/unused).")
         if overridden:
             message += (f" {len(overridden)} of them have a value set for a specific tag, so were configured "
                         f"deliberately at some point: {', '.join(sorted(overridden)[:5])}"

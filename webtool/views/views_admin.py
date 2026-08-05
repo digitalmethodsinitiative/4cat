@@ -627,6 +627,51 @@ def manipulate_tags():
     return render_template("controlpanel/user-tags.html", tags=tags, num_admins=num_admins, flashes=get_flashed_messages())
 
 
+@component.route("/admin/settings/unused", methods=["GET", "POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_settings")
+def manage_unused_settings():
+    """
+    Review settings the database holds but nothing declares
+
+    Archiving moves a setting's values aside rather than deleting them, so a
+    mistake costs a click. Only settings the audit is confident about are
+    offered; the rest are listed with the reason they are not, because knowing
+    a value is being kept deliberately is as useful as being able to remove it.
+    """
+    if request.method == "POST":
+        name = request.form.get("setting", "")
+        try:
+            if request.form.get("action") == "restore":
+                restored = g.config.restore_setting(name)
+                flash(f"Restored {name} ({restored} stored value(s)).")
+            else:
+                archived = g.config.archive_setting(name, archived_by=current_user.get_id())
+                flash(f"Archived {name} ({archived} stored value(s)). It can be restored from this page.")
+        except ValueError as e:
+            flash(str(e))
+
+        return redirect(url_for("admin.manage_unused_settings"))
+
+    audit = g.config.audit_settings()
+    findings = sorted(audit["findings"], key=lambda item: item["name"])
+
+    # settings kept because an extension might come back are a different fact
+    # from settings nothing owns any more, so they are listed apart
+    extension_states = ("dormant", "absent_extension")
+
+    return render_template("controlpanel/settings-unused.html",
+                           # archivable first, since those are the ones anything can be done about
+                           findings=sorted([item for item in findings if item["state"] not in extension_states],
+                                           key=lambda item: (item["state"] != "vanished", item["name"])),
+                           kept_for_extensions=[item for item in findings if item["state"] in extension_states],
+                           refusals=g.config.ARCHIVE_REFUSALS,
+                           scan_is_current=audit["scan_is_current"],
+                           last_clean_scan=audit["last_clean_scan"],
+                           archived=g.config.get_archived_settings(),
+                           flashes=get_flashed_messages())
+
+
 def setting_sort_position(option, settings, undeclared_position):
     """
     Where a setting goes in the settings interface
@@ -723,9 +768,9 @@ def manipulate_settings():
 
     # what last declared each setting, used to group settings by where they come
     # from rather than by guessing from their name
-    declarations = g.config.get_declarations()
     datasource_workers = {f"{datasource}-{suffix}" for datasource in g.modules.datasources
                           for suffix in ("search", "import")}
+    unused_settings = 0
 
     # sorted so that settings which sort equally below still come out in the same
     # order on every request
@@ -740,29 +785,13 @@ def manipulate_settings():
             current_value = json.dumps(current_value)
 
         if option not in definition:
-            # in the database, but nothing declares it, so there is no type to
-            # validate against and no telling what the value is meant to be.
-            declared = declarations.get(option, {})
-            if declared.get("owner_kind") == "extension":
-                # an extension that is not loaded - uninstalled, or installed
-                # but switched off. Its settings are kept so that bringing it
-                # back restores them, but they are not 4CAT's to show meanwhile.
-                continue
-
-            options[option] = {
-                # shown, not offered for editing: an editable field would have
-                # to guess a type, and saving the form would then write plain
-                # text over a value that may be JSON. OPTION_INFO is skipped by
-                # UserInput.parse_all(), so saving cannot touch these at all.
-                "type": UserInput.OPTION_INFO,
-                "help": f"**`{option}`** - currently stored as `{json.dumps(all_settings.get(option))}`"
-                        + (f", last declared by `{declared['declared_by']}`" if declared.get("declared_by") else
-                           ", with no record of anything ever declaring it"),
-                "submenu": "unrecognised",
-                "category": "unrecognised",
-                "tabname": "Unrecognised",
-                "is_changed": False
-            }
+            # stored, but nothing declares it, so there is no type to validate
+            # against and no telling what the value is meant to be. Not shown
+            # here at all - an editable field would have to guess a type, and
+            # saving the form would then write plain text over a value that may
+            # be JSON. They are listed, with what can be done about them, on the
+            # unused settings page instead.
+            unused_settings += 1
             continue
 
         # which tab a setting appears under. A setting may name its own category,
@@ -850,7 +879,8 @@ def manipulate_settings():
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
                            datasources_config=datasources, changed=changed_categories,
-                           expire_override=expire_override, extensions_config=extension_config)
+                           expire_override=expire_override, extensions_config=extension_config,
+                           unused_settings=unused_settings)
 
 
 @component.route("/manage-notifications/", methods=["GET", "POST"])

@@ -1,0 +1,151 @@
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}Unused settings{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "settings-unused" %}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>Unused settings</span></h2>
+
+            {% for notice in flashes %}
+                <p class="form-notice">{{ notice|safe }}</p>
+            {% endfor %}
+
+            <p>These settings have a value stored in the database, but nothing in 4CAT or any installed extension
+                declares them any more. They are not in use. Archiving one moves its values aside rather than deleting
+                them, so it can be restored from this page afterwards.</p>
+
+            {% if not scan_is_current %}
+                <p class="form-notice">The last time 4CAT started, not every module could be loaded. Settings belonging
+                    to whatever failed are unreachable rather than gone, so nothing is offered for archiving until 4CAT
+                    starts cleanly again.</p>
+            {% elif last_clean_scan %}
+                <p>Last complete check: {{ last_clean_scan|datetime("%-d %b %Y %H:%M")|safe }}.</p>
+            {% endif %}
+
+            <table class="fullwidth cp-table">
+                <colgroup>
+                    <col>
+                    <col>
+                    <col class="actions">
+                </colgroup>
+                <tr>
+                    <th>Setting</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+                {% if findings %}
+                    {% for finding in findings %}
+                        <tr>
+                            <td>
+                                <code>{{ finding.name }}</code>
+                                {% if finding.tags|select|list %}
+                                    <br><span class="property-badge">also set for: {{ finding.tags|select|join(", ") }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if finding.state == "vanished" %}
+                                    Not declared since
+                                    {{ finding.last_seen|datetime("%-d %b %Y", wrap=True) }}, last by
+                                    <code>{{ finding.declared_by }}</code>.
+                                {% else %}
+                                    {{ refusals[finding.state] }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if finding.state == "vanished" %}
+                                    <form action="{{ url_for("admin.manage_unused_settings") }}" method="POST" class="inline">
+                                        <input type="hidden" name="setting" value="{{ finding.name }}">
+                                        <button><i class="fas fa-box-archive" aria-hidden="true"></i> Archive</button>
+                                    </form>
+                                {% else %}
+                                    <span class="sr-only">Kept</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="3">Every setting in the database is declared by 4CAT or an installed extension.</td>
+                    </tr>
+                {% endif %}
+            </table>
+        </section>
+
+        {% if kept_for_extensions %}
+            <section>
+                <h2><span>Kept for extensions</span></h2>
+                <p>These belong to extensions that are not loaded right now, either because they are switched off or
+                    because they are not installed. Their values are kept on purpose: installing or enabling the
+                    extension again restores its configuration instead of reverting it to defaults. Nothing here needs
+                    doing, and none of it can be removed from this page.</p>
+
+                <table class="fullwidth cp-table">
+                    <colgroup>
+                        <col>
+                        <col>
+                    </colgroup>
+                    <tr>
+                        <th>Setting</th>
+                        <th>Extension</th>
+                    </tr>
+                    {% for finding in kept_for_extensions %}
+                        <tr>
+                            <td>
+                                <code>{{ finding.name }}</code>
+                                {% if finding.tags|select|list %}
+                                    <br><span class="property-badge">also set for: {{ finding.tags|select|join(", ") }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <code>{{ finding.extension_id }}</code>
+                                {% if finding.state == "dormant" %}(installed, currently switched off){% else %}(not installed){% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </section>
+        {% endif %}
+
+        {% if archived %}
+            <section>
+                <h2><span>Archived settings</span></h2>
+                <p>These were archived from this page. Restoring one puts its values back exactly as they were.</p>
+
+                <table class="fullwidth cp-table">
+                    <colgroup>
+                        <col>
+                        <col>
+                        <col class="actions">
+                    </colgroup>
+                    <tr>
+                        <th>Setting</th>
+                        <th>Archived</th>
+                        <th>Actions</th>
+                    </tr>
+                    {% for row in archived %}
+                        <tr>
+                            <td>
+                                <code>{{ row.name }}</code>
+                                {% if row.tag %}<span class="property-badge">{{ row.tag }}</span>{% endif %}
+                            </td>
+                            <td>
+                                {{ row.archived_at|datetime("%-d %b %Y %H:%M", wrap=True) }}
+                                {% if row.archived_by %}by {{ row.archived_by }}{% endif %}
+                            </td>
+                            <td>
+                                <form action="{{ url_for("admin.manage_unused_settings") }}" method="POST" class="inline">
+                                    <input type="hidden" name="setting" value="{{ row.name }}">
+                                    <input type="hidden" name="action" value="restore">
+                                    <button><i class="fas fa-rotate-left" aria-hidden="true"></i> Restore</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </section>
+        {% endif %}
+    </article>
+{% endblock %}

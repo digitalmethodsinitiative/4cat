@@ -45,7 +45,8 @@ config_definition = {
         "type": UserInput.OPTION_INFO,
         "help": "4CAT extensions can be disabled and disabled via the control below. When enabled, extensions may "
                 "define further settings that can typically be configured via the extension's tab on the left side of "
-                "this page. **Note that 4CAT needs to be restarted for this to take effect!**"
+                "this page. Switching an extension off hides those settings but keeps their values, so switching it "
+                "back on restores its configuration. **Note that 4CAT needs to be restarted for this to take effect!**"
     },
     "extensions.enabled": {
         "type": UserInput.OPTION_EXTENSIONS,
