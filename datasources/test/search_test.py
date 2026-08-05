@@ -37,7 +37,7 @@ if TEST_DATASOURCE_ENABLED:
         Dummy search worker for exercising the worker/queue status pages
         """
         type = "test-search"  # job ID
-        category = "Search"  # category
+        
         title = "Test datasource (dev only)"  # title displayed in UI
         description = "Development-only datasource that creates dummy datasets in various states (complete, forever, crash) to exercise admin status pages."
         extension = "ndjson"  # extension of result file

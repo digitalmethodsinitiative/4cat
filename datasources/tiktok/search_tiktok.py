@@ -18,7 +18,7 @@ class SearchTikTok(Search):
     Import scraped TikTok data
     """
     type = "tiktok-search"  # job ID
-    category = "Search"  # category
+    
     title = "Import scraped Tiktok data"  # title displayed in UI
     description = "Import Tiktok data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

@@ -19,7 +19,7 @@ class SearchTwitterViaZeeschuimer(Search):
     Import scraped X/Twitter data
     """
     type = "twitter-import"  # job ID
-    category = "Search"  # category
+    
     title = "Import scraped X/Twitter data"  # title displayed in UI
     description = "Import X/Twitter data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

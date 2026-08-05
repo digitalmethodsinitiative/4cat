@@ -24,13 +24,13 @@ class SearchBluesky(Search):
     Search for posts in Bluesky
     """
     type = "bsky-search"  # job ID
-    category = "Search"  # category
     title = "Bluesky Search"  # title displayed in UI
     description = "Collects Bluesky posts via its API."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     # the tag column the co-tag and hashtag networks look for
     output = Datasource(columns={"tags"})
     icon = "brand-bluesky"
+    tags = ["API"]
 
     config = {
         "bsky-search.max_results": {

@@ -17,7 +17,7 @@ class SearchFacebook(Search):
     Import scraped 9gag data
     """
     type = "facebook-search"  # job ID
-    category = "Search"  # category
+    
     title = "Import scraped Facebook data"  # title displayed in UI
     description = "Import Facebook data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

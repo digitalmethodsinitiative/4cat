@@ -17,7 +17,7 @@ class SearchNineGag(Search):
     Import scraped 9gag data
     """
     type = "ninegag-search"  # job ID
-    category = "Search"  # category
+    
     title = "Import scraped 9gag data"  # title displayed in UI
     description = "Import 9gag data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

@@ -22,13 +22,15 @@ from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
 
 class SearchCustom(BasicProcessor):
     type = "upload-search"  # job ID
-    category = "Search"  # category
+    
     title = "Custom Dataset Upload"  # title displayed in UI
     description = "Upload your own CSV file to be used as a dataset"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
     # a collected, top-level csv; the columns depend on the uploaded file, so unknown here
     output = Datasource()
     icon = "file-import"
+
+    tags = ["upload"]
 
     max_workers = 1
     

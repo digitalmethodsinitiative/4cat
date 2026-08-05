@@ -33,12 +33,13 @@ class SearchTumblr(Search):
 	Tumblr data filter module.
 	"""
 	type = "tumblr-search"  # job ID
-	category = "Search"  # category
+	
 	title = "Search Tumblr"  # title displayed in UI
 	description = "Retrieve Tumblr posts by tags or blogs."  # description displayed in UI
 	extension = "ndjson"  # extension of result file, used internally and in UI
 	# the tag column the co-tag and hashtag networks look for
 	output = Datasource(columns={"tags"})
+	tags = ["API"]
 
 	icon = "brand-tumblr"
 

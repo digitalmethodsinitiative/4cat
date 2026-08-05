@@ -31,12 +31,13 @@ class SearchTelegram(Search):
     Search Telegram via API
     """
     type = "telegram-search"  # job ID
-    category = "Search"  # category
+    
     title = "Telegram API search"  # title displayed in UI
     description = "Scrapes messages from open Telegram groups via its API."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     output = Datasource()
     icon = "brand-telegram"
+    tags = ["API"]
 
     # cache
     details_cache = None

@@ -13,10 +13,10 @@ from common.lib.outputs import MediaArchive
 
 class AudioUploadToText(SearchMedia):
     type = "upload-audio-to-text-search"  # job ID
-    category = "Search"  # category
     title = "Convert speech to text"  # title displayed in UI
     description = "Upload your own audio and use OpenAI's Whisper or GPT models to create transcripts"  # description displayed in UI
     icon = "closed-captioning"
+    tags = ["audio", "media", "upload"]
 
     # only audio is accepted here, so the output media is narrower than SearchMedia's
     output = MediaArchive(media="audio", collector=True, position="top")

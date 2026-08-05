@@ -21,12 +21,13 @@ class SearchDouban(Search):
     Defines methods that are used to query Douban data from the site directly
     """
     type = "douban-search"  # job ID
-    category = "Search"  # category
+    
     title = "Douban Search"  # title displayed in UI
     description = "Scrapes group posts from Douban for a given set of groups"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
     output = Datasource()
     icon = "comment"
+    tags = ["scraping"]
 
     # not available as a processor for existing datasets
     accepts = [None]

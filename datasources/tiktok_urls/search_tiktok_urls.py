@@ -30,13 +30,14 @@ class SearchTikTokByID(Search):
     Import scraped TikTok data
     """
     type = "tiktok-urls-search"  # job ID
-    category = "Search"  # category
+    
     title = "Search TikTok by post URL"  # title displayed in UI
     description = "Retrieve metadata for TikTok post URLs."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     # the tag column the co-tag and hashtag networks look for
     output = Datasource(columns={"hashtags"})
     icon = "brand-tiktok"
+    tags = ["scraping"]
 
     # not available as a processor for existing datasets
     accepts = [None]

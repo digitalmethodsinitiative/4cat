@@ -13,11 +13,12 @@ from common.lib.outputs import MediaArchive
 
 class SearchMedia(BasicProcessor):
     type = "media-import-search"  # job ID
-    category = "Search"  # category
+    
     title = "Upload Media"  # title displayed in UI
     description = "Upload your own audio, video, or image files to be used as a dataset"  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
     icon = "images"
+    tags = ["media", "upload"]
 
     # A top-level archive of uploaded media; one upload is a single media type, but
     # which one is only known at run time, so the output media is that bounded set.

@@ -22,6 +22,8 @@ class SearchVK(Search):
     output = Datasource()
     icon = "brand-vk"
 
+    tags = ["API"]
+
     previous_request = 0
     import_issues = True
 
