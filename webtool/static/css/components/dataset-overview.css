@@ -10,3 +10,57 @@
 .result-list nav.tabs {
     margin: var(--spacing-regular) auto;
 }
+
+/* The bar over the dataset list: the set being looked at on one row, the
+   filters narrowing it down on the next, kept a little apart so they read as
+   two separate decisions. */
+.dataset-filters form {
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--spacing-small);
+}
+
+.dataset-filters ul {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-small);
+}
+
+/* gaps do the spacing here, so the margin the metadata bar puts on its nav
+   items would only double it */
+.dataset-metadata > nav.dataset-filters li {
+    margin-right: 0;
+}
+
+/* the set being looked at, called out against the ones that are not */
+.dataset-metadata .dataset-filters .button-like.current,
+.dataset-metadata .dataset-filters .button-like.current:hover {
+    background: var(--bright);
+    border-color: var(--bright);
+    color: var(--semidark);
+}
+
+/* the filter row sits on the dark bar, so its text needs what the buttons
+   around it already get */
+.dataset-filters .dataset-filter-options {
+    color: var(--bright);
+}
+
+.dataset-filters .dataset-filter-options label {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-tiny);
+    white-space: nowrap;
+}
+
+/* the search boxes take whatever the fixed-width controls leave */
+.dataset-filters .dataset-filter-options .search-box {
+    flex: 1 1 10rem;
+    min-width: 0;
+}
+
+/* what submits the row closes it off */
+.dataset-filters .dataset-filter-submit {
+    margin-left: auto;
+}

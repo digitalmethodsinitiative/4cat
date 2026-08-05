@@ -1,8 +1,0 @@
-<div class="form-element">
-    <select name="datasource" id="datasource-select" aria-label="Data sources" x-model="datasource">
-        <option value="" disabled selected>Select data source</option>
-        {% for datasource in datasources %}
-            <option value="{{ datasource }}">{{ datasources[datasource].name }}</option>
-        {% endfor %}
-    </select>
-</div>

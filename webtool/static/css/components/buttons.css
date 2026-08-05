@@ -118,7 +118,7 @@ button.no-border {
     border-color: var(--red);
 }
 
-a.button-like, .button-like button, button.button-like, .plain-page button:not(.self-styled), input[type=submit] {
+a.button-like, .button-like button, button.button-like, li.button-like, .plain-page button:not(.self-styled), input[type=submit] {
     padding: 8px;
 }
 

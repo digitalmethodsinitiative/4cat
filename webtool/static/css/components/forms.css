@@ -79,10 +79,9 @@ form .notice {
     padding: var(--spacing-regular);
 }
 
-/* Shared form definition for UserInput fields and annotation fields */
-:is(.form-element, .form-controls) input:not([type=checkbox]):not([type=hidden]),
-:is(.form-element, .form-controls) textarea,
-:is(.form-element, .form-controls) select {
+input:not([type=checkbox]):not([type=hidden]),
+textarea,
+select {
     width: 100%;
     box-sizing: border-box;
     font: inherit;
@@ -94,7 +93,7 @@ form .notice {
     padding: var(--spacing-small);
 }
 
-:is(.form-element, .form-controls) select {
+select {
     -moz-appearance:none;
     -webkit-appearance:none;
     appearance:none;
@@ -105,24 +104,24 @@ form .notice {
     padding-right: calc(var(--spacing-small) + 16px);
 }
 
-:is(.form-element, .form-controls) select:open {
+select:open {
     background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="%23333333" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" transform="matrix(1,0,0,-1,0,0)"><polyline points="2,5 8,11 14,5"></polyline></svg>');
 }
 
-:is(.form-element, .form-controls) select:focus {
+select:focus {
     outline: none;
     border-bottom: var(--stroke-heavy) solid var(--fourcat-accent);
 }
 
-:is(.form-element, .form-controls) input:not([type=checkbox]):focus,
-:is(.form-element, .form-controls) textarea:focus,
-:is(.form-element, .form-controls) select:focus {
+input:not([type=checkbox]):focus,
+textarea:focus,
+select:focus {
     outline: var(--stroke) solid var(--fourcat-accent);
     border-bottom: var(--stroke-heavy) solid var(--fourcat-accent);
     outline-offset: calc(-1 * var(--stroke-light));
 }
 
-:is(.form-element, .form-controls) input[type=checkbox] {
+input[type=checkbox] {
   box-sizing: border-box;
   width: 1.2rem;
   height: 1.2rem;
@@ -136,36 +135,35 @@ form .notice {
   transition: outline 0.1s;
 }
 
-:is(.form-element, .form-controls) input[type=checkbox]:checked {
+input[type=checkbox]:checked {
   background-color: var(--button-bg-regular);
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink"><polyline points="2,7 7,12 14,3"></polyline></svg>');
   background-repeat: no-repeat;
   background-position: center;
 }
 
-:is(.form-element, .form-controls) option,
-:is(.form-element, .form-controls) optgroup {
+option,
+optgroup {
     font-family: Chivo, sans-serif;
     font-size: var(--font-body);
 }
 
-:is(.form-element, .form-controls) textarea {
+textarea {
     min-height: 8em;
     resize: vertical;
 }
 
-:is(.form-element, .form-controls) input.invalid,
-:is(.form-element, .form-controls) input:user-invalid,
-:is(.form-element, .form-controls) input.invalid:not([type=checkbox]):not([type=hidden]),
-:is(.form-element, .form-controls) textarea.invalid,
-:is(.form-element, .form-controls) textarea:user-invalid {
+input.invalid,
+input:user-invalid,
+input.invalid:not([type=checkbox]):not([type=hidden]),
+textarea.invalid,
+textarea:user-invalid {
     background: var(--red-light);
     border-color: var(--red);
     color: var(--red);
 }
 
 /* UserInput form widgets */
-
 .form-element .daterange-wrapper {
     display: flex;
     align-items: center;

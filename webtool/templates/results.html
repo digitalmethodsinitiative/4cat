@@ -9,47 +9,66 @@
         <section class="dark result-list dataset-metadata">
             <h1><span>Datasets</span></h1>
 
-            <nav class="tabs">
+            {# Which datasets are being looked at, over how they are narrowed
+               down. The first row are links, so picking a set takes effect at
+               once; it carries the filters along, so they keep applying within
+               the set that was picked. The second row needs submitting, so the
+               button doing that closes it off. #}
+            <nav class="tabs dataset-filters">
                 <form action="{{ url_for("dataset.show_results") }}" method="GET">
                     <input type="hidden" name="depth" value="{{ depth }}">
-                    <ul>
+                    <ul class="dataset-filter-depth">
                         {% if __user_config("privileges.can_view_all_datasets") %}
-                            <li class="button-like{% if depth == "all" %} current{% endif %}"><a
-                                    href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=all">All
-                                datasets</a></li>{% endif %}
-                        <li class="button-like{% if not depth or depth == "own" %} current{% endif %}"><a
-                                href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=own">My
+                            <li><a class="button-like{% if depth == "all" %} current{% endif %}"
+                                   {% if depth == "all" %}aria-current="page"{% endif %}
+                                   href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=all">All
+                                datasets</a></li>
+                        {% endif %}
+                        <li><a class="button-like{% if not depth or depth == "own" %} current{% endif %}"
+                               {% if not depth or depth == "own" %}aria-current="page"{% endif %}
+                               href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=own">My
                             own datasets</a></li>
-                        <li class="button-like{% if depth == "favourites" %} current{% endif %}"><a
-                                href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites
+                        <li><a class="button-like{% if depth == "favourites" %} current{% endif %}"
+                               {% if depth == "favourites" %}aria-current="page"{% endif %}
+                               href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites
                             only</a></li>
+                    </ul>
 
-                        <li><input aria-label="Filter by query or label" placeholder="Filter datasets..." name="filter"
-                                   value="{{ filter.filter }}"></li>
+                    <ul class="dataset-filter-options">
+                        <li class="search-box">
+                            <input type="search" name="filter" value="{{ filter.filter }}"
+                                   aria-label="Search datasets by query or label"
+                                   placeholder="Search datasets...">
+                        </li>
                         {% if current_user.is_admin %}
-                            <li><input aria-label="User" placeholder="User..." name="user"
-                                       value="{{ filter.user }}"></li>
+                            <li class="search-box">
+                                <input type="search" name="user" value="{{ filter.user }}"
+                                       aria-label="Search datasets by user" placeholder="Search by user...">
+                            </li>
                             <li>
                                 <select aria-label="Sort datasets by" name="sort_by">
-                                    <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>
-                                        Sort by date
-                                    </option>
-                                    <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>
-                                        Sort by size
-                                    </option>
+                                    <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>Sort by date</option>
+                                    <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>Sort by size</option>
                                 </select>
                             </li>
                         {% endif %}
                         <li>
-                            {% include 'components/user-inputs/datasource-select.html' %}
+                            <select name="datasource" aria-label="Filter by data source">
+                                <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data sources</option>
+                                {% for datasource in datasources %}
+                                    <option value="{{ datasource }}"{% if filter.datasource == datasource %} selected{% endif %}>{{ datasources[datasource].name }}</option>
+                                {% endfor %}
+                            </select>
                         </li>
-                        <li><label><input type="checkbox" name="hide_empty" {% if filter.hide_empty %}
-                                          checked="checked"{% endif %}> Hide empty datasets</label></li>
                         <li>
-                            <button>Filter</button>
+                            <label><input type="checkbox" name="hide_empty"
+                                          {% if filter.hide_empty %}checked="checked"{% endif %}> Hide empty
+                                datasets</label>
+                        </li>
+                        <li class="dataset-filter-submit">
+                            <button class="button-like">Filter</button>
                         </li>
                     </ul>
-
                 </form>
             </nav>
         {% if datasets %}
