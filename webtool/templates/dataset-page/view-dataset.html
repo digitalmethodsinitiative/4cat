@@ -62,7 +62,7 @@
                        dispatched by Alpine, and whether htmx is listening for it
                        yet is a question of which script got there first. One the
                        toggle opens is still filled the first time it is shown #}
-                    <section class="explorer-pane center-stage" id="explorer-pane"
+                    <section class="explorer-pane" id="explorer-pane"
                              hx-get="{{ url_for('explorer.explorer_pane', key=dataset.key, page=request.args.get('page'), sort=request.args.get('sort'), order=request.args.get('order'), hidden=request.args.get('hidden')) }}"
                              hx-trigger="{% if explore %}load{% else %}explore-open once from:'closest .dataset-panes'{% endif %}, annotation-fields-saved from:body"
                              hx-swap="innerHTML"

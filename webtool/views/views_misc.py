@@ -209,7 +209,6 @@ def module_detail_context(module_type):
         return None
 
     datasource_id = datasource_ids_by_worker().get(module_type) if module["is_datasource"] else None
-    module["tags"] = (["data source"] if module["is_datasource"] else []) + module["tags"]
 
     requirement = (module.get("how_to_run") or {}).get("accepts", {}).get("requirement")
 
@@ -235,9 +234,6 @@ def module_catalog_sections():
 
     for entry in catalogue:
         entry["datasource_id"] = datasource_ids.get(entry["type"]) if entry["is_datasource"] else None
-        # data sources are labelled as such, so they can be told apart at a
-        # glance and found by searching for 'data source'
-        entry["tags"] = (["data source"] if entry["is_datasource"] else []) + entry["tags"]
 
     def by_title(entries):
         return {entry["type"]: entry for entry in

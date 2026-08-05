@@ -13,7 +13,8 @@ from flask import Blueprint, current_app, jsonify, request, render_template, ren
 	get_flashed_messages, send_from_directory, stream_with_context, g
 from flask_login import login_required, current_user
 
-from webtool.lib.helpers import error, setting_required, parse_markdown
+from webtool.lib.helpers import (error, setting_required, parse_markdown, datasource_variants,
+	datasource_worker_options)
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
 	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException
@@ -265,12 +266,18 @@ def datasource_form(datasource_id):
 	If the data source has no search worker or its search worker does not have
 	any parameters defined, this returns a 404 Not Found status.
 
+	A data source offering variants (see `Search.get_variants`) takes a
+	`variant` query argument saying which one the options are wanted for. It is
+	returned as given, so that whatever renders the form can send it back when
+	the form is submitted.
+
 	:param datasource_id:  Data source ID, as specified in the data source and
 						   config.py
-	:return: A JSON object with the `html` of the template, a `status` code and
-	the `datasource` ID.
+	:request-param str ?variant:  Variant of the data source to get options for
+	:return: A JSON object with the `html` of the template, a `status` code, the
+	`datasource` ID and the `variant`.
 
-	:return-error 404: If the datasource does not exist.
+	:return-error 404: If the datasource or variant does not exist.
 	"""
 	if datasource_id not in g.modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
@@ -284,7 +291,11 @@ def datasource_form(datasource_id):
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
 
-	worker_options = worker_class.get_options(None, g.config)
+	variant = request.args.get("variant") or None
+	if variant and variant not in datasource_variants(worker_class, g.config):
+		return error(404, message="Datasource '%s' has no variant '%s'" % (datasource_id, variant))
+
+	worker_options = datasource_worker_options(worker_class, g.config, variant)
 	if not worker_options:
 		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
 
@@ -300,6 +311,7 @@ def datasource_form(datasource_id):
 	return jsonify({
 		"status": "success",
 		"datasource": datasource_id,
+		"variant": variant,
 		"type": labels,
 		"html": html,
 		# "options": worker_options
@@ -437,6 +449,12 @@ def queue_dataset():
 
 	search_worker = g.modules.workers[search_worker_id]
 
+	# which variant of the data source this is for, if it has any; the form
+	# carries it because the options depend on it, and so does the query
+	variant = request.form.get("variant") or None
+	if variant and variant not in datasource_variants(search_worker, g.config):
+		return error(404, message="Datasource '%s' has no variant '%s'" % (datasource_id, variant))
+
 	# handle confirmation outside of parameter parsing, since it is not data
 	# source specific
 	has_confirm = bool(request.form.get("frontend-confirm", False))
@@ -446,10 +464,16 @@ def queue_dataset():
 		# just in case
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(search_worker.get_options(None, g.config), request.form, silently_correct=False)
+			sanitised_query = UserInput.parse_all(datasource_worker_options(search_worker, g.config, variant),
+												  request.form, silently_correct=False)
 
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
+			if variant:
+				# only when there is one: this is echoed back to the front-end
+				# in `keep` below, and a null would be re-submitted as "null"
+				sanitised_query["variant"] = variant
+
 			sanitised_query = search_worker.validate_query(sanitised_query, request, g.config)
 
 		except QueryNeedsFurtherInputException as e:
@@ -487,7 +511,8 @@ def queue_dataset():
 		# those to "[object Object],..." on the for-real re-submission.
 		# (Other list/dict fields, e.g. parsed URL lists are not touched.)
 		json_option_keys = {
-			option for option, settings in search_worker.get_options(None, g.config).items()
+			option for option, settings in
+			datasource_worker_options(search_worker, g.config, variant).items()
 			if settings.get("type") == UserInput.OPTION_TEXT_JSON
 		}
 		keep = {
@@ -498,6 +523,10 @@ def queue_dataset():
 
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
+	if variant:
+		# re-asserted after validation, since validate_query may return a dict
+		# it built from scratch
+		sanitised_query["variant"] = variant
 
 	if request.form.to_dict().get("pseudonymise") in ("pseudonymise", "anonymise"):
 		sanitised_query["pseudonymise"] = request.form.to_dict().get("pseudonymise")

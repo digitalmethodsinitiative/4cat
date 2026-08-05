@@ -2,6 +2,9 @@
    come from the loop in components/module-grid.html; `module` is the dict built
    in dataset.datasource_grid.
 
+   A data source with variants has one card per variant, so `module_id` is not a
+   data source ID and the URLs the card needs come ready-made from the view.
+
    Data sources without dataset parameters (the Zeeschuimer-fed ones) get no
    options form and so no action button: leaving `select_template` unset is what
    module-card.html keys on. #}
@@ -9,8 +12,8 @@
         tags = module.tags,
         search_terms = module.title ~ ' ' ~ module.description ~ ' ' ~ module_id ~ ' ' ~ module.tags|join(' '),
         select_template = "components/module-select-slideout.html" if module.selectable else None,
-        options_url = url_for('dataset.datasource_options', datasource_id=module_id),
-        metadata_url = url_for('dataset.datasource_metadata', datasource_id=module_id),
+        options_url = module.options_url,
+        metadata_url = module.metadata_url,
         info_url = url_for('misc.module_catalog', module_type=module.worker_type),
         info_label = "More information about this data source",
         code_url = module.code_url,

@@ -14,7 +14,8 @@ from flask import (Blueprint, current_app, render_template, request, redirect, s
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import (Pagination, annotation_context, error, setting_required,
-                                 common_dataset_options, collect_grid_tags, module_request_url)
+                                 common_dataset_options, collect_grid_tags, module_request_url,
+                                 datasource_variants)
 from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor, datasource_form
 
 from common.lib.dataset import DataSet
@@ -33,6 +34,31 @@ def available_datasources():
     """
     return {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
             metadata["has_worker"] and datasource in g.config.get("datasources.enabled", {})}
+
+
+def datasource_collector(datasource_id, metadata, worker):
+    """
+    What collects the data for a data source, for its card
+
+    Three answers: data captured in the browser comes in via Zeeschuimer, and
+    everything else is collected either by 4CAT itself or by a separate service
+    an extension talks to. In the latter case the service is what a user needs
+    to know about - it is where the data actually lives, it is what has to be
+    reachable, and the card's own title is a collection within it rather than
+    the source as a whole - so the data source is named instead of 4CAT.
+
+    :param str datasource_id:  Data source ID
+    :param dict metadata:  Data source metadata, from the module collector
+    :param worker:  The data source's search worker
+    :return str:  What to name as the collector
+    """
+    if metadata["importable"]:
+        return "Zeeschuimer"
+
+    if getattr(worker, "is_extension", False):
+        return metadata.get("name") or datasource_id
+
+    return "4CAT"
 
 
 @component.route('/create-dataset/')
@@ -58,12 +84,18 @@ def datasource_grid():
     - collected by 4CAT itself, or captured with Zeeschuimer and imported -
     since that determines what the user needs to do next. Only the former can
     be selected; the latter are listed at the end for reference.
+
+    A data source that declares variants (see `Search.get_variants`) gets one
+    card per variant instead of one card in total. Those cards are still the
+    same data source: they only differ in what they carry to the options form,
+    so the card ID is not a module ID and the URLs are built here rather than
+    from the ID in the template.
     """
     modules = {}
     for datasource_id, metadata in available_datasources().items():
         worker = g.modules.workers[datasource_id + "-search"]
         status = worker.get_status()
-        modules[datasource_id] = {
+        card = {
             "title": metadata["name"],
             "description": worker.description,
             "icon": getattr(worker, "icon", None),
@@ -74,7 +106,29 @@ def datasource_grid():
             "code_url": worker.get_repo_link(g.config),
             # the module catalogue is keyed by worker type, not data source ID
             "worker_type": worker.type,
+            "collected_via": datasource_collector(datasource_id, metadata, worker),
         }
+
+        variants = datasource_variants(worker, g.config) if metadata["has_options"] else {}
+        if not variants:
+            modules[datasource_id] = {
+                **card,
+                "options_url": url_for("dataset.datasource_options", datasource_id=datasource_id),
+                "metadata_url": url_for("dataset.datasource_metadata", datasource_id=datasource_id),
+            }
+            continue
+
+        for variant_id, variant in variants.items():
+            modules["%s:%s" % (datasource_id, variant_id)] = {
+                **card,
+                "title": variant.get("title", variant_id),
+                "description": variant.get("description", card["description"]),
+                "tags": list(variant.get("tags", card["tags"]) or []),
+                "options_url": url_for("dataset.datasource_options", datasource_id=datasource_id,
+                                       variant=variant_id),
+                "metadata_url": url_for("dataset.datasource_metadata", datasource_id=datasource_id,
+                                        variant=variant_id),
+            }
 
     collected = {k: v for k, v in modules.items() if not v["importable"]}
     imported = {k: v for k, v in modules.items() if v["importable"]}
@@ -106,6 +160,9 @@ def datasource_options(datasource_id):
     Returns the rendered dataset parameter options for the data source picked
     in the module slideout, as a form that js/query-form.js submits.
 
+    The picked variant, if the data source has any, is read from the query
+    string by `datasource_form` and travels with the form from here on.
+
     :param str datasource_id:  Data source to show options for
     """
     result = datasource_form(datasource_id)
@@ -115,7 +172,7 @@ def datasource_options(datasource_id):
         return render_template("components/form-notice.html", message=message)
 
     return render_template("components/datasource-form.html", options_html=result.json["html"],
-                           datasource_id=datasource_id,
+                           datasource_id=datasource_id, variant=result.json.get("variant"),
                            common_options=common_dataset_options(g.config, current_user))
 
 
@@ -126,6 +183,10 @@ def datasource_metadata(datasource_id):
     """
     Get the header for a data source's options in the module slideout
 
+    Titled after the variant that was picked, if any, since that is the card the
+    user clicked; the links stay those of the data source the variant belongs
+    to, which is the module all its variants share.
+
     :param str datasource_id:  Data source to show metadata for
     """
     datasources = available_datasources()
@@ -134,9 +195,17 @@ def datasource_metadata(datasource_id):
 
     worker = g.modules.workers[datasource_id + "-search"]
 
+    title = datasources[datasource_id]["name"]
+    variant = request.args.get("variant")
+    if variant:
+        variants = datasource_variants(worker, g.config)
+        if variant not in variants:
+            return error(404, error="This data source is not available.")
+        title = variants[variant].get("title", variant)
+
     return render_template(
         "components/module-metadata.html",
-        module={"title": datasources[datasource_id]["name"]},
+        module={"title": title},
         icon=getattr(worker, "icon", None),
         info_url=url_for("misc.module_catalog", module_type="%s-search" % datasource_id),
         info_label="How is this data collected?",

@@ -60,6 +60,33 @@ class Search(BasicProcessor, ABC):
 	import_error_count = 0
 	import_warning_count = 0
 
+	@classmethod
+	def get_variants(cls, config=None):
+		"""
+		Variants of this data source, to offer as separate cards
+
+		Some data sources are one interface onto a number of distinct
+		collections - a database server hosting several corpora, say. Instead of
+		having the user select the data source and then pick the collection from
+		a dropdown, such a worker can return one entry per collection here, and
+		the create-dataset page shows one card per entry.
+
+		Variants are not modules: they share this worker's type, data source ID
+		and settings, and none of the module machinery knows about them. What is
+		picked is passed to `get_options()` as `variant` and stored in the
+		dataset's `variant` parameter, so `validate_query()` and `get_items()`
+		can read it back.
+
+		A worker returning variants MUST accept a `variant` keyword argument in
+		`get_options()`. Returning nothing (the default, and what every core data
+		source does) means this data source is a single card, as before.
+
+		:param config:  Configuration reader
+		:return dict:  `{variant ID: {"title": str, "description": str, "tags":
+		list}}`, all keys optional; empty if this data source has no variants
+		"""
+		return {}
+
 	def process(self):
 		"""
 		Create 4CAT dataset from a data source

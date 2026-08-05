@@ -129,6 +129,54 @@ def collect_grid_tags(grid_sections):
 	return sorted(tags)
 
 
+def datasource_variants(worker, config):
+	"""
+	The variants a data source's search worker offers, if any
+
+	Variants let one data source appear as several cards on the create-dataset
+	page - see `Search.get_variants`. Only search workers can declare them, and
+	declaring them is optional, so anything that does not is simply a data
+	source without variants.
+
+	Whatever this reads is extension code that may be talking to a server that
+	is not answering, so a worker that raises is treated as having no variants
+	rather than taking the page down with it.
+
+	:param worker:  Search worker class
+	:param config:  Configuration reader
+	:return dict:  Variants by ID; empty if there are none
+	"""
+	getter = getattr(worker, "get_variants", None)
+	if not getter:
+		return {}
+
+	try:
+		return getter(config=config) or {}
+	except Exception as e:
+		g.log.warning("Could not read variants for data source worker %s (%s: %s)" %
+					  (getattr(worker, "type", "unknown"), type(e).__name__, e))
+		return {}
+
+
+def datasource_worker_options(worker, config, variant=None):
+	"""
+	A data source's dataset parameters, for the variant that was picked
+
+	The `variant` argument is only passed on to workers that actually declare
+	variants, so a data source that knows nothing about them keeps the
+	`get_options()` signature it always had.
+
+	:param worker:  Search worker class
+	:param config:  Configuration reader
+	:param str variant:  Variant ID, or None
+	:return dict:  Options, as `get_options()` returns them
+	"""
+	if variant and datasource_variants(worker, config):
+		return worker.get_options(None, config, variant=variant)
+
+	return worker.get_options(None, config)
+
+
 def module_request_url(kind):
 	"""
 	Link to the GitHub issue form for requesting a new module

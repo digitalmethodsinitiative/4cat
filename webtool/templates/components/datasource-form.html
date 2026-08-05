@@ -12,6 +12,9 @@
       enctype="multipart/form-data" x-data="userinputForm">
 
     <input type="hidden" name="datasource" value="{{ datasource_id }}">
+    {# which variant of the data source these options are for, if it has any;
+       the options were built for it, so the query has to be submitted with it #}
+    {% if variant %}<input type="hidden" name="variant" value="{{ variant }}">{% endif %}
 
     <fieldset class="query-options userinput-form" data-datasource="{{ datasource_id }}">
         {{ options_html|safe }}
