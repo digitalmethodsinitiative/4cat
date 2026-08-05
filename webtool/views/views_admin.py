@@ -721,6 +721,12 @@ def manipulate_settings():
     options = {}
     changed_categories = set()
 
+    # what last declared each setting, used to group settings by where they come
+    # from rather than by guessing from their name
+    declarations = g.config.get_declarations()
+    datasource_workers = {f"{datasource}-{suffix}" for datasource in g.modules.datasources
+                          for suffix in ("search", "import")}
+
     # sorted so that settings which sort equally below still come out in the same
     # order on every request
     for option in sorted({*all_settings.keys(), *definition.keys()}):
@@ -733,24 +739,52 @@ def manipulate_settings():
         if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
             current_value = json.dumps(current_value)
 
+        if option not in definition:
+            # in the database, but nothing declares it, so there is no type to
+            # validate against and no telling what the value is meant to be.
+            declared = declarations.get(option, {})
+            if declared.get("owner_kind") == "extension":
+                # an extension that is not loaded - uninstalled, or installed
+                # but switched off. Its settings are kept so that bringing it
+                # back restores them, but they are not 4CAT's to show meanwhile.
+                continue
+
+            options[option] = {
+                # shown, not offered for editing: an editable field would have
+                # to guess a type, and saving the form would then write plain
+                # text over a value that may be JSON. OPTION_INFO is skipped by
+                # UserInput.parse_all(), so saving cannot touch these at all.
+                "type": UserInput.OPTION_INFO,
+                "help": f"**`{option}`** - currently stored as `{json.dumps(all_settings.get(option))}`"
+                        + (f", last declared by `{declared['declared_by']}`" if declared.get("declared_by") else
+                           ", with no record of anything ever declaring it"),
+                "submenu": "unrecognised",
+                "category": "unrecognised",
+                "tabname": "Unrecognised",
+                "is_changed": False
+            }
+            continue
+
         # which tab a setting appears under. A setting may name its own category,
         # which is how settings declared across several modules end up in one
         # tab; if it does not, the first part of its name is used.
-        category = definition.get(option, {}).get("category") or option.split(".")[0]
+        category = definition[option].get("category") or option.split(".")[0]
 
-        submenu = "other"
-        if category in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
-                                    "logging", "ui", "extensions"):
+        declared_by = g.config.setting_provenance.get(option, {})
+        if declared_by.get("kind") == "extension":
+            submenu = "extensions"
+        elif not declared_by:
+            # not declared by a module, so it comes from config_definition.py
             submenu = "core"
-        elif category.endswith("-search"):
+        elif declared_by.get("declared_by") in datasource_workers:
             submenu = "datasources"
-        elif category in g.modules.processors:
+        else:
             submenu = "processors"
 
         # a setting may also supply its own label, which is the only way a
         # category that core does not know about can be named - core's category
         # list cannot be added to from an extension
-        tabname = definition.get(option, {}).get("category_label")
+        tabname = definition[option].get("category_label")
         if not tabname:
             tabname = config_definition.categories.get(category)
         if not tabname:
@@ -759,11 +793,7 @@ def manipulate_settings():
             tabname = category
 
         options[option] = {
-            **definition.get(option, {
-                "type": UserInput.OPTION_TEXT,
-                "help": option,
-                "default": all_settings.get(option)
-            }),
+            **definition[option],
             "submenu": submenu,
             "default": current_value,  # override default so this is the value displayed in the web UI
             "original_default": default,  # but also save the actual default

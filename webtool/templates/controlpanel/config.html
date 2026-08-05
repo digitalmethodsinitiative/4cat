@@ -25,8 +25,9 @@
             <form action="{{ url_for("admin.manipulate_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
                 <nav class="tab-controls settings">
                     <input type="hidden" name="current-tab" value="{{ current_tab }}">
-                    {% for submenu in ("core", "datasources", "processors", "other") %}
-                    <h3>{{ {"core": "4CAT Core", "datasources": "Data sources", "processors": "Processors", "other": "Other"}[submenu] }}</h3>
+                    {% for submenu in ("core", "datasources", "processors", "extensions", "unrecognised") %}
+                    {% if options.values() | selectattr("submenu", "equalto", submenu) | list %}
+                    <h3>{{ {"core": "4CAT Core", "datasources": "Data sources", "processors": "Processors", "extensions": "Extensions", "unrecognised": "Unrecognised"}[submenu] }}</h3>
                     <ul>
                         {% set tab.name = '' %}
                         {% for option in options if options[option].submenu == submenu %}
@@ -42,6 +43,7 @@
                             {% endif %}
                         {% endfor %}
                     </ul>
+                    {% endif %}
                     {% endfor %}
                 </nav>
 

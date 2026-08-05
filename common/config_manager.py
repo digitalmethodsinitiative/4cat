@@ -414,6 +414,20 @@ class ConfigManager(BaseConfigReader):
 
         return len(declarations)
 
+    def get_declarations(self):
+        """
+        What was last recorded declaring each setting
+
+        Cheap enough to call while rendering a page, unlike `audit_settings()`,
+        which also works out how long things have been missing and which
+        extensions are on disk.
+
+        :return dict:  Declaration rows, by setting name
+        """
+        self.with_db()
+
+        return {row["name"]: row for row in self.db.fetchall("SELECT * FROM settings_declarations")}
+
     def audit_settings(self):
         """
         Find settings in the database that nothing currently declares
