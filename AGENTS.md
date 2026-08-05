@@ -61,6 +61,8 @@ FourcatModule (common/lib/fourcat_module.py)
 
 ### Database Schema (key tables in `backend/database.sql`)
 - `settings` — key-value config store (name, value, tag).
+- `settings_declarations` — which module last declared each setting, and when it was last seen declared. A setting in `settings` with no row here is one nothing currently declares; that is not enough to remove it, since its extension may merely be uninstalled or disabled.
+- `settings_archive` — settings removed from `settings` are moved here rather than deleted, so removal is reversible.
 - `jobs` — job queue (jobtype, remote_id, timestamps, interval for recurring).
 - `datasets` — all datasets (key, type, key_parent for chaining, parameters as JSON, result_file, status, progress, etc.).
 - `datasets_owners` — many-to-many user-dataset ownership.
@@ -113,7 +115,9 @@ Invocation (the plain `docker compose` command uses `docker-compose.yml`):
 ## Configuration
 - **INI-based** (`config/config.ini`): Primary runtime config, read by `ConfigManager`. Docker's `docker_setup.py` syncs environment variables into this file.
 - **Database**: The `settings` table stores runtime-configurable settings (name/value/tag). `ConfigManager` reads from both INI and database, with memcached caching.
-- **Module config**: Module-defined `config` dicts (on worker classes) are collected by `ModuleCollector` at startup and cached to `config/module_config.bin`.
+- **Module config**: Module-defined `config` dicts (on worker classes) are collected by `ModuleCollector` at startup and cached to `config/module_config.bin`, with which module declared what in `config/module_config_provenance.bin` alongside it. The two files are deliberately separate: the first is merged straight into the config definition by every reader, including a front-end container that may still be running older code, so its shape is frozen — do not combine them. **Because these are caches written at start-up, a change to a module's `config` needs a back-end restart before it is visible.**
+- **Setting declarations**: a module may not redeclare a setting core already defines, or use a namespace reserved for core (`privileges.`, `flask.`, `4cat.`, `path.`, `datasources.`, `extensions.`, `logging.`). Such declarations are refused, not merged, because a definition controls a setting's `global` flag, `default` and `type`. See `ModuleCollector.collect_module_config()`.
+- **Start-up order**: `config.ensure_database()` runs *before* `ModuleCollector` in `backend/bootstrap.py`, because the collector reads `extensions.enabled` and `datasources.expiration` from the database. It therefore only ever sees the previous boot's module cache. Anything that needs the current module set — such as recording declarations — has to be a separate pass after the collector, not folded into `ensure_database()`.
 - **Legacy**: `config.py` in the repo root contains some legacy constants. Prefer `ConfigManager` / `config.ini` patterns.
 - **Extensions**: Installed under `config/extensions/`. Each extension can include its own `requirements.txt` (auto-installed by `setup.py`). Enabled/disabled via `extensions.enabled` setting.
 
