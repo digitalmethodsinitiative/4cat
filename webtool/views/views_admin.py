@@ -672,24 +672,6 @@ def manage_unused_settings():
                            flashes=get_flashed_messages())
 
 
-def setting_sort_position(option, settings, undeclared_position):
-    """
-    Where a setting goes in the settings interface
-
-    Settings are grouped by tab, and within a tab they appear in the order they
-    are written in the config definition. A setting that is in the database but
-    declared nowhere has no place in that order, so `undeclared_position` puts
-    it at the end. The name is only a tiebreak, so the order does not change
-    between requests.
-
-    :param str option:  Setting name
-    :param dict settings:  Setting definition, as prepared for the interface
-    :param int undeclared_position:  Position for settings nothing declares
-    :return tuple:  Sort key
-    """
-    return (settings["tabname"], settings.get("config_order", undeclared_position), option)
-
-
 @component.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
@@ -845,11 +827,11 @@ def manipulate_settings():
         options[k]["config_order"] = config_order
         config_order += 1
 
-    undeclared = len(definition) + 1
-
+    # grouped by tab, then in definition order. The name is only a tiebreak, so
+    # the order does not change between requests.
     options = {
         k: options[k]
-        for k in sorted(options, key=lambda o: setting_sort_position(o, options[o], undeclared))
+        for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o]["config_order"], o))
         if not options[k].get("indirect")
     }
 

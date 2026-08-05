@@ -406,6 +406,22 @@ def test_datasources(logger, fourcat_modules, mock_job, mock_job_queue, mock_dat
         logger.info("All datasources passed successfully.")
 
 
+@pytest.mark.dependency(depends=["test_module_collector"])
+def test_datasource_metadata_declares_no_config(fourcat_modules):
+    """
+    Datasource settings are declared on the datasource's search/import worker
+    class, which ModuleCollector collects along with every other worker. There is
+    no second route: a `config` on the datasource package itself is never read,
+    so a datasource declaring its settings there would have them silently
+    ignored.
+    """
+    with_config = [name for name, meta in fourcat_modules.datasources.items() if "config" in meta]
+    assert not with_config, (
+        "Datasource metadata should not carry a 'config' key - settings belong on the search/import "
+        f"worker class, which is collected already. Found on: {sorted(with_config)}"
+    )
+
+
 def test_dataset_finish_raises_on_double_finish(mock_dataset):
     """
     Regression guard for common/lib/dataset.py:986.
