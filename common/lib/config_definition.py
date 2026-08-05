@@ -223,6 +223,15 @@ config_definition = {
                    "should be no need to change this manually.",
         "global": True
     },
+    "4cat.report_orphan_settings": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Report undeclared settings",
+        "tooltip": "Notify admins when the database holds settings that nothing declares any more. Off by default: "
+                   "these are harmless to leave in place, and the notification is mainly useful to people developing "
+                   "4CAT or its extensions. Nothing is ever removed automatically either way.",
+        "global": True
+    },
     "4cat.declarations_last_clean_scan": {
         "type": UserInput.OPTION_TEXT,
         "default": 0,

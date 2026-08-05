@@ -41,6 +41,9 @@ class ConfigManager(BaseConfigReader):
     # cache file; empty on an instance whose back-end has not written one yet.
     setting_provenance = {}
     setting_collisions = []
+    # how long a setting must go undeclared, across complete scans, before the
+    # audit will call it removed rather than merely unseen
+    ORPHAN_GRACE_PERIOD = 7 * 86400
     # Thread-local storage for a singleton memcache client per thread.
     # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
     _memcache_tls = threading.local()
@@ -410,6 +413,102 @@ class ConfigManager(BaseConfigReader):
         self.db.commit()
 
         return len(declarations)
+
+    def audit_settings(self):
+        """
+        Find settings in the database that nothing currently declares
+
+        Every setting is put in one of five states. Only `vanished` is ever a
+        candidate for removal, and even that is offered to a person rather than
+        acted on:
+
+        - `dormant`: declared by an extension that is installed. It may be
+          switched off, in which case its settings are not declared this boot,
+          but they must survive so that switching it back on restores it.
+        - `absent_extension`: declared by an extension that is not installed.
+          Re-installing it must restore the previous configuration, so these are
+          kept indefinitely.
+        - `vanished`: last declared by core, and not seen for long enough that a
+          run of complete scans has passed without it.
+        - `recently_absent`: last declared by core and not seen now, but not for
+          long enough to be sure. Also everything, whatever its age, when the
+          most recent boot was incomplete.
+        - `unknown`: nothing ever recorded declaring it. Pre-dates this record
+          keeping, or was written directly. Never a candidate, because there is
+          no evidence either way.
+
+        Age is measured against the last *complete* scan rather than the clock.
+        While a module fails to import, that marker stops advancing, so nothing
+        can age into looking removed just because 4CAT is currently unable to
+        see it.
+
+        :return dict:  `scan_is_current` (was the most recent boot complete),
+        `last_clean_scan`, and `findings`, a list of undeclared settings
+        """
+        self.with_db()
+
+        last_clean_scan = self.get("4cat.declarations_last_clean_scan") or 0
+        latest = self.db.fetchone("SELECT MAX(last_seen) AS seen FROM settings_declarations")
+        latest_scan = (latest["seen"] if latest else 0) or 0
+
+        # last_seen advances on every boot, the clean-scan marker only on boots
+        # where every module imported. If the two differ, the most recent boot
+        # was incomplete.
+        scan_is_current = bool(last_clean_scan) and latest_scan <= last_clean_scan
+
+        # imported here rather than at the top of the module: helpers builds a
+        # CoreConfigManager when it loads, so importing it there is circular
+        from common.lib.helpers import find_extensions
+        installed, _ = find_extensions()
+
+        rows = self.db.fetchall("""
+            SELECT s.name, s.tag, s.value, d.declared_by, d.owner_kind, d.extension_id, d.last_seen, d.last_definition
+              FROM settings s
+              LEFT JOIN settings_declarations d ON s.name = d.name
+             ORDER BY s.name, s.tag
+        """)
+
+        occurrences = {}
+        for row in rows:
+            occurrences.setdefault(row["name"], []).append(row)
+
+        findings = []
+        for name, stored in occurrences.items():
+            if name in self.config_definition:
+                # declared right now, nothing to say about it
+                continue
+
+            record = stored[0]
+            if not record["declared_by"]:
+                state = "unknown"
+            elif record["owner_kind"] == "extension":
+                state = "dormant" if record["extension_id"] in installed else "absent_extension"
+            elif not scan_is_current:
+                state = "recently_absent"
+            elif (last_clean_scan - (record["last_seen"] or 0)) > self.ORPHAN_GRACE_PERIOD:
+                state = "vanished"
+            else:
+                state = "recently_absent"
+
+            findings.append({
+                "name": name,
+                "state": state,
+                "declared_by": record["declared_by"],
+                "extension_id": record["extension_id"],
+                "last_seen": record["last_seen"],
+                "tags": [row["tag"] for row in stored],
+                # ensure_database() only ever writes the global tag, so a value
+                # stored against a tag was put there by a person. There is no
+                # equivalent signal for the global value: every declared setting
+                # gets a row whether or not anyone ever set it.
+                "has_tag_override": any(row["tag"] for row in stored)
+            })
+
+        return {
+            "scan_is_current": scan_is_current,
+            "last_clean_scan": last_clean_scan,
+            "findings": findings
+        }
 
     def get_all_setting_names(self, with_core=True):
         """
