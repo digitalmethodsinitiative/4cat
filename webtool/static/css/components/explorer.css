@@ -4,7 +4,7 @@
    reaches inside one. */
 
 #explorer-pane {
-    margin-top: var(--spacing-regular);
+    margin: var(--spacing-regular);
 }
 
 .explorer-pane {
@@ -64,8 +64,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--spacing-regular);
-    margin-top: var(--spacing-large);
-    padding-top: var(--spacing-regular);
     border-top: var(--stroke-light) dashed var(--panel-bg-2);
 }
 

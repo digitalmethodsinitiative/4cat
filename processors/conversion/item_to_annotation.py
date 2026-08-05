@@ -21,7 +21,7 @@ class ItemToAnnotation(BasicProcessor):
     filter = True  # to indicate we're filtering the top dataset
     description = ProcessorDescription(
         title="Convert items to annotations",
-        tags=["conversion", "annotations", "override"],
+        tags=["conversion", "annotation", "override"],
         description="Convert values from selected columns into annotations on the parent dataset, shown as separate values in the Explorer. Only values that are numbers or strings are converted.",
         icon="tags",
     )

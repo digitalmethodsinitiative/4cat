@@ -238,3 +238,8 @@ textarea.item-annotation-input {
 .annotation-state.is-error {
     color: var(--red);
 }
+
+#explorer-spinner {
+    margin-top: var(--spacing-large);
+    border: none;
+}

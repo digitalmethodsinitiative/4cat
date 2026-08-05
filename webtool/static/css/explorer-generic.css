@@ -14,10 +14,15 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
 /** --------------------- *
      items
   * --------------------- */
+#explorer-items {
+    padding: var(--spacing-regular);
+}
 .item {
     font-family: Roboto, sans-serif;
     list-style: none;
     padding: 0;
+    font-size: var(--font-normal);
+    border-radius: var(--radius);
 }
 
 .items li.item {
@@ -168,6 +173,11 @@ span.divider {
 }
 
 /* Annotations */
+.item-annotations {
+    background-color: var(--panel-bg-1);
+    padding: var(--spacing-regular);
+    border: var(--radius);
+}
 .item-annotation .annotation-label {
     min-width: 10rem;
 }

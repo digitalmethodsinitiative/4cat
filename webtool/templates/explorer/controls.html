@@ -16,15 +16,9 @@
         </ul>
     </div>
     <div class="panel-header-controls">
-        <form class="explorer-sort"
-              hx-get="{{ url_for('explorer.explorer_items', key=dataset.key) }}"
-              hx-trigger="change"
-              hx-target="#explorer-body"
-              hx-swap="innerHTML"
-              hx-indicator="#explorer-spinner">
+        <form class="explorer-sort">
             <ul>
                 <li>
-                    <label for="explorer-sort-column">Sort by</label>
                     <select id="explorer-sort-column" name="sort" {% if sorting_disabled %}disabled{% endif %}>
                         <option value="dataset-order">Dataset order</option>
                         <option disabled>&mdash; columns &mdash;</option>
@@ -42,6 +36,15 @@
                 {% if sorting_disabled %}
                     <li><span class="explorer-note" x-tooltip="Sorting is unavailable for datasets over {{ max_items|commafy }} items">
                         <i class="fa fa-circle-info" aria-hidden="true"></i></span></li>
+                {% else %}
+                    <li><button
+                            class="button-like"
+                            hx-get="{{ url_for('explorer.explorer_items', key=dataset.key) }}"
+                            hx-trigger="click"
+                            hx-target="#explorer-body"
+                            hx-swap="innerHTML"
+                            hx-indicator="#explorer-spinner"
+                    >Sort</button></li>
                 {% endif %}
             </ul>
         </form>

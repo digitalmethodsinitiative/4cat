@@ -29,3 +29,7 @@
 .plain-page #main-content p a:active {
     border-bottom: 3px solid;
 }
+
+.plain-page #main-content .notice {
+    padding: var(--spacing-regular);
+}

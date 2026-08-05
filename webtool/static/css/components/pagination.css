@@ -56,6 +56,5 @@
 /* the copy above a long list, which sits directly under that list's header and
    needs to be told apart from it */
 .pagination.above {
-    margin-bottom: var(--spacing-regular);
     border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
 }
