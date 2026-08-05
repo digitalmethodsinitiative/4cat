@@ -7,6 +7,11 @@
 # Settings already in the database that nothing declares stay unattributed on
 # purpose - guessing an owner from a name prefix would be inventing provenance
 # we do not have, and unattributed is the class that is never auto-removed.
+#
+# It then clears out a hand-checked list of core settings for features 4CAT no
+# longer has. Those cannot be found automatically for the reason above, so the
+# list is written out below with what became of each one.
+import time
 import sys
 import os
 
@@ -62,6 +67,84 @@ CREATE TABLE IF NOT EXISTS settings_archive (
 """)
 
 db.commit()
+
+# Core settings that 4CAT no longer has, with what became of each. 
+# This is a hand-checked list, because the settings provenance system 
+# is only being built now.
+#
+# Only settings that were part of 4CAT itself are listed. Settings belonging to
+# an extension are never removed by 4CAT, even when the extension has renamed
+# them, because the extension may be re-installed at any version.
+RETIRED_CORE_SETTINGS = {
+    # renamed in the Explorer revamp (#428, 6268a5d71)
+    "datasources._intro": "renamed to datasources.intro",
+    "datasources._intro2": "renamed to datasources.intro2",
+
+    # renamed in 'Pre-Ruff stuff' (#503)
+    "4cat.access_request_limit": "renamed to 4cat.allow_access_request_limiter",
+
+    # the option to serve results over the old-style links went away in
+    # 'remove now unused 4CAT config setting, remove show_' (2026-04-28)
+    # i.e. me developing stuff I immediately removed...
+    "4cat.allow_legacy_result_links": "feature removed",
+    "privileges.allow_legacy_result_links": "feature removed",
+
+    # the datasource scheduler was taken out again in 'excise scheduler merge'
+    # (2024-08-29)
+    "privileges.can_schedule_datasources": "feature removed",
+
+    # the Reddit datasource is no longer part of 4CAT
+    "api.reddit.client_id": "datasource removed",
+    "api.reddit.secret": "datasource removed",
+    "reddit-search.can_query_without_keyword": "datasource removed",
+
+    # removed with the 'annotate with LLMs' processor in 450242e77 (2025-09-29),
+    # which is to be rebuilt on top of llm-prompter.
+    "dmi-service-manager.stormtrooper_enabled": "processor removed, to be rebuilt as llm-prompter",
+    "dmi-service-manager.stormtrooper_intro-1": "processor removed, to be rebuilt as llm-prompter",
+    "dmi-service-manager.stormtrooper_models": "processor removed, to be rebuilt as llm-prompter",
+
+    # per-processor proxy settings gave way to the 4CAT-wide proxy pool
+    # (#487, 2025-06-10). processors/metrics/url_titles.py declared these
+    "url-metadata.proxies": "superseded by the 4CAT-wide proxy pool",
+    "url-metadata.proxies.wait": "superseded by the 4CAT-wide proxy pool",
+
+    # processors/visualisation/download_telegram_files.py takes an amount per
+    # run now, rather than reading a configured maximum
+    "file-downloader-telegram.max_files": "replaced by a per-run option",
+
+    # the VK datasource asks for credentials per query and declares no settings
+    # (these might only have be my dev settings, but I am not positive)
+    "vk.a_info": "datasource declares no settings",
+    "vk.app_id": "datasource declares no settings",
+    "vk.client_secret": "datasource declares no settings",
+}
+
+print("  Archiving settings for features 4CAT no longer has...")
+archived = 0
+for setting, reason in RETIRED_CORE_SETTINGS.items():
+    stored = db.fetchall("SELECT * FROM settings WHERE name = %s", (setting,))
+    if not stored:
+        continue
+
+    for row in stored:
+        # moved rather than deleted, so a wrong call here can be undone from the
+        # settings panel instead of costing whatever was configured
+        db.insert("settings_archive", {
+            "name": row["name"],
+            "value": row["value"],
+            "tag": row["tag"],
+            "declared_by": None,
+            "archived_at": int(time.time()),
+            "archived_by": "migrate-1.56-1.57"
+        }, commit=False)
+
+    db.delete("settings", where={"name": setting}, commit=False)
+    archived += len(stored)
+    print(f"    {setting} ({reason})")
+
+db.commit()
+print(f"  {archived} stored value(s) archived. They can be restored from the settings panel.")
 
 known = db.fetchone("SELECT COUNT(DISTINCT name) AS num FROM settings")
 print(f"  {known['num']} settings in the database; they will be attributed on the next back-end boot.")
