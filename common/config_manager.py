@@ -579,30 +579,33 @@ class ConfigManager(BaseConfigReader):
             # only allowed for vanished settings.
             raise ValueError(f"Setting '{name}' cannot be archived: {self.ARCHIVE_REFUSALS[finding['state']]}")
 
-        now = int(time.time())
-        stored = self.db.fetchall("SELECT * FROM settings WHERE name = %s", (name,))
-        for row in stored:
-            # upsert, not insert: a setting can be archived, come back because
-            # something declares it again, and be archived a second time. Two
-            # rows for one (name, tag) would leave restore_setting() picking
-            # between them arbitrarily and deleting the one it did not pick
-            self.db.upsert("settings_archive", {
-                "name": row["name"],
-                "value": row["value"],
-                "tag": row["tag"],
-                "declared_by": finding["declared_by"],
-                "archived_at": now,
-                "archived_by": archived_by
-            }, constraints=["name", "tag"], commit=False)
-
-        self.db.delete("settings", where={"name": name}, commit=False)
-        self.db.commit()
+        # one statement, so the move cannot be left half-done. The front-end
+        # shares a single database connection across all of its threads, and any
+        # other request served in between can commit it, roll it back, or
+        # reconnect out from under it - which for a separate delete and insert
+        # means losing the archived copy and keeping the delete.
+        # ON CONFLICT because a setting can be archived, come back because
+        # something declares it again, and be archived a second time; the newer
+        # copy replaces the older one rather than sitting alongside it.
+        moved = self.db.fetchall("""
+            WITH moved AS (
+                DELETE FROM settings WHERE name = %s RETURNING name, value, tag
+            )
+            INSERT INTO settings_archive (name, value, tag, declared_by, archived_at, archived_by)
+            SELECT name, value, tag, %s, %s, %s FROM moved
+            ON CONFLICT (name, tag) DO UPDATE SET
+                value = EXCLUDED.value,
+                declared_by = EXCLUDED.declared_by,
+                archived_at = EXCLUDED.archived_at,
+                archived_by = EXCLUDED.archived_by
+            RETURNING name
+        """, (name, finding["declared_by"], int(time.time()), archived_by))
 
         # values for this setting may be memcached under any tag, and there is
         # no list of which, so clear the lot
         self.clear_cache()
 
-        return len(stored)
+        return len(moved)
 
     def restore_setting(self, name):
         """
@@ -620,26 +623,30 @@ class ConfigManager(BaseConfigReader):
         """
         self.with_db()
 
-        archived = self.db.fetchall("SELECT * FROM settings_archive WHERE name = %s", (name,))
-        if not archived:
+        if not self.db.fetchone("SELECT 1 AS found FROM settings_archive WHERE name = %s", (name,)):
             raise ValueError(f"Setting '{name}' is not archived, so cannot be restored.")
 
         if self.db.fetchone("SELECT 1 AS found FROM settings WHERE name = %s", (name,)):
             raise ValueError(f"Setting '{name}' has a value stored again, and restoring would write over it. "
                              f"Archive that value first if you want the archived one back.")
 
-        for row in archived:
-            self.db.upsert("settings", {
-                "name": row["name"],
-                "value": row["value"],
-                "tag": row["tag"]
-            }, constraints=["name", "tag"], commit=False)
+        # as in archive_setting(), one statement so it cannot be left half-done.
+        # a plain INSERT rather than an upsert: the check above established that
+        # nothing is stored, so if something wrote the setting in between, the
+        # unique constraint fails the whole statement and the archived copy
+        # stays put - which is the safe way to lose that race
+        restored = self.db.fetchall("""
+            WITH moved AS (
+                DELETE FROM settings_archive WHERE name = %s RETURNING name, value, tag
+            )
+            INSERT INTO settings (name, value, tag)
+            SELECT name, value, tag FROM moved
+            RETURNING name
+        """, (name,))
 
-        self.db.delete("settings_archive", where={"name": name}, commit=False)
-        self.db.commit()
         self.clear_cache()
 
-        return len(archived)
+        return len(restored)
 
     def get_archived_settings(self):
         """
