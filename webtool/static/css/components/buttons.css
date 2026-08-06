@@ -276,3 +276,18 @@ button.toggle:focus-visible {
     outline: var(--stroke) solid var(--fourcat-accent);
     outline-offset: var(--stroke);
 }
+
+/* a toggle with nothing to switch to: still there, and still says what it
+   switches between, but greyed back so it does not invite the click */
+button.toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* a disabled button still matches :hover, so the preview of the side that
+   would be switched to has to be taken back - it is not going anywhere */
+button.toggle:disabled[aria-checked="true"]:hover > span:first-child,
+button.toggle:disabled[aria-checked="false"]:hover > span:last-child {
+    background: var(--semidark);
+    color: var(--button-grey);
+}

@@ -172,12 +172,13 @@ span.divider {
     width: 100%;
 }
 
-/* Annotations */
 .item-annotations {
     background-color: var(--panel-bg-1);
     padding: var(--spacing-regular);
     border: var(--radius);
+    margin-top: var(--spacing-regular);
 }
+/* Annotations */
 .item-annotation .annotation-label {
     min-width: 10rem;
 }

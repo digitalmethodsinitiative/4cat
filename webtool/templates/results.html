@@ -53,10 +53,13 @@
                             </li>
                         {% endif %}
                         <li>
+                            {# only what there is something to filter to: one option
+                               per data source these datasets were collected from,
+                               or per variant of one where it has them #}
                             <select name="datasource" aria-label="Filter by data source">
                                 <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data sources</option>
-                                {% for datasource in datasources %}
-                                    <option value="{{ datasource }}"{% if filter.datasource == datasource %} selected{% endif %}>{{ datasources[datasource].name }}</option>
+                                {% for value, label in datasource_options.items() %}
+                                    <option value="{{ value }}"{% if filter.datasource == value %} selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </li>
@@ -85,7 +88,7 @@
                 {% endif %}{% endfor %}
             </ol>
         {% else %}
-            <p class="banner">No datasets available.{% if depth == "favourites" %} You can mark datasets as 'favourite'
+            <p class="notice notice-warning">No datasets available.{% if depth == "favourites" %} You can mark datasets as 'favourite'
                 to easily find them in this view.{% endif %}</p>
         {% endif %}
         </section>

@@ -56,7 +56,16 @@
                 {% include "dataset-page/analysis-tree.html" %}
             </div>
 
-            {% if dataset.is_finished() and __user_config("privileges.can_use_explorer") %}
+            {# emitted whether or not the dataset is finished yet. A dataset
+               being created finishes while its page is open - the card polls
+               itself and swaps in the finished one, toggle and all - and only
+               the card and the analysis tree ride along on that swap. A pane
+               that was left out because the dataset was not ready when the page
+               was rendered would therefore never arrive, and flipping the
+               toggle would hide the analysis tree to show nothing. It is empty
+               and hidden until it is opened in any case, so there is nothing to
+               leave out. #}
+            {% if __user_config("privileges.can_use_explorer") %}
                 <div class="explorer-pane-host" x-show="exploring" x-cloak>
                     {# a pane the address already asks for fills itself on load,
                        rather than waiting for the toggle's event: that event is

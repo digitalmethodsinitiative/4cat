@@ -24,7 +24,7 @@
     color: var(--bright);
 }
 
-.dataset-metadata .badge-list, .dataset-metadata p.notice {
+.dataset-metadata .badge-list {
     background: var(--brighten-12);
     padding: var(--spacing-small) var(--spacing-regular);
     box-sizing: border-box;
@@ -50,12 +50,6 @@
     font-weight: normal;
 }
 
-.dataset-metadata p.notice {
-    font-variant: small-caps;
-    text-transform: lowercase;
-    margin: 0 auto;
-}
-
 .dataset-metadata p.notice a {
     text-decoration: underline;
 }
@@ -69,5 +63,14 @@
 }
 
 .dataset-metadata .analyze-or-explore {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
     margin-top: var(--spacing-regular);
+}
+
+/* why the toggle beside it cannot be flipped - see dataset-page/dataset-card.html */
+.explore-unavailable {
+    flex: 0 0 auto;
+    color: var(--semidark);
 }

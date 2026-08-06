@@ -89,6 +89,14 @@ def explorer_page_context(dataset: DataSet, page=1, sort="", reverse=False) -> d
     :param bool reverse:  Whether to sort descending
     :return dict:  Template context, or None if the page holds no items
     """
+    # a dataset that collected nothing is finished but has no results file to
+    # read - 'finished and empty' is a state of its own (see
+    # DataSet.check_dataset_finished), as is a dataset whose file has since been
+    # cleaned up. Neither is an error: there is nothing to show, which is what
+    # the Explorer says to a page past the end of a dataset as well.
+    if not dataset.get_results_path().exists():
+        return None
+
     items_per_page = g.config.get("explorer.posts_per_page", 50)
     max_items = g.config.get("explorer.max_posts", 500000)
     offset = (int(page) - 1) * items_per_page

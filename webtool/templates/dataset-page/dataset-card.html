@@ -167,18 +167,42 @@ included inside one.
     {# the Explorer is a pane on this page, so its controls only belong on the
        page that has it: the top-level card, not the cards in the analysis tree
        or on the dataset overview #}
-    {% if main_header and dataset.is_finished() and __user_config("privileges.can_use_explorer") %}
-        <dl class="badge-list annotation-fields">
-            {% include "explorer/annotation-fields-box.html" %}
-        </dl>
+    {% if main_header and __user_config("privileges.can_use_explorer") %}
+        {% if dataset.is_finished() %}
+            <dl class="badge-list annotation-fields">
+                {% include "explorer/annotation-fields-box.html" %}
+            </dl>
+        {% endif %}
+
+        {# there is nothing to explore until there are items to explore: a
+           dataset still being created has none yet, and one that finished
+           without collecting any never will. The toggle is shown either way,
+           inactive, rather than appearing once there is something - so it is
+           clear the Explorer is where it always is, and why it cannot be
+           opened right now #}
+        {% set unavailable = "" %}
+        {% if not dataset.is_finished() %}
+            {% set unavailable = "This dataset is still being created" %}
+        {% elif not dataset.num_rows %}
+            {% set unavailable = "This dataset collected no items, so there is nothing to explore or annotate" %}
+        {% endif %}
         <nav class="analyze-or-explore">
             <button type="button" class="toggle self-styled" role="switch"
                     aria-checked="{{ "true" if explore else "false" }}"
                     aria-label="Switch between analysing and annotating this dataset"
+                    {% if unavailable %}disabled{% endif %}
                     x-data="toggleButton" @click="flip()" :aria-checked="checked">
                 <span>Analyze</span>
                 <span>Explore &amp; Annotate</span>
             </button>
+            {% if unavailable %}
+                {# beside the toggle rather than on it: a disabled control does
+                   not report the pointer being over it, so a tooltip on the
+                   button itself would never show. Same arrangement as the
+                   Explorer's own sort control when sorting is unavailable #}
+                <span class="explore-unavailable" x-tooltip="{{ unavailable }}">
+                    <i class="fa fa-circle-info" aria-hidden="true"></i></span>
+            {% endif %}
         </nav>
     {% endif %}
 </section>

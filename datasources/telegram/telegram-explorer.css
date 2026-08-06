@@ -8,8 +8,6 @@
 }
 
 * {
-	font-size: 15px;
-	line-height: 1.4;
 }
 
 .explorer-content {
@@ -32,15 +30,20 @@
 	margin: 0 auto;
 }
 
+.items .item .item-container {
+	display: flex;
+	flex-direction: row;
+}
+
 .items .item .item-container.new-group {
 	margin-top: 6px;
 }
 
 /* Profile picture  */
 .items .item .profile-picture-container {
-	display: inline-block;
-	width: 60px;
-	vertical-align: top;
+	position: relative;
+	flex: 0 0 12%;
+	max-width: 12%;
 }
 
 .profile-picture {
@@ -49,7 +52,6 @@
 	width: 50px;
     height: 50px;
     line-height: 53px;
-    float: left;
     text-align: center;
 }
 
@@ -62,13 +64,11 @@
 
 /* item content */
 .items .item .item-content {
-	display: inline-block;
-	max-width: 80%;
+	flex: 1 1 auto;
+	min-width: 0;
 	list-style-type: none;
 	background-color: white;
 	border-radius: 5px 20px 20px 5px;
-	padding: 12px 17px;
-	z-index: -1;
 	overflow: hidden;
 }
 
@@ -84,10 +84,14 @@
 }
 
 .bubble-left {
-	position: relative;
-	margin-right: -5px;
-	float: right;
+	position: absolute;
+	top: 0;
+	right: -1px;
 	z-index: 0;
+}
+
+.item-content > div:not(.carousel-wrapper, .media-wrapper) {
+	padding: 12px 17px;
 }
 
 .author, .author a, .author a:hover {
@@ -95,12 +99,6 @@
 	color: #2984cd;
 	font-weight: bold;
 	text-decoration: none;
-}
-
-.items .item .body {
-	display: inline;
-	padding-top: 5px;
-	padding-bottom: 5px;
 }
 
 .items .item .body a {
@@ -119,7 +117,6 @@
 /* Media carousel */
 .carousel-wrapper {
     position: relative;
-	margin: -12px -17px 10px;
 	overflow: hidden; /* Ensures large media doesn't spill out */
 }
 
@@ -196,18 +193,20 @@
 
 .item-content .media-wrapper .no-media {
 	padding: 20px;
-	color: var(--gray-darker);
-	background-color: var(--gray);
+	background-color: var(--yellow-light);
+	color: var(--yellow);
 }
 
 .item-content .media-wrapper .no-media a {
-	color: var(--gray-darker);
+	background-color: var(--yellow-light);
+	color: var(--yellow);
 	text-decoration: none;
 	font-weight: bold;
 }
 
 /* Emoji reaction counts */
 .reactions {
+	padding: 0 3px;
 	margin-top: 3px;
 	margin-bottom: 3px;
 }
@@ -272,7 +271,7 @@
 	background-image: linear-gradient(#389ed5, #59c8e2);
     color: white;
     border-radius: 5px 20px 20px 5px;
-    margin-left: 63px;
+	margin-bottom: var(--spacing-regular);
 }
 
 .item-annotation {

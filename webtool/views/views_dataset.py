@@ -36,6 +36,65 @@ def available_datasources():
             metadata["has_worker"] and datasource in g.config.get("datasources.enabled", {})}
 
 
+def split_datasource_filter(value):
+    """
+    Read a data source filter value into what it selects
+
+    The dataset overview's data source filter is one `<select>`, so a value that
+    names a variant has to carry both the data source and the variant in one
+    string. A data source ID is a module directory name and so never contains a
+    colon; a variant ID is whatever the data source made up, so everything past
+    the first colon is the variant.
+
+    :param str value:  A filter value, as `datasource` or `datasource:variant`
+    :return tuple:  `(datasource, variant)`, with `variant` empty if there is none
+    """
+    datasource, _, variant = value.partition(":")
+    return datasource, variant
+
+
+def datasource_filter_options(pairs):
+    """
+    Name the data sources and variants a set of datasets came from
+
+    A data source that offers variants (see `Search.get_variants`) is one option
+    per variant rather than one option in total: the variant is what the data
+    was actually collected from, and so what someone filtering means. Variants
+    are named by asking the data source's own search worker, since only it knows
+    what they are called - and only for the data sources that have a dataset
+    with one, which on a 4CAT without variant-declaring extensions is none.
+
+    A data source outlives the module that made it, so anything no longer
+    installed is named by its ID: it is the only name left for it, and its
+    datasets are still there to be filtered to. Whether a data source has a
+    search worker is beside the point here - what is being filtered is datasets
+    that exist, not data sources one could collect from.
+
+    :param pairs:  `(datasource, variant)` pairs, `variant` empty if there is none
+    :return dict:  Option label by filter value, in no particular order
+    """
+    variant_titles = {}
+    for datasource in {datasource for datasource, variant in pairs if variant}:
+        # `-import` as well as `-search`: both name a data source's search
+        # worker (see AGENTS.md), and this only wants to read from whichever
+        # one this data source has
+        worker = g.modules.workers.get("%s-search" % datasource,
+                                       g.modules.workers.get("%s-import" % datasource))
+        if worker:
+            variant_titles[datasource] = datasource_variants(worker, g.config)
+
+    options = {}
+    for datasource, variant in pairs:
+        name = g.modules.datasources.get(datasource, {}).get("name") or datasource
+        if not variant:
+            options[datasource] = name
+        else:
+            title = variant_titles.get(datasource, {}).get(variant, {}).get("title") or variant
+            options["%s:%s" % (datasource, variant)] = "%s: %s" % (name, title)
+
+    return options
+
+
 def datasource_collector(datasource_id, metadata, worker):
     """
     What collects the data for a data source, for its card
@@ -245,6 +304,13 @@ def show_results(page):
     if filters["sort_by"] not in ("timestamp", "num_rows"):
         filters["sort_by"] = "timestamp"
 
+    # read back the way the filter itself writes it, so that a value typed into
+    # the address bar matches the option that stands for it and the option is
+    # shown as the one in force
+    if filters["datasource"] and filters["datasource"] != "all":
+        datasource, variant = split_datasource_filter(filters["datasource"])
+        filters["datasource"] = "%s:%s" % (datasource, variant) if variant else datasource
+
     if not request.args:
         filters["hide_empty"] = False
 
@@ -293,11 +359,33 @@ def show_results(page):
     if filters["hide_empty"]:
         where.append("num_rows > 0")
 
+    # what this listing actually holds datasets from, so that the filter offers
+    # what there is something to filter to rather than every data source 4CAT
+    # knows of. Read before the data source filter itself is added below, which
+    # would otherwise leave only the one already picked to pick.
+    used_datasources = [
+        (row["datasource"], row["variant"]) for row in g.db.fetchall(
+            "SELECT DISTINCT parameters::json->>'datasource' AS datasource, "
+            "parameters::json->>'variant' AS variant FROM datasets WHERE "
+            + " AND ".join(where), tuple(replacements))
+        if row["datasource"]
+    ]
+
     # not all datasets have a datasource defined, but that is fine, since if
     # we are looking for all datasources the query just excludes this part
     if filters["datasource"] and filters["datasource"] != "all":
+        datasource, variant = split_datasource_filter(filters["datasource"])
         where.append("parameters::json->>'datasource' = %s")
-        replacements.append(filters["datasource"])
+        replacements.append(datasource)
+        # an option stands for the datasets it was made from and no others: one
+        # naming a variant means that variant, and one naming a data source with
+        # no variant means the datasets that have none. Every core data source
+        # has none, so for those this is the same filter it always was.
+        if variant:
+            where.append("parameters::json->>'variant' = %s")
+            replacements.append(variant)
+        else:
+            where.append("parameters::json->>'variant' IS NULL")
 
     where = " AND ".join(where)
 
@@ -321,8 +409,14 @@ def show_results(page):
     favourites = [row["key"] for row in
                   g.db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
-                   metadata["has_worker"]}
+    datasource_options = datasource_filter_options(used_datasources)
+
+    # whatever is being filtered on now stays in the list even if nothing
+    # matches it any more, so that the filter can be changed and not only cleared
+    if filters["datasource"] and filters["datasource"] not in (*datasource_options, "all"):
+        datasource_options.update(datasource_filter_options([split_datasource_filter(filters["datasource"])]))
+
+    datasource_options = dict(sorted(datasource_options.items(), key=lambda option: option[1].lower()))
 
     breadcrumbs = [{
         "url": url_for("dataset.show_results"),
@@ -331,7 +425,7 @@ def show_results(page):
     # the dataset card names a dataset after the processor that made it, and
     # calls it deprecated when there is no such processor any more - so a page
     # rendering cards needs the processors, or every one of them looks defunct
-    return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
+    return render_template("results.html", filter=filters, depth=depth, datasource_options=datasource_options,
                            datasets=filtered, pagination=pagination, favourites=favourites, breadcrumbs=breadcrumbs,
                            processors=g.modules.processors)
 
@@ -579,7 +673,7 @@ def preview_items(key):
             g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
-    preview_size = 1000
+    preview_size = 100
     preview_bytes = (1024 * 1024 * 1)  # 1MB
 
     # json and ndjson can use mapped data for the preview or the raw json;
@@ -838,8 +932,12 @@ def show_result(key):
         }]
 
     # the dataset page opens on the Explorer when asked to - the Explorer's old
-    # address redirects here, and its page links push URLs of this shape
-    explore = request.args.get("view") == "explore"
+    # address redirects here, and its page links push URLs of this shape. Only
+    # when there is something to open, though: the toggle back to the analyses
+    # is inactive while there are no items to explore, so a page that opened on
+    # an Explorer it cannot fill would be a page with nothing on it and no way
+    # off it.
+    explore = request.args.get("view") == "explore" and dataset.is_finished() and dataset.num_rows > 0
 
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=g.modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
@@ -874,7 +972,8 @@ def dataset_card_component(key):
         # one still links to its overview
         datasources=g.modules.datasources,
         # the last poll of a finishing dataset renders the card with the
-        # annotation fields box in it, so it needs the same context
+        # annotation fields box and the Explorer toggle in it, so it needs the
+        # same context
         **annotation_context(dataset),
     )
 
