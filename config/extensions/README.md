@@ -63,13 +63,14 @@ Note that the `config` must be on the class, not on a data source's `__init__.py
 its search or import worker, which 4CAT collects along with every other worker.
 
 ### Naming
-Put your settings under a prefix of your own. The part before the first `.` decides which tab they appear under, so
-related settings sharing a prefix are grouped together. For new extensions, `extensions.<your extension id>.` is
-recommended, since it cannot collide with anything else.
+Put your settings under a prefix of your own. By default the part before the first `.` decides which tab they appear
+under, so related settings sharing a prefix are grouped together. Your extension's own id, as in the
+`my_extension.api_key` example above, is the safe choice - nothing else will be using it.
 
 Some namespaces are reserved for 4CAT itself, and a setting declared in one of them will be **refused**: `privileges.`,
 `flask.`, `4cat.`, `path.`, `datasources.`, `extensions.` and `logging.`. This is so that an extension cannot claim a
-name 4CAT might use in a future version, and thereby take over its definition.
+name 4CAT might use in a future version, and thereby take over its definition. Note that `extensions.` is among them
+despite how it reads: it belongs to 4CAT's own settings *about* extensions, not to your extension's settings.
 
 A setting that a 4CAT release already declares is also refused - 4CAT's own definition always wins. Where two extensions
 declare the same setting, the first one wins, and which is 'first' does not depend on the machine. Refusals are written
@@ -77,6 +78,20 @@ to the 4CAT log, so if a setting of yours does not show up, look there first.
 
 Several classes sharing a base class that declares `config` is fine: the setting is registered once, and inheriting it
 is not treated as a collision.
+
+### Where a setting appears
+A setting's tab is the part of its name before the first `.`, and that tab is listed under a heading matching where the
+setting was declared - 'Extensions' for anything an extension declares. Three optional keys override that:
+
+- `"category"` puts the setting in a named tab whatever its name is, which is how settings declared across several
+  classes end up in one place.
+- `"category_label"` titles that tab. Without one, 4CAT falls back to its own list of category names, then to the
+  category itself.
+- `"submenu"` lists the tab under a different heading: `core`, `datasources`, `processors` or `extensions`.
+
+The last two describe the *tab*, not the setting, so declaring either on any one setting applies to the whole tab and
+the first declaration wins. They are also the only way to name or place a tab 4CAT does not already know about, since
+its own category list cannot be added to from outside.
 
 ### Settings that your code writes
 If a setting holds something your worker maintains rather than something an administrator sets - a cache timestamp, a
