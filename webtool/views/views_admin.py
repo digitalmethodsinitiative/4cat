@@ -797,29 +797,45 @@ def manipulate_settings():
         else:
             submenu = "processors"
 
-        # a setting may also supply its own label, which is the only way a
-        # category that core does not know about can be named - core's category
-        # list cannot be added to from an extension
-        tabname = definition[option].get("category_label")
-        if not tabname:
-            tabname = config_definition.categories.get(category)
-        if not tabname:
-            tabname = modules.get(category)
-        if not tabname:
-            tabname = category
-
         options[option] = {
             **definition[option],
             "submenu": submenu,
             "default": current_value,  # override default so this is the value displayed in the web UI
             "original_default": default,  # but also save the actual default
             "category": category,
-            "tabname": tabname,
             "is_changed": is_changed
         }
 
         if tag and is_changed:
             changed_categories.add(category)
+
+    # A category is one tab, so its heading and its name belong to the category
+    # rather than to each setting in it, and are settled once here. A setting may
+    # declare `submenu` or `category_label` to place or name its tab - the only
+    # way to do either for a category core does not know about - and the first
+    # such declaration in definition order wins. Otherwise the heading follows
+    # whoever declares the settings, core first: a category core puts anything in
+    # is a 4CAT namespace, whatever else adds to it.
+    submenu_precedence = ("core", "extensions", "datasources", "processors")
+    category_meta = {}
+    for option in definition:
+        settings = options[option]
+        meta = category_meta.setdefault(settings["category"], {"submenu": None, "tabname": None, "derived": None})
+
+        if meta["submenu"] is None and definition[option].get("submenu") in submenu_precedence:
+            meta["submenu"] = definition[option]["submenu"]
+        if meta["tabname"] is None:
+            meta["tabname"] = definition[option].get("category_label")
+
+        if meta["derived"] is None or \
+                submenu_precedence.index(settings["submenu"]) < submenu_precedence.index(meta["derived"]):
+            meta["derived"] = settings["submenu"]
+
+    for settings in options.values():
+        meta = category_meta[settings["category"]]
+        settings["submenu"] = meta["submenu"] or meta["derived"]
+        settings["tabname"] = meta["tabname"] or config_definition.categories.get(settings["category"]) \
+            or modules.get(settings["category"]) or settings["category"]
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 
