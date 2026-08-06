@@ -202,6 +202,52 @@ def test_archiving_a_setting_in_use_is_refused(config):
     config.db.delete.assert_not_called()
 
 
+def test_restoring_over_a_live_value_is_refused(config):
+    """
+    Archiving is reversible because it moves rather than deletes. Restoring is
+    not: it writes over whatever is stored now, and there is no second archive
+    to undo that with. So it has to refuse when the setting is in use again.
+    """
+    config.clear_cache = MagicMock()
+    config.db.fetchone.return_value = {"found": 1}  # archived, and stored again
+
+    with pytest.raises(ValueError, match="write over"):
+        config.restore_setting("gone.setting")
+
+    config.db.fetchall.assert_not_called()
+
+
+def test_restoring_takes_only_the_tag_it_was_asked_for(config):
+    """
+    The archive lists one row per tag, each with its own Restore button, so
+    restoring has to take one and leave the others where they are.
+    """
+    config.clear_cache = MagicMock()
+    config.db.fetchone.side_effect = [{"found": 1}, None]  # archived; not in use
+    config.db.fetchall.return_value = [{"name": "gone.setting"}]
+
+    assert config.restore_setting("gone.setting", tag="researchers") == 1
+
+    query, replacements = config.db.fetchall.call_args[0]
+    assert "name = %s AND tag = %s" in query
+    assert replacements == ("gone.setting", "researchers")
+
+
+def test_restoring_without_a_tag_takes_every_tag(config):
+    """
+    No tag means the whole setting, which is what archive_setting() put there.
+    """
+    config.clear_cache = MagicMock()
+    config.db.fetchone.side_effect = [{"found": 1}, None]
+    config.db.fetchall.return_value = [{"name": "gone.setting"}, {"name": "gone.setting"}]
+
+    assert config.restore_setting("gone.setting") == 2
+
+    query, replacements = config.db.fetchall.call_args[0]
+    assert "tag = %s" not in query
+    assert replacements == ("gone.setting",)
+
+
 def test_archiving_moves_every_tag_in_one_statement(config):
     """
     A setting can hold a value per tag as well as globally, and all of them have

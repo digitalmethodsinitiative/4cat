@@ -634,7 +634,7 @@ class ConfigManager(BaseConfigReader):
 
         return len(moved)
 
-    def restore_setting(self, name):
+    def restore_setting(self, name, tag=None):
         """
         Put an archived setting back
 
@@ -644,16 +644,25 @@ class ConfigManager(BaseConfigReader):
         first if you want the older one back.
 
         :param str name:  Setting to restore
+        :param str tag:  Restore only the value archived against this tag; the
+        empty string is the global value. `None` restores every archived value
+        for the setting, which is what `archive_setting()` put there.
         :return int:  Number of stored values restored
         :raises ValueError:  If nothing was archived under this name, or the
         setting is in use again
         """
         self.with_db()
 
-        if not self.db.fetchone("SELECT 1 AS found FROM settings_archive WHERE name = %s", (name,)):
+        # fixed SQL either way, only the values are ever interpolated
+        conditions = "name = %s" if tag is None else "name = %s AND tag = %s"
+        replacements = (name,) if tag is None else (name, tag)
+
+        if not self.db.fetchone(f"SELECT 1 AS found FROM settings_archive WHERE {conditions}", replacements):
             raise ValueError(f"Setting '{name}' is not archived, so cannot be restored.")
 
-        if self.db.fetchone("SELECT 1 AS found FROM settings WHERE name = %s", (name,)):
+        # scoped the same way, so restoring one tag is not refused because a
+        # different tag happens to be in use
+        if self.db.fetchone(f"SELECT 1 AS found FROM settings WHERE {conditions}", replacements):
             raise ValueError(f"Setting '{name}' has a value stored again, and restoring would write over it. "
                              f"Archive that value first if you want the archived one back.")
 
@@ -662,14 +671,14 @@ class ConfigManager(BaseConfigReader):
         # nothing is stored, so if something wrote the setting in between, the
         # unique constraint fails the whole statement and the archived copy
         # stays put - which is the safe way to lose that race
-        restored = self.db.fetchall("""
+        restored = self.db.fetchall(f"""
             WITH moved AS (
-                DELETE FROM settings_archive WHERE name = %s RETURNING name, value, tag
+                DELETE FROM settings_archive WHERE {conditions} RETURNING name, value, tag
             )
             INSERT INTO settings (name, value, tag)
             SELECT name, value, tag FROM moved
             RETURNING name
-        """, (name,))
+        """, replacements)
 
         self.clear_cache()
 

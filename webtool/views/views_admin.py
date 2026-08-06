@@ -648,7 +648,9 @@ def manage_unused_settings():
         label = escape(name)
         try:
             if request.form.get("action") == "restore":
-                restored = g.config.restore_setting(name)
+                # the field is sent even for the global value, where it is
+                # empty - absent means every tag, empty means the global one
+                restored = g.config.restore_setting(name, tag=request.form.get("tag"))
                 flash(f"Restored {label} ({restored} stored value(s)).")
             else:
                 archived = g.config.archive_setting(name, archived_by=current_user.get_id())

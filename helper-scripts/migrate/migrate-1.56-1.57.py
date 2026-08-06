@@ -2,11 +2,14 @@
 # that nothing declares any more can be told apart from one whose extension is
 # merely uninstalled, disabled, or failed to import.
 #
-# Creates two tables. No back-fill: the declarations table is populated by the
-# back-end on its next boot, for everything that is actually declared then.
-# Settings already in the database that nothing declares stay unattributed on
-# purpose - guessing an owner from a name prefix would be inventing provenance
-# we do not have, and unattributed is the class that is never auto-removed.
+# Creates two tables. Almost no back-fill: the declarations table is populated
+# by the back-end on its next boot, for everything that is actually declared
+# then. Settings already in the database that nothing declares stay unattributed
+# on purpose - guessing an owner from a name prefix would be inventing
+# provenance we do not have, and unattributed is the class that is never
+# auto-removed. The exception is the retired core settings below, which are
+# attributed because we know what they were, and because an archived setting
+# with no declaration could never be archived again once restored.
 #
 # It then clears out a hand-checked list of core settings for features 4CAT no
 # longer has. Those cannot be found automatically for the reason above, so the
@@ -127,11 +130,23 @@ RETIRED_CORE_SETTINGS = {
 }
 
 print("  Archiving settings for features 4CAT no longer has...")
+now = int(time.time())
 archived = 0
 for setting, reason in RETIRED_CORE_SETTINGS.items():
     stored = db.fetchall("SELECT * FROM settings WHERE name = %s", (setting,))
     if not stored:
         continue
+
+    # every one of these was part of 4CAT itself, so record that before moving
+    # it aside. Without a declaration row, restoring one - if only to see what
+    # was configured - would bring it back as 'unknown', which the settings
+    # panel will not archive again: a one-way trip out of the archive.
+    db.insert("settings_declarations", {
+        "name": setting,
+        "declared_by": "core:config_definition",
+        "owner_kind": "core",
+        "absent_since": now
+    }, safe=True, commit=False)
 
     for row in stored:
         # moved rather than deleted, so a wrong call here can be undone from the
@@ -140,8 +155,8 @@ for setting, reason in RETIRED_CORE_SETTINGS.items():
             "name": row["name"],
             "value": row["value"],
             "tag": row["tag"],
-            "declared_by": None,
-            "archived_at": int(time.time()),
+            "declared_by": "core:config_definition",
+            "archived_at": now,
             "archived_by": "migrate-1.56-1.57"
         }, commit=False)
 

@@ -139,6 +139,8 @@
                             <td>
                                 <form action="{{ url_for("admin.manage_unused_settings") }}" method="POST" class="inline">
                                     <input type="hidden" name="setting" value="{{ row.name }}">
+                                    {# one row per tag, so restore only the one this button sits next to #}
+                                    <input type="hidden" name="tag" value="{{ row.tag }}">
                                     <input type="hidden" name="action" value="restore">
                                     <button><i class="fas fa-rotate-left" aria-hidden="true"></i> Restore</button>
                                 </form>
