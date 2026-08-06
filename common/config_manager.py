@@ -358,9 +358,17 @@ class ConfigManager(BaseConfigReader):
         Record which module declares each setting, and when it was last seen
 
         Run after the ModuleCollector, since it needs the provenance the
-        collector works out while loading modules. Every setting in the config
-        definition gets a row: module-declared ones are attributed to the worker
-        that declared them, everything else to core.
+        collector works out while loading modules. Every setting declared this
+        boot gets a row: module-declared ones are attributed to the worker that
+        declared them, core ones to `config_definition`.
+
+        Only settings that really were declared this boot are recorded.
+        `config_definition` is merged rather than rebuilt, so it can still hold
+        a setting from the *previous* boot's module cache - the boot right after
+        an extension is switched off is exactly that case, since the sidecar is
+        replaced wholesale but the definition is not. Recording those would
+        attribute them to core, wiping out the extension they belong to, and
+        they would end up offered for removal while the extension is merely off.
 
         A setting in the `settings` table with *no* row here is one that nothing
         currently declares. That alone is not grounds to remove it - it may
@@ -378,7 +386,13 @@ class ConfigManager(BaseConfigReader):
 
         declarations = []
         for setting, definition in self.config_definition.items():
-            declared = self.setting_provenance.get(setting, {})
+            declared = self.setting_provenance.get(setting)
+            if declared is None and setting not in config_definition:
+                # left over from the previous boot's module cache, not declared
+                # by anything now. Leave whatever was recorded for it alone.
+                continue
+
+            declared = declared or {}
 
             try:
                 # definitions can hold values JSON cannot represent (core has a
