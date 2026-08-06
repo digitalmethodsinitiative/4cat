@@ -85,15 +85,15 @@ def run(as_daemon=True, log_level="INFO"):
 	# record which module declares which setting. Has to happen here rather than
 	# in ensure_database() above, which runs before the modules are loaded and
 	# so only ever sees the previous boot's cache.
-	# both channels count. A datasource that fails to import is never walked for
-	# workers, so its settings go undeclared without anything reaching
-	# missing_modules - see ModuleCollector.failed_datasources.
-	incomplete = len(modules.missing_modules) + len(modules.failed_datasources)
+	# collection_failures() covers every way 4CAT can end up not seeing part of
+	# itself, not only modules that failed to import outright.
+	incomplete = modules.collection_failures()
 	recorded = config.record_declarations(degraded=bool(incomplete))
 	if incomplete:
-		log.warning(f"Recorded {recorded} setting declarations, but {incomplete} module(s) failed to import. Not "
-					f"marking this as a clean scan: settings belonging to the failed modules are unreachable, not "
-					f"obsolete, and must not age into looking removed.")
+		log.warning(f"Recorded {recorded} setting declarations, but {len(incomplete)} module(s) or setting(s) could "
+					f"not be loaded. Not marking this as a clean scan: settings belonging to them are unreachable, "
+					f"not obsolete, and must not age into looking removed. "
+					f"({'; '.join(f'{name}: {reason}' for name, reason in sorted(incomplete.items()))})")
 	else:
 		log.debug(f"Recorded {recorded} setting declarations.")
 

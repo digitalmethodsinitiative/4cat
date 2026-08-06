@@ -33,6 +33,9 @@ def collector():
     instance = object.__new__(ModuleCollector)
     instance.workers = {}
     instance.log_buffer = ""
+    instance.uncacheable_settings = {}
+    instance.missing_modules = {}
+    instance.failed_datasources = {}
 
     return instance
 
@@ -115,6 +118,58 @@ def test_inherited_config_is_not_a_collision(collector):
     assert module_config["selenium.browser"]["default"] == "firefox"
     assert provenance["selenium.browser"]["declared_by"] == "a-sub"
     assert provenance["selenium.browser"]["also_declared_by"] == ["b-sub"]
+
+
+def test_unpicklable_definition_makes_the_boot_incomplete(collector, tmp_path):
+    """
+    A definition that cannot be pickled is dropped rather than taking the
+    back-end down - core itself puts a lambda in one, so a module doing the same
+    is plausible.
+
+    But the setting is then missing from the definition while the module that
+    declares it is loaded and still reading it, which is indistinguishable from
+    the setting having been removed. So it has to register as a collection
+    failure, or the scan counts as clean and the setting ages into `vanished`
+    while it is very much in use.
+    """
+    collector.write_cache_file(tmp_path.joinpath("module_config.bin"),
+                               {"ok.setting": {"default": 1}, "bad.setting": {"coerce_type": lambda x: x}},
+                               drop_unpicklable=True)
+
+    with tmp_path.joinpath("module_config.bin").open("rb") as infile:
+        assert sorted(pickle.load(infile)) == ["ok.setting"]
+
+    assert "bad.setting" in collector.uncacheable_settings
+    assert "bad.setting" in collector.collection_failures(), (
+        "a dropped setting must make the boot count as incomplete"
+    )
+
+
+def test_sidecar_is_never_silently_pruned(collector, tmp_path):
+    """
+    Dropping a key to salvage the write is only ever right for the settings
+    cache. Doing it to the provenance sidecar would discard the entire
+    provenance map, so that has to fail loudly instead.
+    """
+    # pickle raises PicklingError for a module-level function and AttributeError
+    # for a local one, which is why write_cache_file catches broadly
+    with pytest.raises((pickle.PicklingError, AttributeError)):
+        collector.write_cache_file(tmp_path.joinpath("module_config_provenance.bin"),
+                                   {"format": 1, "provenance": {"a": lambda: 1}, "collisions": []})
+
+
+def test_unknown_submenu_is_reported_but_not_refused(collector):
+    """
+    `submenu` only decides which heading a tab is listed under. Losing a working
+    setting over a typo in an optional presentation key would be out of
+    proportion, but silently ignoring it leaves the author with no signal.
+    """
+    collector.workers = {"w": _worker({"my_ext.setting": {"default": 1, "submenu": "proccesors"}})}
+    module_config, _, collisions = collector.collect_module_config()
+
+    assert "my_ext.setting" in module_config
+    assert collisions == []
+    assert "proccesors" in collector.log_buffer
 
 
 def test_reads_legacy_cache_without_sidecar(tmp_path):

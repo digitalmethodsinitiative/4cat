@@ -39,6 +39,10 @@ class ModuleCollector:
     # added to self.datasources, so load_modules() never walks it for workers,
     # so its settings go undeclared without anything landing in missing_modules.
     failed_datasources = {}
+    # settings whose definition could not be pickled, so they are missing from
+    # the cache even though the module declaring them loaded fine. Same problem
+    # again: nothing else would notice they had gone.
+    uncacheable_settings = {}
     log_buffer = None
     config = None
 
@@ -90,7 +94,8 @@ class ModuleCollector:
             # goes in the sidecar, which has no legacy readers and can carry a
             # format version. Do not merge these back together: that would put
             # the combined shape back on the load-bearing path.
-            self.write_cache_file(config_path.joinpath("module_config.bin"), module_config)
+            self.write_cache_file(config_path.joinpath("module_config.bin"), module_config,
+                                  drop_unpicklable=True)
             self.write_cache_file(config_path.joinpath("module_config_provenance.bin"), {
                 "format": 1,
                 "provenance": provenance,
@@ -101,6 +106,28 @@ class ModuleCollector:
         # that turns a silently failed write into an error at boot rather than
         # a back-end running on default values.
         self.config.load_user_settings(require_module_config=write_cache)
+
+    def collection_failures(self):
+        """
+        Everything that stopped this collection from seeing all of 4CAT
+
+        Anything listed here means some settings went undeclared this boot even
+        though whatever owns them is installed and still reads them. That has to
+        keep the declaration scan from counting as complete, or those settings
+        age into looking obsolete while they are merely out of reach.
+
+        Ask here rather than adding up the registries at the call site, so a
+        newly-found way to lose part of 4CAT has one place to register itself.
+
+        :return dict:  Description by module or setting name, empty if all well
+        """
+        return {
+            **{name: f"module could not be imported: {reason}" for name, reason in self.missing_modules.items()},
+            **{name: f"data source could not be imported: {reason}" for name, reason in
+               self.failed_datasources.items()},
+            **{name: f"setting definition could not be cached for {where}" for name, where in
+               self.uncacheable_settings.items()}
+        }
 
     def collect_module_config(self):
         """
@@ -125,7 +152,7 @@ class ModuleCollector:
         """
         # safe to import here: config_definition pulls in user_input, neither of
         # which imports this module
-        from common.lib.config_definition import config_definition as core_definition
+        from common.lib.config_definition import config_definition as core_definition, submenus
 
         module_config = {}
         provenance = {}
@@ -168,6 +195,16 @@ class ModuleCollector:
                                         f"setting will not be registered and its declared definition is ignored.\n")
                     continue
 
+                # not a refusal - the setting is fine, only its placement is
+                # nonsense, and losing a working setting over a typo in an
+                # optional presentation key would be out of proportion. The
+                # settings panel falls back to working the tab out itself, so
+                # say so here or the author gets no signal at all.
+                if type(definition) is dict and definition.get("submenu") not in (None, *submenus):
+                    self.log_buffer += (f"Setting '{setting}' declared by {worker_type} asks for submenu "
+                                        f"'{definition['submenu']}', which is not one of {', '.join(submenus)}. The "
+                                        f"setting is registered, but its tab will be placed automatically.\n")
+
                 module_config[setting] = definition
                 provenance[setting] = {
                     "declared_by": worker_type,
@@ -180,44 +217,50 @@ class ModuleCollector:
 
         return module_config, provenance, collisions
 
-    def write_cache_file(self, path, data):
+    def write_cache_file(self, path, data, drop_unpicklable=False):
         """
         Pickle data to a file, atomically
 
         Written to a temporary file and moved into place, so a reader in the
         other container never sees a half-written file.
 
-        A module can declare a setting whose definition cannot be pickled - core
-        itself puts a lambda in one definition, so an extension doing the same is
-        plausible. Rather than take down the back-end at boot, the offending
-        settings are identified, dropped and reported.
-
         :param Path path:  File to write
         :param data:  Picklable data
+        :param bool drop_unpicklable:  For the settings cache only. A module can
+        declare a setting whose definition cannot be pickled - core itself puts
+        a lambda in one definition, so an extension doing the same is plausible.
+        Rather than take the back-end down at boot, those settings are dropped,
+        reported, and recorded in `uncacheable_settings` so the boot counts as
+        incomplete: they are missing from the definition while the module that
+        declares them is loaded and still reading them, which is exactly the
+        state that must not be mistaken for a setting having been removed.
+        Never pass this for the provenance sidecar, where dropping a key would
+        silently discard the whole provenance map.
         """
         try:
             payload = pickle.dumps(data)
         except Exception:
+            if not drop_unpicklable or type(data) is not dict:
+                raise
+
             # find the culprits so the log can name them, instead of failing
             # with a traceback that points only at this line
-            if type(data) is dict:
-                unpicklable = []
-                for key, value in data.items():
-                    try:
-                        pickle.dumps({key: value})
-                    except Exception:
-                        unpicklable.append(key)
+            unpicklable = []
+            for key, value in data.items():
+                try:
+                    pickle.dumps({key: value})
+                except Exception:
+                    unpicklable.append(key)
 
-                if unpicklable:
-                    self.log_buffer += (f"Could not cache these settings, they will be unavailable: "
-                                        f"{', '.join(sorted(unpicklable))}. Their definitions contain something that "
-                                        f"cannot be pickled (e.g. a lambda).\n")
-                    data = {k: v for k, v in data.items() if k not in unpicklable}
-                    payload = pickle.dumps(data)
-                else:
-                    raise
-            else:
+            if not unpicklable:
                 raise
+
+            self.log_buffer += (f"Could not cache these settings, they will be unavailable: "
+                                f"{', '.join(sorted(unpicklable))}. Their definitions contain something that "
+                                f"cannot be pickled (e.g. a lambda).\n")
+            self.uncacheable_settings.update({key: path.name for key in unpicklable})
+            data = {key: value for key, value in data.items() if key not in unpicklable}
+            payload = pickle.dumps(data)
 
         temp_path = path.with_name(path.name + ".tmp")
         with temp_path.open("wb") as outfile:

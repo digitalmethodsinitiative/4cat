@@ -793,6 +793,11 @@ config_definition = {
     }
 }
 
+# Headings the settings panel lists category tabs under, in precedence order:
+# where settings sharing a category disagree about which they belong to, the
+# earliest wins. A setting may name one with `submenu` in its definition.
+submenus = ("core", "extensions", "datasources", "processors")
+
 # These are used in the web interface for more readable names
 # Can't think of a better place to put them...
 categories = {

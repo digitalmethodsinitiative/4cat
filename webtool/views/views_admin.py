@@ -826,7 +826,7 @@ def manipulate_settings():
     # such declaration in definition order wins. Otherwise the heading follows
     # whoever declares the settings, core first: a category core puts anything in
     # is a 4CAT namespace, whatever else adds to it.
-    submenu_precedence = ("core", "extensions", "datasources", "processors")
+    submenu_precedence = config_definition.submenus
     category_meta = {}
     for option in definition:
         settings = options[option]
