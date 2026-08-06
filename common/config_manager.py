@@ -582,14 +582,18 @@ class ConfigManager(BaseConfigReader):
         now = int(time.time())
         stored = self.db.fetchall("SELECT * FROM settings WHERE name = %s", (name,))
         for row in stored:
-            self.db.insert("settings_archive", {
+            # upsert, not insert: a setting can be archived, come back because
+            # something declares it again, and be archived a second time. Two
+            # rows for one (name, tag) would leave restore_setting() picking
+            # between them arbitrarily and deleting the one it did not pick
+            self.db.upsert("settings_archive", {
                 "name": row["name"],
                 "value": row["value"],
                 "tag": row["tag"],
                 "declared_by": finding["declared_by"],
                 "archived_at": now,
                 "archived_by": archived_by
-            }, commit=False)
+            }, constraints=["name", "tag"], commit=False)
 
         self.db.delete("settings", where={"name": name}, commit=False)
         self.db.commit()
@@ -604,15 +608,25 @@ class ConfigManager(BaseConfigReader):
         """
         Put an archived setting back
 
+        Refused if the setting has a stored value again, because restoring
+        writes over it and - unlike archiving, which moves rather than deletes -
+        there would be nothing left to undo that with. Archive the current value
+        first if you want the older one back.
+
         :param str name:  Setting to restore
         :return int:  Number of stored values restored
-        :raises ValueError:  If nothing was archived under this name
+        :raises ValueError:  If nothing was archived under this name, or the
+        setting is in use again
         """
         self.with_db()
 
         archived = self.db.fetchall("SELECT * FROM settings_archive WHERE name = %s", (name,))
         if not archived:
             raise ValueError(f"Setting '{name}' is not archived, so cannot be restored.")
+
+        if self.db.fetchone("SELECT 1 AS found FROM settings WHERE name = %s", (name,)):
+            raise ValueError(f"Setting '{name}' has a value stored again, and restoring would write over it. "
+                             f"Archive that value first if you want the archived one back.")
 
         for row in archived:
             self.db.upsert("settings", {

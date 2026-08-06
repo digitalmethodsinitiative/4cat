@@ -42,6 +42,14 @@ CREATE TABLE IF NOT EXISTS settings_archive (
   archived_by            TEXT DEFAULT NULL
 );
 
+-- one archived value per setting per tag: archiving the same setting twice
+-- replaces the earlier copy, rather than leaving two rows that a restore would
+-- have to pick between arbitrarily and then delete the loser of
+CREATE UNIQUE INDEX IF NOT EXISTS unique_archived_setting
+  ON settings_archive (
+    name, tag
+  );
+
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
   id                     BIGSERIAL PRIMARY KEY,

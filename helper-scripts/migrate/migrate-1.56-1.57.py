@@ -66,6 +66,13 @@ CREATE TABLE IF NOT EXISTS settings_archive (
 );
 """)
 
+db.execute("""
+CREATE UNIQUE INDEX IF NOT EXISTS unique_archived_setting
+  ON settings_archive (
+    name, tag
+  );
+""")
+
 db.commit()
 
 # Core settings that 4CAT no longer has, with what became of each. 
