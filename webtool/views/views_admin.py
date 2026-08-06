@@ -757,7 +757,13 @@ def manipulate_settings():
     # from rather than by guessing from their name
     datasource_workers = {f"{datasource}-{suffix}" for datasource in g.modules.datasources
                           for suffix in ("search", "import")}
-    unused_settings = 0
+
+    # stored but not declared, so not shown on this page. The audit knows which
+    # of those are kept on purpose for an extension that is switched off or
+    # uninstalled; counting those as "no longer in use" would contradict the
+    # page this links to, which says they are deliberately kept.
+    unused_settings = len([finding for finding in g.config.audit_settings()["findings"]
+                           if finding["state"] not in ("dormant", "absent_extension")])
 
     # sorted so that settings which sort equally below still come out in the same
     # order on every request
@@ -778,7 +784,6 @@ def manipulate_settings():
             # would discard whatever was typed into it anyway, since it only
             # returns keys that are in the definition. Listed with their stored
             # value on the unused settings page instead.
-            unused_settings += 1
             continue
 
         # which tab a setting appears under. A setting may name its own category,

@@ -515,8 +515,10 @@ class ConfigManager(BaseConfigReader):
 
         # imported here rather than at the top of the module: helpers builds a
         # CoreConfigManager when it loads, so importing it there is circular
+        # only the names are needed, and collecting the metadata forks git once
+        # per extension - far too slow for something a page render calls
         from common.lib.helpers import find_extensions
-        installed, _ = find_extensions()
+        installed, _ = find_extensions(with_metadata=False)
 
         rows = self.db.fetchall("""
             SELECT s.name, s.tag, s.value, d.declared_by, d.owner_kind, d.extension_id, d.last_seen, d.absent_since
