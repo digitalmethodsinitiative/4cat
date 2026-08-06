@@ -786,12 +786,15 @@ def manipulate_settings():
         # tab; if it does not, the first part of its name is used.
         category = definition[option].get("category") or option.split(".")[0]
 
+        # a setting is core because core declares it, not because no module
+        # claimed it: provenance is absent for everything if the sidecar could
+        # not be read, and reading that as "all core" would put every setting
+        # under one heading.
         declared_by = g.config.setting_provenance.get(option, {})
-        if declared_by.get("kind") == "extension":
-            submenu = "extensions"
-        elif not declared_by:
-            # not declared by a module, so it comes from config_definition.py
+        if option in config_definition.config_definition:
             submenu = "core"
+        elif declared_by.get("kind") == "extension":
+            submenu = "extensions"
         elif declared_by.get("declared_by") in datasource_workers:
             submenu = "datasources"
         else:
