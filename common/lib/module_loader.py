@@ -168,7 +168,15 @@ class ModuleCollector:
             extension_id = getattr(worker, "extension_name", None) if is_extension else None
 
             for setting, definition in worker_config.items():
-                if setting in core_definition:
+                if type(definition) is not dict:
+                    # everything downstream reads a definition as a mapping. Has
+                    # to be caught here, where the module can still be named: the
+                    # first thing to touch it is record_declarations() at boot,
+                    # which runs before the log buffer is flushed, so the
+                    # AttributeError would arrive with nothing pointing at the
+                    # module that caused it.
+                    refusal = "its definition is not a dictionary"
+                elif setting in core_definition:
                     refusal = "it is already defined as a core setting"
                 elif setting.startswith(self.RESERVED_PREFIXES):
                     refusal = "it uses a namespace reserved for core settings"
@@ -200,7 +208,7 @@ class ModuleCollector:
                 # optional presentation key would be out of proportion. The
                 # settings panel falls back to working the tab out itself, so
                 # say so here or the author gets no signal at all.
-                if type(definition) is dict and definition.get("submenu") not in (None, *submenus):
+                if definition.get("submenu") not in (None, *submenus):
                     self.log_buffer += (f"Setting '{setting}' declared by {worker_type} asks for submenu "
                                         f"'{definition['submenu']}', which is not one of {', '.join(submenus)}. The "
                                         f"setting is registered, but its tab will be placed automatically.\n")

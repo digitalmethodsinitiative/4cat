@@ -625,12 +625,10 @@ class ConfigManager(BaseConfigReader):
                 declared_by = EXCLUDED.declared_by,
                 archived_at = EXCLUDED.archived_at,
                 archived_by = EXCLUDED.archived_by
-            RETURNING name
+            RETURNING name, tag
         """, (name, finding["declared_by"], int(time.time()), archived_by))
 
-        # values for this setting may be memcached under any tag, and there is
-        # no list of which, so clear the lot
-        self.clear_cache()
+        self.uncache_setting(name, [row["tag"] for row in moved])
 
         return len(moved)
 
@@ -677,10 +675,10 @@ class ConfigManager(BaseConfigReader):
             )
             INSERT INTO settings (name, value, tag)
             SELECT name, value, tag FROM moved
-            RETURNING name
+            RETURNING name, tag
         """, replacements)
 
-        self.clear_cache()
+        self.uncache_setting(name, [row["tag"] for row in restored])
 
         return len(restored)
 
@@ -982,11 +980,37 @@ class ConfigManager(BaseConfigReader):
             client.delete(self._get_memcache_id(attribute_name, tag))
         return updated_rows
 
+    def uncache_setting(self, name, tags):
+        """
+        Drop the cached values for one setting
+
+        Targeted, unlike `clear_cache()`: that flushes the whole memcached
+        instance, which 4CAT shares with the rate limiter and with both
+        containers' config caches, and is far too blunt for a single setting
+        changing.
+
+        Only the given tags are cleared. `get()` also caches a marker for tags
+        that have no value at all, but a setting being archived or restored is
+        by definition one that nothing declares, so nothing is reading it under
+        a tag it never had a value for.
+
+        :param str name:  Setting to forget
+        :param tags:  Tags whose cached value should be dropped
+        """
+        client = self.get_memcache()
+        if not client:
+            return
+
+        for tag in set(tags):
+            client.delete(self._get_memcache_id(name, tag))
+
     def clear_cache(self):
         """
         Clear cached configuration values
 
-        Called when the backend restarts - helps start with a blank slate.
+        Flushes the entire memcached instance, so this is for starting with a
+        blank slate - the back-end restarting - and not for a single setting
+        changing. Use `uncache_setting()` for that.
         """
         client = self.get_memcache()
         if not client:

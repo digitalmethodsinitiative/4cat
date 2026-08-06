@@ -224,7 +224,7 @@ def test_restoring_takes_only_the_tag_it_was_asked_for(config):
     """
     config.clear_cache = MagicMock()
     config.db.fetchone.side_effect = [{"found": 1}, None]  # archived; not in use
-    config.db.fetchall.return_value = [{"name": "gone.setting"}]
+    config.db.fetchall.return_value = [{"name": "gone.setting", "tag": "researchers"}]
 
     assert config.restore_setting("gone.setting", tag="researchers") == 1
 
@@ -239,7 +239,8 @@ def test_restoring_without_a_tag_takes_every_tag(config):
     """
     config.clear_cache = MagicMock()
     config.db.fetchone.side_effect = [{"found": 1}, None]
-    config.db.fetchall.return_value = [{"name": "gone.setting"}, {"name": "gone.setting"}]
+    config.db.fetchall.return_value = [{"name": "gone.setting", "tag": ""},
+                                       {"name": "gone.setting", "tag": "researchers"}]
 
     assert config.restore_setting("gone.setting") == 2
 
@@ -262,7 +263,9 @@ def test_archiving_moves_every_tag_in_one_statement(config):
         "findings": [{"name": "gone.setting", "state": "vanished", "declared_by": "core:config_definition"}]
     })
     config.clear_cache = MagicMock()
-    config.db.fetchall.return_value = [{"name": "gone.setting"}, {"name": "gone.setting"}]
+    config.uncache_setting = MagicMock()
+    config.db.fetchall.return_value = [{"name": "gone.setting", "tag": ""},
+                                       {"name": "gone.setting", "tag": "researchers"}]
 
     moved = config.archive_setting("gone.setting", archived_by="admin")
 
@@ -277,5 +280,8 @@ def test_archiving_moves_every_tag_in_one_statement(config):
     # nothing may be issued separately, or there is a window to be torn in
     config.db.insert.assert_not_called()
     config.db.delete.assert_not_called()
-    # stale values would otherwise be served from memcache under any tag
-    config.clear_cache.assert_called_once()
+    # stale values would otherwise be served from memcache, but only the tags
+    # that moved need clearing - clear_cache() flushes the whole instance,
+    # which 4CAT shares with the rate limiter
+    config.uncache_setting.assert_called_once_with("gone.setting", ["", "researchers"])
+    config.clear_cache.assert_not_called()
