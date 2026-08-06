@@ -21,6 +21,7 @@ from email.mime.text import MIMEText
 
 from flask import Blueprint, render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response, g
 from flask_login import current_user, login_required
+from markupsafe import escape
 
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
@@ -641,15 +642,19 @@ def manage_unused_settings():
     """
     if request.method == "POST":
         name = request.form.get("setting", "")
+        # flashed messages are rendered with |safe, because some of them carry
+        # links. This one is built from a submitted field, and the errors raised
+        # below quote that field back too, so it cannot go in unescaped.
+        label = escape(name)
         try:
             if request.form.get("action") == "restore":
                 restored = g.config.restore_setting(name)
-                flash(f"Restored {name} ({restored} stored value(s)).")
+                flash(f"Restored {label} ({restored} stored value(s)).")
             else:
                 archived = g.config.archive_setting(name, archived_by=current_user.get_id())
-                flash(f"Archived {name} ({archived} stored value(s)). It can be restored from this page.")
+                flash(f"Archived {label} ({archived} stored value(s)). It can be restored from this page.")
         except ValueError as e:
-            flash(str(e))
+            flash(escape(str(e)))
 
         return redirect(url_for("admin.manage_unused_settings"))
 
