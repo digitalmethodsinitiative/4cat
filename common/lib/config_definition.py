@@ -244,6 +244,17 @@ config_definition = {
         "global": True,
         "indirect": True
     },
+    "4cat.declarations_reported": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Last reported undeclared settings",
+        "tooltip": "Fingerprint of the set of settings admins were last notified about, so the same set is not "
+                   "reported twice. Kept here rather than read back off the notification itself, because a dismissed "
+                   "notification is deleted once the phone-home server no longer lists it, and so cannot record that "
+                   "it was ever sent.",
+        "global": True,
+        "indirect": True
+    },
     "4cat.layout_hue": {
         "type": UserInput.OPTION_HUE,
         "default": 356,

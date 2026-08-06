@@ -23,10 +23,14 @@ class SettingsAuditor(BasicWorker):
     type = "audit-settings"
     max_workers = 1
 
-    # notifications are keyed by which settings they are about, so an admin who
-    # dismisses one is not told about the same settings again, but does hear
-    # about it if a different set turns up later
-    NOTIFICATION_PREFIX = "settings-audit-"
+    # this worker's notifications open with this, which is how it finds them
+    # again. Note it must *not* set a canonical_id: 4CAT reserves a non-empty
+    # canonical_id for notifications that come from the phone-home server, and
+    # both common/lib/user.py (which hides rather than deletes those when
+    # dismissed) and check_updates.py (which deletes dismissed ones the server
+    # no longer lists) rely on that. Matching on the message text instead, as
+    # check_updates.py does for its own version notices.
+    NOTIFICATION_PREFIX = "Unused settings:"
 
     @classmethod
     def ensure_job(cls, config=None):
@@ -35,7 +39,7 @@ class SettingsAuditor(BasicWorker):
 
     def work(self):
         if not self.config.get("4cat.report_orphan_settings"):
-            self.clear_notifications()
+            self.forget_report()
             return
 
         audit = self.config.audit_settings()
@@ -45,17 +49,20 @@ class SettingsAuditor(BasicWorker):
                       f"nothing has declared for long enough to look removed.")
 
         if not removed:
-            self.clear_notifications()
+            self.forget_report()
             return
 
         # keyed on the settings themselves, so re-running with the same result
-        # finds the existing notification and leaves it alone. Replacing it
-        # would clear the dismissed flag and start nagging an admin who has
-        # already looked and decided to keep them.
+        # says nothing rather than nagging an admin who has already looked and
+        # decided to keep them.
         fingerprint = hashlib.sha256(",".join(removed).encode("utf-8")).hexdigest()[:12]
-        canonical_id = self.NOTIFICATION_PREFIX + fingerprint
 
-        if self.db.fetchone("SELECT id FROM users_notifications WHERE canonical_id = %s", (canonical_id,)):
+        # what was reported is remembered here rather than read back off the
+        # notification, because dismissing a notification without a canonical id
+        # deletes it (common/lib/user.py). Asking the table whether we already
+        # spoke would therefore answer "no" the moment an admin says "yes, I
+        # know", and the same notice would go out again the next day.
+        if self.config.get("4cat.declarations_reported") == fingerprint:
             return
 
         # a different set than last time, so whatever was said before is out of
@@ -65,26 +72,41 @@ class SettingsAuditor(BasicWorker):
         overridden = [finding["name"] for finding in audit["findings"]
                       if finding["state"] == "vanished" and finding["has_tag_override"]]
 
-        message = (f"{len(removed)} setting(s) are stored but no longer declared by 4CAT or any installed extension. "
-                   f"They are not in use and can be [reviewed and removed](/admin/settings/unused).")
+        message = (f"{self.NOTIFICATION_PREFIX} {len(removed)} setting(s) are stored but no longer declared by 4CAT "
+                   f"or any installed extension. They are not in use and can be "
+                   f"[reviewed and removed](/admin/settings/unused).")
         if overridden:
             message += (f" {len(overridden)} of them have a value set for a specific tag, so were configured "
                         f"deliberately at some point: {', '.join(sorted(overridden)[:5])}"
                         f"{' and others' if len(overridden) > 5 else ''}.")
 
         self.db.insert("users_notifications", {
-            "canonical_id": canonical_id,
             "username": "!admin",
             "notification": message,
             "allow_dismiss": True
         }, safe=True)
 
+        self.config.set("4cat.declarations_reported", fingerprint)
+
+    def forget_report(self):
+        """
+        Drop the notification and the record of having sent it
+
+        Used when there is nothing to report, so that if the same set of
+        settings turns up again later it is reported afresh rather than being
+        silently suppressed by a fingerprint from before.
+        """
+        self.clear_notifications()
+        self.config.set("4cat.declarations_reported", "")
+
     def clear_notifications(self):
         """
         Remove any notification this worker has left before
 
-        Matched on the canonical id, which this worker owns, rather than on the
-        text of the message.
+        Scoped to admin notifications with no canonical id that open with this
+        worker's own phrase, so it cannot touch anything the phone-home server
+        put there. Same approach as `check_updates.py` takes to its own version
+        notices.
         """
-        self.db.execute("DELETE FROM users_notifications WHERE canonical_id LIKE %s",
-                        (self.NOTIFICATION_PREFIX + "%",))
+        self.db.execute("DELETE FROM users_notifications WHERE username = '!admin' AND canonical_id = '' "
+                        "AND notification LIKE %s", (self.NOTIFICATION_PREFIX + "%",))
