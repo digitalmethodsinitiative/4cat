@@ -187,6 +187,7 @@
 .annotation-label {
     flex: 0 0 auto;
     padding-top: var(--spacing-tiny);
+    max-width: 25%;
 }
 
 .item-annotation-value {
@@ -212,15 +213,23 @@ textarea.item-annotation-input {
     color: var(--dark);
 }
 
+.item-annotation-info-buttons {
+    margin-left: auto;
+}
+
+.item-annotation-info-buttons div {
+    display: inline-block;
+}
+
+.item-annotation-info {
+    flex: 0 0 auto;
+}
+
 /* a checkbox field renders as .option-tags (forms.css); it only needs to be
    told to take the room the input of any other field type would */
 .item-annotation-value > .option-tags {
     flex: 1 1 16rem;
     min-width: 0;
-}
-
-.item-annotation-info {
-    flex: 0 0 auto;
 }
 
 /* where a value stands: appears while saving, then settles into a tick that
@@ -233,6 +242,10 @@ textarea.item-annotation-input {
 
 .annotation-state.is-saved {
     color: var(--green);
+}
+
+.annotation-state.is-refused {
+    color: var(--yellow);
 }
 
 .annotation-state.is-error {

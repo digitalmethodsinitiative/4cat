@@ -3,6 +3,7 @@ Annotation class
 """
 
 
+import math
 import time
 import json
 
@@ -14,9 +15,16 @@ from common.lib.user_input import UserInput
 ANNOTATION_TYPES = {
     "text": UserInput.OPTION_TEXT,
     "textarea": UserInput.OPTION_TEXT_LARGE,
+    "integer": UserInput.OPTION_TEXT,
+    "float": UserInput.OPTION_TEXT,
     "dropdown": UserInput.OPTION_CHOICE,
     "checkbox": UserInput.OPTION_MULTI,
 }
+
+# Field types whose value is a number rather than the text it was typed as.
+NUMERIC_TYPES = ("integer", "float")
+# Field types whose value is a single piece of free text.
+TEXT_TYPES = ("text", "textarea")
 
 
 class Annotation:
@@ -69,6 +77,16 @@ class Annotation:
             raise AnnotationException("Annotation() needs a `db` database object")
 
         self.db = db
+
+        # a numeric annotation is held as a number rather than as the text it
+        # was typed as, so that a value just submitted and one read from the
+        # database compare as the same value
+        if data and data.get("type") in NUMERIC_TYPES and "value" in data:
+            number = Annotation.parse_number(data["type"], data["value"])
+            if number is None:
+                raise AnnotationException("'%s' is not a valid %s value"
+                                          % (data["value"], data["type"]))
+            data["value"] = number
 
         new_or_updated = False
 
@@ -178,8 +196,7 @@ class Annotation:
         if not data:
             return {}
 
-        if data["type"] == "checkbox":
-            data["value"] = data["value"].split(",")
+        data["value"] = Annotation.parse_stored_value(data["type"], data["value"])
         data["metadata"] = json.loads(data["metadata"])
 
         return data
@@ -201,8 +218,7 @@ class Annotation:
         if not data:
             return {}
 
-        if data["type"] == "checkbox":
-            data["value"] = data["value"].split(",")
+        data["value"] = Annotation.parse_stored_value(data["type"], data["value"])
         data["metadata"] = json.loads(data["metadata"])
 
         return data
@@ -218,6 +234,14 @@ class Annotation:
         db_data["metadata"] = json.dumps(m)
         if db_data["type"] == "checkbox":
             db_data["value"] = ",".join(db_data["value"])
+        elif db_data["type"] in NUMERIC_TYPES:
+            # every write passes through here, so this is where a value that is
+            # not a number is refused, whatever route it took to get here
+            number = Annotation.parse_number(db_data["type"], db_data["value"])
+            if number is None:
+                raise AnnotationException("'%s' is not a valid %s value"
+                                          % (db_data["value"], db_data["type"]))
+            db_data["value"] = str(number)
 
         return self.db.upsert("annotations", data=db_data, constraints=["field_id", "dataset", "item_id"])
 
@@ -226,6 +250,102 @@ class Annotation:
         Deletes this annotation
         """
         return self.db.delete("annotations", {"id": self.id})
+
+    @staticmethod
+    def parse_number(annotation_type: str, value):
+        """
+        Read a value as the number an annotation field of this type holds
+
+        Whatever the value was typed or stored as, since the database column is
+        text and a value made by a processor may be a number already.
+
+        :param str annotation_type:  `integer` or `float`
+        :param value:  The value to read
+
+        :return:  The number, an empty string if there is no value at all, or
+                  `None` if the value cannot be read as a number of this type
+        """
+        if value is None:
+            return ""
+
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return ""
+
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+
+        # a dataset column is no place for infinity or a NaN
+        if not math.isfinite(number):
+            return None
+
+        if annotation_type != "integer":
+            return number
+
+        # an integer that came in as one is kept as it is, since going through
+        # a float would round the very large ones
+        if isinstance(value, int):
+            return int(value)
+
+        # rounded half away from zero (5.5 -> 6, -5.5 -> -6), which is what
+        # people expect of a number; Python's own round() rounds half to even
+        return int(number + 0.5) if number >= 0 else -int(-number + 0.5)
+
+    @staticmethod
+    def parse_stored_value(annotation_type: str, value):
+        """
+        Read a value as it is stored in the database into what it stands for
+
+        Checkbox values are stored as a comma-separated list and numeric values
+        as text; everything else is the string it says it is.
+
+        :param str annotation_type:  The type of the field the value belongs to
+        :param value:  The value as the database holds it
+
+        :return:  The value as this type of field holds it
+        """
+        if annotation_type == "checkbox":
+            return value.split(",")
+
+        if annotation_type in NUMERIC_TYPES:
+            number = Annotation.parse_number(annotation_type, value)
+            # a stored value that is not a number reads as no annotation rather
+            # than breaking everything that reads the dataset
+            return "" if number is None else number
+
+        return value
+
+    @staticmethod
+    def type_change_effect(old_type: str, new_type: str) -> str:
+        """
+        What changing a field from one type to another does to its annotations
+
+        The one place that decides this, so that what a change is announced to
+        do and what it then does cannot drift apart.
+
+        :param str old_type:  The type the field has now
+        :param str new_type:  The type it would get
+
+        :return str:  `keep` if the values survive as they are, `convert` if
+                      they can be read as values of the new type - the ones that
+                      cannot are deleted - and `delete` if none of them survive
+        """
+        if old_type == new_type:
+            return "keep"
+
+        # any text that reads as a number is kept as one, and an integer and a
+        # float can always be read as each other
+        if new_type in NUMERIC_TYPES and old_type in (*TEXT_TYPES, *NUMERIC_TYPES):
+            return "convert"
+
+        # text stays text however long it may be, and a number reads as text
+        if old_type in (*TEXT_TYPES, *NUMERIC_TYPES) and new_type in TEXT_TYPES:
+            return "keep"
+
+        return "delete"
 
 
     @staticmethod
@@ -267,8 +387,7 @@ class Annotation:
             return []
 
         for i in range(len(data)):
-            if data[i]["type"] == "checkbox":
-                data[i]["value"] = data[i]["value"].split(",")
+            data[i]["value"] = Annotation.parse_stored_value(data[i]["type"], data[i]["value"])
             data[i]["metadata"] = json.loads(data[i]["metadata"])
 
         return [Annotation(data=d, db=db) for d in data]
@@ -314,14 +433,13 @@ class Annotation:
         :returns int:               How many records were affected.
         """
 
-        text_fields = ["textarea", "text"]
-
         # If old and new fields are identical, do nothing.
         if old_fields == new_fields:
             return 0
 
         fields_to_delete = set()        # Delete all annotations with this field ID
         fields_to_update = {}           # Update values of annotations with this field ID
+        fields_to_convert = {}          # Read values of annotations with this field ID as another type
         old_options = {}
 
         # Loop through the old annotation fields
@@ -335,12 +453,17 @@ class Annotation:
             field_id = old_field_id
             new_field = new_fields[field_id]
 
-            # If the annotation type has changed, also delete existing annotations,
-            # except between text and textarea, where we can just change the type and keep the text.
+            # If the annotation type has changed, what happens to the values
+            # that were annotated with it depends on what it changed into: they
+            # may survive as they are, be readable as the new type, or be
+            # nothing the new type can hold at all.
             if old_field["type"] != new_field["type"]:
-                if old_field["type"] not in text_fields and new_field["type"] not in text_fields:
+                effect = Annotation.type_change_effect(old_field["type"], new_field["type"])
+                if effect == "delete":
                     fields_to_delete.add(field_id)
                     continue
+                elif effect == "convert":
+                    fields_to_convert[field_id] = new_field["type"]
 
             # Loop through all the key/values in the new field settings
             # and update in case it's different from the old values.
@@ -382,8 +505,24 @@ class Annotation:
         if fields_to_delete:
             Annotation.delete_many(db, field_id=list(fields_to_delete))
 
-        # Write changes to fields to database
         count = 0
+
+        # Read the values of fields that became numeric as numbers. What can be
+        # read as one is kept (an integer field rounds what it is given); what
+        # cannot is not a value the field can hold anymore, so it goes.
+        for field_id, new_type in fields_to_convert.items():
+            if field_id in fields_to_delete:
+                continue
+
+            for annotation in db.fetchall("SELECT id, value FROM annotations WHERE dataset = %s AND field_id = %s",
+                                          (dataset_key, field_id)):
+                number = Annotation.parse_number(new_type, annotation["value"])
+                if number is None:
+                    db.delete("annotations", {"id": annotation["id"]})
+                else:
+                    count += db.update("annotations", {"value": str(number)}, where={"id": annotation["id"]})
+
+        # Write changes to fields to database
         if fields_to_update:
             for field_id, updates in fields_to_update.items():
 

@@ -6,17 +6,20 @@
 
    A dataset with no fields yet has nothing to show while the editor is closed,
    so the right-hand cell stays out of the way until there is either a field or
-   an open editor. `hasFields()` reads the badges rather than a flag because they
-   are swapped in out of band when fields are saved; it is re-evaluated whenever
-   `open` changes, which is the only moment the answer can matter.
+   an open editor. Whether there are any is told to this box rather than read
+   off the page: the badges are swapped in out of band, both when fields are
+   saved and when a processor turns out to have made some, and a count read out
+   of the DOM would not be something Alpine re-reads when that happens. The
+   marker that watches for processor-made fields says so as it arrives.
 
    Always present once the dataset is finished, whichever pane is showing: the
    fields describe the dataset, not the Explorer.
 
-   Expects: dataset, annotation_fields, can_annotate
+   Expects: dataset, annotation_fields, can_annotate, annotation_watch
 #}
 <div class="annotation-fields-box" id="annotation-fields-box"
-     x-data="{ open: false, hasFields() { return !!this.$el.querySelector('.annotation-field-badge') } }">
+     x-data="{ open: false, hasFields: {{ (annotation_fields|length > 0)|tojson }} }"
+     @annotation-fields-present="hasFields = $event.detail">
     <dt>
         <button type="button" class="annotation-fields-summary self-styled"
                 @click="open = !open" :aria-expanded="open ? 'true' : 'false'"
@@ -29,15 +32,23 @@
             <i class="fa fa-fw" :class="open ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true"></i>
             Annotation fields
         </button>
+        {% include "explorer/annotation-fields-watch.html" %}
     </dt>
     {# hidden server-side too, so an empty row does not flash before Alpine runs #}
-    <dd x-show="open || hasFields()"{% if not annotation_fields %} style="display: none"{% endif %}>
+    <dd x-show="open || hasFields"{% if not annotation_fields %} style="display: none"{% endif %}>
         <div class="annotation-fields-badges" id="annotation-fields-badges">
             {% include "explorer/annotation-fields-badges.html" %}
         </div>
 
         <div class="annotation-fields-editor-host">
-            <div id="annotation-fields-editor" x-show="open" x-cloak></div>
+            {# fetches itself when a processor turns out to have added fields, so
+               the rows agree with the badges beside them. It does that whether
+               or not it has ever been opened - it is hidden until it is, and
+               filling it early only saves the fetch the first click would do #}
+            <div id="annotation-fields-editor" x-show="open" x-cloak
+                 hx-get="{{ url_for('explorer.annotation_fields_editor', key=dataset.key) }}"
+                 hx-trigger="annotations-updated from:body"
+                 hx-swap="innerHTML"></div>
             {% with spinner_id = "annotation-fields-spinner" %}{% include "components/spinner.html" %}{% endwith %}
         </div>
     </dd>

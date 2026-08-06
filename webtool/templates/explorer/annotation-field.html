@@ -39,6 +39,7 @@
         <input type="text" placeholder="Label" id="annotation-field-label-{{ field_id }}"
                class="annotation-field-label{% if field_errors.get("label") %} invalid{% endif %}"
                name="label-{{ field_id }}" value="{{ field.label }}"
+               maxlength="50"
                {% if not can_annotate %}disabled{% endif %} {% if is_new %}autofocus{% endif %}>
 
         {% if generated %}
@@ -62,6 +63,8 @@
                     {% if not can_annotate %}disabled{% endif %}>
                 <option value="text">Text</option>
                 <option value="textarea">Text (large)</option>
+                <option value="integer">Number (integer)</option>
+                <option value="float">Number (decimal)</option>
                 <option value="dropdown">Single option</option>
                 <option value="checkbox">Multiple options</option>
             </select>
@@ -111,7 +114,9 @@
                         <input type="text" :name="'option-{{ field_id }}'" x-model="option.value"
                                placeholder="Option" aria-label="Option"
                                :class="{invalid: optionInvalid(option)}"
-                               @input="ensureBlank()" {% if not can_annotate %}disabled{% endif %}>
+                               @input="ensureBlank()" {% if not can_annotate %}disabled{% endif %}
+                               maxlength="50"
+                        >
                         {% if can_annotate %}
                             <button type="button" :disabled="index == options.length - 1" class="button-like no-border" @click="removeOption(option)"
                                     aria-label="Remove option">

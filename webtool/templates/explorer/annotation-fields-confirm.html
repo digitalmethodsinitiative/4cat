@@ -38,6 +38,7 @@
                     <li>
                         <strong>{{ entry.label }}</strong> &mdash; {{ entry.reason }},
                         {{ entry.annotations|commafy }} annotation{{ "" if entry.annotations == 1 else "s" }} deleted
+                        {%- if entry.converted %}, {{ entry.converted|commafy }} converted{% endif %}
                     </li>
                 {% endfor %}
             </ul>

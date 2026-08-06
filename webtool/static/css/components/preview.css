@@ -176,6 +176,10 @@
     color: var(--text-grey);
 }
 
+.media-carousel-nav {
+    background-color: var(--semidark);
+}
+
 .dataset-preview--big .media-carousel-slide .media-image,
 .dataset-preview--big .media-carousel-slide .media-video {
     max-height: 80vh;

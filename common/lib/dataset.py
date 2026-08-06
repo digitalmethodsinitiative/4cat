@@ -2775,10 +2775,11 @@ class DataSet(FourcatModule):
                     % field_id
                 )
 
-        # Check if fields are removed
+        # Check if fields are removed or changed into another type; both mean
+        # the annotations made with them have to be deleted or rewritten
         if not add and old_fields:
-            for field_id in old_fields.keys():
-                if field_id not in new_fields:
+            for field_id, old_field in old_fields.items():
+                if field_id not in new_fields or old_field.get("type") != new_fields[field_id].get("type"):
                     changes = True
 
         # Make sure to do nothing to processor-generated annotations; these must remain 'traceable' to their origin

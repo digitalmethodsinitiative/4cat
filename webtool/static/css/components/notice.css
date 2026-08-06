@@ -1,4 +1,8 @@
 /* Notices on info, warnings, and success */
+.notice a {
+    text-decoration: underline;
+}
+
 .notice-info {
     background: var(--blue-light);
     color: var(--blue);

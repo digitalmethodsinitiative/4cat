@@ -21,7 +21,7 @@ from flask import Blueprint, current_app, request, render_template, g, redirect,
 from flask_login import login_required, current_user
 
 from webtool.lib.helpers import annotation_context, can_annotate_dataset, error, setting_required
-from common.lib.annotation import ANNOTATION_TYPES
+from common.lib.annotation import Annotation, ANNOTATION_TYPES
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, AnnotationException
 
@@ -316,6 +316,52 @@ def annotation_fields_editor(key: str):
     return render_template("explorer/annotation-fields-editor.html", **context)
 
 
+@component.route("/results/<string:key>/explorer/annotation-fields/watch/")
+@api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
+def annotation_fields_watch(key: str):
+    """
+    Whether a processor has added annotations, as a partial
+
+    Polled by the marker in the annotation fields box while an analysis is
+    running (see explorer/annotation-fields-watch.html). The page sends what it
+    currently has; this says whether that is still what there is.
+
+    An update is announced only when both things are true: whatever could have
+    been writing annotations has stopped, and the annotations are no longer the
+    ones the page was rendered with. So a reader is never interrupted mid-run by
+    a processor that writes its annotations in batches, and never at all by one
+    that writes none.
+
+    :param str key:  Dataset key
+    """
+    dataset, denied = explorer_dataset(key)
+    if denied:
+        return denied
+
+    context = annotation_field_context(dataset)
+    context["can_annotate"] = can_annotate_dataset(dataset)
+
+    was_running = {other for other in request.args.get("running", "").split(",") if other}
+    still_running = {other for other in context["annotation_watch"]["running"].split(",") if other}
+
+    # an analysis the page saw running has finished, or none is running at all -
+    # the second covers the processor that was over before the page could see it
+    # running, which is every fast one
+    settled = bool(was_running - still_running) or not still_running
+    changed = request.args.get("state") != context["annotation_watch"]["state"]
+
+    if not (settled and changed):
+        return render_template("explorer/annotation-fields-watch.html", **context)
+
+    # the editor and the Explorer's items listen for this and fetch themselves;
+    # the badges come along with the response
+    context["updated"] = True
+    return render_template("explorer/annotation-fields-watch.html", **context), 200, {
+        "HX-Trigger": "annotations-updated"}
+
+
 @component.route("/results/<string:key>/explorer/annotation-fields/new/")
 @api_ratelimit
 @login_required
@@ -569,6 +615,9 @@ def validate_annotation_fields(fields: dict) -> tuple:
         elif labels[field["label"]] > 1:
             errors[field_id]["label"] = True
             warnings.append("Annotation field labels must be unique.")
+        elif len(field["label"]) > 50:
+            errors[field_id]["label"] = True
+            warnings.append("Annotation field labels must have less than 50 characters.")
 
         if field.get("from_dataset"):
             # nothing else about these comes from the form
@@ -598,18 +647,18 @@ def annotation_field_impact(dataset: DataSet, old_fields: dict, new_fields: dict
     """
     What saving these annotation fields would destroy
 
-    Deleting a field deletes its annotations; so does changing a field between
-    kinds, since the old values cannot be read as the new type. This counts
-    what that would come to, so the confirmation can say it out loud.
+    Deleting a field deletes its annotations; so does changing a field into a
+    kind that cannot hold what it holds now. A change into a numeric field is
+    in between: the values that read as a number are converted and only the
+    rest are lost, so those are counted one by one. What each change does is
+    `Annotation.type_change_effect()`'s to say, so that what is announced here
+    is what is then done.
 
     :param DataSet dataset:  Dataset the fields belong to
     :param dict old_fields:  Fields as currently saved
     :param dict new_fields:  Fields as they would be saved
     :return list:  One dict per affected field, empty if nothing is lost
     """
-    text_types = ("text", "textarea")
-    choice_types = ("dropdown", "checkbox")
-
     # counted in the database rather than by reading every annotation of the
     # dataset into memory, which on a thoroughly annotated one is a lot of rows
     # to load in order to end up with a handful of numbers
@@ -624,23 +673,33 @@ def annotation_field_impact(dataset: DataSet, old_fields: dict, new_fields: dict
         if not counts[field_id]:
             continue
 
+        converted = 0
         if field_id not in new_fields:
             reason = "deleted"
+            lost = counts[field_id]
         else:
             old_type = old_field.get("type")
             new_type = new_fields[field_id].get("type")
-            # text to choice, choice to text, and one choice kind to another all
-            # leave the existing values unreadable
-            changed = old_type != new_type and (
-                (old_type in text_types and new_type in choice_types)
-                or (old_type in choice_types and new_type in text_types)
-                or (old_type in choice_types and new_type in choice_types)
-            )
-            if not changed:
+            effect = Annotation.type_change_effect(old_type, new_type)
+
+            if effect == "keep":
                 continue
+            elif effect == "convert":
+                # only the values that cannot be read as a number are lost, so
+                # these have to be looked at rather than counted
+                lost = sum(1 for annotation in g.db.fetchall(
+                    "SELECT value FROM annotations WHERE dataset = %s AND field_id = %s", (dataset.key, field_id))
+                    if Annotation.parse_number(new_type, annotation["value"]) is None)
+                if not lost:
+                    continue
+                converted = counts[field_id] - lost
+            else:
+                lost = counts[field_id]
+
             reason = "changed from %s to %s" % (old_type, new_type)
 
-        impact.append({"label": old_field.get("label", field_id), "reason": reason, "annotations": counts[field_id]})
+        impact.append({"label": old_field.get("label", field_id), "reason": reason,
+                       "annotations": lost, "converted": converted})
 
     return impact
 

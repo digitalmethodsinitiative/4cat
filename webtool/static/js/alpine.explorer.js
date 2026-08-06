@@ -108,17 +108,52 @@ document.addEventListener('alpine:init', () => {
      * Declared on the .item-annotation around an input that posts itself. htmx
      * 4 reports the response on the request's own event, so one handler covers
      * both outcomes; nothing here touches the input, which is never swapped.
+     *
+     * Since there is no save button, the chip is the only thing that says
+     * whether what is on screen is also what is stored, so it may only say
+     * 'saved' when it is. A value can fail to be stored on either side: the
+     * input may hold something it cannot make a value of, or the server may
+     * refuse what it is sent. Both end up in the same 'refused' state, so a
+     * field type that validates in a way nothing here knows about is covered
+     * without this having to learn about it.
      */
     Alpine.data('annotationValue', () => ({
         state: 'idle',
 
-        saving() {
+        /**
+         * Send the value, unless the input cannot stand behind it.
+         *
+         * A control that cannot read what was typed - letters in a number
+         * field - reports its value as the empty string, and posting that
+         * would quietly wipe the annotation that was there. One that breaks
+         * its own constraints would store something the field does not accept.
+         * In both cases what is on screen is not what would be stored, so the
+         * request is called off (htmx checks whether this event was cancelled
+         * before it makes one) and the chip says the value is not saved.
+         *
+         * @param {Event} event  The htmx:before:request event, from the input
+         */
+        saving(event) {
+            const input = event.target;
+            if (typeof input?.checkValidity === 'function' && !input.checkValidity()) {
+                event.preventDefault();
+                this.state = 'refused';
+                return;
+            }
+
             this.state = 'saving';
         },
 
         settle(event) {
             const status = event.detail?.ctx?.response?.status;
-            this.state = (status && status < 400) ? 'saved' : 'error';
+            if (status && status < 400) {
+                this.state = 'saved';
+            } else {
+                // 400 is the server declining to store this value, which is
+                // something the person who typed it can put right; anything
+                // else went wrong on the way rather than in the value
+                this.state = (status === 400) ? 'refused' : 'error';
+            }
         }
     }));
 

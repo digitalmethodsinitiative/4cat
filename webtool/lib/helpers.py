@@ -4,6 +4,7 @@ General helper functions for Flask templating and 4CAT views
 import markdown2
 import colorsys
 import csv
+import json
 import re
 
 from functools import wraps
@@ -13,6 +14,7 @@ from flask_login import current_user
 from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
 
+from common.lib.helpers import hash_to_md5
 from common.lib.module_map import ModuleMap
 from common.lib.user_input import UserInput
 
@@ -219,6 +221,47 @@ def can_annotate_dataset(dataset):
 	)
 
 
+def annotation_watch_state(dataset):
+	"""
+	Whether a processor could still be writing annotations, and what there is now
+
+	Processors write their annotations to the dataset they were ultimately run
+	on, which is the dataset whose page this is. That happens in the background,
+	so the page has to go and look: it polls for as long as an analysis is
+	running (`running`), and compares what it has (`state`) with what is there.
+
+	`state` stands for every annotation of this dataset at once rather than for
+	any one of them, since the page only needs to know *whether* it is behind,
+	not what changed. Both are strings so a rendered page can carry them back
+	unaltered.
+
+	:param dataset:  The DataSet being watched
+	:return dict:  `running`, the keys of its unfinished analyses, and `state`
+	"""
+	# every analysis below this dataset, however deep, in one query rather than
+	# one per level of a tree that can be several deep
+	running = [row["key"] for row in g.db.fetchall("""
+		WITH RECURSIVE analyses AS (
+			SELECT key, is_finished FROM datasets WHERE key_parent = %s
+			UNION ALL
+			SELECT child.key, child.is_finished FROM datasets child, analyses
+			WHERE child.key_parent = analyses.key
+		)
+		SELECT key FROM analyses WHERE NOT is_finished ORDER BY key
+	""", (dataset.key,))]
+
+	# the annotations themselves are counted rather than read: what matters is
+	# whether they are still the ones the page was rendered with
+	totals = g.db.fetchone("SELECT COUNT(*) AS count, COALESCE(MAX(timestamp), 0) AS latest "
+						   "FROM annotations WHERE dataset = %s", (dataset.key,))
+
+	state = "%s-%s-%s" % (
+		hash_to_md5(json.dumps(dataset.annotation_fields, sort_keys=True))[:12],
+		totals["count"], totals["latest"])
+
+	return {"running": ",".join(running), "state": state}
+
+
 def annotation_context(dataset):
 	"""
 	Context for anything rendering a dataset's annotation fields
@@ -258,6 +301,7 @@ def annotation_context(dataset):
 		"annotation_fields": annotation_fields,
 		"from_datasets": from_datasets,
 		"can_annotate": can_annotate_dataset(dataset),
+		"annotation_watch": annotation_watch_state(dataset),
 		# which fields the reader has folded away in the items below. Kept in the
 		# address so that it survives a refresh and can be linked to, and read
 		# back here so the items are rendered folded rather than folded by script

@@ -16,7 +16,8 @@
         <section class="dark dataset-metadata dataset-preview-host" data-dataset-key="{{ dataset.key }}"
                  x-data="datasetPreview"
                  @annotation-saved.window="invalidate()"
-                 @annotation-fields-saved.window="invalidate()">
+                 @annotation-fields-saved.window="invalidate()"
+                 @annotations-updated.window="invalidate()">
 
             <nav>
                 <ul>
@@ -64,7 +65,11 @@
                        toggle opens is still filled the first time it is shown #}
                     <section class="explorer-pane" id="explorer-pane"
                              hx-get="{{ url_for('explorer.explorer_pane', key=dataset.key, page=request.args.get('page'), sort=request.args.get('sort'), order=request.args.get('order'), hidden=request.args.get('hidden')) }}"
-                             hx-trigger="{% if explore %}load{% else %}explore-open once from:'closest .dataset-panes'{% endif %}, annotation-fields-saved from:body"
+                             {# `annotations-updated` is a processor having added
+                                annotations: the items show something else now,
+                                so the pane is fetched again the same way saving
+                                fields does it #}
+                             hx-trigger="{% if explore %}load{% else %}explore-open once from:'closest .dataset-panes'{% endif %}, annotation-fields-saved from:body, annotations-updated from:body"
                              hx-swap="innerHTML"
                              hx-indicator="#explorer-spinner"></section>
                     {% with spinner_id = "explorer-spinner" %}{% include "components/spinner.html" %}{% endwith %}
