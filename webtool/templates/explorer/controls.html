@@ -37,14 +37,19 @@
                     <li><span class="explorer-note" x-tooltip="Sorting is unavailable for datasets over {{ max_items|commafy }} items">
                         <i class="fa fa-circle-info" aria-hidden="true"></i></span></li>
                 {% else %}
-                    <li><button
+                    <li>
+                        <button
                             class="button-like"
                             hx-get="{{ url_for('explorer.explorer_items', key=dataset.key) }}"
+                            hx-include="closest form"
                             hx-trigger="click"
                             hx-target="#explorer-body"
                             hx-swap="innerHTML"
                             hx-indicator="#explorer-spinner"
-                    >Sort</button></li>
+                        >
+                            Sort
+                        </button>
+                    </li>
                 {% endif %}
             </ul>
         </form>
