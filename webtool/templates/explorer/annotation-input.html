@@ -96,7 +96,7 @@
                   :class="'is-' + state" aria-live="polite">
                 <template x-if="state === 'saving'">
                     <div class="item-annotation-info button-secondary button-warning" x-tooltip="Saving annotation">
-                        <i class="fa fa-circle-notch fa-spin" aria-hidden="true"></i>
+                        <span><i class="fa fa-circle-notch fa-spin" aria-hidden="true"></i></span>
                     </div>
                 </template>
                 <template x-if="state === 'saved' || state === 'idle'">
@@ -105,8 +105,8 @@
                     </div>
                 </template>
                 <template x-if="state === 'error'">
-                    <div class="item-annotation-info button-secondary button-warning" x-tooltip="Error when saving annotation">
-                        <span><i class="fa fa-warning" aria-hidden="true"></i></span>
+                    <div class="item-annotation-info button-secondary button-error" x-tooltip="Error when saving annotation">
+                        <span><i class="fa fa-exclamation-triangle" aria-hidden="true"></i></span>
                     </div>
                 </template>
             </span>
