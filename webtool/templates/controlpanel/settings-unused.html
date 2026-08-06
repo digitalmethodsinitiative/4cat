@@ -48,7 +48,7 @@
                             <td>
                                 {% if finding.state == "vanished" %}
                                     Not declared since
-                                    {{ finding.last_seen|datetime("%-d %b %Y", wrap=True) }}, last by
+                                    {{ finding.last_seen|datetime("%-d %b %Y", wrap=True)|safe }}, last by
                                     <code>{{ finding.declared_by }}</code>.
                                 {% else %}
                                     {{ refusals[finding.state] }}
@@ -132,7 +132,7 @@
                                 {% if row.tag %}<span class="property-badge">{{ row.tag }}</span>{% endif %}
                             </td>
                             <td>
-                                {{ row.archived_at|datetime("%-d %b %Y %H:%M", wrap=True) }}
+                                {{ row.archived_at|datetime("%-d %b %Y %H:%M", wrap=True)|safe }}
                                 {% if row.archived_by %}by {{ row.archived_by }}{% endif %}
                             </td>
                             <td>
