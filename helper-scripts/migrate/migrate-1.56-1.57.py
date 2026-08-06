@@ -45,12 +45,11 @@ CREATE TABLE IF NOT EXISTS settings_declarations (
   declared_by            TEXT DEFAULT '' NOT NULL,
   owner_kind             TEXT DEFAULT 'core' NOT NULL,
   extension_id           TEXT DEFAULT NULL,
-  category               TEXT DEFAULT '' NOT NULL,
-  category_label         TEXT DEFAULT NULL,
-  is_managed             BOOLEAN DEFAULT FALSE,
+  is_indirect            BOOLEAN DEFAULT FALSE,
   first_seen             INTEGER DEFAULT 0,
   last_seen              INTEGER DEFAULT 0,
-  last_definition        TEXT DEFAULT NULL
+  last_definition        TEXT DEFAULT NULL,
+  absent_since           INTEGER DEFAULT NULL
 );
 """)
 

@@ -44,11 +44,12 @@
                                 {% if finding.tags|select|list %}
                                     <br><span class="property-badge">also set for: {{ finding.tags|select|join(", ") }}</span>
                                 {% endif %}
+                                <br>stored value: <code>{{ finding.value|truncate(120, True) }}</code>
                             </td>
                             <td>
                                 {% if finding.state == "vanished" %}
-                                    Not declared since
-                                    {{ finding.last_seen|datetime("%-d %b %Y", wrap=True)|safe }}, last by
+                                    Gone since
+                                    {{ finding.absent_since|datetime("%-d %b %Y", wrap=True)|safe }}, last declared by
                                     <code>{{ finding.declared_by }}</code>.
                                 {% else %}
                                     {{ refusals[finding.state] }}

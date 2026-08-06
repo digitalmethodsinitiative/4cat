@@ -116,10 +116,12 @@ class ConfigManager(BaseConfigReader):
         values can be validated, etc
 
         Without the module definitions, module-defined settings have no `type`,
-        no `default` and no `global` flag. Stored values are still read from the
-        database, so nothing breaks immediately - but the settings page then
-        renders those settings as plain text fields, and saving that form writes
-        the text back over values that should have been JSON. That is why a
+        no `default` and no `global` flag. Stored values are not at risk:
+        `UserInput.parse_all()` only returns keys that are in the definition it
+        is handed, and the settings form is saved from that, so a setting
+        missing from the definition cannot be written over. What breaks is the
+        control panel, which would then silently offer a fraction of 4CAT's
+        settings, and a `global` setting would resolve per tag. That is why a
         serving front-end refuses to start without them.
 
         The back-end cannot make the same demand: it *writes* the cache, so on a
@@ -147,8 +149,8 @@ class ConfigManager(BaseConfigReader):
         elif require_module_config:
             if module_config_path.exists():
                 raise ConfigException(f"{module_config_path.name} exists but could not be read. Refusing to start: "
-                                      f"module-defined settings would silently fall back to their defaults, which can "
-                                      f"overwrite stored values when settings are saved from the web interface.")
+                                      f"every module-defined setting would be missing from the control panel, which "
+                                      f"would then quietly show an incomplete picture of how 4CAT is configured.")
 
             raise ConfigException(f"No {module_config_path.name} file exists! It is written by the back-end when it "
                                   f"boots, so the back-end must be started first.")
@@ -406,9 +408,7 @@ class ConfigManager(BaseConfigReader):
                 declared.get("declared_by", "core:config_definition"),
                 declared.get("kind", "core"),
                 declared.get("extension_id"),
-                definition.get("category", setting.split(".")[0]),
-                definition.get("category_label"),
-                bool(definition.get("managed", False)),
+                bool(definition.get("indirect", False)),
                 now,
                 now,
                 last_definition
@@ -419,21 +419,37 @@ class ConfigManager(BaseConfigReader):
             # records when a setting was first known, so it must survive
             self.db.execute_many("""
                 INSERT INTO settings_declarations
-                    (name, declared_by, owner_kind, extension_id, category, category_label, is_managed,
+                    (name, declared_by, owner_kind, extension_id, is_indirect,
                      first_seen, last_seen, last_definition)
                 VALUES %s
                 ON CONFLICT (name) DO UPDATE SET
                     declared_by = EXCLUDED.declared_by,
                     owner_kind = EXCLUDED.owner_kind,
                     extension_id = EXCLUDED.extension_id,
-                    category = EXCLUDED.category,
-                    category_label = EXCLUDED.category_label,
-                    is_managed = EXCLUDED.is_managed,
+                    is_indirect = EXCLUDED.is_indirect,
                     last_seen = EXCLUDED.last_seen,
-                    last_definition = EXCLUDED.last_definition
+                    last_definition = EXCLUDED.last_definition,
+                    -- declared again, so whatever absence was recorded is over
+                    absent_since = NULL
             """, replacements=declarations, commit=False)
 
+        # written on every boot, unlike the clean-scan marker below: this is what
+        # tells the audit whether the most recent start-up could see everything
+        self.set("4cat.declarations_last_scan_complete", not degraded)
+
         if not degraded:
+            # anything with a row that was not declared this boot starts its
+            # clock now, which is the moment we actually saw it missing.
+            # Measuring from last_seen instead counts the previous run's uptime
+            # as time spent absent, so a setting dropped by an upgrade on a
+            # server that had been up a month looks a month gone the instant it
+            # goes. Only on a complete boot: while an import is broken we cannot
+            # tell missing from unreachable.
+            self.db.execute("""
+                UPDATE settings_declarations SET absent_since = %s
+                 WHERE absent_since IS NULL AND name <> ALL(%s::text[])
+            """, (now, [declaration[0] for declaration in declarations]), commit=False)
+
             self.set("4cat.declarations_last_clean_scan", now)
 
         self.db.commit()
@@ -468,8 +484,8 @@ class ConfigManager(BaseConfigReader):
         - `absent_extension`: declared by an extension that is not installed.
           Re-installing it must restore the previous configuration, so these are
           kept indefinitely.
-        - `vanished`: last declared by core, and not seen for long enough that a
-          run of complete scans has passed without it.
+        - `vanished`: last declared by core, and found missing longer ago than
+          the grace period.
         - `recently_absent`: last declared by core and not seen now, but not for
           long enough to be sure. Also everything, whatever its age, when the
           most recent boot was incomplete.
@@ -477,24 +493,25 @@ class ConfigManager(BaseConfigReader):
           keeping, or was written directly. Never a candidate, because there is
           no evidence either way.
 
-        Age is measured against the last *complete* scan rather than the clock.
-        While a module fails to import, that marker stops advancing, so nothing
-        can age into looking removed just because 4CAT is currently unable to
-        see it.
+        Age is measured from `absent_since`, the first complete start-up that
+        found a setting gone, and not from `last_seen`, which is only the last
+        time 4CAT looked and found it - the gap between two start-ups is the
+        operator's uptime, not time spent absent. `absent_since` is written only
+        on a complete start-up, so a broken import still cannot age anything
+        out, and `scan_is_current` holds everything back besides.
 
         :return dict:  `scan_is_current` (was the most recent boot complete),
         `last_clean_scan`, and `findings`, a list of undeclared settings
         """
         self.with_db()
+        now = int(time.time())
 
         last_clean_scan = self.get("4cat.declarations_last_clean_scan") or 0
-        latest = self.db.fetchone("SELECT MAX(last_seen) AS seen FROM settings_declarations")
-        latest_scan = (latest["seen"] if latest else 0) or 0
 
-        # last_seen advances on every boot, the clean-scan marker only on boots
-        # where every module imported. If the two differ, the most recent boot
-        # was incomplete.
-        scan_is_current = bool(last_clean_scan) and latest_scan <= last_clean_scan
+        # a start-up that could not load every module cannot be trusted to say
+        # what is missing, so nothing is judged until one that could. Only ever
+        # true after a complete boot, which is also what writes last_clean_scan.
+        scan_is_current = bool(self.get("4cat.declarations_last_scan_complete"))
 
         # imported here rather than at the top of the module: helpers builds a
         # CoreConfigManager when it loads, so importing it there is circular
@@ -502,7 +519,7 @@ class ConfigManager(BaseConfigReader):
         installed, _ = find_extensions()
 
         rows = self.db.fetchall("""
-            SELECT s.name, s.tag, s.value, d.declared_by, d.owner_kind, d.extension_id, d.last_seen, d.last_definition
+            SELECT s.name, s.tag, s.value, d.declared_by, d.owner_kind, d.extension_id, d.last_seen, d.absent_since
               FROM settings s
               LEFT JOIN settings_declarations d ON s.name = d.name
              ORDER BY s.name, s.tag
@@ -523,9 +540,12 @@ class ConfigManager(BaseConfigReader):
                 state = "unknown"
             elif record["owner_kind"] == "extension":
                 state = "dormant" if record["extension_id"] in installed else "absent_extension"
-            elif not scan_is_current:
+            elif not scan_is_current or not record["absent_since"]:
+                # no absence recorded: the last complete start-up still had this
+                # setting, so this process not knowing it is not evidence of
+                # anything
                 state = "recently_absent"
-            elif (last_clean_scan - (record["last_seen"] or 0)) > self.ORPHAN_GRACE_PERIOD:
+            elif (now - record["absent_since"]) > self.ORPHAN_GRACE_PERIOD:
                 state = "vanished"
             else:
                 state = "recently_absent"
@@ -536,6 +556,11 @@ class ConfigManager(BaseConfigReader):
                 "declared_by": record["declared_by"],
                 "extension_id": record["extension_id"],
                 "last_seen": record["last_seen"],
+                "absent_since": record["absent_since"],
+                # nothing declares this, so there is no definition to render it
+                # with and no field for it on the settings page. Carried so the
+                # unused settings page can at least show what is stored.
+                "value": record["value"],
                 "tags": [row["tag"] for row in stored],
                 # ensure_database() only ever writes the global tag, so a value
                 # stored against a tag was put there by a person. There is no

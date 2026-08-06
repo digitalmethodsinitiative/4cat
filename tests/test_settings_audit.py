@@ -43,25 +43,33 @@ def config(installed_extensions):
         manager.core_settings = {}
         manager.get = MagicMock(side_effect=lambda key, *args, **kwargs: {
             "4cat.declarations_last_clean_scan": NOW,
+            "4cat.declarations_last_scan_complete": True,
         }.get(key))
 
         yield manager
 
 
 def stored(name, value="null", tag="", declared_by=None, owner_kind=None, extension_id=None,
-           last_seen=None, last_definition=None):
+           last_seen=None, absent_since=None):
     return {"name": name, "tag": tag, "value": value, "declared_by": declared_by, "owner_kind": owner_kind,
-            "extension_id": extension_id, "last_seen": last_seen, "last_definition": last_definition}
+            "extension_id": extension_id, "last_seen": last_seen, "absent_since": absent_since}
 
 
-def run_audit(config, rows, latest_scan=NOW):
+def run_audit(config, rows, scan_complete=True):
     """
     Run the audit over a hand-built settings/declarations join
+
+    The clock is pinned so a setting's age is whatever the row says it is,
+    rather than however long ago NOW happens to be when the suite runs.
     """
-    config.db.fetchone.return_value = {"seen": latest_scan}
+    config.get = MagicMock(side_effect=lambda key, *args, **kwargs: {
+        "4cat.declarations_last_clean_scan": NOW,
+        "4cat.declarations_last_scan_complete": scan_complete,
+    }.get(key))
     config.db.fetchall.return_value = rows
 
-    audit = config.audit_settings()
+    with patch("common.config_manager.time.time", return_value=NOW):
+        audit = config.audit_settings()
 
     return {finding["name"]: finding for finding in audit["findings"]}, audit
 
@@ -94,31 +102,62 @@ def test_extension_not_installed_is_kept(config):
     assert findings["webjutter-search.password"]["state"] == "absent_extension"
 
 
-def test_core_setting_unseen_across_clean_scans_has_vanished(config):
+def test_core_setting_absent_past_the_grace_period_has_vanished(config):
     """
     The one state that is ever offered for removal: last declared by core, and
-    absent for longer than the grace period of complete scans.
+    found missing longer ago than the grace period.
     """
     findings, _ = run_audit(config, [
         stored("4cat.removed_feature", declared_by="core:config_definition", owner_kind="core",
-               last_seen=NOW - 60 * DAY)
+               last_seen=NOW - 90 * DAY, absent_since=NOW - 60 * DAY)
     ])
 
     assert findings["4cat.removed_feature"]["state"] == "vanished"
 
 
+def test_uptime_before_a_setting_went_is_not_counted_against_it(config):
+    """
+    Age comes from absent_since - the first complete start-up that found the
+    setting gone - and never from last_seen, which is only the last time 4CAT
+    looked and found it.
+
+    The gap between two start-ups is the operator's uptime. Measuring from
+    last_seen would make a setting an upgrade removed look long gone the moment
+    it went, so on a server up for months the grace period would buy nothing at
+    exactly the point it is meant to.
+    """
+    findings, _ = run_audit(config, [
+        # last declared three months ago, found missing moments ago
+        stored("4cat.removed_feature", declared_by="core:config_definition", owner_kind="core",
+               last_seen=NOW - 90 * DAY, absent_since=NOW - 60)
+    ])
+
+    assert findings["4cat.removed_feature"]["state"] == "recently_absent"
+
+
+def test_setting_not_yet_recorded_absent_is_not_a_candidate(config):
+    """
+    No absence recorded means the last complete start-up still had this setting,
+    so this process not knowing it is not evidence of anything.
+    """
+    findings, _ = run_audit(config, [
+        stored("4cat.removed_feature", declared_by="core:config_definition", owner_kind="core",
+               last_seen=NOW - 90 * DAY, absent_since=None)
+    ])
+
+    assert findings["4cat.removed_feature"]["state"] == "recently_absent"
+
+
 def test_incomplete_boot_never_produces_a_candidate(config):
     """
-    While a module fails to import its settings are unreachable, not removed. A
-    boot that could not see everything must not promote anything to a candidate,
-    however old it looks - last_seen advances on every boot, the clean-scan
-    marker only on complete ones, so the two differing means the last boot was
-    incomplete.
+    While a module fails to import its settings are unreachable, not removed, so
+    a start-up that could not load everything must not promote anything to a
+    candidate however old it looks.
     """
     findings, audit = run_audit(config, [
         stored("4cat.removed_feature", declared_by="core:config_definition", owner_kind="core",
-               last_seen=NOW - 60 * DAY)
-    ], latest_scan=NOW + DAY)
+               last_seen=NOW - 90 * DAY, absent_since=NOW - 60 * DAY)
+    ], scan_complete=False)
 
     assert audit["scan_is_current"] is False
     assert findings["4cat.removed_feature"]["state"] == "recently_absent"
@@ -163,25 +202,34 @@ def test_archiving_a_setting_in_use_is_refused(config):
     config.db.delete.assert_not_called()
 
 
-def test_archiving_moves_every_tag_not_just_the_global_one(config):
+def test_archiving_moves_every_tag_in_one_statement(config):
     """
-    A setting can hold a value per tag as well as globally. Archiving has to take
-    all of them, or the setting is half-removed and comes back partly configured.
+    A setting can hold a value per tag as well as globally, and all of them have
+    to move or it comes back partly configured.
+
+    The move is one statement on purpose. The front-end shares a single database
+    connection across its threads, so a delete and an insert issued separately
+    can have another request commit or roll back between them - which for this
+    pair means losing the archived copy and keeping the delete.
     """
     config.audit_settings = MagicMock(return_value={
         "findings": [{"name": "gone.setting", "state": "vanished", "declared_by": "core:config_definition"}]
     })
     config.clear_cache = MagicMock()
-    config.db.fetchall.return_value = [
-        {"name": "gone.setting", "value": '"a"', "tag": ""},
-        {"name": "gone.setting", "value": '"b"', "tag": "researchers"},
-    ]
+    config.db.fetchall.return_value = [{"name": "gone.setting"}, {"name": "gone.setting"}]
 
     moved = config.archive_setting("gone.setting", archived_by="admin")
 
     assert moved == 2
-    assert config.db.insert.call_count == 2
-    # by name, so every tag goes; deleting per (name, tag) would leave the rest
-    config.db.delete.assert_called_once_with("settings", where={"name": "gone.setting"}, commit=False)
+    config.db.fetchall.assert_called_once()
+    query = config.db.fetchall.call_args[0][0]
+    assert "DELETE FROM settings" in query and "INSERT INTO settings_archive" in query, (
+        f"the move must be a single statement, got: {query}"
+    )
+    # per name, so every tag goes; a per-(name, tag) delete would leave the rest
+    assert "WHERE name = %s" in query.split("RETURNING")[0]
+    # nothing may be issued separately, or there is a window to be torn in
+    config.db.insert.assert_not_called()
+    config.db.delete.assert_not_called()
     # stale values would otherwise be served from memcache under any tag
     config.clear_cache.assert_called_once()

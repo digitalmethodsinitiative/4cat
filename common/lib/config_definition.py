@@ -244,6 +244,16 @@ config_definition = {
         "global": True,
         "indirect": True
     },
+    "4cat.declarations_last_scan_complete": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Last settings scan was complete",
+        "tooltip": "Whether the most recent back-end boot could load every module. While this is off, nothing may be "
+                   "judged obsolete: the settings of a module that failed to import look abandoned when they are "
+                   "merely unreachable.",
+        "global": True,
+        "indirect": True
+    },
     "4cat.declarations_reported": {
         "type": UserInput.OPTION_TEXT,
         "default": "",

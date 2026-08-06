@@ -24,12 +24,18 @@ CREATE TABLE IF NOT EXISTS settings_declarations (
   declared_by            TEXT DEFAULT '' NOT NULL,
   owner_kind             TEXT DEFAULT 'core' NOT NULL,
   extension_id           TEXT DEFAULT NULL,
-  category               TEXT DEFAULT '' NOT NULL,
-  category_label         TEXT DEFAULT NULL,
-  is_managed             BOOLEAN DEFAULT FALSE,
+  -- the setting is maintained by 4CAT rather than set by an admin
+  -- (`indirect` in the definition), so an orphaned one is machine-written
+  -- state rather than something a person configured
+  is_indirect            BOOLEAN DEFAULT FALSE,
   first_seen             INTEGER DEFAULT 0,
   last_seen              INTEGER DEFAULT 0,
-  last_definition        TEXT DEFAULT NULL
+  last_definition        TEXT DEFAULT NULL,
+  -- the first complete start-up that found this setting gone, NULL while it is
+  -- still declared. How long a setting has been absent must be measured from
+  -- this, not from last_seen: last_seen is only the last time 4CAT looked and
+  -- found it, so the gap between two start-ups is the operator's uptime.
+  absent_since           INTEGER DEFAULT NULL
 );
 
 -- settings are moved here rather than deleted, so removing one is reversible

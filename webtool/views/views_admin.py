@@ -772,12 +772,12 @@ def manipulate_settings():
             current_value = json.dumps(current_value)
 
         if option not in definition:
-            # stored, but nothing declares it, so there is no type to validate
-            # against and no telling what the value is meant to be. Not shown
-            # here at all - an editable field would have to guess a type, and
-            # saving the form would then write plain text over a value that may
-            # be JSON. They are listed, with what can be done about them, on the
-            # unused settings page instead.
+            # stored, but nothing declares it, so there is no type to render a
+            # field with and no telling what the value is meant to be. An
+            # editable field would have to guess, and UserInput.parse_all()
+            # would discard whatever was typed into it anyway, since it only
+            # returns keys that are in the definition. Listed with their stored
+            # value on the unused settings page instead.
             unused_settings += 1
             continue
 
