@@ -106,27 +106,37 @@ class TikTokVideoDownloader(ProcessorPreset):
                     "columns": ["video_url"],
                     "split-comma": False,
                     "also_indirect": "all", # enabled YT-DLP
-                    "_ytdlp_fallback_column": "tiktok_url" # YT-DLP uses TikTok post URL
+                    "_ytdlp_fallback_column": "tiktok_url", # YT-DLP uses TikTok post URL
+                    # The helper dataset above copies each item's own id through,
+                    # so the archive's metadata can credit the dataset this preset
+                    # was run on rather than the helper. Only when the id column is
+                    # the items' own `id`: with any other column the recorded post
+                    # IDs would not match that dataset's items, and the helper -
+                    # whose `id` column does hold them - stays the right answer.
+                    **({"_from_dataset": self.source_dataset.key} if column == "id" else {}),
                 }
             },
         ]
 
         return pipeline
 
-    @staticmethod
-    def map_metadata(url, data):
+    @classmethod
+    def map_metadata(cls, filename, item):
         """
-        Iterator to yield modified metadata for CSV
+        Yield CSV row(s) for a successful metadata entry
 
         The archive this preset produces is written by the video downloader in
         its pipeline and copied to this dataset, so the metadata file inside it
         has the video downloader's format and is read the same way.
-
-        :param str url:  string that may contain URLs
-        :param dict data:  dictionary with metadata collected previously
-        :yield dict:  	  iterator containing reformated metadata
         """
-        yield from VideoDownloaderPlus.map_metadata(url, data)
+        yield from VideoDownloaderPlus.map_metadata(filename, item)
+
+    @classmethod
+    def map_failure_metadata(cls, failure):
+        """
+        Yield CSV row(s) for a failed download, in the video downloader's format
+        """
+        yield from VideoDownloaderPlus.map_failure_metadata(failure)
 
 
 class TikTokVideoMetadata(BasicProcessor):
