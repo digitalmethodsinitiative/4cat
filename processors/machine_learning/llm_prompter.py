@@ -27,11 +27,25 @@ class LLMPrompter(BasicProcessor):
     Prompt various LLMs, locally or through APIs
     """
     type = "llm-prompter"  # job type ID
-    category = "Machine learning"  # category
-    title = "LLM prompting"  # title displayed in UI
-    description = ("Use LLMs to analyze a dataset per item, via APIs or locally. Suitable for a wide arrange of tasks like "
-                   "classification, entity extraction, or OCR. Supported APIs include OpenAI, Google, Anthropic, "
-                   "Mistral, and DeepSeek.")
+    description = ProcessorDescription(
+        title="Prompt a large language model",
+        tags=["text analysis", "visual", "audio", "classification", "genAI", "annotations"],
+        description="Run a prompt against a large language model for each item in a dataset, using a local model or a third-party API such as OpenAI, Google, Anthropic, Mistral, or DeepSeek. Insert column values into the prompt with brackets, attach images or other media, optionally let the model search the web, and optionally return structured JSON.",
+        references=[
+            "[Törnberg, Petter. 2023. 'How to Use LLMs for Text Analysis.' arXiv:2307.13106.](https://arxiv.org/pdf/2307.13106)",
+            "[Karjus, Andres. 2023. 'Machine-assisted mixed methods: augmenting humanities and social sciences with artificial intelligence.' arXiv preprint arXiv:2309.14379.](https://arxiv.org/abs/2309.14379)",
+        ],
+        warnings=[
+            "Third-party API models send your data to an external provider and usually incur costs; consider anonymising your data or using a local model instead.",
+            "Test your prompt on a small sample first, as results depend heavily on the prompt and the chosen model.",
+            "Results from a model that is allowed to search the web depend on what the web looked like at the time of the run, and re-running the same prompt later may therefore produce different output.",
+        ],
+        info=[
+            "Batching several items per prompt can be faster but may reduce accuracy and needs a model that supports structured output.",
+            "Web search is run by the model's provider, not by 4CAT. The URLs the model cited are stored per item, but the search queries and the full result pages are not.",
+        ],
+        icon="robot",
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI. In this case it's variable!
 
     # coarse map spec; is_compatible_with (below) is the runtime truth -- it accepts csv/ndjson
@@ -232,6 +246,15 @@ class LLMPrompter(BasicProcessor):
                 "requires": "structured_output==true",
                 "default": "",
             },
+            "web_search": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Allow web search",
+                "default": False,
+                "tooltip": "Let the model look things up on the web before it answers, using its provider's own "
+                           "search tool. Only OpenAI, Anthropic and Google models support this. Cannot be combined "
+                           "with structured output or with batching. The URLs the model cites are saved per item.",
+                "requires": "model^=thirdparty && structured_output==false",
+            },
             "temperature": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Temperature",
@@ -349,6 +372,7 @@ class LLMPrompter(BasicProcessor):
         self.dataset.update_status("Validating settings")
 
         hide_think = self.parameters.get("hide_think", False)
+        web_search = self.parameters.get("web_search", False)
 
         # Check if the source dataset is a media archive (zip with images/video/audio)
         is_media_archive = (
@@ -374,7 +398,9 @@ class LLMPrompter(BasicProcessor):
 
         # Set value for batch length in prompts
         batches = max(1, min(self.parameters.get("batches", 1), self.source_dataset.num_rows))
-        use_batches = batches > 1 and not (media_columns or is_media_archive)  # no batching for media files
+        # no batching for media files, and none when searching: batching relies on
+        # structured output, which competes with the search tool
+        use_batches = batches > 1 and not (media_columns or is_media_archive) and not web_search
 
         if not use_batches:
             self.dataset.delete_parameter("batches")
@@ -397,6 +423,10 @@ class LLMPrompter(BasicProcessor):
 
         if server["type"] == "thirdparty" and not api_key:
             return self.dataset.finish_with_error(f"No API key provided for model {chosen_model_id}")
+
+        if web_search and not LLMAdapter.supports_web_search(model):
+            return self.dataset.finish_with_error(f"Model {chosen_model_id} does not offer web search. Use an "
+                                                  f"OpenAI, Anthropic or Google model, or disable web search.")
 
         # Prompt validation
         base_prompt = self.parameters.get("prompt", "")
@@ -452,11 +482,15 @@ class LLMPrompter(BasicProcessor):
                 api_key=api_key,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                client_kwargs=client_kwargs
+                client_kwargs=client_kwargs,
+                web_search=web_search
             )
         except Exception as e:
             self.dataset.finish_with_error(str(e))
             return
+
+        if web_search:
+            self.dataset.update_status(f"Web search enabled; {model['name']} may look things up before answering")
 
         # Setup annotation saving
         annotations = []
@@ -601,6 +635,9 @@ class LLMPrompter(BasicProcessor):
                         self.dataset.finish_with_warning(outputs, warning)
                         return
 
+                    # Sources the model consulted, if it was allowed to search
+                    sources = llm.get_sources(response) if web_search else []
+
                     # Parse structured or plain output
                     if structured_output:
                         if isinstance(response, str):
@@ -611,6 +648,10 @@ class LLMPrompter(BasicProcessor):
                         except (ValidationError, SchemaError) as e:
                             self.dataset.finish_with_error(f"Invalid JSON schema and/or LLM output: `{e}`")
                             return
+                    elif web_search:
+                        # a searching response interleaves the answer with blocks
+                        # recording the vendor's searches; only the text is output
+                        output = [llm.get_text(response)]
                     else:
                         output = response.content
                         if not isinstance(output, list):
@@ -653,6 +694,7 @@ class LLMPrompter(BasicProcessor):
                             "time_created_utc": time_created,
                             "batch_number": "",
                             "system_prompt": system_prompt,
+                            "urls_consulted": sources,
                         }
                         outfile.write(json.dumps(result) + "\n")
                         outputs += 1
@@ -873,6 +915,9 @@ class LLMPrompter(BasicProcessor):
                             self.dataset.finish_with_warning(outputs, warning)
                             return
 
+                        # Sources the model consulted, if it was allowed to search
+                        sources = llm.get_sources(response) if web_search else []
+
                         # Always parse JSON outputs in the case of batches.
                         if use_batches or structured_output:
                             if isinstance(response, str):
@@ -898,6 +943,11 @@ class LLMPrompter(BasicProcessor):
                             except (ValidationError, SchemaError) as e:
                                 self.dataset.finish_with_error(f"Invalid JSON schema and/or LLM output: `{e}`")
                                 return
+
+                        # A searching response interleaves the answer with blocks
+                        # recording the vendor's searches; only the text is output
+                        elif web_search:
+                            output = [llm.get_text(response)]
 
                         # Else we'll just store the output in a list
                         else:
@@ -958,6 +1008,7 @@ class LLMPrompter(BasicProcessor):
                                 "time_created_utc": time_created,
                                 "batch_number": n + 1 if use_batches else "",
                                 "system_prompt": system_prompt,
+                                "urls_consulted": sources,
                             }
                             outfile.write(json.dumps(result) + "\n")
                             outputs += 1
@@ -1122,6 +1173,18 @@ class LLMPrompter(BasicProcessor):
         if query["model"] not in chain(*[v.keys() for v in allowed_models.values()]):
             raise QueryParametersException(f"The '{query['model']}' model is not currently available.")
 
+        if query.get("web_search"):
+            model = config.get("llm.available_models", {}).get(query["model"], {})
+            if not LLMAdapter.supports_web_search(model):
+                raise QueryParametersException("Web search is only available for OpenAI, Anthropic and Google "
+                                               f"models; '{query['model']}' does not offer it.")
+            if query.get("structured_output"):
+                raise QueryParametersException("Web search cannot be combined with structured JSON output. Disable "
+                                               "one of the two.")
+            if int(query.get("batches", 1) or 1) > 1:
+                raise QueryParametersException("Web search cannot be combined with batching. Set 'items per prompt' "
+                                               "to 1, or disable web search.")
+
         # For media archive datasets, use_media won't be present in the query
         is_media_archive = "use_media" not in query
 
@@ -1149,6 +1212,11 @@ class LLMPrompter(BasicProcessor):
         # Every nested key in this JSON will become its own flattened key if this is the case.
         output = flatten_dict({"output": item["output"]}) if isinstance(item["output"], dict) else {"output": item["output"]}
 
+        # Sources the model consulted through web search. Absent in datasets made
+        # before web search was available, and empty whenever the model did not
+        # search or did not cite what it found.
+        urls_consulted = [source.get("url", "") for source in item.get("urls_consulted", [])]
+
         return MappedItem({
             "id": item["id"],
             **output,
@@ -1160,5 +1228,6 @@ class LLMPrompter(BasicProcessor):
             "time_created": item["time_created"],
             "time_created_utc": item["time_created_utc"],
             "batch_number": item["batch_number"],
-            "system_prompt": item["system_prompt"]
+            "system_prompt": item["system_prompt"],
+            "urls_consulted": ",".join([url for url in urls_consulted if url])
         })

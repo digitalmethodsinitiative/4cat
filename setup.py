@@ -17,7 +17,7 @@ core_packages = {
 	"html2text==2020.*",
 	"ImageHash>4.2.0",
 	"json_stream",
-	"langchain_core",
+	"langchain_core>=1.0",  # llm_prompter reads normalised message content blocks
 	"langchain_community",
 	"langchain_anthropic",
 	"langchain_google_genai",

@@ -15,6 +15,19 @@ from langchain_openai import ChatOpenAI
 from langchain_mistralai import ChatMistralAI
 from langchain_deepseek import ChatDeepSeek
 
+# Vendors that host a web search tool on their own infrastructure, which we can
+# hand to the model as a tool definition. The vendor runs the searches and folds
+# the results into its answer, so 4CAT never issues a search request itself.
+# Everything else (Mistral, DeepSeek, and any self-hosted Ollama/vLLM/LM Studio
+# server) has no equivalent, and binding the tool there errors out.
+WEB_SEARCH_PROVIDERS = {"openai", "anthropic", "google"}
+
+# Seconds to wait for a response. Searching turns are much slower than plain
+# completions, since the vendor runs one or more searches before generating, so
+# they get a more forgiving ceiling.
+REQUEST_TIMEOUT = 100
+WEB_SEARCH_REQUEST_TIMEOUT = 300
+
 
 class LLMAdapter:
     def __init__(
@@ -25,6 +38,8 @@ class LLMAdapter:
             temperature: float = 0.1,
             max_tokens: int = 1000,
             client_kwargs: Optional[dict] = None,
+            web_search: bool = False,
+            max_web_searches: int = 5,
     ):
         """
         Instantiate an adapter to interface with an LLM model
@@ -36,6 +51,10 @@ class LLMAdapter:
         :param float temperature:  Temperature hyperparameter
         :param int max_tokens:  Max tokens to generate
         :param dict client_kwargs:  Optional parameters for the LLM adapter class
+        :param bool web_search:  Give the model its vendor's web search tool. Only
+          supported for the vendors in `WEB_SEARCH_PROVIDERS`.
+        :param int max_web_searches:  Ceiling on searches per prompt, where the
+          vendor lets us set one
         """
         self.model = model
         self.server = server
@@ -45,8 +64,17 @@ class LLMAdapter:
         self.parser = None
         self.max_tokens = max_tokens
         self.client_kwargs = dict(client_kwargs) if client_kwargs else {}
+        self.web_search = web_search
+        self.max_web_searches = max_web_searches
 
         self.llm: BaseChatModel = self._load_llm()
+
+        if self.web_search:
+            # binding returns a new runnable rather than mutating the chat model,
+            # so this is the last thing we do with `self.llm`. Structured output
+            # would compete with the search tool for the same function-calling
+            # channel, which is why the processor treats them as exclusive.
+            self.llm = self.llm.bind_tools([self.get_web_search_tool()])
 
     def _load_llm(self) -> BaseChatModel:
         """
@@ -68,6 +96,11 @@ class LLMAdapter:
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
         }
+
+        # only override the SDK defaults when searching, so ordinary prompting
+        # keeps the timeout behaviour it has always had
+        if self.web_search:
+            chat_params["timeout"] = WEB_SEARCH_REQUEST_TIMEOUT
         # Only pass a base URL when the connection actually has one. An empty
         # string is taken literally by some SDKs (Anthropic, DeepSeek -> empty
         # endpoint) instead of falling back to the vendor default.
@@ -83,7 +116,10 @@ class LLMAdapter:
             adapter_class = ChatGoogleGenerativeAI
 
         elif wrapper == "anthropic":
-            chat_params.update({"timeout": 100, "stop": None})
+            chat_params.update({
+                "timeout": WEB_SEARCH_REQUEST_TIMEOUT if self.web_search else REQUEST_TIMEOUT,
+                "stop": None
+            })
             adapter_class = ChatAnthropic
 
         elif wrapper == "mistral":
@@ -95,12 +131,6 @@ class LLMAdapter:
 
         elif wrapper == "ollama":
             adapter_class = ChatOllama
-            # An Ollama server can sit behind a proxy that expects an auth
-            # header. Ollama's SDK takes extra headers via client_kwargs, so
-            # pass them there; without this the request goes out unauthenticated
-            # and the proxy rejects it, even though the model list loads fine.
-            if self.server.get("auth_header"):
-                self.client_kwargs.setdefault("headers", {})[self.server["auth_header"]] = self.server["auth_key"]
             chat_params.update({"client_kwargs": self.client_kwargs})
 
         elif wrapper in {"litellm", "openai-like"}:
@@ -121,6 +151,116 @@ class LLMAdapter:
             raise ValueError(f"{self.__class__.__name__} Unsupported LLM wrapper: {wrapper}")
 
         return adapter_class(**chat_params)
+
+    @staticmethod
+    def supports_web_search(model: dict) -> bool:
+        """
+        Can this model be given a vendor-hosted web search tool?
+
+        :param dict model:  Model metadata (as in `llm.available_models`)
+        :return bool:
+        """
+        return model.get("wrapper") in WEB_SEARCH_PROVIDERS
+
+    def get_web_search_tool(self) -> dict:
+        """
+        Build the web search tool definition for this model's vendor.
+
+        Each vendor spells its search tool differently, so this is the one place
+        that knows about those differences.
+
+        :return dict:  Tool definition, to bind to the chat model
+        :raises ValueError:  If the vendor has no web search tool
+        """
+        wrapper = self.model["wrapper"]
+
+        if wrapper == "openai":
+            # built-in tools are only available through the Responses API, but
+            # langchain-openai switches to it by itself once one is bound
+            return {"type": "web_search"}
+
+        elif wrapper == "anthropic":
+            # the original tool version, which every Claude model with web search
+            # accepts. Newer versions add result filtering but are rejected by
+            # older models, and the model catalogue is admin-editable, so we
+            # cannot assume the selected model is recent enough for those.
+            return {
+                "type": "web_search_20250305",
+                "name": "web_search",
+                "max_uses": self.max_web_searches
+            }
+
+        elif wrapper == "google":
+            return {"google_search": {}}
+
+        raise ValueError(f"{self.__class__.__name__}: model '{self.model['local_id']}' has no web search tool")
+
+    @staticmethod
+    def get_text(response) -> str:
+        """
+        Get the plain text of a response.
+
+        A response from a searching model interleaves the answer with blocks
+        recording the searches the vendor ran on the model's behalf. Only the text
+        is the model's actual output, so everything else is dropped here.
+
+        :param response:  Response message
+        :return str:  Response text
+        """
+        # `text` is a property in recent LangChain versions and a method in older
+        # ones; both are in the wild depending on what got installed
+        text = getattr(response, "text", None)
+        if callable(text):
+            try:
+                text = text()
+            except Exception:
+                text = None
+        if isinstance(text, str) and text:
+            return text
+
+        content = getattr(response, "content", "")
+        if isinstance(content, str):
+            return content
+
+        return "\n".join([block.get("text", "") for block in content
+                          if isinstance(block, dict) and block.get("type") == "text"])
+
+    @staticmethod
+    def get_sources(response) -> List[dict]:
+        """
+        Get the sources a model consulted through its web search tool.
+
+        LangChain normalises the various vendor citation formats into 'citation'
+        annotations on the response's text blocks, so one pass over those covers
+        all supported vendors. Vendors are not obliged to cite, and the URL is
+        optional even when they do, so an empty list means 'nothing reported' and
+        not 'nothing consulted'.
+
+        :param response:  Response message
+        :return list:  Consulted sources, as `{"url": ..., "title": ...}` dicts, in
+          the order the model cited them and without duplicates
+        """
+        try:
+            blocks = response.content_blocks
+        except Exception:
+            # older langchain-core, or content that cannot be normalised
+            return []
+
+        sources = []
+        seen = set()
+
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            for annotation in block.get("annotations", []) or []:
+                if not isinstance(annotation, dict) or annotation.get("type") != "citation":
+                    continue
+                url = annotation.get("url")
+                if url and url not in seen:
+                    seen.add(url)
+                    sources.append({"url": url, "title": annotation.get("title", "")})
+
+        return sources
 
     def generate_text(
             self,
@@ -307,6 +447,11 @@ class LLMAdapter:
         """
         if not json_schema:
             raise ValueError("json_schema is None")
+
+        if self.web_search:
+            # both want the model's function-calling channel; forcing a schema
+            # would stop the model from ever reaching for the search tool
+            raise ValueError("Structured output cannot be combined with web search")
 
         if isinstance(json_schema, str):
             json_schema = json.loads(json_schema)
