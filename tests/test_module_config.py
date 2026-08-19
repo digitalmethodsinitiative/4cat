@@ -13,9 +13,14 @@ collapses per-tag resolution; its `default`, which applies whenever no row
 exists; and its `type`, which governs validation on save.
 
 """
+import ast
 import pickle
 
 import pytest
+
+from pathlib import Path
+
+DATASOURCES = Path(__file__).parent.parent.resolve().joinpath("datasources")
 
 
 @pytest.fixture
@@ -193,3 +198,75 @@ def test_reads_legacy_cache_without_sidecar(tmp_path):
 
     assert config.config_definition["legacy.setting"] == {"default": "kept"}
     assert config.setting_provenance == {}
+
+
+def _assigned_names(tree):
+    """
+    Every name assigned anywhere in a parsed module
+
+    Matched by name rather than by working out whether the assignment actually
+    runs: `datasources/test` only disables itself when an environment variable
+    is unset, and a data source that can be switched off at all is what matters
+    here.
+    """
+    return {target.id for node in ast.walk(tree) if isinstance(node, ast.Assign)
+            for target in node.targets if isinstance(target, ast.Name)}
+
+
+def _declared_settings(path):
+    """
+    Setting names declared in a class-level `config` dict in one file
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return []
+
+    return [key.value
+            for node in ast.walk(tree) if isinstance(node, ast.ClassDef)
+            for statement in node.body
+            if isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Dict)
+            and any(isinstance(target, ast.Name) and target.id == "config" for target in statement.targets)
+            for key in statement.value.keys
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)]
+
+
+def test_optional_datasources_declare_no_settings():
+    """
+    A core data source can decline to load by setting DATASOURCE_DISABLED. It
+    then never enters ModuleCollector.datasources, and that is the only thing
+    that puts its folder on the scan list in load_modules() - so its search and
+    import workers are not registered either, and any setting they declare goes
+    undeclared while the code is still installed and still reads it. The audit
+    cannot tell that apart from a setting that really was removed, so after the
+    grace period it offers the stored value for archiving.
+
+    Extension data sources are not affected: their folder also sits under
+    PATH_EXTENSIONS, which is scanned in its own right.
+
+    Rather than have the collector work out which of those it is looking at, the
+    rule is simply that a data source able to switch itself off declares no
+    settings.
+    """
+    assert DATASOURCES.is_dir(), "no datasources folder to check"
+
+    # without this the test passes just as happily if _declared_settings() stops
+    # recognising a config block
+    assert any(_declared_settings(module) for module in DATASOURCES.rglob("*.py")), \
+        "no data source appears to declare any setting - _declared_settings() is probably broken"
+
+    offenders = {}
+    for datasource in sorted(DATASOURCES.glob("*/__init__.py")):
+        if "DATASOURCE_DISABLED" not in _assigned_names(ast.parse(datasource.read_text(encoding="utf-8"))):
+            continue
+
+        for module in sorted(datasource.parent.rglob("*.py")):
+            declared = _declared_settings(module)
+            if declared:
+                offenders[str(module.relative_to(DATASOURCES.parent))] = sorted(declared)
+
+    assert not offenders, (
+        f"these files declare settings for a data source that can switch itself off with "
+        f"DATASOURCE_DISABLED, which stops 4CAT scanning that folder at all - the settings would then "
+        f"look removed rather than merely switched off: {offenders}"
+    )
