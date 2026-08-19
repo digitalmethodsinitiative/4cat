@@ -93,8 +93,9 @@
 
             {% if unused_settings %}
                 <p class="config-tag-info">{{ unused_settings }} setting{{ "s are" if unused_settings != 1 else " is" }}
-                    stored in the database but no longer in use, so {{ "they are" if unused_settings != 1 else "it is" }}
-                    not shown above. <a href="{{ url_for("admin.manage_unused_settings") }}">Review unused settings</a>.</p>
+                    stored in the database but not declared by anything 4CAT currently loads, so
+                    {{ "they are" if unused_settings != 1 else "it is" }} not shown above.
+                    <a href="{{ url_for("admin.manage_unused_settings") }}">Review unused settings</a>.</p>
             {% endif %}
         </section>
     </article>

@@ -209,7 +209,8 @@ def test_restoring_over_a_live_value_is_refused(config):
     to undo that with. So it has to refuse when the setting is in use again.
     """
     config.clear_cache = MagicMock()
-    config.db.fetchone.return_value = {"found": 1}  # archived, and stored again
+    # archived, and stored again with a value somebody chose
+    config.db.fetchone.return_value = {"found": 1, "values_stored": 1, "values_configured": 1}
 
     with pytest.raises(ValueError, match="write over"):
         config.restore_setting("gone.setting")
@@ -223,7 +224,8 @@ def test_restoring_takes_only_the_tag_it_was_asked_for(config):
     restoring has to take one and leave the others where they are.
     """
     config.clear_cache = MagicMock()
-    config.db.fetchone.side_effect = [{"found": 1}, None]  # archived; not in use
+    # archived; nothing stored for it now
+    config.db.fetchone.side_effect = [{"found": 1}, {"values_stored": 0, "values_configured": 0}]
     config.db.fetchall.return_value = [{"name": "gone.setting", "tag": "researchers"}]
 
     assert config.restore_setting("gone.setting", tag="researchers") == 1
@@ -238,7 +240,7 @@ def test_restoring_without_a_tag_takes_every_tag(config):
     No tag means the whole setting, which is what archive_setting() put there.
     """
     config.clear_cache = MagicMock()
-    config.db.fetchone.side_effect = [{"found": 1}, None]
+    config.db.fetchone.side_effect = [{"found": 1}, {"values_stored": 0, "values_configured": 0}]
     config.db.fetchall.return_value = [{"name": "gone.setting", "tag": ""},
                                        {"name": "gone.setting", "tag": "researchers"}]
 
@@ -285,3 +287,24 @@ def test_archiving_moves_every_tag_in_one_statement(config):
     # which 4CAT shares with the rate limiter
     config.uncache_setting.assert_called_once_with("gone.setting", ["", "researchers"])
     config.clear_cache.assert_not_called()
+
+
+def test_restoring_writes_over_a_value_left_at_its_default(config):
+    """
+    A setting declared again after being archived always has a row, because
+    ensure_database() creates one at the default. Refusing on that would put the
+    archived value out of reach for good: archive_setting() will not take it a
+    second time either, since something declares it now.
+    """
+    config.clear_cache = MagicMock()
+    config.config_definition = {"gone.setting": {"default": "the-default"}}
+    # archived; one row stored, none of it configured by anyone
+    config.db.fetchone.side_effect = [{"found": 1}, {"values_stored": 1, "values_configured": 0}]
+    config.db.fetchall.return_value = [{"name": "gone.setting", "tag": ""}]
+
+    assert config.restore_setting("gone.setting") == 1
+
+    query, _ = config.db.fetchall.call_args[0]
+    assert "ON CONFLICT (name, tag) DO UPDATE" in query, (
+        "the default row is there to be written over, not to collide with"
+    )

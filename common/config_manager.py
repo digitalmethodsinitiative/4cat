@@ -53,8 +53,9 @@ class ConfigManager(BaseConfigReader):
                             "configuration rather than reverting to defaults.",
         "recently_absent": "it has not been undeclared for long enough to be sure it is gone rather than in the middle "
                            "of being moved. It may also be that the last start-up could not load every module.",
-        "unknown": "there is no record of anything ever declaring it, so there is no evidence it was removed rather "
-                   "than simply never recorded. Remove it by hand if you are sure."
+        "unknown": "4CAT has no record of anything declaring it. That is not evidence it was removed - it may "
+                   "belong to an extension that was already uninstalled or switched off before 4CAT began keeping "
+                   "track. It is kept for that reason."
     }
     # Thread-local storage for a singleton memcache client per thread.
     # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
@@ -636,10 +637,12 @@ class ConfigManager(BaseConfigReader):
         """
         Put an archived setting back
 
-        Refused if the setting has a stored value again, because restoring
-        writes over it and - unlike archiving, which moves rather than deletes -
-        there would be nothing left to undo that with. Archive the current value
-        first if you want the older one back.
+        Refused if the setting has a stored value again that someone chose,
+        because restoring writes over it and - unlike archiving, which moves
+        rather than deletes - there would be nothing left to undo that with. A
+        value still at its default is written over: that row is one
+        `ensure_database()` created, and refusing on it would leave the archived
+        value unreachable for good.
 
         :param str name:  Setting to restore
         :param str tag:  Restore only the value archived against this tag; the
@@ -660,21 +663,48 @@ class ConfigManager(BaseConfigReader):
 
         # scoped the same way, so restoring one tag is not refused because a
         # different tag happens to be in use
-        if self.db.fetchone(f"SELECT 1 AS found FROM settings WHERE {conditions}", replacements):
-            raise ValueError(f"Setting '{name}' has a value stored again, and restoring would write over it. "
-                             f"Archive that value first if you want the archived one back.")
+        # ensure_database() gives every declared setting a row at its default, so
+        # a setting declared again after being archived always has one. Refusing
+        # on that would strand the archived value for good: it cannot be archived
+        # a second time either, because archive_setting() only accepts settings
+        # nothing declares. A value still at the default was set by nobody, and
+        # the setting is editable in the settings panel again, so writing over it
+        # is both safe and undoable by hand.
+        #
+        # IS DISTINCT FROM rather than <>, so a setting with no default of its own
+        # (NULL here) counts every stored value as one somebody chose
+        default = json.dumps(self.config_definition[name]["default"]) \
+            if name in self.config_definition and "default" in self.config_definition[name] else None
+
+        stored = self.db.fetchone(f"""
+            SELECT COUNT(*) AS values_stored,
+                   COUNT(*) FILTER (WHERE value IS DISTINCT FROM %s) AS values_configured
+              FROM settings WHERE {conditions}
+        """, (default, *replacements))
+
+        if stored["values_configured"]:
+            raise ValueError(f"Setting '{name}' has a value stored again that is not its default, so restoring "
+                             f"would write over it. Archive or change that value first if you want the archived "
+                             f"one back.")
+
+        overwritable = bool(stored["values_stored"])
 
         # as in archive_setting(), one statement so it cannot be left half-done.
         # a plain INSERT rather than an upsert: the check above established that
         # nothing is stored, so if something wrote the setting in between, the
         # unique constraint fails the whole statement and the archived copy
-        # stays put - which is the safe way to lose that race
+        # stays put - which is the safe way to lose that race. The one exception
+        # is a row still at its default, which is written over deliberately; the
+        # clause is fixed SQL either way, chosen by the check above.
+        on_conflict = "ON CONFLICT (name, tag) DO UPDATE SET value = EXCLUDED.value" if overwritable else ""
+
         restored = self.db.fetchall(f"""
             WITH moved AS (
                 DELETE FROM settings_archive WHERE {conditions} RETURNING name, value, tag
             )
             INSERT INTO settings (name, value, tag)
             SELECT name, value, tag FROM moved
+            {on_conflict}
             RETURNING name, tag
         """, replacements)
 

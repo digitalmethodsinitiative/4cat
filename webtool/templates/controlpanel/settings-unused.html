@@ -13,9 +13,10 @@
                 <p class="form-notice">{{ notice|safe }}</p>
             {% endfor %}
 
-            <p>These settings have a value stored in the database, but nothing in 4CAT or any installed extension
-                declares them any more. They are not in use. Archiving one moves its values aside rather than deleting
-                them, so it can be restored from this page afterwards.</p>
+            <p>These settings have a value stored in the database, but nothing 4CAT currently loads declares them.
+                That may be because they were removed, or because whatever declared them is not installed or not
+                switched on - the status column says which, where 4CAT knows. Archiving one moves its values aside
+                rather than deleting them, so it can be restored from this page afterwards.</p>
 
             {% if not scan_is_current %}
                 <p class="form-notice">The last time 4CAT started, not every module could be loaded. Settings belonging
