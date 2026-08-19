@@ -7,7 +7,6 @@
 #
 #   ASYNC    blocking calls such as time.sleep or open inside an async function
 #   W605     a backslash in a string that Python does not read as an escape
-#   RUF013   an argument that defaults to None but is not typed as optional
 #   RUF034   an if/else that gives the same answer either way   
 #   PLW0127  a variable assigned to itself
 
@@ -15,4 +14,4 @@
 target-version = "py311"
 
 [lint]
-select = ["E4", "E7", "E9", "F", "PLE", "B006", "B012", "B025"]
+select = ["E4", "E7", "E9", "F", "PLE", "B006", "B012", "B025", "RUF013"]
