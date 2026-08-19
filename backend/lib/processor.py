@@ -156,8 +156,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                         # this means there is no dataset that is *not* a preset anywhere
                         # above this dataset. This should never occur, but if it does, we
                         # cannot continue
-                        self.log.error("Processor preset %s for dataset %s cannot find non-preset parent dataset",
-                                       (self.type, self.dataset.key))
+                        self.log.error(f"Processor preset {self.type} for dataset {self.dataset.key} cannot find non-preset parent dataset")
                         self.job.finish()
                         return
 
