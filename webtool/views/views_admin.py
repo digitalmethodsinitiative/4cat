@@ -796,7 +796,12 @@ def manipulate_settings():
         # which tab a setting appears under. A setting may name its own category,
         # which is how settings declared across several modules end up in one
         # tab; if it does not, the first part of its name is used.
-        category = definition[option].get("category") or option.split(".")[0]
+        category = definition[option].get("category")
+        if not category or not config_definition.category_format.match(str(category)):
+            # ignored rather than rendered: the category is written into the tab's
+            # HTML id, and one the panel cannot look up breaks that tab and blanks
+            # whichever is open. ModuleCollector logs it at boot, naming the module.
+            category = option.split(".")[0]
 
         # a setting is core because core declares it, not because no module
         # claimed it: provenance is absent for everything if the sidecar could
@@ -831,7 +836,8 @@ def manipulate_settings():
     # such declaration in definition order wins. Otherwise the heading follows
     # whoever declares the settings, core first: a category core puts anything in
     # is a 4CAT namespace, whatever else adds to it.
-    submenu_precedence = config_definition.submenus
+    # a list so it can be ranked with index(); the dict's order is the precedence
+    submenu_precedence = list(config_definition.submenus)
     category_meta = {}
     for option in definition:
         settings = options[option]
@@ -898,7 +904,7 @@ def manipulate_settings():
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
                            datasources_config=datasources, changed=changed_categories,
                            expire_override=expire_override, extensions_config=extension_config,
-                           unused_settings=unused_settings)
+                           unused_settings=unused_settings, submenus=config_definition.submenus)
 
 
 @component.route("/manage-notifications/", methods=["GET", "POST"])

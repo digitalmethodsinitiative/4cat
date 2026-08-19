@@ -793,10 +793,22 @@ config_definition = {
     }
 }
 
-# Headings the settings panel lists category tabs under, in precedence order:
-# where settings sharing a category disagree about which they belong to, the
-# earliest wins. A setting may name one with `submenu` in its definition.
-submenus = ("core", "extensions", "datasources", "processors")
+# Headings the settings panel lists category tabs under, mapped to the label each
+# is shown under. In precedence order: where settings sharing a category disagree
+# about which heading they belong to, the earliest wins. A setting may name one
+# with `submenu` in its definition. The panel lists them in this order too.
+submenus = {
+    "core": "4CAT Core",
+    "extensions": "Extensions",
+    "datasources": "Data sources",
+    "processors": "Processors"
+}
+
+# a category becomes part of a tab's HTML id, which the settings panel looks up
+# with querySelector(). A category the selector cannot match takes down the tab
+# it names and the open one with it, because the switcher closes the current tab
+# before it fails to find the new one.
+category_format = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 # These are used in the web interface for more readable names
 # Can't think of a better place to put them...
