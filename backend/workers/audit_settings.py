@@ -39,7 +39,11 @@ class SettingsAuditor(BasicWorker):
 
     def work(self):
         if not self.config.get("4cat.report_orphan_settings"):
-            self.forget_report()
+            # only clear up if there is something to clear up. This runs daily on
+            # every install, and the setting is off by default, so doing it
+            # unconditionally is a DELETE and a settings write a day for nothing.
+            if self.config.get("4cat.declarations_reported"):
+                self.forget_report()
             return
 
         audit = self.config.audit_settings()

@@ -57,7 +57,7 @@ class YouTubeMetadata(BasicProcessor):
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
 
-		options = {	
+		options = {
 			"columns": {
 				"type": UserInput.OPTION_TEXT,
 				"help": "Columns with YouTube URLs",

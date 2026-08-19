@@ -81,7 +81,10 @@ is not treated as a collision.
 
 ### Where a setting appears
 A setting's tab is the part of its name before the first `.`, and that tab is listed under a heading matching where the
-setting was declared - 'Extensions' for anything an extension declares. Three optional keys override that:
+setting was declared - 'Extensions' for anything an extension declares. Note that this is decided per *tab*, not per
+setting, and 4CAT's own settings win: a tab that also holds a core setting is listed under '4CAT Core', including
+anything your extension put in it. Give your settings a prefix of your own and the question does not arise. Three
+optional keys override that:
 
 - `"category"` puts the setting in a named tab whatever its name is, which is how settings declared across several
   classes end up in one place.

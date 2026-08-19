@@ -143,9 +143,11 @@ class ConfigManager(BaseConfigReader):
 
         module_config_path = config_path.joinpath("module_config.bin")
         module_config = self.load_cache_file(module_config_path)
-        if module_config is not None:
-            # note: an empty mapping is valid (no module declares a setting) and
-            # is not the same as a failed read
+        if type(module_config) is dict:
+            # an empty mapping is valid (no module declares a setting) and is not
+            # the same as a failed read. Anything that is not a mapping at all is:
+            # update() would raise out of here, which for the front-end is during
+            # module import, so it has to take the unreadable path below instead.
             self.config_definition.update(module_config)
         elif require_module_config:
             if module_config_path.exists():

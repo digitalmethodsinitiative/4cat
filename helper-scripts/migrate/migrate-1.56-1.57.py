@@ -77,8 +77,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_archived_setting
 
 db.commit()
 
-# Core settings that 4CAT no longer has, with what became of each. 
-# This is a hand-checked list, because the settings provenance system 
+# Core settings that 4CAT no longer has, with what became of each.
+# This is a hand-checked list, because the settings provenance system
 # is only being built now.
 #
 # Only settings that were part of 4CAT itself are listed. Settings belonging to
