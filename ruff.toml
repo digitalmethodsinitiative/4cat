@@ -7,10 +7,9 @@
 #
 #   ASYNC    blocking calls such as time.sleep or open inside an async function
 #   W605     a backslash in a string that Python does not read as an escape
-#   PLW0127  a variable assigned to itself
 
 # The oldest Python that 4CAT supports
 target-version = "py311"
 
 [lint]
-select = ["E4", "E7", "E9", "F", "PLE", "B006", "B012", "B025", "RUF013", "RUF034"]
+select = ["E4", "E7", "E9", "F", "PLE", "B006", "B012", "B025", "RUF013", "RUF034", "PLW0127"]
