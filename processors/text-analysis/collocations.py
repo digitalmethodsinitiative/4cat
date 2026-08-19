@@ -256,8 +256,6 @@ class GetCollocations(BasicProcessor):
 
 					results.append(result)
 
-				max_output = max_output
-
 		if not results:
 			return
 

@@ -1037,7 +1037,7 @@ class LLMPrompter(BasicProcessor):
             self.dataset.finish(i)
 
     @staticmethod
-    def get_json_schema_for_batch(batch_size: int, custom_schema: dict = None) -> dict:
+    def get_json_schema_for_batch(batch_size: int, custom_schema: dict | None = None) -> dict:
         """
         Generates a JSON schema for an array of exactly `batch_size` items.
 

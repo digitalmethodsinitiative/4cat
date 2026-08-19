@@ -551,6 +551,8 @@ class SearchTelegram(Search):
                 except ChannelPrivateError:
                     self.dataset.update_status(f"Entity {entity_id_map.get(query, query)} is private, skipping")
                     self.flawless += 1
+                    # unable to process any entities here, so break out of the loop and continue with the next query
+                    break
 
                 except (UsernameInvalidError,):
                     self.dataset.update_status(f"Could not scrape entity '{entity_id_map.get(query, query)}', does not seem to exist, skipping")
@@ -576,11 +578,6 @@ class SearchTelegram(Search):
                 except ValueError as e:
                     self.dataset.update_status(f"Error '{e}' while collecting entity {entity_id_map.get(query, query)}, skipping")
                     self.flawless += 1
-
-                except ChannelPrivateError as e:
-                    self.dataset.update_status(
-                        f"QUERY '{entity_id_map.get(query, query)}' unable to complete due to error {e}. Skipping.")
-                    break
 
                 except TimeoutError:
                     if retries < 3:

@@ -212,8 +212,8 @@ class SearchWithTwitterAPIv2(Search):
                     except (json.JSONDecodeError, ValueError):
                         self.dataset.update_status("'Forbidden' error from the X API. Your key may not have access to "
                                                    "the full-archive search endpoint.", is_final=True)
-                    finally:
-                        return
+
+                    return
 
                 # sometimes twitter says '503 service unavailable' for unclear
                 # reasons - in that case just wait a while and try again
