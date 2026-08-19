@@ -331,7 +331,7 @@ class ExtractURLs(BasicProcessor):
         self.dataset.finish(url_matches_found)
 
     @staticmethod
-    def resolve_redirect(url, redirect_domains=None, cache={}, depth=0):
+    def resolve_redirect(url, redirect_domains=None, cache=None, depth=0):
         """
         Attempt to resolve redirects
 
@@ -341,6 +341,9 @@ class ExtractURLs(BasicProcessor):
         :param int depth: Number of redirects to attempt to follow
         :return str: Original url or new url for redirects
         """
+        if cache is None:
+            cache = {}
+        
         # Can use regex.sub() instead of string
         if hasattr(url, "group"):
             url = url.group(0)
