@@ -1,4 +1,3 @@
-#!python3
 import sys
 from common.lib.exceptions import ConfigException
 
