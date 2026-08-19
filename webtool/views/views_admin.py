@@ -648,15 +648,20 @@ def manage_unused_settings():
         label = escape(name)
         try:
             if request.form.get("action") == "restore":
-                # the field is sent even for the global value, where it is
-                # empty - absent means every tag, empty means the global one
-                restored = g.config.restore_setting(name, tag=request.form.get("tag"))
+                if "tag" not in request.form:
+                    raise ValueError(f"No tag was given for '{name}', so it is unclear which value to restore.")
+
+                restored = g.config.restore_setting(name, tag=request.form["tag"])
                 flash(f"Restored {label} ({restored} stored value(s)).")
             else:
                 archived = g.config.archive_setting(name, archived_by=current_user.get_id())
                 flash(f"Archived {label} ({archived} stored value(s)). It can be restored from this page.")
         except ValueError as e:
             flash(escape(str(e)))
+        except psycopg2.IntegrityError:
+            # The front-end shares one database connection across all its threads...
+            g.db.rollback()
+            flash(f"Could not restore {label}: something else wrote it at the same time. Try again.")
 
         return redirect(url_for("admin.manage_unused_settings"))
 
