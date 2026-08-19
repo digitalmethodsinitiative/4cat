@@ -90,10 +90,13 @@ def run(as_daemon=True, log_level="INFO"):
 	incomplete = modules.collection_failures()
 	recorded = config.record_declarations(degraded=bool(incomplete))
 	if incomplete:
+		# str() on the key because this line runs when 4CAT is already broken, and
+		# must not fail on an unexpected key type while saying so
+		detail = "; ".join(f"{name}: {reason}"
+						   for name, reason in sorted(incomplete.items(), key=lambda failure: str(failure[0])))
 		log.warning(f"Recorded {recorded} setting declarations, but {len(incomplete)} module(s) or setting(s) could "
 					f"not be loaded. Not marking this as a clean scan: settings belonging to them are unreachable, "
-					f"not obsolete, and must not age into looking removed. "
-					f"({'; '.join(f'{name}: {reason}' for name, reason in sorted(incomplete.items()))})")
+					f"not obsolete, and must not age into looking removed. ({detail})")
 	else:
 		log.debug(f"Recorded {recorded} setting declarations.")
 

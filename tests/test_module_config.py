@@ -33,9 +33,8 @@ def collector():
     instance = object.__new__(ModuleCollector)
     instance.workers = {}
     instance.log_buffer = ""
-    instance.uncacheable_settings = {}
+    instance.scan_failures = {}
     instance.missing_modules = {}
-    instance.failed_datasources = {}
 
     return instance
 
@@ -139,7 +138,7 @@ def test_unpicklable_definition_makes_the_boot_incomplete(collector, tmp_path):
     with tmp_path.joinpath("module_config.bin").open("rb") as infile:
         assert sorted(pickle.load(infile)) == ["ok.setting"]
 
-    assert "bad.setting" in collector.uncacheable_settings
+    assert "bad.setting" in collector.scan_failures
     assert "bad.setting" in collector.collection_failures(), (
         "a dropped setting must make the boot count as incomplete"
     )

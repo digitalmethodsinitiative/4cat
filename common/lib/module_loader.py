@@ -31,18 +31,12 @@ class ModuleCollector:
     process-wide through its module cache.
     """
     ignore = []
+    # missing dependency -> the modules that needed it, which is the grouping the
+    # "install these packages" warning at the end of load_modules() wants
     missing_modules = {}
-    # datasources whose package could not be imported at all. Kept apart from a
-    # folder that merely lacks DATASOURCE/init_datasource, which is not a
-    # failure - that is just a directory that is not a datasource (a leftover,
-    # say). This distinction matters: a datasource that fails to import is never
-    # added to self.datasources, so load_modules() never walks it for workers,
-    # so its settings go undeclared without anything landing in missing_modules.
-    failed_datasources = {}
-    # settings whose definition could not be pickled, so they are missing from
-    # the cache even though the module declaring them loaded fine. Same problem
-    # again: nothing else would notice they had gone.
-    uncacheable_settings = {}
+    # name -> why it could not be seen. Everything in here means some settings
+    # went undeclared while whatever owns them is installed and still reads them.
+    scan_failures = {}
     log_buffer = None
     config = None
 
@@ -122,11 +116,11 @@ class ModuleCollector:
         :return dict:  Description by module or setting name, empty if all well
         """
         return {
-            **{name: f"module could not be imported: {reason}" for name, reason in self.missing_modules.items()},
-            **{name: f"data source could not be imported: {reason}" for name, reason in
-               self.failed_datasources.items()},
-            **{name: f"setting definition could not be cached for {where}" for name, where in
-               self.uncacheable_settings.items()}
+            # flipped: missing_modules groups by dependency, but a caller counting
+            # what was lost needs one entry per module
+            **{module: f"could not be imported (missing dependency: {dependency})"
+               for dependency, modules in self.missing_modules.items() for module in modules},
+            **self.scan_failures
         }
 
     def collect_module_config(self):
@@ -199,8 +193,12 @@ class ModuleCollector:
                         "extension_id": extension_id,
                         "reason": refusal
                     })
-                    self.log_buffer += (f"Refusing setting '{setting}' declared by {worker_type}: {refusal}. The "
-                                        f"setting will not be registered and its declared definition is ignored.\n")
+                    # the worker still reads this setting, but it is no longer in
+                    # the definition, so the scan is not complete
+                    reason = f"declared by {worker_type} but refused: {refusal}"
+                    self.scan_failures[setting] = reason
+                    self.log_buffer += (f"Setting '{setting}' {reason}. It is not registered and its declared "
+                                        f"definition is ignored.\n")
                     continue
 
                 # not a refusal - the setting is fine, only its placement is
@@ -238,7 +236,7 @@ class ModuleCollector:
         declare a setting whose definition cannot be pickled - core itself puts
         a lambda in one definition, so an extension doing the same is plausible.
         Rather than take the back-end down at boot, those settings are dropped,
-        reported, and recorded in `uncacheable_settings` so the boot counts as
+        reported, and recorded in `scan_failures` so the boot counts as
         incomplete: they are missing from the definition while the module that
         declares them is loaded and still reading them, which is exactly the
         state that must not be mistaken for a setting having been removed.
@@ -266,7 +264,8 @@ class ModuleCollector:
             self.log_buffer += (f"Could not cache these settings, they will be unavailable: "
                                 f"{', '.join(sorted(unpicklable))}. Their definitions contain something that "
                                 f"cannot be pickled (e.g. a lambda).\n")
-            self.uncacheable_settings.update({key: path.name for key in unpicklable})
+            self.scan_failures.update({key: f"definition could not be pickled, so it is missing from {path.name}"
+                                       for key in unpicklable})
             data = {key: value for key, value in data.items() if key not in unpicklable}
             payload = pickle.dumps(data)
 
@@ -347,7 +346,9 @@ class ModuleCollector:
                     except (SyntaxError, ImportError) as e:
                         # this is fine, just ignore this data source and give a heads up
                         self.ignore.append(module_name)
-                        key_name = e.name if hasattr(e, "name") else module_name
+                        # a hand-raised ImportError("install x") has .name set to None,
+                        # which would key this dict by None and later break sorting it
+                        key_name = getattr(e, "name", None) or module_name
                         if key_name not in self.missing_modules:
                             self.missing_modules[key_name] = [module_name]
                         else:
@@ -363,7 +364,15 @@ class ModuleCollector:
                             continue
 
                         if component[1].type in self.workers:
-                            # already indexed
+                            # paths lists some folders twice - an extension data source
+                            # is under both the extension folder and its own path - so
+                            # the same class is reached more than once, which is fine.
+                            # Two *different* classes claiming one type is a naming bug.
+                            if self.workers[component[1].type] is not component[1]:
+                                self.log_buffer += (
+                                    f"Worker type '{component[1].type}' is declared by two classes: "
+                                    f"{self.workers[component[1].type].__module__} and {module_name}. Only the "
+                                    f"first is loaded; give one of them a different type.\n")
                             continue
 
                         # extract data that is useful for the scheduler and other
@@ -420,9 +429,8 @@ class ModuleCollector:
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
-                # a real failure: this datasource's workers will not be found
-                # either, so its settings will look undeclared this boot
-                self.failed_datasources[module_name] = str(e)
+                # its workers are never found either, so its settings go undeclared
+                self.scan_failures[module_name] = f"data source could not be imported: {e}"
                 self.log_buffer += "Could not import %s: %s\n" % (module_name, e)
                 return
 
