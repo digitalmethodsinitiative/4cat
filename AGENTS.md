@@ -171,7 +171,7 @@ Invocation (the plain `docker compose` command uses `docker-compose.yml`):
 - Tests mock `Database`, `ConfigManager`, `Job`, `JobQueue`, and `DataSet` extensively via `unittest.mock`. See fixtures in `test_modules.py` for patterns.
 - **After making changes**: at minimum run `pytest` to ensure all modules still load and pass validation. New processors/datasources must pass `test_processors`/`test_datasources`.
 - There are no integration or end-to-end tests. For complex logic, consider adding targeted unit tests.
-- `ruff` is available as a dependency. Run `ruff check .` to lint changed files. No custom `ruff` config exists (defaults apply), but respect the tab-indentation convention.
+- `ruff` is available as a dependency. Run `ruff check .` to lint changed files. `ruff.toml` sets which rules are checked — deliberately a small set, so that a new ruff release cannot change what passes. Its comments explain how to adopt further rules, one at a time. `.github/workflows/ruff.yml` pins the ruff version to match. Respect the tab-indentation convention.
 - Make sure to check whether you are on a Unix-like system (macOS/Linux) or Windows to choose the correct commands.
 
 ## Safety and Guardrails
