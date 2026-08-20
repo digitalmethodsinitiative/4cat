@@ -73,7 +73,7 @@ def _parse_migration_alterations():
 		text = path.read_text(encoding="utf-8")
 		# added
 		for m in re.finditer(
-			r"ALTER\s+TABLE\s+(\w+)\s+ADD(?:\s+COLUMN)?\s+(\w+)",
+			r"ALTER\s+TABLE\s+(\w+)\s+ADD(?:\s+COLUMN)?(?:\s+IF\s+NOT\s+EXISTS)?\s+(\w+)",
 			text,
 			re.IGNORECASE,
 		):

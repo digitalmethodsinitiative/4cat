@@ -400,7 +400,8 @@ class ConfigManager(BaseConfigReader):
                 bool(definition.get("indirect", False)),
                 now,
                 now,
-                last_definition
+                last_definition,
+                True
             ))
 
         if declarations:
@@ -409,7 +410,7 @@ class ConfigManager(BaseConfigReader):
             self.db.execute_many("""
                 INSERT INTO settings_declarations
                     (name, declared_by, owner_kind, extension_id, is_indirect,
-                     first_seen, last_seen, last_definition)
+                     first_seen, last_seen, last_definition, declared)
                 VALUES %s
                 ON CONFLICT (name) DO UPDATE SET
                     declared_by = EXCLUDED.declared_by,
@@ -418,9 +419,18 @@ class ConfigManager(BaseConfigReader):
                     is_indirect = EXCLUDED.is_indirect,
                     last_seen = EXCLUDED.last_seen,
                     last_definition = EXCLUDED.last_definition,
+                    declared = TRUE,
                     -- declared again, so whatever absence was recorded is over
                     absent_since = NULL
             """, replacements=declarations, commit=False)
+
+        # every boot, degraded or not: this is a record of what was seen, not a
+        # judgement about it. What stops them ageing towards removal is
+        # absent_since below, which a degraded boot does not write.
+        self.db.execute("""
+            UPDATE settings_declarations SET declared = FALSE
+             WHERE declared AND name <> ALL(%s::text[])
+        """, ([declaration[0] for declaration in declarations],), commit=False)
 
         # written on every boot, unlike the clean-scan marker below: this is what
         # tells the audit whether the most recent start-up could see everything
@@ -513,6 +523,9 @@ class ConfigManager(BaseConfigReader):
             SELECT s.name, s.tag, s.value, d.declared_by, d.owner_kind, d.extension_id, d.last_seen, d.absent_since
               FROM settings s
               LEFT JOIN settings_declarations d ON s.name = d.name
+             -- anything still declared has nothing to report, and dropping it
+             -- here rather than in the loop saves time.
+             WHERE d.name IS NULL OR NOT d.declared
              ORDER BY s.name, s.tag
         """)
 
@@ -522,12 +535,14 @@ class ConfigManager(BaseConfigReader):
 
         findings = []
         for name, stored in occurrences.items():
-            if name in self.config_definition:
-                # declared right now, nothing to say about it
-                continue
-
             record = stored[0]
+
             if not record["declared_by"]:
+                if name in self.config_definition:
+                    # Fallback: no row for it yet, which on an instance whose back-end has
+                    # not recorded declarations since upgrading is every setting.
+                    continue
+
                 state = "unknown"
             elif record["owner_kind"] == "extension":
                 state = "dormant" if record["extension_id"] in installed else "absent_extension"

@@ -24,15 +24,21 @@ CREATE TABLE IF NOT EXISTS settings_declarations (
   declared_by            TEXT DEFAULT '' NOT NULL,
   owner_kind             TEXT DEFAULT 'core' NOT NULL,
   extension_id           TEXT DEFAULT NULL,
-  -- the setting is maintained by 4CAT rather than set by an admin
+  -- declared: whether anything declared this setting on the most recent start-up.
+  -- Written every boot, degraded or not, because it records what was seen;
+  -- absent_since is written only on a complete one, because that is a judgement
+  -- about absence. Keeping them apart is the point: a broken import makes a
+  -- setting undeclared without making it obsolete.
+  declared               BOOLEAN DEFAULT FALSE NOT NULL,
+  -- is_indirect: setting is maintained by 4CAT rather than set by an admin
   -- (`indirect` in the definition), so an orphaned one is machine-written
   -- state rather than something a person configured
   is_indirect            BOOLEAN DEFAULT FALSE,
   first_seen             INTEGER DEFAULT 0,
   last_seen              INTEGER DEFAULT 0,
   last_definition        TEXT DEFAULT NULL,
-  -- the first complete start-up that found this setting gone, NULL while it is
-  -- still declared. How long a setting has been absent must be measured from
+  -- absent_since: first complete start-up that found this setting gone, NULL while 
+  -- it is still declared. How long a setting has been absent must be measured from
   -- this, not from last_seen: last_seen is only the last time 4CAT looked and
   -- found it, so the gap between two start-ups is the operator's uptime.
   absent_since           INTEGER DEFAULT NULL

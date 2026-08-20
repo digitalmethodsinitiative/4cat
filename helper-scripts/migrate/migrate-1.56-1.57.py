@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS settings_declarations (
   declared_by            TEXT DEFAULT '' NOT NULL,
   owner_kind             TEXT DEFAULT 'core' NOT NULL,
   extension_id           TEXT DEFAULT NULL,
+  declared               BOOLEAN DEFAULT FALSE NOT NULL,
   is_indirect            BOOLEAN DEFAULT FALSE,
   first_seen             INTEGER DEFAULT 0,
   last_seen              INTEGER DEFAULT 0,
@@ -145,6 +146,9 @@ for setting, reason in RETIRED_CORE_SETTINGS.items():
         "name": setting,
         "declared_by": "core:config_definition",
         "owner_kind": "core",
+        # retired, so nothing declares it - which together with absent_since is
+        # what lets it be archived again if it is ever restored
+        "declared": False,
         "absent_since": now
     }, safe=True, commit=False)
 
