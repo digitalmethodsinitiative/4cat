@@ -772,6 +772,11 @@ def manipulate_settings():
     unused_settings = len([finding for finding in g.config.audit_settings()["findings"]
                            if finding["state"] not in ("dormant", "absent_extension")])
 
+    # what the back-end recorded declaring each setting, used below to group them
+    # by where they come from. Read from the database rather than a cache file so
+    # both containers see the same answer.
+    declarations = g.config.get_declarations()
+
     # sorted so that settings which sort equally below still come out in the same
     # order on every request
     for option in sorted({*all_settings.keys(), *definition.keys()}):
@@ -804,13 +809,13 @@ def manipulate_settings():
             category = option.split(".")[0]
 
         # a setting is core because core declares it, not because no module
-        # claimed it: provenance is absent for everything if the sidecar could
-        # not be read, and reading that as "all core" would put every setting
+        # claimed it: nothing is recorded for anything until the back-end has
+        # booted once, and reading that as "all core" would put every setting
         # under one heading.
-        declared_by = g.config.setting_provenance.get(option, {})
+        declared_by = declarations.get(option, {})
         if option in config_definition.config_definition:
             submenu = "core"
-        elif declared_by.get("kind") == "extension":
+        elif declared_by.get("owner_kind") == "extension":
             submenu = "extensions"
         elif declared_by.get("declared_by") in datasource_workers:
             submenu = "datasources"

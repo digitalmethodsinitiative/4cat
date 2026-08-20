@@ -36,11 +36,6 @@ class ConfigManager(BaseConfigReader):
 
     core_settings = {}
     config_definition = {}
-    # who declared each module-defined setting, and any declarations refused for
-    # colliding with core or with another module. Populated from the sidecar
-    # cache file; empty on an instance whose back-end has not written one yet.
-    setting_provenance = {}
-    setting_collisions = []
     # how long a setting must go undeclared, across complete scans, before the
     # audit will call it removed rather than merely unseen
     ORPHAN_GRACE_PERIOD = 7 * 86400
@@ -139,9 +134,7 @@ class ConfigManager(BaseConfigReader):
         # module settings can't be loaded directly because modules need the
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
-        config_path = self.get("PATH_CONFIG")
-
-        module_config_path = config_path.joinpath("module_config.bin")
+        module_config_path = self.get("PATH_CONFIG").joinpath("module_config.bin")
         module_config = self.load_cache_file(module_config_path)
         if type(module_config) is dict:
             # an empty mapping is valid (no module declares a setting) and is not
@@ -157,15 +150,6 @@ class ConfigManager(BaseConfigReader):
 
             raise ConfigException(f"No {module_config_path.name} file exists! It is written by the back-end when it "
                                   f"boots, so the back-end must be started first.")
-
-        # provenance (which module declared which setting) lives in a separate
-        # file on purpose - see ModuleCollector.__init__ for why they are not
-        # one file. Absent on an instance that has not yet booted a back-end
-        # with this code, in which case every setting is simply unattributed.
-        sidecar = self.load_cache_file(config_path.joinpath("module_config_provenance.bin"))
-        if type(sidecar) is dict and sidecar.get("format") == 1:
-            self.setting_provenance = sidecar.get("provenance", {})
-            self.setting_collisions = sidecar.get("collisions", [])
 
     def load_cache_file(self, path):
         """
@@ -358,7 +342,7 @@ class ConfigManager(BaseConfigReader):
         self.set("flask.tag_order", tag_order)
         self.db.commit()
 
-    def record_declarations(self, degraded=False):
+    def record_declarations(self, provenance, degraded=False):
         """
         Record which module declares each setting, and when it was last seen
 
@@ -380,6 +364,8 @@ class ConfigManager(BaseConfigReader):
         belong to an extension that is uninstalled or disabled - which is why
         this only ever writes rows and never deletes them.
 
+        :param dict provenance:  Which worker declared each module setting, as
+        ModuleCollector worked it out this boot.
         :param bool degraded:  True if some modules failed to import this boot.
         Declarations are still recorded (what loaded really was seen), but the
         clean-scan marker is not advanced, so nothing can age into looking
@@ -391,7 +377,7 @@ class ConfigManager(BaseConfigReader):
 
         declarations = []
         for setting, definition in self.config_definition.items():
-            declared = self.setting_provenance.get(setting)
+            declared = provenance.get(setting)
             if declared is None and setting not in config_definition:
                 # left over from the previous boot's module cache, not declared
                 # by anything now. Leave whatever was recorded for it alone.

@@ -149,19 +149,6 @@ def test_unpicklable_definition_makes_the_boot_incomplete(collector, tmp_path):
     )
 
 
-def test_sidecar_is_never_silently_pruned(collector, tmp_path):
-    """
-    Dropping a key to salvage the write is only ever right for the settings
-    cache. Doing it to the provenance sidecar would discard the entire
-    provenance map, so that has to fail loudly instead.
-    """
-    # pickle raises PicklingError for a module-level function and AttributeError
-    # for a local one, which is why write_cache_file catches broadly
-    with pytest.raises((pickle.PicklingError, AttributeError)):
-        collector.write_cache_file(tmp_path.joinpath("module_config_provenance.bin"),
-                                   {"format": 1, "provenance": {"a": lambda: 1}, "collisions": []})
-
-
 def test_unknown_submenu_is_reported_but_not_refused(collector):
     """
     `submenu` only decides which heading a tab is listed under. Losing a working
@@ -174,30 +161,6 @@ def test_unknown_submenu_is_reported_but_not_refused(collector):
     assert "my_ext.setting" in module_config
     assert collisions == []
     assert "proccesors" in collector.log_buffer
-
-
-def test_reads_legacy_cache_without_sidecar(tmp_path):
-    """
-    An instance upgraded from an older 4CAT has a module_config.bin but no
-    provenance sidecar. That must load normally, with everything unattributed,
-    rather than failing or discarding the definitions.
-    """
-    from common.config_manager import ConfigManager
-
-    with tmp_path.joinpath("module_config.bin").open("wb") as outfile:
-        pickle.dump({"legacy.setting": {"default": "kept"}}, outfile)
-
-    config = object.__new__(ConfigManager)
-    config.core_settings = {"PATH_CONFIG": tmp_path}
-    config.config_definition = {}
-    config.setting_provenance = {}
-    config.setting_collisions = []
-    config.logger = None
-
-    config.load_user_settings()
-
-    assert config.config_definition["legacy.setting"] == {"default": "kept"}
-    assert config.setting_provenance == {}
 
 
 def _assigned_names(tree):

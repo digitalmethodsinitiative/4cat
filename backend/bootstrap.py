@@ -88,7 +88,7 @@ def run(as_daemon=True, log_level="INFO"):
 	# collection_failures() covers every way 4CAT can end up not seeing part of
 	# itself, not only modules that failed to import outright.
 	incomplete = modules.collection_failures()
-	recorded = config.record_declarations(degraded=bool(incomplete))
+	recorded = config.record_declarations(modules.setting_provenance, degraded=bool(incomplete))
 	if incomplete:
 		# str() on the key because this line runs when 4CAT is already broken, and
 		# must not fail on an unexpected key type while saying so

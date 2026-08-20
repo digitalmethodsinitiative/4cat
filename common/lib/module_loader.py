@@ -66,6 +66,10 @@ class ModuleCollector:
         # this can be flushed later once the logger is available
         self.log_buffer = ""
         self.config = config
+        # Which worker declared each module setting, worked out below. Handed to
+        # record_declarations(). Unlike the settings nothing needs it before 
+        # there is a database.
+        self.setting_provenance = {}
 
         self.load_datasources()
         self.load_modules()
@@ -79,22 +83,16 @@ class ModuleCollector:
         # datasource's search/import worker class, which is in self.workers
         if write_cache:
             module_config, provenance, collisions = self.collect_module_config()
-            config_path = config.get("PATH_CONFIG")
+            self.setting_provenance = provenance
 
-            # two files, deliberately. module_config.bin's shape is merged
-            # straight into the config definition by every reader, including a
-            # front-end container that may still be running older code, so it
-            # is frozen as a plain {name: definition} mapping. Everything new
-            # goes in the sidecar, which has no legacy readers and can carry a
-            # format version. Do not merge these back together: that would put
-            # the combined shape back on the load-bearing path.
-            self.write_cache_file(config_path.joinpath("module_config.bin"), module_config,
+            # A file rather than a database table because ConfigManager needs 
+            # the definitions before it has opened a database connection and 
+            # definitions can be code (e.g. core keeps a lambda in one).
+            # Its shape is merged straight into the config definition by every
+            # reader, including a front-end container that may still be running
+            # older code, so keep it a plain {name: definition} mapping.
+            self.write_cache_file(config.get("PATH_CONFIG").joinpath("module_config.bin"), module_config,
                                   drop_unpicklable=True)
-            self.write_cache_file(config_path.joinpath("module_config_provenance.bin"), {
-                "format": 1,
-                "provenance": provenance,
-                "collisions": collisions
-            })
 
         # load from cache. If we just wrote it, insist it can be read back -
         # that turns a silently failed write into an error at boot rather than
