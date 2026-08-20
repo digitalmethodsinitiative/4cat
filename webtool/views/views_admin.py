@@ -801,12 +801,16 @@ def manipulate_settings():
         # which tab a setting appears under. A setting may name its own category,
         # which is how settings declared across several modules end up in one
         # tab; if it does not, the first part of its name is used.
-        category = definition[option].get("category")
-        if not category or not config_definition.category_format.match(str(category)):
-            # ignored rather than rendered: the category is written into the tab's
-            # HTML id, and one the panel cannot look up breaks that tab and blanks
-            # whichever is open. ModuleCollector logs it at boot, naming the module.
-            category = option.split(".")[0]
+        # the declared category is what the tab is called; category_id() is what
+        # the tab is keyed and looked up by, so "Web Studies" is a fine category
+        # and becomes id "web-studies". Only something that slugifies to nothing
+        # falls back to the setting's own name - ModuleCollector logs that at
+        # boot, naming the module responsible.
+        category_label = definition[option].get("category") or option.split(".")[0]
+        category = config_definition.category_id(category_label)
+        if not category:
+            category_label = option.split(".")[0]
+            category = config_definition.category_id(category_label)
 
         # a setting is core because core declares it, not because no module
         # claimed it: nothing is recorded for anything until the back-end has
@@ -828,6 +832,8 @@ def manipulate_settings():
             "default": current_value,  # override default so this is the value displayed in the web UI
             "original_default": default,  # but also save the actual default
             "category": category,
+            # kept for the tab's name, which unlike its id may say anything
+            "category_label": category_label,
             "is_changed": is_changed
         }
 
@@ -846,7 +852,9 @@ def manipulate_settings():
     category_meta = {}
     for option in definition:
         settings = options[option]
-        meta = category_meta.setdefault(settings["category"], {"submenu": None, "tabname": None, "derived": None})
+        meta = category_meta.setdefault(settings["category"],
+                                        {"submenu": None, "tabname": None, "derived": None,
+                                         "label": settings["category_label"]})
 
         if meta["submenu"] is None and definition[option].get("submenu") in submenu_precedence:
             meta["submenu"] = definition[option]["submenu"]
@@ -861,7 +869,7 @@ def manipulate_settings():
         meta = category_meta[settings["category"]]
         settings["submenu"] = meta["submenu"] or meta["derived"]
         settings["tabname"] = meta["tabname"] or config_definition.categories.get(settings["category"]) \
-            or modules.get(settings["category"]) or settings["category"]
+            or modules.get(settings["category"]) or meta["label"]
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 

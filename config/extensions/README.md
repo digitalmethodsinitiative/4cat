@@ -87,7 +87,8 @@ anything your extension put in it. Give your settings a prefix of your own and t
 optional keys override that:
 
 - `"category"` puts the setting in a named tab whatever its name is, which is how settings declared across several
-  classes end up in one place.
+  classes end up in one place. It may read as prose - `"Web Studies"` is fine - and is slugified for the tab's HTML
+  id, so declare the same category on every setting you want in that tab rather than relying on the name alone.
 - `"category_label"` titles that tab. Without one, 4CAT falls back to its own list of category names, then to the
   category itself.
 - `"submenu"` lists the tab under a different heading: `core`, `datasources`, `processors` or `extensions`.

@@ -804,11 +804,23 @@ submenus = {
     "processors": "Processors"
 }
 
-# a category becomes part of a tab's HTML id, which the settings panel looks up
-# with querySelector(). A category the selector cannot match takes down the tab
-# it names and the open one with it, because the switcher closes the current tab
-# before it fails to find the new one.
-category_format = re.compile(r"^[a-zA-Z0-9_-]+$")
+def category_id(category):
+    """
+    The HTML id of the tab a category is shown on
+
+    A category does two jobs. It is the id the settings panel looks tabs up by
+    with querySelector(), which has to be a plain identifier, and it is what the
+    tab is called when nothing names it explicitly - and "Web Studies" is a
+    reasonable thing to call a tab. So the id is slugified here and the label
+    keeps whatever was written; see `category_label` to set the two separately.
+
+    Every category 4CAT itself uses is already a slug, so this changes nothing
+    for them.
+
+    :param category:  Category as declared
+    :return str:  Usable as an HTML id, empty if nothing usable was left
+    """
+    return re.sub(r"[^a-zA-Z0-9_-]+", "-", str(category)).strip("-").lower()
 
 # These are used in the web interface for more readable names
 # Can't think of a better place to put them...

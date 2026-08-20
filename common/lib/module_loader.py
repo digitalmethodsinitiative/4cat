@@ -144,7 +144,7 @@ class ModuleCollector:
         """
         # safe to import here: config_definition pulls in user_input, neither of
         # which imports this module
-        from common.lib.config_definition import config_definition as core_definition, submenus, category_format
+        from common.lib.config_definition import config_definition as core_definition, submenus, category_id
 
         module_config = {}
         provenance = {}
@@ -209,14 +209,14 @@ class ModuleCollector:
                                         f"'{definition['submenu']}', which is not one of {', '.join(submenus)}. The "
                                         f"setting is registered, but its tab will be placed automatically.\n")
 
-                # same reasoning, but this one would break the settings panel
-                # rather than just misplace a tab, so the panel ignores it too
+                # spaces and punctuation are fine - category_id() slugifies for the
+                # HTML id and the tab keeps its written name - but something that
+                # slugifies to nothing leaves no id to hang the tab on
                 category = definition.get("category")
-                if category is not None and not category_format.match(str(category)):
+                if category is not None and not category_id(category):
                     self.log_buffer += (f"Setting '{setting}' declared by {worker_type} asks for category "
-                                        f"'{category}', which cannot be used as a tab name - only letters, digits, "
-                                        f"hyphens and underscores. The setting is registered, but its tab is named "
-                                        f"after the setting instead.\n")
+                                        f"'{category}', which leaves nothing usable as a tab id. The setting is "
+                                        f"registered, but its tab is named after the setting instead.\n")
 
                 module_config[setting] = definition
                 provenance[setting] = {

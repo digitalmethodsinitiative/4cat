@@ -17,8 +17,8 @@ class SettingsAuditor(BasicWorker):
 
     This worker tells admins about the ones that look genuinely removed, and
     removes nothing itself. A notification is its only output, so it does
-    nothing at all unless `4cat.report_orphan_settings` is on - on a server that
-    is not being developed against there is nothing to act on.
+    nothing at all unless `4cat.report_orphan_settings` is on. This is a developer
+    feature and not likely useful to most admins.
     """
     type = "audit-settings"
     max_workers = 1
@@ -38,10 +38,9 @@ class SettingsAuditor(BasicWorker):
         return {"remote_id": "", "interval": 87000}
 
     def work(self):
+        # check if admins wish to be notified about settings that are stored but no longer declared by any module
         if not self.config.get("4cat.report_orphan_settings"):
-            # only clear up if there is something to clear up. This runs daily on
-            # every install, and the setting is off by default, so doing it
-            # unconditionally is a DELETE and a settings write a day for nothing.
+            # if the feature is off, forget any report we may have left behind
             if self.config.get("4cat.declarations_reported"):
                 self.forget_report()
             return
