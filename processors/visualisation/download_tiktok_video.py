@@ -81,23 +81,21 @@ class TikTokVideoDownloader(ProcessorPreset):
         """
         This queues the video-downloader with set options
         """
-        # Check if an upload
-        if self.source_dataset.type == "upload-search":
-            # Variable column name
-            column = self.parameters.get("column")
-        else:
-            column = "id"
-
         amount = self.parameters.get("amount")
+
+        metadata_parameters = {
+            "amount": amount,
+            "_amount_leeway": 10  # extra metadata in case videos fail
+        }
+        # only an uploaded dataset needs to be told which column holds the post
+        # IDs; for TikTok datasources the metadata processor uses a fixed column
+        if self.source_dataset.type == "upload-search":
+            metadata_parameters["id_column"] = self.parameters.get("column")
 
         pipeline = [
             {
                 "type": "tiktok-video-downloader-metadata",
-                "parameters": {
-                    "column": column,
-                    "amount": amount,
-                    "_amount_leeway": 10 # extra metadata in case videos fail
-                }
+                "parameters": metadata_parameters
             },
             {
                 "type": "video-downloader",

@@ -59,7 +59,12 @@ class Search(BasicProcessor, ABC):
 		are marked as finished.
 		"""
 
-		query_parameters = self.dataset.get_parameters()
+		# search workers read all parameters from a single dictionary: the
+		# dataset's stored parameters, with the declared default filled in for
+		# any option that was not stored (prepared in work()). get_items()
+		# receives this same dictionary as its `query` argument, so `query`
+		# and `self.parameters` always agree.
+		query_parameters = self.parameters
 		results_file = self.dataset.get_results_path()
 
 		self.log.info("Querying: %s" % str({k: v for k, v in query_parameters.items() if not self.get_options(
@@ -106,7 +111,9 @@ class Search(BasicProcessor, ABC):
 		class. This method just provides some scaffolding and processing
 		of results via `after_search()`, if it is defined.
 
-		:param dict query:  Query parameters
+		:param dict query:  Query parameters: the dataset's stored parameters
+		  with declared option defaults filled in for missing keys. This is
+		  the same dictionary as `self.parameters`.
 		:return:  Iterable of matching items, or None if there are no results.
 		"""
 		items = self.get_items(query)
@@ -128,7 +135,10 @@ class Search(BasicProcessor, ABC):
 
 		To be implemented by descending classes!
 
-		:param dict query:  Query parameters
+		:param dict query:  Query parameters: the dataset's stored parameters
+		  with declared option defaults filled in for missing keys. This is
+		  the same dictionary as `self.parameters`; read options from either,
+		  they always agree.
 		:return Generator:  A generator or iterable that returns items
 		  collected according to the provided parameters.
 		"""
