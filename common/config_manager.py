@@ -469,7 +469,7 @@ class ConfigManager(BaseConfigReader):
 
         return {row["name"]: row for row in self.db.fetchall("SELECT * FROM settings_declarations")}
 
-    def audit_settings(self):
+    def audit_settings(self, name=None):
         """
         Find settings in the database that nothing currently declares
 
@@ -499,6 +499,9 @@ class ConfigManager(BaseConfigReader):
         on a complete start-up, so a broken import still cannot age anything
         out, and `scan_is_current` holds everything back besides.
 
+        :param str name:  Only audit this one setting. `archive_setting()` needs
+        one answer, and without this it would scan and classify every stored
+        setting to find it.
         :return dict:  `scan_is_current` (was the most recent boot complete),
         `last_clean_scan`, and `findings`, a list of undeclared settings
         """
@@ -512,22 +515,24 @@ class ConfigManager(BaseConfigReader):
         # true after a complete boot, which is also what writes last_clean_scan.
         scan_is_current = bool(self.get("4cat.declarations_last_scan_complete"))
 
-        # imported here rather than at the top of the module: helpers builds a
-        # CoreConfigManager when it loads, so importing it there is circular
-        # only the names are needed, and collecting the metadata forks git once
-        # per extension - far too slow for something a page render calls
-        from common.lib.helpers import find_extensions
-        installed, _ = find_extensions(with_metadata=False)
+        # worked out lazily below: only an extension-owned setting needs it, and
+        # it is a directory scan, so auditing one core setting should not pay for
+        # it. Imported there too - helpers builds a CoreConfigManager when it
+        # loads, so importing it at the top of this module is circular.
+        installed = None
 
-        rows = self.db.fetchall("""
+        # anything still declared has nothing to report, and dropping those here
+        # rather than in the loop keeps their stored values in the database -
+        # some of them run to hundreds of kilobytes
+        undeclared = "d.name IS NULL OR NOT d.declared"
+        query = f"""
             SELECT s.name, s.tag, s.value, d.declared_by, d.owner_kind, d.extension_id, d.last_seen, d.absent_since
               FROM settings s
               LEFT JOIN settings_declarations d ON s.name = d.name
-             -- anything still declared has nothing to report, and dropping it
-             -- here rather than in the loop saves time.
-             WHERE d.name IS NULL OR NOT d.declared
+             WHERE {"s.name = %s AND (" + undeclared + ")" if name is not None else undeclared}
              ORDER BY s.name, s.tag
-        """)
+        """
+        rows = self.db.fetchall(query, (name,)) if name is not None else self.db.fetchall(query)
 
         occurrences = {}
         for row in rows:
@@ -545,6 +550,10 @@ class ConfigManager(BaseConfigReader):
             if not record["declared_by"]:
                 state = "unknown"
             elif record["owner_kind"] == "extension":
+                if installed is None:
+                    from common.lib.helpers import find_extensions
+                    installed, _ = find_extensions(with_metadata=False)
+
                 state = "dormant" if record["extension_id"] in installed else "absent_extension"
             elif not scan_is_current or not record["absent_since"]:
                 # no absence recorded: the last complete start-up still had this
@@ -601,7 +610,7 @@ class ConfigManager(BaseConfigReader):
         """
         self.with_db()
 
-        finding = next((item for item in self.audit_settings()["findings"] if item["name"] == name), None)
+        finding = next((item for item in self.audit_settings(name=name)["findings"] if item["name"] == name), None)
         if not finding:
             raise ValueError(f"Setting '{name}' is in use, so cannot be archived.")
 

@@ -4,6 +4,7 @@ Report settings the database holds that nothing declares
 import hashlib
 
 from backend.lib.worker import BasicWorker
+from common.lib.helpers import add_notification
 
 
 class SettingsAuditor(BasicWorker):
@@ -83,11 +84,7 @@ class SettingsAuditor(BasicWorker):
                         f"deliberately at some point: {', '.join(sorted(overridden)[:5])}"
                         f"{' and others' if len(overridden) > 5 else ''}.")
 
-        self.db.insert("users_notifications", {
-            "username": "!admin",
-            "notification": message,
-            "allow_dismiss": True
-        }, safe=True)
+        add_notification(self.db, "!admin", message)
 
         self.config.set("4cat.declarations_reported", fingerprint)
 
