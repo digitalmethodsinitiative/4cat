@@ -45,7 +45,8 @@ config_definition = {
         "type": UserInput.OPTION_INFO,
         "help": "4CAT extensions can be disabled and disabled via the control below. When enabled, extensions may "
                 "define further settings that can typically be configured via the extension's tab on the left side of "
-                "this page. **Note that 4CAT needs to be restarted for this to take effect!**"
+                "this page. Switching an extension off hides those settings but keeps their values, so switching it "
+                "back on restores its configuration. **Note that 4CAT needs to be restarted for this to take effect!**"
     },
     "extensions.enabled": {
         "type": UserInput.OPTION_EXTENSIONS,
@@ -222,6 +223,47 @@ config_definition = {
         "tooltip": "Whether you've seen the 'phone home request'. Set to `False` to see the request again. There "
                    "should be no need to change this manually.",
         "global": True
+    },
+    "4cat.report_orphan_settings": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Report undeclared settings",
+        "tooltip": "Notify admins when the database holds settings that nothing declares any more. Off by default: "
+                   "these are harmless to leave in place, and the notification is mainly useful to people developing "
+                   "4CAT or its extensions. Nothing is ever removed automatically either way.",
+        "global": True
+    },
+    "4cat.declarations_last_clean_scan": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 0,
+        "help": "Last clean settings scan",
+        "tooltip": "Timestamp of the last back-end boot on which every module imported successfully, so the record of "
+                   "which module declares which setting could be trusted as complete. Anything judging a setting to be "
+                   "obsolete must measure against this, not against the current time: while an import is broken, the "
+                   "settings of the module that failed look abandoned when they are merely unreachable.",
+        "global": True,
+        "indirect": True
+    },
+    "4cat.declarations_last_scan_complete": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Last settings scan was complete",
+        "tooltip": "Whether the most recent back-end boot could load every module. While this is off, nothing may be "
+                   "judged obsolete: the settings of a module that failed to import look abandoned when they are "
+                   "merely unreachable.",
+        "global": True,
+        "indirect": True
+    },
+    "4cat.declarations_reported": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Last reported undeclared settings",
+        "tooltip": "Fingerprint of the set of settings admins were last notified about, so the same set is not "
+                   "reported twice. Kept here rather than read back off the notification itself, because a dismissed "
+                   "notification is deleted once the phone-home server no longer lists it, and so cannot record that "
+                   "it was ever sent.",
+        "global": True,
+        "indirect": True
     },
     "4cat.layout_hue": {
         "type": UserInput.OPTION_HUE,
@@ -538,8 +580,8 @@ config_definition = {
     "api.youtube.key": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
-        "help": "YouTube API Key",
-        "tooltip": "The developer key from your API console"
+        "help": "YouTube API key",
+        "tooltip": "Can be created on https://developers.google.com/youtube/v3"
     },
     # service manager
     # this is a service that 4CAT can connect to to run e.g. ML models
@@ -750,6 +792,35 @@ config_definition = {
                    "issues with large datasets.",
     }
 }
+
+# Headings the settings panel lists category tabs under, mapped to the label each
+# is shown under. In precedence order: where settings sharing a category disagree
+# about which heading they belong to, the earliest wins. A setting may name one
+# with `submenu` in its definition. The panel lists them in this order too.
+submenus = {
+    "core": "4CAT Core",
+    "extensions": "Extensions",
+    "datasources": "Data sources",
+    "processors": "Processors"
+}
+
+def category_id(category):
+    """
+    The HTML id of the tab a category is shown on
+
+    A category does two jobs. It is the id the settings panel looks tabs up by
+    with querySelector(), which has to be a plain identifier, and it is what the
+    tab is called when nothing names it explicitly - and "Web Studies" is a
+    reasonable thing to call a tab. So the id is slugified here and the label
+    keeps whatever was written; see `category_label` to set the two separately.
+
+    Every category 4CAT itself uses is already a slug, so this changes nothing
+    for them.
+
+    :param category:  Category as declared
+    :return str:  Usable as an HTML id, empty if nothing usable was left
+    """
+    return re.sub(r"[^a-zA-Z0-9_-]+", "-", str(category)).strip("-").lower()
 
 # These are used in the web interface for more readable names
 # Can't think of a better place to put them...

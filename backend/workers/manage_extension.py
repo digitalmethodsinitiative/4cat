@@ -95,10 +95,12 @@ class ExtensionManipulator(BasicWorker):
         Currently as simple as deleting the folder, but could add further
         cleaning up code later.
 
-        While an extension can define configuration settings, we do not
-        explicitly remove these here. 4CAT has general cleanup code for
-        unreferenced settings and it may be beneficial to keep them in case
-        the extension is re-installed later.
+        While an extension can define configuration settings, we deliberately
+        do not remove these here, so that re-installing the extension later
+        restores its previous configuration instead of silently reverting to
+        defaults. Note that no general cleanup code removes them elsewhere
+        either: an undeclared setting cannot be told apart from one whose
+        extension is merely uninstalled without extra provenance data.
 
         :param str extension_name:  ID of the extension (i.e. name of the
         folder it is in)

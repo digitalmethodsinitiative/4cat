@@ -40,7 +40,13 @@ from webtool.lib.openapi_collector import OpenAPICollector  # noqa: E402
 
 # make a web app!
 app = Flask(__name__)
-config = ConfigManager()
+# the front-end refuses to serve without module-defined settings: they would be
+# missing from the control panel entirely, which would then quietly show a
+# fraction of how 4CAT is configured. Stored values are never at risk - the
+# settings form is saved through UserInput.parse_all(), which only returns keys
+# that are in the definition it is given. wait-for-backend.sh guarantees the
+# back-end has booted, and therefore written the cache, before this runs.
+config = ConfigManager(require_module_config=True)
 
 # set up logger for error logging etc
 log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))

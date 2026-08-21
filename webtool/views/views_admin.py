@@ -21,6 +21,7 @@ from email.mime.text import MIMEText
 
 from flask import Blueprint, render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect, Response, g
 from flask_login import current_user, login_required
+from markupsafe import escape
 
 from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
 from common.lib.user import User
@@ -627,6 +628,62 @@ def manipulate_tags():
     return render_template("controlpanel/user-tags.html", tags=tags, num_admins=num_admins, flashes=get_flashed_messages())
 
 
+@component.route("/admin/settings/unused", methods=["GET", "POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_settings")
+def manage_unused_settings():
+    """
+    Review settings the database holds but nothing declares
+
+    Archiving moves a setting's values aside rather than deleting them, so a
+    mistake costs a click. Only settings the audit is confident about are
+    offered; the rest are listed with the reason they are not, because knowing
+    a value is being kept deliberately is as useful as being able to remove it.
+    """
+    if request.method == "POST":
+        name = request.form.get("setting", "")
+        # flashed messages are rendered with |safe, because some of them carry
+        # links. This one is built from a submitted field, and the errors raised
+        # below quote that field back too, so it cannot go in unescaped.
+        label = escape(name)
+        try:
+            if request.form.get("action") == "restore":
+                if "tag" not in request.form:
+                    raise ValueError(f"No tag was given for '{name}', so it is unclear which value to restore.")
+
+                restored = g.config.restore_setting(name, tag=request.form["tag"])
+                flash(f"Restored {label} ({restored} stored value(s)).")
+            else:
+                archived = g.config.archive_setting(name, archived_by=current_user.get_id())
+                flash(f"Archived {label} ({archived} stored value(s)). It can be restored from this page.")
+        except ValueError as e:
+            flash(escape(str(e)))
+        except psycopg2.IntegrityError:
+            # The front-end shares one database connection across all its threads...
+            g.db.rollback()
+            flash(f"Could not restore {label}: something else wrote it at the same time. Try again.")
+
+        return redirect(url_for("admin.manage_unused_settings"))
+
+    audit = g.config.audit_settings()
+    findings = sorted(audit["findings"], key=lambda item: item["name"])
+
+    # settings kept because an extension might come back are a different fact
+    # from settings nothing owns any more, so they are listed apart
+    extension_states = ("dormant", "absent_extension")
+
+    return render_template("controlpanel/settings-unused.html",
+                           # archivable first, since those are the ones anything can be done about
+                           findings=sorted([item for item in findings if item["state"] not in extension_states],
+                                           key=lambda item: (item["state"] != "vanished", item["name"])),
+                           kept_for_extensions=[item for item in findings if item["state"] in extension_states],
+                           refusals=g.config.ARCHIVE_REFUSALS,
+                           scan_is_current=audit["scan_is_current"],
+                           last_clean_scan=audit["last_clean_scan"],
+                           archived=g.config.get_archived_settings(),
+                           flashes=get_flashed_messages())
+
+
 @component.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
@@ -703,7 +760,26 @@ def manipulate_settings():
     options = {}
     changed_categories = set()
 
-    for option in {*all_settings.keys(), *definition.keys()}:
+    # what last declared each setting, used to group settings by where they come
+    # from rather than by guessing from their name
+    datasource_workers = {f"{datasource}-{suffix}" for datasource in g.modules.datasources
+                          for suffix in ("search", "import")}
+
+    # stored but not declared, so not shown on this page. The audit knows which
+    # of those are kept on purpose for an extension that is switched off or
+    # uninstalled; counting those as "no longer in use" would contradict the
+    # page this links to, which says they are deliberately kept.
+    unused_settings = len([finding for finding in g.config.audit_settings()["findings"]
+                           if finding["state"] not in ("dormant", "absent_extension")])
+
+    # what the back-end recorded declaring each setting, used below to group them
+    # by where they come from. Read from the database rather than a cache file so
+    # both containers see the same answer.
+    declarations = g.config.get_declarations()
+
+    # sorted so that settings which sort equally below still come out in the same
+    # order on every request
+    for option in sorted({*all_settings.keys(), *definition.keys()}):
         tag_value = all_settings.get(option, definition.get(option, {}).get("default"))
         global_value = global_settings.get(option, definition.get(option, {}).get("default"))
         is_changed = tag and global_value != tag_value
@@ -713,52 +789,106 @@ def manipulate_settings():
         if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
             current_value = json.dumps(current_value)
 
-        # this is used for organising things in the UI
-        option_owner = option.split(".")[0]
-        submenu = "other"
-        if option_owner in ("4cat", "datasources", "privileges", "path", "mail", "explorer", "flask",
-                                    "logging", "ui", "extensions"):
+        if option not in definition:
+            # stored, but nothing declares it, so there is no type to render a
+            # field with and no telling what the value is meant to be. An
+            # editable field would have to guess, and UserInput.parse_all()
+            # would discard whatever was typed into it anyway, since it only
+            # returns keys that are in the definition. Listed with their stored
+            # value on the unused settings page instead.
+            continue
+
+        # which tab a setting appears under. A setting may name its own category,
+        # which is how settings declared across several modules end up in one
+        # tab; if it does not, the first part of its name is used.
+        # the declared category is what the tab is called; category_id() is what
+        # the tab is keyed and looked up by, so "Web Studies" is a fine category
+        # and becomes id "web-studies". Only something that slugifies to nothing
+        # falls back to the setting's own name - ModuleCollector logs that at
+        # boot, naming the module responsible.
+        category_raw = definition[option].get("category") or option.split(".")[0]
+        category = config_definition.category_id(category_raw)
+        if not category:
+            category_raw = option.split(".")[0]
+            category = config_definition.category_id(category_raw)
+
+        # a setting is core because core declares it, not because no module
+        # claimed it: nothing is recorded for anything until the back-end has
+        # booted once, and reading that as "all core" would put every setting
+        # under one heading.
+        declared_by = declarations.get(option, {})
+        if option in config_definition.config_definition:
             submenu = "core"
-        elif option_owner.endswith("-search"):
+        elif declared_by.get("owner_kind") == "extension":
+            submenu = "extensions"
+        elif declared_by.get("declared_by") in datasource_workers:
             submenu = "datasources"
-        elif option_owner in g.modules.processors:
+        else:
             submenu = "processors"
 
-        tabname = config_definition.categories.get(option_owner)
-        if not tabname:
-            tabname = modules.get(option_owner)
-        if not tabname:
-            tabname = option_owner
-
         options[option] = {
-            **definition.get(option, {
-                "type": UserInput.OPTION_TEXT,
-                "help": option,
-                "default": all_settings.get(option)
-            }),
+            **definition[option],
             "submenu": submenu,
             "default": current_value,  # override default so this is the value displayed in the web UI
             "original_default": default,  # but also save the actual default
-            "tabname": tabname,
+            "category": category,
+            # the category as written, before slugifying: names the tab when
+            # nothing else does. Not the same as a definition's category_label,
+            # which is an explicit title an author chose.
+            "category_raw": category_raw,
             "is_changed": is_changed
         }
 
         if tag and is_changed:
-            changed_categories.add(option.split(".")[0])
+            changed_categories.add(category)
+
+    # A category is one tab, so its heading and its name belong to the category
+    # rather than to each setting in it, and are settled once here. A setting may
+    # declare `submenu` or `category_label` to place or name its tab - the only
+    # way to do either for a category core does not know about - and the first
+    # such declaration in definition order wins. Otherwise the heading follows
+    # whoever declares the settings, core first: a category core puts anything in
+    # is a 4CAT namespace, whatever else adds to it.
+    # a list so it can be ranked with index(); the dict's order is the precedence
+    submenu_precedence = list(config_definition.submenus)
+    category_meta = {}
+    for option in definition:
+        settings = options[option]
+        meta = category_meta.setdefault(settings["category"],
+                                        {"submenu": None, "tabname": None, "derived": None,
+                                         "label": settings["category_raw"]})
+
+        if meta["submenu"] is None and definition[option].get("submenu") in submenu_precedence:
+            meta["submenu"] = definition[option]["submenu"]
+        if meta["tabname"] is None:
+            meta["tabname"] = definition[option].get("category_label")
+
+        if meta["derived"] is None or \
+                submenu_precedence.index(settings["submenu"]) < submenu_precedence.index(meta["derived"]):
+            meta["derived"] = settings["submenu"]
+
+    for settings in options.values():
+        meta = category_meta[settings["category"]]
+        settings["submenu"] = meta["submenu"] or meta["derived"]
+        settings["tabname"] = meta["tabname"] or config_definition.categories.get(settings["category"]) \
+            or modules.get(settings["category"]) or meta["label"]
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 
-    # We are ordering the options based on how they are ordered in their dictionaries,
-    # and not the database order. To do so, we're adding a simple config order number
-    # and sort on this.
+    # settings appear in the order they are written in the config definition:
+    # for core settings the order of config_definition.py, for module settings
+    # the order the modules are collected in, which groups each module's
+    # settings together
     config_order = 0
     for k, v in definition.items():
         options[k]["config_order"] = config_order
         config_order += 1
 
+    # grouped by tab, then in definition order. The name is only a tiebreak, so
+    # the order does not change between requests.
     options = {
         k: options[k]
-        for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o].get("config_order", 0)))
+        for k in sorted(options, key=lambda o: (options[o]["tabname"], options[o]["config_order"], o))
         if not options[k].get("indirect")
     }
 
@@ -788,7 +918,8 @@ def manipulate_settings():
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
                            datasources_config=datasources, changed=changed_categories,
-                           expire_override=expire_override, extensions_config=extension_config)
+                           expire_override=expire_override, extensions_config=extension_config,
+                           unused_settings=unused_settings, submenus=config_definition.submenus)
 
 
 @component.route("/manage-notifications/", methods=["GET", "POST"])

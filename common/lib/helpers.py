@@ -295,13 +295,17 @@ def get_ffmpeg_version(ffmpeg_path):
     return version.parse(ffmpeg_version)
 
 
-def find_extensions():
+def find_extensions(with_metadata=True):
     """
     Find 4CAT extensions and load their metadata
 
     Looks for subfolders of the extension folder, and loads additional metadata
     where available.
 
+    :param bool with_metadata:  Read each extension's `metadata.json` and ask
+    git for its remote. That runs a `git` subprocess per extension, so pass
+    `False` when only the extension IDs are needed - the metadata is then left
+    at its defaults and the call is a directory listing rather than a fork.
     :return tuple:  A tuple with two items; the extensions, as an ID -> metadata
     dictionary, and a list of (str) errors encountered while loading
     """
@@ -320,6 +324,9 @@ def find_extensions():
             "is_git": False,
         } for extension in sorted(os.scandir(extension_path), key=lambda x: x.name) if extension.is_dir() and not extension.name.startswith("__")
     }
+
+    if not with_metadata:
+        return extensions, errors
 
     # collect metadata for extensions
     allowed_metadata_keys = ("name", "version", "url")

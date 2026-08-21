@@ -2,12 +2,14 @@
 Load modules and datasources dynamically
 """
 from pathlib import Path
+import pathlib
 import importlib
 import inspect
 import pickle
 import sys
 import re
 import os
+import tempfile
 
 
 class ModuleCollector:
@@ -31,7 +33,12 @@ class ModuleCollector:
     process-wide through its module cache.
     """
     ignore = []
+    # missing dependency -> the modules that needed it, which is the grouping the
+    # "install these packages" warning at the end of load_modules() wants
     missing_modules = {}
+    # name -> why it could not be seen. Everything in here means some settings
+    # went undeclared while whatever owns them is installed and still reads them.
+    scan_failures = {}
     log_buffer = None
     config = None
 
@@ -41,6 +48,11 @@ class ModuleCollector:
     workers = {}
     processors = {}
     datasources = {}
+
+    # Namespaces reserved for core settings. A module-declared setting may never
+    # enter these, so an extension cannot squat a name 4CAT might add later and
+    # thereby own its definition (which controls `global`, `default` and `type`).
+    RESERVED_PREFIXES = ("privileges.", "flask.", "4cat.", "path.", "datasources.", "extensions.", "logging.")
 
     def __init__(self, config, write_cache=False):
         """
@@ -56,6 +68,10 @@ class ModuleCollector:
         # this can be flushed later once the logger is available
         self.log_buffer = ""
         self.config = config
+        # Which worker declared each module setting, worked out below. Handed to
+        # record_declarations(). Unlike the settings nothing needs it before 
+        # there is a database.
+        self.setting_provenance = {}
 
         self.load_datasources()
         self.load_modules()
@@ -65,17 +81,224 @@ class ModuleCollector:
         self.expand_datasources()
 
         # cache module-defined config options for use by the config manager
+        # this covers datasource settings too: those are declared on the
+        # datasource's search/import worker class, which is in self.workers
         if write_cache:
-            module_config = {}
-            for worker in self.workers.values():
-                if hasattr(worker, "config") and type(worker.config) is dict:
-                    module_config.update(worker.config)
+            module_config, provenance, collisions = self.collect_module_config()
+            self.setting_provenance = provenance
 
-            with config.get("PATH_CONFIG").joinpath("module_config.bin").open("wb") as outfile:
-                pickle.dump(module_config, outfile)
+            # A file rather than a database table because ConfigManager needs 
+            # the definitions before it has opened a database connection and 
+            # definitions can be code (e.g. core keeps a lambda in one).
+            # Its shape is merged straight into the config definition by every
+            # reader, including a front-end container that may still be running
+            # older code, so keep it a plain {name: definition} mapping.
+            self.write_cache_file(config.get("PATH_CONFIG").joinpath("module_config.bin"), module_config,
+                                  drop_unpicklable=True)
 
-        # load from cache
-        self.config.load_user_settings()
+        # load from cache. If we just wrote it, insist it can be read back -
+        # that turns a silently failed write into an error at boot rather than
+        # a back-end running on default values.
+        self.config.load_user_settings(require_module_config=write_cache)
+
+    def collection_failures(self):
+        """
+        Everything that stopped this collection from seeing all of 4CAT
+
+        Anything listed here means some settings went undeclared this boot even
+        though whatever owns them is installed and still reads them. That has to
+        keep the declaration scan from counting as complete, or those settings
+        age into looking obsolete while they are merely out of reach.
+
+        Ask here rather than adding up the registries at the call site, so a
+        newly-found way to lose part of 4CAT has one place to register itself.
+
+        :return dict:  Description by module or setting name, empty if all well
+        """
+        return {
+            # flipped: missing_modules groups by dependency, but a caller counting
+            # what was lost needs one entry per module
+            **{module: f"could not be imported (missing dependency: {dependency})"
+               for dependency, modules in self.missing_modules.items() for module in modules},
+            **self.scan_failures
+        }
+
+    def collect_module_config(self):
+        """
+        Collect module-declared settings, with provenance and collisions
+
+        Modules declare settings in a `config` dict on the worker class.
+
+        Collisions are refused rather than merged, on three rules:
+
+        - a key already defined in core `config_definition` is refused. The core
+          definition is authoritative; a module overriding it can change that
+          setting's `global` flag (which collapses per-tag resolution), its
+          `default` (reachable whenever no row exists) or its `type` (which
+          weakens validation).
+        - a key in a namespace reserved for core is refused outright, even if
+          core does not define it yet.
+        - between two modules, the first declarer wins - and 4CAT's own modules
+          are visited before extensions, so an extension cannot take a setting
+          an in-tree worker declares. Only `config_definition.py` was protected
+          otherwise; between modules it would come down to which worker type
+          sorted first. Each group is visited in sorted order rather than
+          filesystem order, so the outcome does not depend on the machine.
+
+        :return tuple:  `(module_config, provenance, collisions)`
+        """
+        # safe to import here: config_definition pulls in user_input, neither of
+        # which imports this module
+        from common.lib.config_definition import config_definition as core_definition, submenus, category_id
+
+        module_config = {}
+        provenance = {}
+        collisions = []
+
+        # 4CAT's own modules first, then extensions, each alphabetically: an
+        # extension must not be able to take a setting an in-tree worker declares
+        # just by being named earlier in the alphabet
+        for worker_type in sorted(self.workers, key=lambda name:
+                                  (bool(getattr(self.workers[name], "is_extension", False)), name)):
+            worker = self.workers[worker_type]
+            worker_config = getattr(worker, "config", None)
+            if type(worker_config) is not dict:
+                continue
+
+            is_extension = bool(getattr(worker, "is_extension", False))
+            extension_id = getattr(worker, "extension_name", None) if is_extension else None
+
+            for setting, definition in worker_config.items():
+                if type(definition) is not dict:
+                    # everything downstream reads a definition as a mapping. Has
+                    # to be caught here, where the module can still be named: the
+                    # first thing to touch it is record_declarations() at boot,
+                    # which runs before the log buffer is flushed, so the
+                    # AttributeError would arrive with nothing pointing at the
+                    # module that caused it.
+                    refusal = "its definition is not a dictionary"
+                elif setting in core_definition:
+                    refusal = "it is already defined as a core setting"
+                elif setting.startswith(self.RESERVED_PREFIXES):
+                    refusal = "it uses a namespace reserved for core settings"
+                elif setting in module_config:
+                    if module_config[setting] is definition:
+                        # the very same definition object, i.e. the setting is
+                        # declared on a base class and this worker inherits it.
+                        # not a collision - just note the extra declarer.
+                        provenance[setting]["also_declared_by"].append(worker_type)
+                        continue
+
+                    refusal = f"it was already declared by {provenance[setting]['declared_by']}"
+                else:
+                    refusal = None
+
+                if refusal:
+                    collisions.append({
+                        "setting": setting,
+                        "declared_by": worker_type,
+                        "extension_id": extension_id,
+                        "reason": refusal
+                    })
+                    reason = f"declared by {worker_type} but refused: {refusal}"
+
+                    # only counts against the scan if the setting ends up
+                    # declared by nobody.
+                    if setting not in core_definition and setting not in module_config:
+                        self.scan_failures[setting] = reason
+                    self.log_buffer += (f"Setting '{setting}' {reason}. It is not registered and its declared "
+                                        f"definition is ignored.\n")
+                    continue
+
+                # not a refusal - the setting is fine, only its placement is
+                # nonsense, and losing a working setting over a typo in an
+                # optional presentation key would be out of proportion. The
+                # settings panel falls back to working the tab out itself, so
+                # say so here or the author gets no signal at all.
+                if definition.get("submenu") not in (None, *submenus):
+                    self.log_buffer += (f"Setting '{setting}' declared by {worker_type} asks for submenu "
+                                        f"'{definition['submenu']}', which is not one of {', '.join(submenus)}. The "
+                                        f"setting is registered, but its tab will be placed automatically.\n")
+
+                # spaces and punctuation are fine - category_id() slugifies for the
+                # HTML id and the tab keeps its written name - but something that
+                # slugifies to nothing leaves no id to hang the tab on
+                category = definition.get("category")
+                if category is not None and not category_id(category):
+                    self.log_buffer += (f"Setting '{setting}' declared by {worker_type} asks for category "
+                                        f"'{category}', which leaves nothing usable as a tab id. The setting is "
+                                        f"registered, but its tab is named after the setting instead.\n")
+
+                module_config[setting] = definition
+                provenance[setting] = {
+                    "declared_by": worker_type,
+                    "kind": "extension" if is_extension else "core",
+                    "extension_id": extension_id,
+                    # other workers inheriting the same definition; the setting
+                    # is live as long as any one of them loads
+                    "also_declared_by": []
+                }
+
+        return module_config, provenance, collisions
+
+    def write_cache_file(self, path, data, drop_unpicklable=False):
+        """
+        Pickle data to a file, atomically
+
+        Written to a temporary file and moved into place, so a reader in the
+        other container never sees a half-written file.
+
+        :param Path path:  File to write
+        :param data:  Picklable data
+        :param bool drop_unpicklable:  For the settings cache only. A module can
+        declare a setting whose definition cannot be pickled - core itself puts
+        a lambda in one definition, so an extension doing the same is plausible.
+        Rather than take the back-end down at boot, those settings are dropped,
+        reported, and recorded in `scan_failures` so the boot counts as
+        incomplete: they are missing from the definition while the module that
+        declares them is loaded and still reading them, which is exactly the
+        state that must not be mistaken for a setting having been removed.
+        Never pass this for the provenance sidecar, where dropping a key would
+        silently discard the whole provenance map.
+        """
+        try:
+            payload = pickle.dumps(data)
+        except Exception:
+            if not drop_unpicklable or type(data) is not dict:
+                raise
+
+            # find the culprits so the log can name them, instead of failing
+            # with a traceback that points only at this line
+            unpicklable = []
+            for key, value in data.items():
+                try:
+                    pickle.dumps({key: value})
+                except Exception:
+                    unpicklable.append(key)
+
+            if not unpicklable:
+                raise
+
+            self.log_buffer += (f"Could not cache these settings, they will be unavailable: "
+                                f"{', '.join(sorted(unpicklable))}. Their definitions contain something that "
+                                f"cannot be pickled (e.g. a lambda).\n")
+            self.scan_failures.update({key: f"definition could not be pickled, so it is missing from {path.name}"
+                                       for key in unpicklable})
+            data = {key: value for key, value in data.items() if key not in unpicklable}
+            payload = pickle.dumps(data)
+
+        # a name unique to this writer, in the same folder so the move below is
+        # a rename rather than a copy.
+        descriptor, temp_path = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+        try:
+            with os.fdopen(descriptor, "wb") as outfile:
+                outfile.write(payload)
+
+            os.replace(temp_path, path)
+        except BaseException:
+            # never leave a half-written temporary file behind
+            pathlib.Path(temp_path).unlink(missing_ok=True)
+            raise
 
     @staticmethod
     def is_4cat_class(object, only_processors=False):
@@ -148,7 +371,9 @@ class ModuleCollector:
                     except (SyntaxError, ImportError) as e:
                         # this is fine, just ignore this data source and give a heads up
                         self.ignore.append(module_name)
-                        key_name = e.name if hasattr(e, "name") else module_name
+                        # a hand-raised ImportError("install x") has .name set to None,
+                        # which would key this dict by None and later break sorting it
+                        key_name = getattr(e, "name", None) or module_name
                         if key_name not in self.missing_modules:
                             self.missing_modules[key_name] = [module_name]
                         else:
@@ -164,7 +389,15 @@ class ModuleCollector:
                             continue
 
                         if component[1].type in self.workers:
-                            # already indexed
+                            # paths lists some folders twice - an extension data source
+                            # is under both the extension folder and its own path - so
+                            # the same class is reached more than once, which is fine.
+                            # Two *different* classes claiming one type is a naming bug.
+                            if self.workers[component[1].type] is not component[1]:
+                                self.log_buffer += (
+                                    f"Worker type '{component[1].type}' is declared by two classes: "
+                                    f"{self.workers[component[1].type].__module__} and {module_name}. Only the "
+                                    f"first is loaded; give one of them a different type.\n")
                             continue
 
                         # extract data that is useful for the scheduler and other
@@ -221,6 +454,8 @@ class ModuleCollector:
             try:
                 datasource = importlib.import_module(module_name)
             except ImportError as e:
+                # its workers are never found either, so its settings go undeclared
+                self.scan_failures[module_name] = f"data source could not be imported: {e}"
                 self.log_buffer += "Could not import %s: %s\n" % (module_name, e)
                 return
 
@@ -241,7 +476,6 @@ class ModuleCollector:
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
                 "init": datasource.init_datasource,
-                "config": {} if not hasattr(datasource, "config") else datasource.config,
                 "explorer-templates": self.load_datasource_explorer_templates(datasource_id, subdirectory)
             }
 

@@ -36,14 +36,35 @@ class ConfigManager(BaseConfigReader):
 
     core_settings = {}
     config_definition = {}
+    # how long a setting must go undeclared, across complete scans, before the
+    # audit will call it removed rather than merely unseen
+    ORPHAN_GRACE_PERIOD = 7 * 86400
+
+    # why a setting in each of the other audit states is not archivable
+    ARCHIVE_REFUSALS = {
+        "dormant": "it belongs to an extension that is installed, so switching that extension back on should restore "
+                   "its configuration.",
+        "absent_extension": "it belongs to an extension that is not installed. Re-installing it should restore its "
+                            "configuration rather than reverting to defaults.",
+        "recently_absent": "it has not been undeclared for long enough to be sure it is gone rather than in the middle "
+                           "of being moved. It may also be that the last start-up could not load every module.",
+        "unknown": "4CAT has no record of anything declaring it. That is not evidence it was removed - it may "
+                   "belong to an extension that was already uninstalled or switched off before 4CAT began keeping "
+                   "track. It is kept for that reason."
+    }
     # Thread-local storage for a singleton memcache client per thread.
     # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
     _memcache_tls = threading.local()
 
-    def __init__(self, db=None):
+    def __init__(self, db=None, require_module_config=False):
+        """
+        :param db:  Database object
+        :param bool require_module_config:  Refuse to initialise if
+        module-defined settings are unavailable. See `load_user_settings()`.
+        """
         # ensure core settings (including database config) are loaded
         self.load_core_settings()
-        self.load_user_settings()
+        self.load_user_settings(require_module_config=require_module_config)
         # Do not create a memcache client here; get_memcache() will lazily create per-thread.
 
         # establish database connection if none available
@@ -83,12 +104,29 @@ class ConfigManager(BaseConfigReader):
         """
         self.logger = logger
 
-    def load_user_settings(self):
+    def load_user_settings(self, require_module_config=False):
         """
         Load settings configurable by the user
 
         Does not load the settings themselves, but rather the definition so
         values can be validated, etc
+
+        Without the module definitions, module-defined settings have no `type`,
+        no `default` and no `global` flag. Stored values are not at risk:
+        `UserInput.parse_all()` only returns keys that are in the definition it
+        is handed, and the settings form is saved from that, so a setting
+        missing from the definition cannot be written over. What breaks is the
+        control panel, which would then silently offer a fraction of 4CAT's
+        settings, and a `global` setting would resolve per tag. That is why a
+        serving front-end refuses to start without them.
+
+        The back-end cannot make the same demand: it *writes* the cache, so on a
+        first boot it necessarily starts without one. Neither can `migrate.py`,
+        `docker_setup` or the helper scripts, which all run before the back-end
+        has ever booted. Those pass `require_module_config=False` (the default).
+
+        :param bool require_module_config:  Raise if module-defined settings
+        could not be loaded, instead of continuing with core settings only
         """
         # basic 4CAT settings
         self.config_definition.update(config_definition)
@@ -97,33 +135,55 @@ class ConfigManager(BaseConfigReader):
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
         module_config_path = self.get("PATH_CONFIG").joinpath("module_config.bin")
-        if module_config_path.exists():
+        module_config = self.load_cache_file(module_config_path)
+        if type(module_config) is dict:
+            # an empty mapping is valid (no module declares a setting) and is not
+            # the same as a failed read. Anything that is not a mapping at all is:
+            # update() would raise out of here, which for the front-end is during
+            # module import, so it has to take the unreadable path below instead.
+            self.config_definition.update(module_config)
+        elif require_module_config:
+            if module_config_path.exists():
+                raise ConfigException(f"{module_config_path.name} exists but could not be read. Refusing to start: "
+                                      f"every module-defined setting would be missing from the control panel, which "
+                                      f"would then quietly show an incomplete picture of how 4CAT is configured.")
+
+            raise ConfigException(f"No {module_config_path.name} file exists! It is written by the back-end when it "
+                                  f"boots, so the back-end must be started first.")
+
+    def load_cache_file(self, path):
+        """
+        Read one of the module config cache files
+
+        If 4CAT runs as two containers (front-end and back-end) both may read
+        this while the back-end writes it. Writes are atomic, so a reader sees
+        either the old file or the new one - but a file being replaced can still
+        briefly fail to open, so a couple of retries are allowed.
+
+        Note the file must be reopened for each attempt: a failed `pickle.load`
+        leaves the handle partway through the stream, so retrying on the same
+        handle can never succeed.
+
+        :param Path path:  File to read
+        :return:  Unpickled contents, or `None` if unreadable
+        """
+        if not path.exists():
+            return None
+
+        for _ in range(3):
             try:
-                with module_config_path.open("rb") as infile:
-                    retries = 0
-                    module_config = None
-                    # if 4CAT is being run in two different containers
-                    # (front-end and back-end) they might both be running this
-                    # bit of code at the same time. If the file is half-written
-                    # loading it will fail, so allow for a few retries
-                    while retries < 3:
-                        try:
-                            module_config = pickle.load(infile)
-                            break
-                        except Exception:  # this can be a number of exceptions, all with the same recovery path
-                            time.sleep(0.1)
-                            retries += 1
-                            continue
+                with path.open("rb") as infile:
+                    return pickle.load(infile)
+            except Exception:  # a number of exceptions, all with the same recovery path
+                time.sleep(0.1)
 
-                    if module_config is None:
-                        # not really a way to gracefully recover from this, but
-                        # we can at least describe the error
-                        raise RuntimeError("Could not read module_config.bin. The 4CAT developers did a bad job of "
-                                           "preventing this. Shame on them!")
+        # whether this is fatal is the caller's decision - see
+        # load_user_settings(require_module_config=...)
+        if self.logger:
+            self.logger.warning(f"Could not read {path.name} - module-defined settings are unavailable until the "
+                                f"back-end writes it again.")
 
-                    self.config_definition.update(module_config)
-            except (ValueError, TypeError):
-                pass
+        return None
 
     def load_core_settings(self):
         """
@@ -231,8 +291,21 @@ class ConfigManager(BaseConfigReader):
         """
         Ensure the database is in sync with the config definition
 
-        Deletes all stored settings not defined in 4CAT, and creates a global
-        setting for all settings not yet in the database.
+        Creates a global setting with the default value for every setting in
+        the config definition that has no value in the database yet, and keeps
+        the tag order in sync with the tags actually in use.
+
+        This does *not* delete settings that are in the database but no longer
+        defined anywhere to avoid deleting settings because their
+        extension is uninstalled or disabled, or because their module failed to
+        import this boot; telling those apart needs provenance that is not
+        available here.
+
+        Note this runs *before* the ModuleCollector (see backend/bootstrap.py),
+        which reads `extensions.enabled` and `datasources.expiration` from the
+        database. It therefore sees the module config cached by the *previous*
+        boot, and on a fresh install sees no module-declared settings at all -
+        those first get a row on the second boot.
         """
         self.with_db()
 
@@ -268,6 +341,402 @@ class ConfigManager(BaseConfigReader):
 
         self.set("flask.tag_order", tag_order)
         self.db.commit()
+
+    def record_declarations(self, provenance, degraded=False):
+        """
+        Record which module declares each setting, and when it was last seen
+
+        Run after the ModuleCollector, since it needs the provenance the
+        collector works out while loading modules. Every setting declared this
+        boot gets a row: module-declared ones are attributed to the worker that
+        declared them, core ones to `config_definition`.
+
+        Only settings that really were declared this boot are recorded.
+        `config_definition` is merged rather than rebuilt, so it can still hold
+        a setting from the *previous* boot's module cache - the boot right after
+        an extension is switched off is exactly that case, since the sidecar is
+        replaced wholesale but the definition is not. Recording those would
+        attribute them to core, wiping out the extension they belong to, and
+        they would end up offered for removal while the extension is merely off.
+
+        A setting in the `settings` table with *no* row here is one that nothing
+        currently declares. That alone is not grounds to remove it - it may
+        belong to an extension that is uninstalled or disabled - which is why
+        this only ever writes rows and never deletes them.
+
+        :param dict provenance:  Which worker declared each module setting, as
+        ModuleCollector worked it out this boot.
+        :param bool degraded:  True if some modules failed to import this boot.
+        Declarations are still recorded (what loaded really was seen), but the
+        clean-scan marker is not advanced, so nothing can age into looking
+        obsolete while an import is broken.
+        :return int:  Number of declarations recorded
+        """
+        self.with_db()
+        now = int(time.time())
+
+        declarations = []
+        for setting, definition in self.config_definition.items():
+            declared = provenance.get(setting)
+            if declared is None and setting not in config_definition:
+                # left over from the previous boot's module cache, not declared
+                # by anything now. Leave whatever was recorded for it alone.
+                continue
+
+            declared = declared or {}
+
+            try:
+                # definitions can hold values JSON cannot represent (core has a
+                # lambda in one), and this is only ever read back for display
+                last_definition = json.dumps(definition, default=str)
+            except (TypeError, ValueError):
+                last_definition = None
+
+            declarations.append((
+                setting,
+                declared.get("declared_by", "core:config_definition"),
+                declared.get("kind", "core"),
+                declared.get("extension_id"),
+                bool(definition.get("indirect", False)),
+                now,
+                now,
+                last_definition,
+                True
+            ))
+
+        if declarations:
+            # note first_seen is deliberately absent from the update list: it
+            # records when a setting was first known, so it must survive
+            self.db.execute_many("""
+                INSERT INTO settings_declarations
+                    (name, declared_by, owner_kind, extension_id, is_indirect,
+                     first_seen, last_seen, last_definition, declared)
+                VALUES %s
+                ON CONFLICT (name) DO UPDATE SET
+                    declared_by = EXCLUDED.declared_by,
+                    owner_kind = EXCLUDED.owner_kind,
+                    extension_id = EXCLUDED.extension_id,
+                    is_indirect = EXCLUDED.is_indirect,
+                    last_seen = EXCLUDED.last_seen,
+                    last_definition = EXCLUDED.last_definition,
+                    declared = TRUE,
+                    -- declared again, so whatever absence was recorded is over
+                    absent_since = NULL
+            """, replacements=declarations, commit=False)
+
+        # every boot, degraded or not: this is a record of what was seen, not a
+        # judgement about it. What stops them ageing towards removal is
+        # absent_since below, which a degraded boot does not write.
+        self.db.execute("""
+            UPDATE settings_declarations SET declared = FALSE
+             WHERE declared AND name <> ALL(%s::text[])
+        """, ([declaration[0] for declaration in declarations],), commit=False)
+
+        # written on every boot, unlike the clean-scan marker below: this is what
+        # tells the audit whether the most recent start-up could see everything
+        self.set("4cat.declarations_last_scan_complete", not degraded)
+
+        if not degraded:
+            # anything with a row that was not declared this boot starts its
+            # clock now, which is the moment we actually saw it missing.
+            # Measuring from last_seen instead counts the previous run's uptime
+            # as time spent absent, so a setting dropped by an upgrade on a
+            # server that had been up a month looks a month gone the instant it
+            # goes. Only on a complete boot: while an import is broken we cannot
+            # tell missing from unreachable.
+            self.db.execute("""
+                UPDATE settings_declarations SET absent_since = %s
+                 WHERE absent_since IS NULL AND name <> ALL(%s::text[])
+            """, (now, [declaration[0] for declaration in declarations]), commit=False)
+
+            self.set("4cat.declarations_last_clean_scan", now)
+
+        self.db.commit()
+
+        return len(declarations)
+
+    def get_declarations(self):
+        """
+        What was last recorded declaring each setting
+
+        Cheap enough to call while rendering a page, unlike `audit_settings()`,
+        which also works out how long things have been missing and which
+        extensions are on disk.
+
+        :return dict:  Declaration rows, by setting name
+        """
+        self.with_db()
+
+        return {row["name"]: row for row in self.db.fetchall("SELECT * FROM settings_declarations")}
+
+    def audit_settings(self, name=None):
+        """
+        Find settings in the database that nothing currently declares
+
+        Every setting is put in one of five states. Only `vanished` is ever a
+        candidate for removal, and even that is offered to a person rather than
+        acted on:
+
+        - `dormant`: declared by an extension that is installed. It may be
+          switched off, in which case its settings are not declared this boot,
+          but they must survive so that switching it back on restores it.
+        - `absent_extension`: declared by an extension that is not installed.
+          Re-installing it must restore the previous configuration, so these are
+          kept indefinitely.
+        - `vanished`: last declared by core, and found missing longer ago than
+          the grace period.
+        - `recently_absent`: last declared by core and not seen now, but not for
+          long enough to be sure. Also everything, whatever its age, when the
+          most recent boot was incomplete.
+        - `unknown`: nothing ever recorded declaring it. Pre-dates this record
+          keeping, or was written directly. Never a candidate, because there is
+          no evidence either way.
+
+        Age is measured from `absent_since`, the first complete start-up that
+        found a setting gone, and not from `last_seen`, which is only the last
+        time 4CAT looked and found it - the gap between two start-ups is the
+        operator's uptime, not time spent absent. `absent_since` is written only
+        on a complete start-up, so a broken import still cannot age anything
+        out, and `scan_is_current` holds everything back besides.
+
+        :param str name:  Only audit this one setting. `archive_setting()` needs
+        one answer, and without this it would scan and classify every stored
+        setting to find it.
+        :return dict:  `scan_is_current` (was the most recent boot complete),
+        `last_clean_scan`, and `findings`, a list of undeclared settings
+        """
+        self.with_db()
+        now = int(time.time())
+
+        last_clean_scan = self.get("4cat.declarations_last_clean_scan") or 0
+
+        # a start-up that could not load every module cannot be trusted to say
+        # what is missing, so nothing is judged until one that could. Only ever
+        # true after a complete boot, which is also what writes last_clean_scan.
+        scan_is_current = bool(self.get("4cat.declarations_last_scan_complete"))
+
+        # worked out lazily below: only an extension-owned setting needs it, and
+        # it is a directory scan, so auditing one core setting should not pay for
+        # it. Imported there too - helpers builds a CoreConfigManager when it
+        # loads, so importing it at the top of this module is circular.
+        installed = None
+
+        # anything still declared has nothing to report, and dropping those here
+        # rather than in the loop keeps their stored values in the database -
+        # some of them run to hundreds of kilobytes
+        undeclared = "d.name IS NULL OR NOT d.declared"
+        query = f"""
+            SELECT s.name, s.tag, s.value, d.declared_by, d.owner_kind, d.extension_id, d.last_seen, d.absent_since
+              FROM settings s
+              LEFT JOIN settings_declarations d ON s.name = d.name
+             WHERE {"s.name = %s AND (" + undeclared + ")" if name is not None else undeclared}
+             ORDER BY s.name, s.tag
+        """
+        rows = self.db.fetchall(query, (name,)) if name is not None else self.db.fetchall(query)
+
+        occurrences = {}
+        for row in rows:
+            occurrences.setdefault(row["name"], []).append(row)
+
+        findings = []
+        for name, stored in occurrences.items():
+            if name in self.config_definition:
+                # Fallback to SQL WHERE above; no row exists yet (first run) or frontend
+                # running prior to backend (should not occur normally).
+                continue
+
+            record = stored[0]
+
+            if not record["declared_by"]:
+                state = "unknown"
+            elif record["owner_kind"] == "extension" and not record["extension_id"]:
+                # recorded as an extension's without naming which one, so there is
+                # nothing to check against what is installed. 
+                state = "unknown"
+            elif record["owner_kind"] == "extension":
+                if installed is None:
+                    from common.lib.helpers import find_extensions
+                    installed, _ = find_extensions(with_metadata=False)
+
+                state = "dormant" if record["extension_id"] in installed else "absent_extension"
+            elif not scan_is_current or record["absent_since"] is None:
+                # no absence recorded: the last complete start-up still had this
+                # setting, so this process not knowing it is not evidence of
+                # anything
+                state = "recently_absent"
+            elif (now - record["absent_since"]) > self.ORPHAN_GRACE_PERIOD:
+                state = "vanished"
+            else:
+                state = "recently_absent"
+
+            findings.append({
+                "name": name,
+                "state": state,
+                "declared_by": record["declared_by"],
+                "extension_id": record["extension_id"],
+                "last_seen": record["last_seen"],
+                "absent_since": record["absent_since"],
+                # nothing declares this, so there is no definition to render it
+                # with and no field for it on the settings page. Carried so the
+                # unused settings page can at least show what is stored.
+                "value": record["value"],
+                "tags": [row["tag"] for row in stored],
+                # ensure_database() only ever writes the global tag, so a value
+                # stored against a tag was put there by a person. There is no
+                # equivalent signal for the global value: every declared setting
+                # gets a row whether or not anyone ever set it.
+                "has_tag_override": any(row["tag"] for row in stored)
+            })
+
+        return {
+            "scan_is_current": scan_is_current,
+            "last_clean_scan": last_clean_scan,
+            "findings": findings
+        }
+
+    def archive_setting(self, name, archived_by=None):
+        """
+        Move a setting out of use, reversibly
+
+        Every value for the setting - the global one and any stored against a
+        tag - moves to `settings_archive`, so nothing is destroyed and
+        `restore_setting()` can put it back.
+
+        Only a setting the audit calls `vanished` may be archived, and that is
+        checked here rather than trusted from the caller. Anything else is
+        either still in use, belongs to an extension that may come back, or has
+        no recorded history to judge it by.
+
+        :param str name:  Setting to archive
+        :param str archived_by:  Username, recorded so it is clear who did it
+        :return int:  Number of stored values moved
+        :raises ValueError:  If this setting is not one that may be archived
+        """
+        self.with_db()
+
+        finding = next((item for item in self.audit_settings(name=name)["findings"] if item["name"] == name), None)
+        if not finding:
+            raise ValueError(f"Setting '{name}' is in use, so cannot be archived.")
+
+        if finding["state"] != "vanished":
+            # This is for safety. We may want to allow archiving of other states in future, but for now it is
+            # only allowed for vanished settings.
+            raise ValueError(f"Setting '{name}' cannot be archived: {self.ARCHIVE_REFUSALS[finding['state']]}")
+
+        # one statement, so the move cannot be left half-done. The front-end
+        # shares a single database connection across all of its threads, and any
+        # other request served in between can commit it, roll it back, or
+        # reconnect out from under it - which for a separate delete and insert
+        # means losing the archived copy and keeping the delete.
+        # ON CONFLICT because a setting can be archived, come back because
+        # something declares it again, and be archived a second time; the newer
+        # copy replaces the older one rather than sitting alongside it.
+        moved = self.db.fetchall("""
+            WITH moved AS (
+                DELETE FROM settings WHERE name = %s RETURNING name, value, tag
+            )
+            INSERT INTO settings_archive (name, value, tag, declared_by, archived_at, archived_by)
+            SELECT name, value, tag, %s, %s, %s FROM moved
+            ON CONFLICT (name, tag) DO UPDATE SET
+                value = EXCLUDED.value,
+                declared_by = EXCLUDED.declared_by,
+                archived_at = EXCLUDED.archived_at,
+                archived_by = EXCLUDED.archived_by
+            RETURNING name, tag
+        """, (name, finding["declared_by"], int(time.time()), archived_by))
+
+        self.uncache_setting(name, [row["tag"] for row in moved])
+
+        return len(moved)
+
+    def restore_setting(self, name, tag=None):
+        """
+        Put an archived setting back
+
+        Refused if the setting has a stored value again that someone chose,
+        because restoring writes over it and - unlike archiving, which moves
+        rather than deletes - there would be nothing left to undo that with. A
+        value still at its default is written over: that row is one
+        `ensure_database()` created, and refusing on it would leave the archived
+        value unreachable for good.
+
+        :param str name:  Setting to restore
+        :param str tag:  Restore only the value archived against this tag; the
+        empty string is the global value. `None` restores every archived value
+        for the setting, which is what `archive_setting()` put there.
+        :return int:  Number of stored values restored
+        :raises ValueError:  If nothing was archived under this name, or the
+        setting is in use again
+        """
+        self.with_db()
+
+        # fixed SQL either way, only the values are ever interpolated
+        conditions = "name = %s" if tag is None else "name = %s AND tag = %s"
+        replacements = (name,) if tag is None else (name, tag)
+
+        if not self.db.fetchone(f"SELECT 1 AS found FROM settings_archive WHERE {conditions}", replacements):
+            raise ValueError(f"Setting '{name}' is not archived, so cannot be restored.")
+
+        # scoped the same way, so restoring one tag is not refused because a
+        # different tag happens to be in use
+        # ensure_database() gives every declared setting a row at its default, so
+        # a setting declared again after being archived always has one. Refusing
+        # on that would strand the archived value for good: it cannot be archived
+        # a second time either, because archive_setting() only accepts settings
+        # nothing declares. A value still at the default was set by nobody, and
+        # the setting is editable in the settings panel again, so writing over it
+        # is both safe and undoable by hand.
+        #
+        # IS DISTINCT FROM rather than <>, so a setting with no default of its own
+        # (NULL here) counts every stored value as one somebody chose
+        default = json.dumps(self.config_definition[name]["default"]) \
+            if name in self.config_definition and "default" in self.config_definition[name] else None
+
+        stored = self.db.fetchone(f"""
+            SELECT COUNT(*) AS values_stored,
+                   COUNT(*) FILTER (WHERE value IS DISTINCT FROM %s) AS values_configured
+              FROM settings WHERE {conditions}
+        """, (default, *replacements))
+
+        if stored["values_configured"]:
+            raise ValueError(f"Setting '{name}' has a value stored again that is not its default, so restoring "
+                             f"would write over it. Archive or change that value first if you want the archived "
+                             f"one back.")
+
+        overwritable = bool(stored["values_stored"])
+
+        # as in archive_setting(), one statement so it cannot be left half-done.
+        # a plain INSERT rather than an upsert: the check above established that
+        # nothing is stored, so if something wrote the setting in between, the
+        # unique constraint fails the whole statement and the archived copy
+        # stays put - which is the safe way to lose that race. The one exception
+        # is a row still at its default, which is written over deliberately; the
+        # clause is fixed SQL either way, chosen by the check above.
+        on_conflict = "ON CONFLICT (name, tag) DO UPDATE SET value = EXCLUDED.value" if overwritable else ""
+
+        restored = self.db.fetchall(f"""
+            WITH moved AS (
+                DELETE FROM settings_archive WHERE {conditions} RETURNING name, value, tag
+            )
+            INSERT INTO settings (name, value, tag)
+            SELECT name, value, tag FROM moved
+            {on_conflict}
+            RETURNING name, tag
+        """, replacements)
+
+        self.uncache_setting(name, [row["tag"] for row in restored])
+
+        return len(restored)
+
+    def get_archived_settings(self):
+        """
+        Settings that have been archived, and can be put back
+
+        :return list:  Archived settings, most recently archived first
+        """
+        self.with_db()
+
+        return self.db.fetchall("SELECT * FROM settings_archive ORDER BY archived_at DESC, name ASC, tag ASC")
 
     def get_all_setting_names(self, with_core=True):
         """
@@ -557,11 +1026,37 @@ class ConfigManager(BaseConfigReader):
             client.delete(self._get_memcache_id(attribute_name, tag))
         return updated_rows
 
+    def uncache_setting(self, name, tags):
+        """
+        Drop the cached values for one setting
+
+        Targeted, unlike `clear_cache()`: that flushes the whole memcached
+        instance, which 4CAT shares with the rate limiter and with both
+        containers' config caches, and is far too blunt for a single setting
+        changing.
+
+        Only the given tags are cleared. `get()` also caches a marker for tags
+        that have no value at all, but a setting being archived or restored is
+        by definition one that nothing declares, so nothing is reading it under
+        a tag it never had a value for.
+
+        :param str name:  Setting to forget
+        :param tags:  Tags whose cached value should be dropped
+        """
+        client = self.get_memcache()
+        if not client:
+            return
+
+        for tag in set(tags):
+            client.delete(self._get_memcache_id(name, tag))
+
     def clear_cache(self):
         """
         Clear cached configuration values
 
-        Called when the backend restarts - helps start with a blank slate.
+        Flushes the entire memcached instance, so this is for starting with a
+        blank slate - the back-end restarting - and not for a single setting
+        changing. Use `uncache_setting()` for that.
         """
         client = self.get_memcache()
         if not client:

@@ -25,12 +25,13 @@
             <form action="{{ url_for("admin.manipulate_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
                 <nav class="tab-controls settings">
                     <input type="hidden" name="current-tab" value="{{ current_tab }}">
-                    {% for submenu in ("core", "datasources", "processors", "other") %}
-                    <h3>{{ {"core": "4CAT Core", "datasources": "Data sources", "processors": "Processors", "other": "Other"}[submenu] }}</h3>
+                    {% for submenu in submenus %}
+                    {% if options.values() | selectattr("submenu", "equalto", submenu) | list %}
+                    <h3>{{ submenus[submenu] }}</h3>
                     <ul>
                         {% set tab.name = '' %}
                         {% for option in options if options[option].submenu == submenu %}
-                            {% set option_category = option.split(".")[0] %}
+                            {% set option_category = options[option].category %}
                             {% if option_category != tab.name %}
                                 {% set tab.name = option_category %}
                                 <li class="{% if tab.name in changed %}changed{% endif %}{% if (tab.first and not current_tab) or tab.name == current_tab %} highlighted{% set tab.first = False %}{% endif %}">
@@ -42,6 +43,7 @@
                             {% endif %}
                         {% endfor %}
                     </ul>
+                    {% endif %}
                     {% endfor %}
                 </nav>
 
@@ -51,7 +53,7 @@
                         <p class="form-notice">{{ notice|safe }}</p>
                     {% endfor %}
                     {% for option in options %}
-                        {% set option_category = option.split(".")[0] %}
+                        {% set option_category = options[option].category %}
                         {% if option_category != tab.name %}
                             {% set tab.name = option_category %}
                             {% if tab.open %}
@@ -88,6 +90,13 @@
                 <p role="tooltip" class="multiple" id="tooltip-setting-disabled" aria-hidden="true">This setting can only be changed globally, not per tag</p>
                 <p role="tooltip" class="multiple" id="tooltip-setting-changed" aria-hidden="true">This setting was changed for the '{{ tag }}' tag</p>
             </form>
+
+            {% if unused_settings %}
+                <p class="config-tag-info">{{ unused_settings }} setting{{ "s are" if unused_settings != 1 else " is" }}
+                    stored in the database but not declared by anything 4CAT currently loads, so
+                    {{ "they are" if unused_settings != 1 else "it is" }} not shown above.
+                    <a href="{{ url_for("admin.manage_unused_settings") }}">Review unused settings</a>.</p>
+            {% endif %}
         </section>
     </article>
 {% endblock %}

@@ -82,6 +82,24 @@ def run(as_daemon=True, log_level="INFO"):
 	# load 4CAT modules and cache the results
 	modules = ModuleCollector(config=config, write_cache=True)
 
+	# record which module declares which setting. Has to happen here rather than
+	# in ensure_database() above, which runs before the modules are loaded and
+	# so only ever sees the previous boot's cache.
+	# collection_failures() covers every way 4CAT can end up not seeing part of
+	# itself, not only modules that failed to import outright.
+	incomplete = modules.collection_failures()
+	recorded = config.record_declarations(modules.setting_provenance, degraded=bool(incomplete))
+	if incomplete:
+		# str() on the key because this line runs when 4CAT is already broken, and
+		# must not fail on an unexpected key type while saying so
+		detail = "; ".join(f"{name}: {reason}"
+						   for name, reason in sorted(incomplete.items(), key=lambda failure: str(failure[0])))
+		log.warning(f"Recorded {recorded} setting declarations, but {len(incomplete)} module(s) or setting(s) could "
+					f"not be loaded. Not marking this as a clean scan: settings belonging to them are unreachable, "
+					f"not obsolete, and must not age into looking removed. ({detail})")
+	else:
+		log.debug(f"Recorded {recorded} setting declarations.")
+
 	# make it happen
 	# this is blocking until the back-end is shut down
 	WorkerManager(logger=log, database=db, queue=queue, modules=modules, as_daemon=as_daemon)
