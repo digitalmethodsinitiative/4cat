@@ -40,10 +40,10 @@ class ConfigManager(BaseConfigReader):
     # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
     _memcache_tls = threading.local()
 
-    def __init__(self, db=None):
+    def __init__(self, db=None, require_module_config=False):
         # ensure core settings (including database config) are loaded
         self.load_core_settings()
-        self.load_user_settings()
+        self.load_user_settings(require_module_config=require_module_config)
         # Do not create a memcache client here; get_memcache() will lazily create per-thread.
 
         # establish database connection if none available
@@ -83,12 +83,18 @@ class ConfigManager(BaseConfigReader):
         """
         self.logger = logger
 
-    def load_user_settings(self):
+    def load_user_settings(self, require_module_config=False):
         """
         Load settings configurable by the user
 
         Does not load the settings themselves, but rather the definition so
         values can be validated, etc
+
+        :param bool require_module_config:  Refuse to carry on without the
+        settings that modules declare. The back-end writes that cache while it
+        boots, so it can start without one; anything that only reads the cache
+        would otherwise show a fraction of how 4CAT is configured and say
+        nothing about it.
         """
         # basic 4CAT settings
         self.config_definition.update(config_definition)
@@ -97,33 +103,55 @@ class ConfigManager(BaseConfigReader):
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
         module_config_path = self.get("PATH_CONFIG").joinpath("module_config.bin")
-        if module_config_path.exists():
+        module_config = self.load_cache_file(module_config_path)
+
+        if type(module_config) is dict:
+            # an empty mapping is valid - no module declares a setting - and is
+            # not the same as a failed read. Anything that is not a mapping is
+            # a failed read: update() would raise out of here, which for the
+            # front-end happens during module import.
+            self.config_definition.update(module_config)
+        elif require_module_config:
+            if module_config_path.exists():
+                raise ConfigException(f"{module_config_path.name} exists but could not be read. Refusing to start "
+                                      f"rather than run on part of 4CAT's settings.")
+
+            raise ConfigException(f"No {module_config_path.name} file exists! It is written by the back-end when it "
+                                  f"boots, so the back-end must be started first.")
+
+    def load_cache_file(self, path):
+        """
+        Read the module settings cache
+
+        If 4CAT runs as two containers (front-end and back-end) both may read
+        this while the back-end writes it. Writes are atomic, so a reader sees
+        either the old file or the new one - but a file being replaced can
+        still briefly fail to open, so a couple of retries are allowed.
+
+        Note the file has to be reopened for each attempt: a failed
+        `pickle.load` leaves the handle partway through the stream, so retrying
+        on the same handle can never succeed.
+
+        :param Path path:  File to read
+        :return:  Unpickled contents, or `None` if it could not be read
+        """
+        if not path.exists():
+            return None
+
+        for _ in range(3):
             try:
-                with module_config_path.open("rb") as infile:
-                    retries = 0
-                    module_config = None
-                    # if 4CAT is being run in two different containers
-                    # (front-end and back-end) they might both be running this
-                    # bit of code at the same time. If the file is half-written
-                    # loading it will fail, so allow for a few retries
-                    while retries < 3:
-                        try:
-                            module_config = pickle.load(infile)
-                            break
-                        except Exception:  # this can be a number of exceptions, all with the same recovery path
-                            time.sleep(0.1)
-                            retries += 1
-                            continue
+                with path.open("rb") as infile:
+                    return pickle.load(infile)
+            except Exception:  # a number of exceptions, all with the same recovery path
+                time.sleep(0.1)
 
-                    if module_config is None:
-                        # not really a way to gracefully recover from this, but
-                        # we can at least describe the error
-                        raise RuntimeError("Could not read module_config.bin. The 4CAT developers did a bad job of "
-                                           "preventing this. Shame on them!")
+        # whether this is fatal is the caller's decision - see
+        # load_user_settings(require_module_config=...)
+        if self.logger:
+            self.logger.warning(f"Could not read {path.name} - the settings modules declare are unavailable until "
+                                f"the back-end writes it again.")
 
-                    self.config_definition.update(module_config)
-            except (ValueError, TypeError):
-                pass
+        return None
 
     def load_core_settings(self):
         """
