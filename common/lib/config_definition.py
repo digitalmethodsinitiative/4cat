@@ -538,8 +538,8 @@ config_definition = {
     "api.youtube.key": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
-        "help": "YouTube API Key",
-        "tooltip": "The developer key from your API console"
+        "help": "YouTube API key",
+        "tooltip": "Can be created on https://developers.google.com/youtube/v3"
     },
     # service manager
     # this is a service that 4CAT can connect to to run e.g. ML models
