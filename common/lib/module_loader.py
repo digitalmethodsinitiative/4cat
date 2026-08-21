@@ -2,12 +2,14 @@
 Load modules and datasources dynamically
 """
 from pathlib import Path
+import pathlib
 import importlib
 import inspect
 import pickle
 import sys
 import re
 import os
+import tempfile
 
 
 class ModuleCollector:
@@ -276,11 +278,18 @@ class ModuleCollector:
             data = {key: value for key, value in data.items() if key not in unpicklable}
             payload = pickle.dumps(data)
 
-        temp_path = path.with_name(path.name + ".tmp")
-        with temp_path.open("wb") as outfile:
-            outfile.write(payload)
+        # a name unique to this writer, in the same folder so the move below is
+        # a rename rather than a copy.
+        descriptor, temp_path = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+        try:
+            with os.fdopen(descriptor, "wb") as outfile:
+                outfile.write(payload)
 
-        os.replace(temp_path, path)
+            os.replace(temp_path, path)
+        except BaseException:
+            # never leave a half-written temporary file behind
+            pathlib.Path(temp_path).unlink(missing_ok=True)
+            raise
 
     @staticmethod
     def is_4cat_class(object, only_processors=False):
