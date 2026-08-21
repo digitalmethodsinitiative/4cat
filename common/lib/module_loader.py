@@ -248,10 +248,19 @@ class ModuleCollector:
         extension_path = self.config.get('PATH_EXTENSIONS')
         enabled_extensions = [e for e, s in self.config.get("extensions.enabled").items() if s["enabled"]]
 
+        # 4CAT's own folders before the extensions folder: where an extension
+        # and an in-tree module claim the same worker type, the in-tree one is
+        # kept, rather than whichever the walk happened to reach first. An
+        # extension's data source folder sits under the extensions folder, so
+        # walking that covers it - listing it here as well would only mean
+        # reaching the same classes twice.
+        core_datasources = [self.datasources[datasource]["path"] for datasource in self.datasources
+                            if extension_path not in self.datasources[datasource]["path"].parents]
+
         paths = [self.config.get('PATH_ROOT').joinpath("processors"),
                  self.config.get('PATH_ROOT').joinpath("backend/workers"),
-                 extension_path,
-                 *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
+                 *core_datasources,
+                 extension_path]
 
         root_match = re.compile(r"^%s" % re.escape(str(self.config.get('PATH_ROOT'))))
         root_path = self.config.get('PATH_ROOT')
@@ -370,6 +379,17 @@ class ModuleCollector:
                 return
 
             datasource_id = datasource.DATASOURCE
+
+            if datasource_id in self.datasources:
+                # 4CAT's own data sources are loaded before extensions, so this
+                # keeps 4CAT's version rather than letting an extension replace
+                # it - and with it the folder that load_modules() scans for that
+                # data source's workers, which would take those workers and the
+                # settings they declare out of 4CAT altogether.
+                self.log_buffer += ("Data source '%s' in %s is already provided by %s, so it is not loaded. Give one "
+                                    "of them a different DATASOURCE id.\n" %
+                                    (datasource_id, subdirectory, self.datasources[datasource_id]["path"]))
+                return
 
             self.datasources[datasource_id] = {
                 "expire-datasets": expiration.get(datasource_id, None),
