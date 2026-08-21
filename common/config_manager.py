@@ -549,13 +549,17 @@ class ConfigManager(BaseConfigReader):
 
             if not record["declared_by"]:
                 state = "unknown"
+            elif record["owner_kind"] == "extension" and not record["extension_id"]:
+                # recorded as an extension's without naming which one, so there is
+                # nothing to check against what is installed. 
+                state = "unknown"
             elif record["owner_kind"] == "extension":
                 if installed is None:
                     from common.lib.helpers import find_extensions
                     installed, _ = find_extensions(with_metadata=False)
 
                 state = "dormant" if record["extension_id"] in installed else "absent_extension"
-            elif not scan_is_current or not record["absent_since"]:
+            elif not scan_is_current or record["absent_since"] is None:
                 # no absence recorded: the last complete start-up still had this
                 # setting, so this process not knowing it is not evidence of
                 # anything
