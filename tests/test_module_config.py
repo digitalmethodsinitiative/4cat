@@ -68,6 +68,31 @@ def test_core_definition_wins_over_module(collector):
     assert [c["setting"] for c in collisions] == ["4cat.name"]
 
 
+def test_extension_cannot_take_a_setting_a_core_module_declares(collector):
+    """
+    Only config_definition.py was ever safe from being redeclared. Between two
+    modules the winner came down to whichever worker type sorted first, so an
+    extension named early in the alphabet could take a setting an in-tree worker
+    declares - along with its type and default, which decide how the value is
+    validated and what it falls back to.
+
+    4CAT's own modules are visited before extensions now. The names below are
+    picked so that a plain sort would get this wrong, which is what makes the
+    test worth having.
+    """
+    collector.workers = {
+        "zzz-core-worker": _worker({"shared.setting": {"type": "string", "default": "from core"}}),
+        "aaa-extension-worker": _worker({"shared.setting": {"type": "toggle", "default": "from extension"}},
+                                       extension="an_extension"),
+    }
+    module_config, provenance, collisions = collector.collect_module_config()
+
+    assert module_config["shared.setting"]["default"] == "from core"
+    assert provenance["shared.setting"]["declared_by"] == "zzz-core-worker"
+    assert provenance["shared.setting"]["kind"] == "core"
+    assert [c["declared_by"] for c in collisions] == ["aaa-extension-worker"]
+
+
 def test_reserved_namespace_refused(collector):
     """
     A module may not declare into a core namespace even if core has not used

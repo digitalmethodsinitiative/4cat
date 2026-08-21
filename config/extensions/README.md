@@ -72,8 +72,9 @@ Some namespaces are reserved for 4CAT itself, and a setting declared in one of t
 name 4CAT might use in a future version, and thereby take over its definition. Note that `extensions.` is among them
 despite how it reads: it belongs to 4CAT's own settings *about* extensions, not to your extension's settings.
 
-A setting that a 4CAT release already declares is also refused - 4CAT's own definition always wins. Where two extensions
-declare the same setting, the first one wins, and which is 'first' does not depend on the machine. Refusals are written
+A setting that a 4CAT release already declares is also refused - 4CAT's own definition always wins, whether it comes from
+4CAT's settings file or from one of its own processors or data sources. Where two extensions declare the same setting,
+the first one wins, and which is 'first' does not depend on the machine. Refusals are written
 to the 4CAT log, so if a setting of yours does not show up, look there first.
 
 Several classes sharing a base class that declares `config` is fine: the setting is registered once, and inheriting it

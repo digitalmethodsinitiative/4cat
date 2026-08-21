@@ -138,9 +138,12 @@ class ModuleCollector:
           weakens validation).
         - a key in a namespace reserved for core is refused outright, even if
           core does not define it yet.
-        - between two modules, the first declarer wins. Workers are visited in
-          sorted order rather than filesystem order so this is reproducible
-          across machines.
+        - between two modules, the first declarer wins - and 4CAT's own modules
+          are visited before extensions, so an extension cannot take a setting
+          an in-tree worker declares. Only `config_definition.py` was protected
+          otherwise; between modules it would come down to which worker type
+          sorted first. Each group is visited in sorted order rather than
+          filesystem order, so the outcome does not depend on the machine.
 
         :return tuple:  `(module_config, provenance, collisions)`
         """
@@ -152,7 +155,11 @@ class ModuleCollector:
         provenance = {}
         collisions = []
 
-        for worker_type in sorted(self.workers):
+        # 4CAT's own modules first, then extensions, each alphabetically: an
+        # extension must not be able to take a setting an in-tree worker declares
+        # just by being named earlier in the alphabet
+        for worker_type in sorted(self.workers, key=lambda name:
+                                  (bool(getattr(self.workers[name], "is_extension", False)), name)):
             worker = self.workers[worker_type]
             worker_config = getattr(worker, "config", None)
             if type(worker_config) is not dict:
@@ -193,10 +200,12 @@ class ModuleCollector:
                         "extension_id": extension_id,
                         "reason": refusal
                     })
-                    # the worker still reads this setting, but it is no longer in
-                    # the definition, so the scan is not complete
                     reason = f"declared by {worker_type} but refused: {refusal}"
-                    self.scan_failures[setting] = reason
+
+                    # only counts against the scan if the setting ends up
+                    # declared by nobody.
+                    if setting not in core_definition and setting not in module_config:
+                        self.scan_failures[setting] = reason
                     self.log_buffer += (f"Setting '{setting}' {reason}. It is not registered and its declared "
                                         f"definition is ignored.\n")
                     continue
