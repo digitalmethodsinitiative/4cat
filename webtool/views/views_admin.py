@@ -806,11 +806,11 @@ def manipulate_settings():
         # and becomes id "web-studies". Only something that slugifies to nothing
         # falls back to the setting's own name - ModuleCollector logs that at
         # boot, naming the module responsible.
-        category_label = definition[option].get("category") or option.split(".")[0]
-        category = config_definition.category_id(category_label)
+        category_raw = definition[option].get("category") or option.split(".")[0]
+        category = config_definition.category_id(category_raw)
         if not category:
-            category_label = option.split(".")[0]
-            category = config_definition.category_id(category_label)
+            category_raw = option.split(".")[0]
+            category = config_definition.category_id(category_raw)
 
         # a setting is core because core declares it, not because no module
         # claimed it: nothing is recorded for anything until the back-end has
@@ -832,8 +832,10 @@ def manipulate_settings():
             "default": current_value,  # override default so this is the value displayed in the web UI
             "original_default": default,  # but also save the actual default
             "category": category,
-            # kept for the tab's name, which unlike its id may say anything
-            "category_label": category_label,
+            # the category as written, before slugifying: names the tab when
+            # nothing else does. Not the same as a definition's category_label,
+            # which is an explicit title an author chose.
+            "category_raw": category_raw,
             "is_changed": is_changed
         }
 
@@ -854,7 +856,7 @@ def manipulate_settings():
         settings = options[option]
         meta = category_meta.setdefault(settings["category"],
                                         {"submenu": None, "tabname": None, "derived": None,
-                                         "label": settings["category_label"]})
+                                         "label": settings["category_raw"]})
 
         if meta["submenu"] is None and definition[option].get("submenu") in submenu_precedence:
             meta["submenu"] = definition[option]["submenu"]
