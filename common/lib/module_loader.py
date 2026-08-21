@@ -309,7 +309,17 @@ class ModuleCollector:
                             continue
 
                         if component[1].type in self.workers:
-                            # already indexed
+                            # a folder can be reached more than once (through a
+                            # symlink, say), so meeting the same class again is
+                            # fine. Two *different* classes claiming one type is
+                            # a naming clash, and only the first is usable: the
+                            # scheduler, the interface and the settings cache all
+                            # look a worker up by its type.
+                            if self.workers[component[1].type] is not component[1]:
+                                self.log_buffer += (
+                                    f"Worker type '{component[1].type}' is declared by two classes: "
+                                    f"{self.workers[component[1].type].__module__} and {module_name}. Only the "
+                                    f"first is loaded; give one of them a different type.\n")
                             continue
 
                         # extract data that is useful for the scheduler and other
