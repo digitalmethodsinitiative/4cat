@@ -535,14 +535,14 @@ class ConfigManager(BaseConfigReader):
 
         findings = []
         for name, stored in occurrences.items():
+            if name in self.config_definition:
+                # Fallback to SQL WHERE above; no row exists yet (first run) or frontend
+                # running prior to backend (should not occur normally).
+                continue
+
             record = stored[0]
 
             if not record["declared_by"]:
-                if name in self.config_definition:
-                    # Fallback: no row for it yet, which on an instance whose back-end has
-                    # not recorded declarations since upgrading is every setting.
-                    continue
-
                 state = "unknown"
             elif record["owner_kind"] == "extension":
                 state = "dormant" if record["extension_id"] in installed else "absent_extension"
