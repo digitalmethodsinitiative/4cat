@@ -78,10 +78,8 @@ class ModuleCollector:
             self.write_cache_file(config.get("PATH_CONFIG").joinpath("module_config.bin"),
                                   self.collect_module_config())
 
-        # load from cache. If we just wrote it, insist it can be read back:
-        # that turns a silently failed write into an error at boot, rather than
-        # a back-end running on default values without saying so.
-        self.config.load_user_settings(require_module_config=write_cache)
+        # load from cache
+        self.config.load_user_settings()
 
     def collect_module_config(self):
         """
@@ -128,7 +126,14 @@ class ModuleCollector:
                 continue
 
             for setting, definition in worker_config.items():
-                if type(definition) is not dict:
+                if type(setting) is not str:
+                    # a setting name is a string everywhere else: it is a
+                    # dictionary key here, a database column value in `settings`
+                    # and an HTML field name in the control panel. Caught before
+                    # the checks below, which would otherwise raise on it and
+                    # take the back-end down at boot naming nothing.
+                    refusal = "its name is not a string"
+                elif type(definition) is not dict:
                     # everything downstream reads a definition as a mapping. It
                     # has to be caught here, while the module can still be
                     # named: whatever touches it first does so long afterwards.
@@ -192,7 +197,8 @@ class ModuleCollector:
                 raise
 
             self.log_buffer += (f"Could not cache these settings, so they will be unavailable: "
-                                f"{', '.join(sorted(unpicklable))}. Their definitions contain something that "
+                                f"{', '.join(sorted(str(setting) for setting in unpicklable))}. Their definitions "
+                                f"contain something that "
                                 f"cannot be pickled, e.g. a lambda.\n")
 
             data = {key: value for key, value in data.items() if key not in unpicklable}
@@ -248,19 +254,10 @@ class ModuleCollector:
         extension_path = self.config.get('PATH_EXTENSIONS')
         enabled_extensions = [e for e, s in self.config.get("extensions.enabled").items() if s["enabled"]]
 
-        # 4CAT's own folders before the extensions folder: where an extension
-        # and an in-tree module claim the same worker type, the in-tree one is
-        # kept, rather than whichever the walk happened to reach first. An
-        # extension's data source folder sits under the extensions folder, so
-        # walking that covers it - listing it here as well would only mean
-        # reaching the same classes twice.
-        core_datasources = [self.datasources[datasource]["path"] for datasource in self.datasources
-                            if extension_path not in self.datasources[datasource]["path"].parents]
-
         paths = [self.config.get('PATH_ROOT').joinpath("processors"),
                  self.config.get('PATH_ROOT').joinpath("backend/workers"),
-                 *core_datasources,
-                 extension_path]
+                 extension_path,
+                 *[self.datasources[datasource]["path"] for datasource in self.datasources]] # extension datasources will be here and the above line...
 
         root_match = re.compile(r"^%s" % re.escape(str(self.config.get('PATH_ROOT'))))
         root_path = self.config.get('PATH_ROOT')
@@ -389,17 +386,6 @@ class ModuleCollector:
                 return
 
             datasource_id = datasource.DATASOURCE
-
-            if datasource_id in self.datasources:
-                # 4CAT's own data sources are loaded before extensions, so this
-                # keeps 4CAT's version rather than letting an extension replace
-                # it - and with it the folder that load_modules() scans for that
-                # data source's workers, which would take those workers and the
-                # settings they declare out of 4CAT altogether.
-                self.log_buffer += ("Data source '%s' in %s is already provided by %s, so it is not loaded. Give one "
-                                    "of them a different DATASOURCE id.\n" %
-                                    (datasource_id, subdirectory, self.datasources[datasource_id]["path"]))
-                return
 
             self.datasources[datasource_id] = {
                 "expire-datasets": expiration.get(datasource_id, None),

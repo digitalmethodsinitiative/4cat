@@ -150,6 +150,23 @@ def test_definition_that_is_not_a_dictionary_is_refused(collector):
     assert "not a dictionary" in collector.log_buffer
 
 
+def test_setting_name_that_is_not_a_string_is_refused(collector):
+    """
+    A setting name is a string everywhere else in 4CAT: a key here, a value in
+    the `settings` table, a field name in the control panel. One that is not
+    would reach the reserved-name check and raise there, out of the collector
+    and into the back-end's boot, naming no module at all.
+    """
+    collector.workers = {
+        "sloppy-worker": _worker({1: {"type": "string"}, "fine.setting": {"type": "string"}})
+    }
+
+    module_config = collector.collect_module_config()
+
+    assert module_config == {"fine.setting": {"type": "string"}}, "the module's other settings survive"
+    assert "name is not a string" in collector.log_buffer
+
+
 def test_unpicklable_definition_is_dropped_rather_than_fatal(collector, tmp_path):
     """
     A definition can hold something pickle cannot write - core itself keeps a

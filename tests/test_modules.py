@@ -330,20 +330,22 @@ def test_required_settings_keys_declared(logger, fourcat_modules):
     checks that a spec exists; this checks that its setting keys are valid.
 
     The valid-key universe is built statically from what is actually loaded --
-    core config_definition plus every loaded module's own `config` block (the
-    same two sources config_manager merges at runtime). So it needs no populated
-    database, and uninstalled extensions (never loaded here) are naturally out of
-    scope rather than false failures.
+    core config_definition plus the settings modules actually get to register.
+    So it needs no populated database, and uninstalled extensions (never loaded
+    here) are naturally out of scope rather than false failures.
+
+    Note this asks the collector rather than reading each worker's `config` dict
+    directly. A declaration the collector refuses -- one that collides with a
+    core setting, or uses a name reserved for core -- stays in the worker's own
+    dict but never becomes a setting. Counting those as declarable would let a
+    module require a setting it can never have, which is the same safe-but-silent
+    failure this test exists to catch.
     """
     from common.lib.compatibility import Compatibility
     from common.lib.config_definition import config_definition
 
-    # core settings + every loaded module's own declared settings
-    declarable = set(config_definition)
-    for worker in fourcat_modules.workers.values():
-        worker_config = getattr(worker, "config", None)
-        if isinstance(worker_config, dict):
-            declarable.update(worker_config)
+    # core settings + the settings modules successfully declared
+    declarable = set(config_definition) | set(fourcat_modules.collect_module_config())
 
     unknown = []
     for name, processor_class in fourcat_modules.processors.items():
