@@ -62,5 +62,14 @@ Refusals are written to the 4CAT log, naming the module responsible. If a settin
 control panel, look there first. Giving your settings a prefix of your own - `my_extension.api_key` rather than
 `api_key` - avoids the question entirely.
 
-A worker's `type` has to be unique in the same way. If two classes claim the same one, only the first 4CAT loads is
-used - the other is skipped, and the clash is written to the log naming both classes.
+## Names an extension cannot take
+
+Three things have to be unique across the whole of 4CAT: a setting name, a worker's `type`, and a data source's
+`DATASOURCE` id. Where an extension and 4CAT itself claim the same one, **4CAT's own always wins**: its version is
+loaded, yours is skipped, and the clash is written to the log naming both sides.
+
+An extension therefore cannot replace a built-in processor or data source. If you want yours to behave differently
+from a built-in, give it a name of its own; if you need to change the built-in itself, that is a change to 4CAT.
+
+Where two *extensions* claim the same name, the first one loaded keeps it. Which one that is does not depend on the
+machine, but it is not something to rely on - pick names of your own and the question does not arise.

@@ -15,6 +15,7 @@ we import within the test functions and utilize pytest.fixtures to mock the nece
 """
 
 PATH_ROOT = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve()
+DATASOURCES = PATH_ROOT.joinpath("datasources")
 
 @pytest.fixture
 def mock_database():
@@ -427,6 +428,77 @@ def test_dataset_finish_raises_on_double_finish(mock_dataset):
 
     with pytest.raises(RuntimeError, match="finished"):
         mock_dataset.finish(5)
+
+def test_every_core_data_source_folder_registers():
+    """
+    A folder under datasources/ that holds Python code must register as a data
+    source. 4CAT's own data sources always win a DATASOURCE clash, so a core
+    folder left half-removed is worse than no folder at all: it keeps the id an
+    extension is trying to take over, and the extension is refused in favour of
+    something that no longer works. Retiring a data source to an extension means
+    removing 4CAT's copy, not emptying it.
+
+    A folder with no Python code in it is not checked. Deleting the files leaves
+    the directory behind on an existing checkout (git does not track directories,
+    and __pycache__ is ignored), and that leftover is litter rather than a
+    half-removed data source - the collector never looks at it.
+    """
+    offenders = {}
+    for folder in sorted(DATASOURCES.glob("*/")):
+        if not folder.is_dir() or not any(folder.rglob("*.py")):
+            continue
+
+        init = folder.joinpath("__init__.py")
+        source = init.read_text(encoding="utf-8") if init.exists() else ""
+        missing = [name for name in ("DATASOURCE", "init_datasource") if name not in source]
+        if missing:
+            offenders[folder.name] = missing
+
+    assert not offenders, (
+        f"these datasources/ folders contain Python code but do not register as a data source, so 4CAT "
+        f"holds their id without providing anything: {offenders}. Remove the folder, or give it an "
+        f"__init__.py defining both names."
+    )
+
+
+def test_a_second_collector_reports_no_data_source_clashes(fourcat_modules, mock_basic_config):
+    """
+    4CAT refuses a DATASOURCE id an earlier folder already provided, so an
+    extension cannot take over a built-in data source.
+
+    The registry that check reads is shared by every collector in the process,
+    and load_datasources() always rescans, so without comparing folders a second
+    collector reports every data source already loaded as a clash - telling the
+    operator to rename a built-in, naming the same folder on both sides. This
+    fixture is function-scoped and several tests ask for it, so more than one
+    collector per run is the normal case, not a corner one.
+    """
+    from common.lib.module_loader import ModuleCollector
+
+    second = ModuleCollector(config=mock_basic_config)
+
+    clashes = [line for line in second.log_buffer.split("\n") if "already provided by" in line]
+    assert not clashes, f"rescanning a folder that is already registered is not a clash: {clashes}"
+
+
+def test_two_folders_claiming_one_data_source_id_are_reported(mock_basic_config):
+    """
+    A real clash - two different folders declaring the same DATASOURCE - still
+    has to be reported, and whichever was registered first is kept.
+    """
+    from common.lib.module_loader import ModuleCollector
+
+    collector = object.__new__(ModuleCollector)
+    collector.log_buffer = ""
+    collector.config = mock_basic_config
+    # set on the instance, so the registry shared by the class is left alone
+    collector.datasources = {"bsky": {"path": Path("/somewhere/else"), "name": "Not really Bluesky"}}
+
+    collector.load_datasources()
+
+    assert "already provided by" in collector.log_buffer
+    assert collector.datasources["bsky"]["path"] == Path("/somewhere/else"),         "the folder registered first keeps the id"
+
 
 def get_trace(stack) -> FrameSummary:
     """
