@@ -38,6 +38,10 @@ class ThingExpirer(BasicWorker):
 
     expiry_notification_after_days = 7    
 
+    # every account deletion warning starts with this, which lets us find and
+    # remove an existing warning when it is no longer accurate
+    expiry_notification_prefix = "WARNING: This account will be deleted"
+
     @classmethod
     def ensure_job(cls, config=None):
         """
@@ -143,6 +147,9 @@ class ThingExpirer(BasicWorker):
             # parse expiration date if available
             delete_after = user.get_value("delete-after")
             if not delete_after:
+                # deletion may have been called off, in which case an earlier
+                # warning about it should no longer be shown
+                self.clear_expiry_notifications(username)
                 continue
 
             if re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", str(delete_after)):
@@ -153,6 +160,9 @@ class ThingExpirer(BasicWorker):
                 self.log.warning(
                     f"User {username} has invalid expiration date {delete_after}"
                 )
+                # we cannot tell when the account will be deleted, so any
+                # warning mentioning a date would be misleading
+                self.clear_expiry_notifications(username)
                 continue
 
             # check if expired...
@@ -163,8 +173,14 @@ class ThingExpirer(BasicWorker):
                 expires_at_human = expires_at.strftime("%-d %B %Y %H:%M")
                 expires_at_machine = expires_at.strftime("%Y-%m-%dT%H:%M")
 
-                warning_notification = f'WARNING: This account will be deleted at <time datetime="{expires_at_machine}">{expires_at_human}</time>. Make sure to back up your data before then.'
-                user.add_notification(warning_notification)
+                warning_notification = f'{self.expiry_notification_prefix} at <time datetime="{expires_at_machine}">{expires_at_human}</time>. Make sure to back up your data before then.'
+
+                # if the deletion date was changed an older warning may still
+                # be around, mentioning a date that is no longer correct. Both
+                # queries run in one transaction, so the user never sees a
+                # moment without a warning
+                self.clear_expiry_notifications(username, commit=False)
+                user.add_notification(warning_notification, allow_dismiss=False)
 
                 # only warn by e-mail if the account will be deleted within 7 days
                 if expires_at - now > datetime.timedelta(days=self.expiry_notification_after_days):
@@ -228,6 +244,26 @@ class ThingExpirer(BasicWorker):
 
                 else:
                     user.set_value("expiry-email-sent", {**notice, "status": "sent"})
+
+    def clear_expiry_notifications(self, username, commit=True):
+        """
+        Remove account deletion warnings for a user
+
+        These warnings mention the date the account will be deleted, so when
+        that date changes, or the deletion is called off, the warning needs to
+        be removed. Warnings received from the 4CAT update server are left
+        alone; those are managed elsewhere.
+
+        :param str username:  User to remove deletion warnings for
+        :param bool commit:  Commit the deletion? Set to `False` if a warning
+        is added right after, so that both changes are made at once.
+        """
+        self.db.execute(
+            "DELETE FROM users_notifications "
+            "WHERE username = %s AND canonical_id = '' AND notification LIKE %s",
+            (username, self.expiry_notification_prefix + "%"),
+            commit=commit
+        )
 
     def expire_notifications(self):
         """
