@@ -3,6 +3,7 @@ Delete old items
 """
 
 import datetime
+import smtplib
 import time
 import re
 
@@ -159,45 +160,74 @@ class ThingExpirer(BasicWorker):
                 self.log.info(f"User {username} expired - deleting user and datasets")
                 user.delete(modules=self.modules)
             else:
-                warning_notification = f'WARNING: This account will be deleted at <time datetime="{expires_at.strftime("%C")}">{expires_at.strftime("%-d %B %Y %H:%M")}</time>. Make sure to back up your data before then.'
+                expires_at_human = expires_at.strftime("%-d %B %Y %H:%M")
+                expires_at_machine = expires_at.strftime("%Y-%m-%dT%H:%M")
+
+                warning_notification = f'WARNING: This account will be deleted at <time datetime="{expires_at_machine}">{expires_at_human}</time>. Make sure to back up your data before then.'
                 user.add_notification(warning_notification)
 
-                # If the account will be deleted within 7 days, try sending an email
+                # only warn by e-mail if the account will be deleted within 7 days
+                if expires_at - now > datetime.timedelta(days=self.expiry_notification_after_days):
+                    continue
+
+                # we remember which deletion date we last sent an e-mail about,
+                # so that if that date is moved the user is warned again
+                notice_for = int(expires_at.timestamp())
+                notice = user.get_value("expiry-email-sent", default=None)
+                if not isinstance(notice, dict) or notice.get("expires") != notice_for:
+                    # nothing sent for this date yet. Older versions of 4CAT
+                    # stored the time of sending here instead of the date that
+                    # was warned about, so such a value counts as 'not sent'
+                    notice = {"expires": notice_for, "status": None}
+
+                if notice["status"] in ("sent", "failed"):
+                    continue
+
+                # ensure mail is configured on this server and username looks like an email
+                if not self.config.get("mail.server") or not re.match(r"[^@\s]+@[^@\s]+\.[^@\s]+\Z", username):
+                    continue
+
                 try:
-                    delta = expires_at - now
-                    if datetime.timedelta(0) <= delta <= datetime.timedelta(days=self.expiry_notification_after_days):
-                        if user.get_value("expiry-email-sent", default=False):
-                            # already sent
-                            continue
+                    msg = MIMEMultipart("alternative")
+                    msg["From"] = self.config.get("mail.noreply")
+                    msg["To"] = username
+                    msg["Subject"] = "4CAT account expiration warning"
 
-                        # Ensure mail is configured on this server and username looks like an email
-                        if self.config.get('mail.server') and re.match(r"[^@]+@[^@]+\.[^@]+", username):
-                            msg = MIMEMultipart("alternative")
-                            msg["From"] = self.config.get('mail.noreply')
-                            msg["To"] = username
-                            msg["Subject"] = "4CAT account expiration warning"
+                    plain = (
+                        f"Your 4CAT account '{username}' is scheduled for deletion on {expires_at_human}.\n"
+                        "Please back up your data before then."
+                    )
 
-                            plain = (
-                                f"Your 4CAT account '{username}' is scheduled for deletion on {expires_at.strftime('%C')}.\n"
-                                "Please back up your data before then."
-                            )
+                    html = (
+                        f"<p>Your 4CAT account <strong>{username}</strong> is scheduled for deletion at "
+                        f"<time datetime=\"{expires_at_machine}\">{expires_at_human}</time>.</p>"
+                        "<p>Please back up your data before then.</p>"
+                    )
 
-                            html = (
-                                f"<p>Your 4CAT account <strong>{username}</strong> is scheduled for deletion at "
-                                f"<time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%-d %B %Y %H:%M')}</time>.</p>"
-                                "<p>Please back up your data before then.</p>"
-                            )
+                    msg.attach(MIMEText(plain, "plain"))
+                    msg.attach(MIMEText(html, "html"))
 
-                            msg.attach(MIMEText(plain, "plain"))
-                            msg.attach(MIMEText(html, "html"))
+                    # send_email expects (recipient, message, mail_config)
+                    send_email([username], msg, self.config)
 
-                            # send_email expects (recipient, message, mail_config)
-                            send_email([username], msg, self.config)
-                            # mark as sent
-                            user.set_value("expiry-email-sent", int(time.time()))
-                except Exception:
-                    # Don't let email failures interrupt the worker; just log
-                    self.log.warning(f"Failed to send expiration email to {username}")
+                except (smtplib.SMTPRecipientsRefused, smtplib.SMTPNotSupportedError, UnicodeEncodeError) as e:
+                    # nothing can be delivered to this address, e.g. because it
+                    # is not a real e-mail address, so trying again is pointless
+                    self.log.warning(f"Cannot send expiration e-mail to {username}: this address cannot be delivered to ({e}). Not trying again.")
+                    user.set_value("expiry-email-sent", {**notice, "status": "failed"})
+
+                except Exception as e:
+                    # something else went wrong, e.g. the mail server is
+                    # unreachable. That can be fixed later, so try again next
+                    # time, but only mention it in the log the first time
+                    if notice["status"] == "retrying":
+                        self.log.debug(f"Could not send expiration e-mail to {username}: {e}")
+                    else:
+                        self.log.warning(f"Could not send expiration e-mail to {username}: {e}. Will try again later.")
+                        user.set_value("expiry-email-sent", {**notice, "status": "retrying"})
+
+                else:
+                    user.set_value("expiry-email-sent", {**notice, "status": "sent"})
 
     def expire_notifications(self):
         """
