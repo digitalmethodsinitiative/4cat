@@ -79,7 +79,9 @@
                 <button name="action-owner" class="action-button confirm-first"><i class="fa f-fw fa-user-plus" aria-hidden="true"></i> Add as owner to all</button>
 
                 <hr>
+                {% if __user_config("privileges.can_make_dataset_public") %}
                 <button name="action-public" class="action-button confirm-first"><i class="fa f-fw fa-unlock" aria-hidden="true"></i> Make all public</button>
+                {% endif %}
                 <button name="action-private" class="action-button confirm-first"><i class="fa f-fw fa-lock" aria-hidden="true"></i> Make all private</button>
             </form>
         </section>

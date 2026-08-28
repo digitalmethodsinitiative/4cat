@@ -116,6 +116,14 @@ config_definition = {
         "help": "Can view private datasets",
         "tooltip": "Controls whether users can see the datasets made private by their owners."
     },
+    "privileges.can_make_dataset_public": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can make datasets public",
+        "tooltip": "Controls whether users can share their datasets with everyone on this 4CAT server. If this is "
+                   "off, datasets are always created as private and users cannot change that afterwards. Making an "
+                   "already public dataset private is always allowed."
+    },
     "privileges.can_create_api_token": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
@@ -722,12 +730,6 @@ config_definition = {
         "default": True,
         "help": "Offer pseudonymisation",
         "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
-    },
-    "ui.offer_private": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Offer create as private",
-        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
     },
     "ui.option_email": {
         "type": UserInput.OPTION_CHOICE,

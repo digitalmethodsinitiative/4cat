@@ -13,8 +13,8 @@
                         from{% else %}
                         Add to{% endif %} favourites</a></li>
                     {% endif %}
-                    {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) %}
-                        <li><a href="{{ url_for('toolapi.toggle_private', key=dataset.key) }}?redirect"
+                    {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) and (__user_config("privileges.can_make_dataset_public") or not dataset.is_private) %}
+                        <li><a href="{{ url_for('dataset.toggle_private_interactive', key=dataset.key) }}"
                                class="toggle-private"><i
                                 class="fas fa-lock{% if dataset.is_private %}-open{% endif %}" aria-hidden="true"></i>
                             {% if dataset.is_private %}Make public{% else %}Make private{% endif %}</a></li>

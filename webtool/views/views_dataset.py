@@ -692,6 +692,10 @@ def toggle_private_interactive(key):
     if not success.is_json:
         return success
 
+    if success.json.get("error"):
+        # e.g. the dataset does not exist, or the user may not make datasets public
+        return render_template("error.html", message=success.json["error"])
+
     if success.json["success"]:
         if success.json["is_private"]:
             flash("Dataset has been made private")

@@ -508,7 +508,11 @@ def queue_dataset():
 		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
 
 	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
-	is_private = bool(request.form.get("make-private", False))
+	# users who are not allowed to make datasets public never get the checkbox, and always get a private dataset
+	if not g.config.get("privileges.can_make_dataset_public"):
+		is_private = True
+	else:
+		is_private = bool(request.form.get("make-private", True))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
 
@@ -1111,7 +1115,8 @@ def toggle_private(key):
 	Private datasets cannot be viewed by users that are not an admin or the
 	owner of the dataset. An exception is datasets assigned to the user
 	'anonymous', which can be viewed by anyone. Only admins and owners can
-	toggle private status of a dataset.
+	toggle private status of a dataset. Making a dataset public furthermore
+	requires the 'can make datasets public' privilege.
 
 	:param str key: Key of the dataset to mark as (not) private
 
@@ -1119,6 +1124,8 @@ def toggle_private(key):
 	:return-schema: {type=object,properties={success={type=boolean},is_private={type=boolean}}}
 
 	:return-error 404:  If the dataset key was not found
+	:return-error 403:  If the user may not manipulate this dataset, or may not
+	                    make datasets public
 	"""
 	try:
 		dataset = DataSet(key=key, db=g.db, modules=g.modules)
@@ -1127,6 +1134,11 @@ def toggle_private(key):
 
 	if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
 		return error(403, error="This dataset is private")
+
+	# making a dataset public requires a privilege; making one private is always allowed, so that
+	# datasets that are already public can be hidden again
+	if dataset.is_private and not g.config.get("privileges.can_make_dataset_public"):
+		return error(403, error="You are not allowed to make datasets public.")
 
 	# apply status to dataset and all children
 	dataset.is_private = not dataset.is_private

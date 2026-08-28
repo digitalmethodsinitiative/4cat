@@ -1077,6 +1077,10 @@ def dataset_bulk():
         else:
             action = action[0].split("-")[-1]
 
+            if action == "public" and not g.config.get("privileges.can_make_dataset_public"):
+                flash("You are not allowed to make datasets public.")
+                incomplete.append("action")
+
         where = []
         replacements = []
         forminput = request.form.to_dict()
@@ -1173,11 +1177,14 @@ def dataset_bulk():
                     if action == "delete":
                         dataset.delete()
 
+                    # make sure the dataset is private/public and update children accordingly
                     if action == "public":
                         dataset.is_private = False
+                        dataset.update_children(is_private=False)
 
                     if action == "private":
                         dataset.is_private = True
+                        dataset.update_children(is_private=True)
 
                     if action == "owner":
                         for user_or_tag in bulk_owner:

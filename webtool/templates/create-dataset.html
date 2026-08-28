@@ -52,7 +52,7 @@
                         </div>
                     </div>
                     {% endif %}
-                    {% if __user_config("ui.offer_private") %}
+                    {% if __user_config("privileges.can_make_dataset_public") %}
                     <div class="form-element">
                         <label for="data-make-private">Make private:</label>
                         <div class="filter-parameters">
