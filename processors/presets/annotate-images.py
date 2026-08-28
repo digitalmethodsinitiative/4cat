@@ -47,6 +47,7 @@ class AnnotateImages(ProcessorPreset):
             },
             "api_key": {
                 "type": UserInput.OPTION_TEXT,
+                "sensitive": True,
                 "help": "API Key",
                 "tooltip": "The API Key for your Google API account. You can generate and find this "
                         "key on the API dashboard."
@@ -81,26 +82,24 @@ class AnnotateImages(ProcessorPreset):
         is converted to a CSV file for easy processing.
         """
         amount = convert_to_int(self.parameters.get("amount", 10), 10)
+        # api_key is marked sensitive, so its stored value is already removed
+        # by the time this runs; the in-memory value is still available to pass
+        # to the pipeline, and is scrubbed from the follow-up datasets in turn
         api_key = self.parameters.get("api_key", "")
         features = self.parameters.get("features", "")
-
-        self.dataset.delete_parameter("api_key")  # sensitive, delete as soon as possible
 
         pipeline = [
             # first, extract top images
             {
                 "type": "top-images",
-                "parameters": {
-                    "overwrite": False
-                }
+                "parameters": {}
             },
             # then, download the images we want to annotate
             {
                 "type": "image-downloader",
                 "parameters": {
                     "amount": amount,
-                    "columns": "item",
-                    "overwrite": False
+                    "columns": "item"
                 }
             },
             # then, annotate the downloaded images with the Google Vision API
@@ -114,7 +113,7 @@ class AnnotateImages(ProcessorPreset):
             },
             # finally, create a simplified CSV file from the download NDJSON (which can also be retrieved later)
             {
-                "type": "convert-vision-to-csv",
+                "type": "convert-google-vision-to-csv",
                 "parameters": {}
             }
         ]

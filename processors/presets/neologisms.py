@@ -69,7 +69,6 @@ class NeologismExtractor(ProcessorPreset):
                 "type": "tokenise-posts",
                 "parameters": {
                     "stem": False,
-                    "strip_symbols": True,
                     "lemmatise": False,
                     "docs_per": timeframe,
                     "columns": columns,
@@ -85,7 +84,6 @@ class NeologismExtractor(ProcessorPreset):
             {
                 "type": "vector-ranker",
                 "parameters": {
-                    "amount": True,
                     "top": 15,
                 }
             }

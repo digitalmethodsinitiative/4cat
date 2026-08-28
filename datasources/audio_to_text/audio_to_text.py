@@ -32,7 +32,11 @@ class AudioUploadToText(SearchMedia):
         # We need SearchMedia's validate_query to upload the media
         media_query = SearchMedia.validate_query(query, request, config)
 
-        # Here's the real trick: act like a preset and add another processor to the pipeline
-        media_query["next"] = [{"type": "audio-to-text",
-                         "parameters": query.copy()}]
+        # Here's the real trick: act like a preset and add another processor to
+        # the pipeline. Pass it only its own options -- the media-upload options
+        # SearchMedia already consumed are not the audio-to-text processor's, so
+        # copying the whole query would leave stray keys in its parameters.
+        audio_options = AudioToText.get_options(config=config)
+        audio_parameters = {key: value for key, value in query.items() if key in audio_options}
+        media_query["next"] = [{"type": "audio-to-text", "parameters": audio_parameters}]
         return media_query

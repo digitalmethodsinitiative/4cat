@@ -71,7 +71,7 @@ class SimilarWords(ProcessorPreset):
 					"stem": False,
 					"lemmatise": False,
 					"columns": "body",
-					"timeframe": timeframe,
+					"docs_per": timeframe,
 					"grouping-per": "sentence",
 					"language": language
 				}

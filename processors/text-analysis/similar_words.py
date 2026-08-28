@@ -63,7 +63,7 @@ class SimilarWord2VecWords(BasicProcessor):
 			},
 			"crawl_depth": {
 				"type": UserInput.OPTION_CHOICE,
-				"default": 1,
+				"default": "1",
 				"options": {"1": 1, "2": 2, "3": 3},
 				"help": "The crawl depth. 1 only gets the neighbours of the input word(s), 2 also their neighbours, etc."
 			}
