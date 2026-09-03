@@ -5,6 +5,11 @@ Re-runs the datasource's `map_item` over its source NDJSON and reports every
 item that raises an exception. Failures are grouped by signature (error type,
 file:line inside map_item) so repeated formats collapse into one entry.
 
+Also works on a ".importing" file: when an import crashes inside map_item it
+never writes its result file, and the raw upload stays behind under that name.
+Those lines are the uploaded envelopes rather than the posts themselves, so they
+are unwrapped the same way the import worker does before map_item sees them.
+
 A JSON report is written into PATH_DATA, named with the dataset key so the
 clean_results.py maintenance script associates it with the dataset (and
 cleans it up if the dataset is later deleted).
@@ -18,12 +23,13 @@ import time
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/../..")
 
 from common.config_manager import ConfigManager
 from common.lib.database import Database
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, MapItemException
+from common.lib.helpers import format_import_item
 from common.lib.logger import Logger
 from common.lib.module_loader import ModuleCollector
 
@@ -32,8 +38,9 @@ cli = argparse.ArgumentParser(
 	description="Re-run map_item over a dataset's NDJSON and report unmappable items, grouped by file:line signature."
 )
 mode = cli.add_mutually_exclusive_group(required=True)
-mode.add_argument("-k", "--key", help="Dataset key. Resolves NDJSON path and datasource via the database.")
-mode.add_argument("-f", "--file", help="Path to an NDJSON file. Requires --datasource.")
+mode.add_argument("-k", "--key", help="Dataset key. Resolves the source file and datasource via the database. "
+									  "Falls back to the dataset's .importing upload if the import never finished.")
+mode.add_argument("-f", "--file", help="Path to an .ndjson file, or to an .importing upload. Requires --datasource.")
 cli.add_argument("-d", "--datasource", help="Datasource type (e.g. 'twitter-import'). Required with --file.")
 cli.add_argument("-n", "--samples", type=int, default=3,
 				 help="Full sample items to keep per failure signature (default 3). 0 = indices only.")
@@ -72,6 +79,14 @@ if args.key:
 		print(f"Dataset type '{dataset.data['type']}' has no known processor in this 4CAT install.")
 		sys.exit(1)
 	ndjson_path = dataset.get_results_path()
+	if not ndjson_path.exists():
+		# An import that crashes inside map_item never writes its result file, but
+		# the uploaded data is still there under the same name. This is the case
+		# the script is most wanted in, so use it rather than giving up.
+		staged_path = ndjson_path.with_suffix(".importing")
+		if staged_path.exists():
+			print(f"No result file for this dataset yet; reading the staged upload {staged_path.name} instead.")
+			ndjson_path = staged_path
 	dataset_key = dataset.key
 	datasource_id = dataset.data["type"]
 else:
@@ -87,9 +102,14 @@ else:
 		sys.exit(1)
 	datasource_id = args.datasource
 
-if ndjson_path.suffix.lower() != ".ndjson":
+if ndjson_path.suffix.lower() not in (".ndjson", ".importing"):
 	print(f"Only NDJSON datasets are supported (got {ndjson_path.suffix}).")
 	sys.exit(1)
+
+# Lines in an .importing file are upload envelopes: the post sits under "data"
+# and everything around it is collection metadata. The import worker lifts that
+# out before calling map_item, so do the same here or every item looks wrong.
+is_staged_upload = ndjson_path.suffix.lower() == ".importing"
 
 if not ndjson_path.exists():
 	print(f"Source file does not exist: {ndjson_path}")
@@ -135,8 +155,15 @@ with ndjson_path.open(encoding="utf-8") as infile:
 	for i, line in enumerate(infile):
 		total += 1
 
+		if is_staged_upload:
+			# the import worker drops NUL bytes before parsing; match it, so this
+			# does not report parse errors the real import would never hit
+			line = line.replace("\0", "")
+
 		try:
 			item = json.loads(line)
+			if is_staged_upload:
+				item = format_import_item(item)
 		except json.JSONDecodeError as e:
 			unmappable += 1
 			sig_key = ("JSONDecodeError", str(e), ndjson_path.name, 0)
