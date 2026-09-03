@@ -154,6 +154,13 @@ Invocation (the plain `docker compose` command uses `docker-compose.yml`):
   - Create a folder under `datasources/` with an `__init__.py` defining `DATASOURCE` and `NAME`.
   - Create a search worker extending `Search` with `type` set to `{DATASOURCE}-search` or `{DATASOURCE}-import`.
   - Optionally add `DESCRIPTION.md`, `database.sql`, and explorer files.
+- When writing or changing a `map_item` method:
+  - An absent key always means the field is missing: the source told us nothing about it. Use `value_or_missing(source, key, default)` from `common/lib/item_mapping.py` for that.
+  - Zero, an empty string and false are values the source did send, so they are never missing. A post with no likes and a post whose like count was never sent are different things. Never write `source.get(key) or MissingMappedField(default)`.
+  - A null is yours to decide about, field by field, because it can mean either thing. In one and the same Instagram response, a null `user` means the page left the author out, while a null `location` or `caption` means the post has none: the first is missing, the other two map to an empty value. Where a platform answers this the same way for most of its fields, say so once in that datasource, as `SearchInstagram.get_value_or_missing` does, rather than repeating the check at every field.
+  - A value that is present and not null can still be untrue. Instagram reports a small, made-up like count on posts whose likes are hidden, and only the separate `like_and_view_counts_disabled` field reveals it. No general rule catches this; look for the platform's own flag.
+  - Choose a default that cannot pass for a real value, since that is what processors fall back on when they do not handle missing data themselves. For a count, use -1 rather than 0.
+  - Platform responses often hold different amounts of data for the same post depending on which page it was captured from. Map such items as far as they go, marking the values that are not there as missing, instead of raising `MapItemException` and losing the post.
 
 ## Webtool Guidelines
 - Use existing frontend formatting.
