@@ -80,9 +80,15 @@ class SearchTikTok(Search):
         thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [now])[0]) >= now]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
+        try:
+            post_id_int = int(post['id'])
+            post_id_bits = f"{post_id_int:064b}"
+        except (ValueError, TypeError):
+            post_id_bits = ""
         return MappedItem({
             "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url")) if metadata.get("source_platform_url") else "",
             "id": post["id"],
+            "id_bits": post_id_bits,
             "thread_id": post["id"],
             "author": user_nickname,
             "author_full": user_fullname,
@@ -115,6 +121,9 @@ class SearchTikTok(Search):
             "challenges": ",".join(challenges),
             "diversification_labels": labels,
             "location_created": post.get("locationCreated", ""),
+            "machine_id": int(post_id_bits[58:], 2),
+            "machine_id_bits": post_id_bits[58:],
             "effects": ",".join([e["name"] for e in post.get("effectStickers", [])]),
             "warning": ",".join([w["text"] for w in post.get("warnInfo", [])])
         })
+

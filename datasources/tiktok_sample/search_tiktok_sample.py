@@ -14,7 +14,6 @@ This implements the method described in Steel et al. (2026).
 """
 import json
 import time
-import csv
 import re
 
 import psycopg2
@@ -26,7 +25,7 @@ from dateutil.parser import parse as parse_datetime
 
 from backend.lib.search import Search
 from backend.lib.proxied_requests import FailedProxiedRequest
-from common.lib.helpers import UserInput, convert_to_int, timify
+from common.lib.helpers import UserInput, convert_to_int, timify, andify
 from common.lib.exceptions import (QueryParametersException, QueryNeedsExplicitConfirmationException,
                                    ProcessorInterruptedException)
 from datasources.tiktok.search_tiktok import SearchTikTok
@@ -43,6 +42,7 @@ TAIL_LENGTH = TAIL_SLICE[1] - TAIL_SLICE[0]
 # offsets within the 22-bit tail
 TAIL_TYPE_SLICE = (10, 14)  # ID bits 52-55; the entity type
 TAIL_MACHINE_SLICE = (16, 22)  # ID bits 58-63; the machine (datacentre) ID
+MACHINE_ID_LENGTH = TAIL_MACHINE_SLICE[1] - TAIL_MACHINE_SLICE[0]
 VIDEO_ENTITY_TYPE = 13  # 0xd - the entity type of a video post
 
 # any username resolves, as long as the ID after it exists
@@ -51,8 +51,30 @@ DUMMY_USERNAME = "fourcat"
 # data source types whose result files contain TikTok post IDs we can seed
 SEEDED_TYPES = ("tiktok-search", "tiktok-urls-search", "tiktok-sample-search")
 
-# where the seeded tails are cached between queries
+# where the seeded tails are cached between queries, by the seeding worker in
+# seed_tiktok_sample.py. the version is bumped when the file gains something the
+# data source needs; older files are still read for what they do contain
 TAIL_CACHE_FILE = "tiktok-sample-tails.json"
+CACHE_VERSION = 3
+
+# how often the seeding worker re-reads the datasets on this server, in seconds
+SEED_INTERVAL = 86400
+
+# how many countries to name per machine ID in the query form. a machine mints
+# posts from all over, so listing every country it ever saw would be unreadable
+# and would suggest more precision than there is
+MACHINE_LOCATION_LIMIT = 5
+
+# how far the 'n most common machine IDs' dropdown goes
+MAX_COMMON_MACHINES = 50
+
+# coverage targets offered for limiting the ID patterns, most complete first.
+# a ladder rather than a free number, because everything interesting happens in
+# the last few percent: on a well-seeded instance the step from 100% to 99%
+# roughly halves the cost, and the steps below 98% start dropping whole machine
+# IDs rather than rare patterns, which biases a sample geographically
+PATTERN_COVERAGE_TARGETS = (100, 99.9, 99.5, 99, 98, 95, 90, 80)
+MAX_PATTERN_OPTIONS = 25
 
 # longest time range that may be sampled, in seconds
 MAX_DURATION = 10
@@ -61,18 +83,20 @@ MAX_DURATION = 10
 # data source simply cannot run in that state, so it says so rather than
 # generating IDs that are certain not to exist
 ASK_FOR_PATTERNS = ("Ask an administrator to fill in the 'Known TikTok ID patterns' setting for this data source, or "
-                    "make a TikTok dataset on this server public so that patterns can be read from it.")
+                    "import a TikTok dataset on this server so that patterns can be read from it.")
 NO_PATTERNS_ANYWHERE = ("This 4CAT instance has no TikTok ID patterns to sample with: none are configured, and there "
-                        "are no public TikTok datasets on this server to derive them from. " + ASK_FOR_PATTERNS)
+                        "are no TikTok datasets on this server to derive them from. " + ASK_FOR_PATTERNS)
+
+# and to someone who is only early. the seeding worker runs on startup and then
+# daily, so this state resolves itself
+NOT_SEEDED_YET = ("4CAT reads TikTok ID patterns from the TikTok datasets on this server once a day, and that has not "
+                  "produced any patterns yet on this instance. If there are TikTok datasets here, try again later. "
+                  + ASK_FOR_PATTERNS)
 
 # how many candidate IDs may come back empty before we say something is wrong.
 # at the ~1/125 rate Steel et al. report, seeing nothing in this many requests
 # has a probability of well under a percent
 ZERO_HIT_WARNING_AFTER = 2000
-
-# how many tails Steel et al. ended up with; used only to estimate the size of a
-# query when this 4CAT instance has not seeded any tails yet
-REFERENCE_TAIL_COUNT = 504
 
 
 class SearchTikTokSample(Search):
@@ -82,7 +106,7 @@ class SearchTikTokSample(Search):
     type = "tiktok-sample-search"  # job ID
     category = "Search"  # category
     title = "Sample TikTok posts by ID"  # title displayed in UI
-    description = ("Collect a near-complete sample of the TikTok posts made during a short time range, by generating "
+    description = ("Collect a sample of TikTok videos made during a short time range by generating "
                    "every plausible post ID for that range and requesting them all.")  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
     is_local = False  # Whether this datasource is locally scraped
@@ -104,7 +128,7 @@ class SearchTikTokSample(Search):
             "help": "Known TikTok ID patterns",
             "tooltip": "One pattern per line. A pattern may be written as 22 binary digits, as a number between "
                        "0 and 4194303, as 64 binary digits, or as a full TikTok post ID (in the latter two cases the "
-                       "last 22 bits are used). If this is left empty, 4CAT seeds patterns from the public TikTok "
+                       "last 22 bits are used). If this is left empty, 4CAT seeds patterns from the TikTok "
                        "datasets on this server instead."
         },
         "tiktok-sample-search.seed-limit": {
@@ -157,23 +181,24 @@ class SearchTikTokSample(Search):
         elif cls.count_seedable_datasets(config) == 0:
             patterns_info = f"**This data source cannot run yet.** {NO_PATTERNS_ANYWHERE}"
         else:
-            patterns_info = ("**No ID patterns are known to this 4CAT instance yet.** When you start this query, 4CAT "
-                             "first reads the post IDs of the public TikTok datasets on this server to find them. If "
-                             "there are no public TikTok datasets here, the query cannot run, and an administrator "
-                             "will need to paste a list of patterns into the `tiktok-sample-search.id-patterns` setting. "
-                             "Note that TikTok's infrastructure changes over time, so a list that worked a year ago "
-                             "may no longer cover the machines minting IDs today.")
+            patterns_info = ("**No ID patterns are known to this 4CAT instance yet, so no sample can be made.** 4CAT "
+                             "reads the post IDs of the TikTok datasets on this server to find them, once when it "
+                             "starts and daily after that, so try again later. If there are no TikTok datasets here, "
+                             "you either need to import a large dataset of TikTok videos (via Zeeschuimer) or an "
+                             "administrator will need to configure a list of patterns. Note that TikTok's "
+                             "infrastructure changes over time, so lists may expire.")
 
         return {
             "intro": {
                 "type": UserInput.OPTION_INFO,
-                "help": "This data source collects a near-complete sample of everything posted to TikTok during a "
-                        "short time range, using the method of [Steel et al. "
-                        "(2026)](https://journalqd.org/article/view/9514). It does not search: it works out every ID "
-                        "TikTok could have minted during the range you give and requests each one.\n\nThis is slow "
-                        "and expensive. Fewer than one in a hundred candidate IDs corresponds to a post that ever "
+                "help": "This data source collects a sample of everything posted to TikTok during a "
+                        "very short time range, using the method of [Steel et al. "
+                        "(2026)](https://journalqd.org/article/view/9514). It works out every ID "
+                        "TikTok could have generated between two points in time and requests each one.\n\nThis is slow: "
+                        " fewer than one in a hundred candidate IDs corresponds to a post that ever "
                         "existed, and fewer still to one that can still be retrieved, so expect a few thousand posts "
-                        "per million requests. Steel et al. needed five months to collect 83 minutes of TikTok."
+                        "per million requests. This can be sped up if proxies are configured. "
+                        "Steel et al. needed five months to collect 83 minutes of TikTok."
             },
             "patterns-info": {
                 "type": UserInput.OPTION_INFO,
@@ -185,8 +210,9 @@ class SearchTikTokSample(Search):
             "start_time": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Start of range (UTC)",
-                "tooltip": "For example 2024-04-10 17:00:00. Always read as UTC. This is the time encoded in the post "
-                           "ID, which for scheduled posts is when the post was created rather than when it went live."
+                "tooltip": "Use a UNIX timestamp or YYYY-MM-DD HH:MM:SS. Always read as UTC. This is the time encoded "
+                           "in the post ID, which does not always correspond to creation or upload time (see Steel et "
+                           "al. 2026)."
             },
             "duration": {
                 "type": UserInput.OPTION_TEXT,
@@ -203,44 +229,256 @@ class SearchTikTokSample(Search):
                 "default": 1000,
                 "min": 1,
                 "max": 1000,
-                "help": "Milliseconds per second",
+                "help": "Sample by first n milliseconds",
                 "tooltip": "Only sample the first this many milliseconds of each second. Steel et al. found the "
-                           "millisecond field to be uniformly distributed, so lowering this yields an unbiased random "
-                           "subsample of the posts in the range: at 100, you collect roughly a tenth of them for a "
-                           "tenth of the requests."
+                           "millisecond field to be uniformly distributed, so lowering this yields a random "
+                           "subsample of the posts in the second. This can be used for a longer time range at the "
+                           "expense of completeness."
             },
-            "sampling-divider": {
+            **cls.get_machine_options(known_tails, cls.get_machines(config)),
+            **cls.get_pattern_limit_option(known_tails),
+        }
+
+    @classmethod
+    def get_pattern_limit_option(cls, tails):
+        """
+        The control for leaving out the rarest ID patterns
+
+        :param dict tails:  Patterns mapped to how often they occurred
+        :return dict:  Data source options
+        """
+        options = cls.get_pattern_options(tails)
+        if len(options) < 2:
+            # nothing to choose between: either there are no patterns, or too
+            # few for any target to leave a different number of them
+            return {}
+
+        return {
+            "pattern-divider": {
                 "type": UserInput.OPTION_DIVIDER
             },
-            "sampling-info": {
-                "type": UserInput.OPTION_INFO,
-                "help": "The two settings below also reduce the number of requests, but unlike the millisecond "
-                        "setting they do so by leaving parts of TikTok out rather than by sampling it more thinly. "
-                        "Use them only if you understand what they exclude."
-            },
-            "max_patterns": {
-                "type": UserInput.OPTION_TEXT,
-                "coerce_type": int,
-                "default": 0,
-                "min": 0,
-                "help": "Most common ID patterns",
-                "tooltip": "Only use this many of the most frequently observed ID patterns; 0 uses all of them. Rarer "
-                           "patterns are the ones that give the method its high coverage, so dropping them lowers the "
-                           "share of posts you find, in ways that are hard to predict."
-            },
-            "machine_ids": {
-                "type": UserInput.OPTION_TEXT,
-                "coerce_type": int,
-                "default": 0,
-                "min": 0,
-                "help": "Most common machine IDs",
-                "tooltip": "Only use patterns belonging to this many of the most frequently observed machine IDs; 0 "
-                           "uses all of them. Steel et al. found that these bits identify the datacentre that minted "
-                           "the ID and that they correlate with where a post comes from, but they stress that how "
-                           "well this works as a way of sampling a region is not yet established. Expect this to skew "
-                           "which parts of the world end up in your dataset."
+            "pattern_coverage": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "100",
+                "options": options,
+                "help": "Limit by most common ID patterns",
+                "tooltip": "Patterns are ranked by how often they occurred in the TikTok data on this server. Every "
+                           "pattern costs the same number of requests per second sampled, but the rarest ones almost "
+                           "never yield a post, so leaving them out raises the share of requests that find something "
+                           "- the hit rate - and shortens the query. What it costs is coverage: the percentage is how "
+                           "much of the known posting each option still reaches, and the posts it gives up are the "
+                           "ones made through the rarest patterns, which is not a random subset. Below roughly 98% "
+                           "whole machine IDs start dropping out, which skews the sample towards particular regions. "
+                           "The pattern counts above are for all machine IDs. If you also limit machine IDs, the same "
+                           "percentage is taken of what those machines posted, so it uses proportionally fewer "
+                           "patterns than the count shown - the two limits multiply rather than compete."
             }
         }
+
+    @classmethod
+    def get_machine_options(cls, tails, machines):
+        """
+        Build the controls for choosing which machine IDs to sample with
+
+        A machine ID identifies the datacentre a post was uploaded to, and
+        which of them a post ends up on correlates with where it was made. The
+        correlation is loose, so rather than presenting machine IDs as a
+        region filter, the countries observed for each machine are shown as
+        they are, and someone can decide from those what to sample.
+
+        Which controls are offered depends on what this 4CAT instance knows:
+        without patterns there is nothing to choose from, and without seeded
+        location data (because none was collected yet, or because the patterns
+        come from a list an administrator configured) there is nothing to
+        select a location by.
+
+        :param dict tails:  Patterns mapped to how often they occurred
+        :param dict machines:  Machine IDs mapped to their post and location
+          counts, as returned by `get_machines()`
+        :return dict:  Data source options
+        """
+        if not tails:
+            return {}
+
+        ranked = cls.rank_machines(tails)
+        located = {machine: data for machine, data in machines.items() if data.get("locations")}
+        modes = {"all": f"Use all {len(ranked)} known machine ID(s)"}
+
+        if located:
+            modes["location"] = "Select by location"
+
+        if len(ranked) > 1:
+            # with one machine ID, 'the most common one' is simply all of them
+            modes["common"] = "Use only the most common machine IDs"
+
+        modes["custom"] = "Use a custom list of machine IDs"
+
+        options = {
+            "machine-divider": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "machine_id_mode": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "all",
+                "options": modes,
+                "help": "Machine IDs",
+                "tooltip": "The last six bits of a post ID identify the datacentre the post was uploaded to. Limiting "
+                           "which of them are sampled makes a query cheaper, at the cost of no longer sampling the "
+                           "whole platform."
+            },
+            "machine_id_info_all": {
+                "type": UserInput.OPTION_INFO,
+                "requires": "machine_id_mode==all",
+                "help": f"All {len(ranked)} machine ID(s) known to this 4CAT instance are sampled. This is the only "
+                        f"setting that samples TikTok as a whole; every other one trades coverage for a smaller query."
+            }
+        }
+
+        if located:
+            breakdown = "\n".join(
+                f"- **{machine}**: {data['located']:,} of {data['posts']:,} post(s) named a country — "
+                f"{cls.describe_locations(data['locations'])}"
+                for machine, data in sorted(
+                    located.items(), key=lambda item: (-item[1]["posts"], item[0])
+                )
+            )
+
+            # most TikTok posts do not carry a location at all, so say what the
+            # shares below are actually a share of before anyone reads them as
+            # 'this machine is 62% American'
+            total_posts = sum(data["posts"] for data in machines.values())
+            total_located = sum(data["located"] for data in machines.values())
+            located_share = total_located / total_posts if total_posts else 0
+
+            options["machine_id_info_location"] = {
+                "type": UserInput.OPTION_INFO,
+                "requires": "machine_id_mode==location",
+                "help": f"Selecting a location uses every machine ID that has that country among the "
+                        f"{MACHINE_LOCATION_LIMIT} countries listed for it below. Machines mint posts from all over, "
+                        f"so this narrows a sample towards a region rather than restricting it to one, and the "
+                        f"resulting dataset will contain posts from elsewhere. The shares below are of the posts this "
+                        f"4CAT instance happens to have seen, which is not a sample of TikTok.\n\n"
+                        f"**Most TikTok posts do not say where they were made.** Of the {total_posts:,} post(s) read "
+                        f"here, {total_located:,} ({located_share:.0%}) named a country, and everything below is a "
+                        f"share of those alone. A machine ID that mostly posts nothing at all can still end up listed "
+                        f"under a country on the strength of the few posts that did say something, so treat a thin "
+                        f"row below as the weak evidence it is.\n\n{breakdown}"
+            }
+            options["machine_id_locations"] = {
+                "type": UserInput.OPTION_MULTI_SELECT,
+                "default": [],
+                "options": cls.get_location_options(located),
+                "requires": "machine_id_mode==location",
+                "help": "Locations",
+                "tooltip": "Country the post said it was created in, as recorded in the posts this 4CAT instance has "
+                           "collected."
+            }
+
+        if "common" in modes:
+            options["machine_id_info_common"] = {
+                "type": UserInput.OPTION_INFO,
+                "requires": "machine_id_mode==common",
+                "help": "Machine IDs are ranked by how many of the known posts they minted. Each option below says "
+                        "what share of those posts it accounts for, and which countries were seen for it, so a set "
+                        "can be picked for what it covers as well as for how much it costs."
+            }
+            options["machine_id_count"] = {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "0",
+                "options": cls.get_common_machine_options(tails, machines),
+                "requires": "machine_id_mode==common",
+                "help": "Most common machine IDs"
+            }
+
+        options["machine_id_info_custom"] = {
+            "type": UserInput.OPTION_INFO,
+            "requires": "machine_id_mode==custom",
+            "help": f"One machine ID per line, or separated by commas. A machine ID may be written as "
+                    f"{MACHINE_ID_LENGTH} binary digits (`000101`) or as the number those digits represent (`5`), "
+                    f"which is what the `machine_id_bits` and `machine_id` columns of a TikTok dataset contain. IDs "
+                    f"that are not known to this 4CAT instance simply match no patterns.\n\nKnown machine IDs: "
+                    + ", ".join(f"`{machine}`" for machine in ranked)
+        }
+        options["machine_id_custom"] = {
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "default": "",
+            "requires": "machine_id_mode==custom",
+            "help": "Machine IDs"
+        }
+
+        return options
+
+    @classmethod
+    def get_location_options(cls, machines):
+        """
+        List the countries that can be sampled by
+
+        Only countries a machine is actually associated with are listed, i.e.
+        the ones named for it in the query form - anything further down the
+        tail of a machine's location counts would be a country someone could
+        select without it selecting anything they were shown.
+
+        :param dict machines:  Machine IDs mapped to their post and location
+          counts
+        :return dict:  Country codes mapped to a label
+        """
+        posts = {}
+        machines_per_country = {}
+
+        for machine, data in machines.items():
+            for code in cls.machine_locations(data):
+                machines_per_country[code] = machines_per_country.get(code, 0) + 1
+
+            for code, count in data["locations"].items():
+                posts[code] = posts.get(code, 0) + count
+
+        total = sum(posts[code] for code in machines_per_country)
+        options = {}
+
+        for code in sorted(machines_per_country, key=lambda code: (-posts[code], code)):
+            share = posts[code] / total if total else 0
+            options[code] = (f"{code}: {'<1%' if share < 0.005 else format(share, '.0%')} of located posts, "
+                             f"{machines_per_country[code]} machine ID(s)")
+
+        return options
+
+    @classmethod
+    def get_common_machine_options(cls, tails, machines):
+        """
+        Build the 'n most common machine IDs' dropdown
+
+        There is one option per machine ID this 4CAT instance actually knows
+        about, and no more: selecting every machine is what 'all' already does.
+
+        Each option says what share of the known posts those machines minted,
+        and which countries were seen for them, so that what a narrower sample
+        gives up is visible at the point where it is chosen. The share is what
+        distinguishes the options on an instance where every machine posts from
+        the same handful of countries.
+
+        :param dict tails:  Patterns mapped to how often they occurred
+        :param dict machines:  Machine IDs mapped to their post and location
+          counts; may be empty
+        :return dict:  Option values mapped to a label
+        """
+        counted = cls.count_machines(tails)
+        ranked = sorted(counted, key=lambda machine: (-counted[machine], machine))
+        total = sum(counted.values())
+
+        options = {"0": f"All {len(ranked)} machine ID(s)"}
+        combined = {}
+        covered = 0
+
+        for amount, machine in enumerate(ranked[:min(MAX_COMMON_MACHINES, len(ranked) - 1)], start=1):
+            covered += counted[machine]
+            for code, count in machines.get(machine, {}).get("locations", {}).items():
+                combined[code] = combined.get(code, 0) + count
+
+            share = covered / total if total else 0
+            options[str(amount)] = f"{amount} — {'<1%' if share < 0.005 else format(share, '.0%')} of known posts" \
+                                   + (f"; {cls.describe_locations(combined)}" if combined else "")
+
+        return options
 
     @staticmethod
     def validate_query(query, request, config):
@@ -264,8 +502,8 @@ class SearchTikTokSample(Search):
             else:
                 start = parse_datetime(start_time)
         except (ValueError, TypeError, OverflowError, OSError):
-            raise QueryParametersException(f"'{start_time}' could not be read as a date and time. Use a format like "
-                                           f"2024-04-10 17:00:00.")
+            raise QueryParametersException(f"'{start_time}' could not be read as a date and time. Use a UNIX timestamp "
+                                           f"or text string like 2024-04-10 17:00:00.")
 
         if start.tzinfo is None:
             start = start.replace(tzinfo=timezone.utc)
@@ -273,19 +511,42 @@ class SearchTikTokSample(Search):
         start = int(start.timestamp())
         duration = max(1, min(MAX_DURATION, convert_to_int(query.get("duration"), 1)))
         milliseconds = max(1, min(1000, convert_to_int(query.get("milliseconds"), 1000)))
-        max_patterns = max(0, convert_to_int(query.get("max_patterns"), 0))
-        machine_ids = max(0, convert_to_int(query.get("machine_ids"), 0))
+
+        machine_query = {
+            "machine_id_mode": query.get("machine_id_mode", "all"),
+            "machine_id_locations": query.get("machine_id_locations", []),
+            "machine_id_count": max(0, convert_to_int(query.get("machine_id_count"), 0)),
+            "machine_id_custom": str(query.get("machine_id_custom", "")).strip()
+        }
+
+        if machine_query["machine_id_mode"] not in ("all", "location", "common", "custom"):
+            machine_query["machine_id_mode"] = "all"
+
+        if machine_query["machine_id_mode"] == "custom":
+            # the machine IDs are checked here rather than at run time because a
+            # typo in this list is otherwise indistinguishable from a machine
+            # that happens to have no patterns
+            custom, rejected = SearchTikTokSample.parse_machine_ids(machine_query["machine_id_custom"])
+            if rejected:
+                raise QueryParametersException(
+                    f"These entries in the custom machine ID list could not be read: {', '.join(rejected[:10])}. Write "
+                    f"each machine ID as {MACHINE_ID_LENGTH} binary digits (e.g. 000101) or as the number those "
+                    f"digits represent (0-{2 ** MACHINE_ID_LENGTH - 1}).")
+            elif not custom:
+                raise QueryParametersException("You need to provide at least one machine ID to sample with.")
+
+        elif machine_query["machine_id_mode"] == "location" and not machine_query["machine_id_locations"]:
+            raise QueryParametersException("You need to select at least one location to sample with.")
 
         now = int(datetime.now(tz=timezone.utc).timestamp())
-        if start < 0:
-            raise QueryParametersException("The start of the range must be after 1 January 1970.")
+        if start < 1474329600:
+            raise QueryParametersException("The start of the range must be after 20 September 2016.")
         elif start + duration > now:
             raise QueryParametersException("The range to sample must lie fully in the past.")
 
-        # figure out how many candidate IDs this would generate. if this 4CAT
-        # instance has not seeded any ID patterns yet we cannot know, so fall
-        # back to the number Steel et al. arrived at - the worker checks again
-        # once it knows the real number
+        # figure out how many candidate IDs this would generate. seeding happens
+        # in the background rather than as part of a query, so without patterns
+        # there is nothing to sample with and no point in queueing anything
         known_tails, _, tail_problem = SearchTikTokSample.get_known_tails(config)
         if not known_tails and tail_problem:
             raise QueryParametersException(tail_problem)
@@ -293,17 +554,20 @@ class SearchTikTokSample(Search):
             # nothing configured, nothing cached and nothing to seed from, so
             # this query could only ever request IDs that cannot exist
             raise QueryParametersException(NO_PATTERNS_ANYWHERE)
+        elif not known_tails:
+            raise QueryParametersException(NOT_SEEDED_YET)
 
-        if known_tails:
-            tail_count = len(SearchTikTokSample.select_tails(known_tails, max_patterns, machine_ids))
-            if not tail_count:
-                raise QueryParametersException("The chosen limits on ID patterns and machine IDs leave no patterns to "
-                                               "sample with.")
-        else:
-            tail_count = REFERENCE_TAIL_COUNT if not max_patterns else min(max_patterns, REFERENCE_TAIL_COUNT)
+        machines, machine_problem = SearchTikTokSample.resolve_machines(
+            machine_query, known_tails, SearchTikTokSample.get_machines(config))
+
+        coverage = SearchTikTokSample.parse_coverage(query.get("pattern_coverage"))
+        tail_count = len(SearchTikTokSample.select_tails(known_tails, machines=machines, coverage=coverage))
+        if not tail_count:
+            raise QueryParametersException("The chosen limits on ID patterns and machine IDs leave no patterns to "
+                                           "sample with." + (f" {machine_problem}" if machine_problem else ""))
 
         candidates = duration * milliseconds * tail_count
-        max_candidates = convert_to_int(config.get("tiktok-sample-search.max-candidates", 1000000), 1000000)
+        max_candidates = convert_to_int(config.get("tiktok-sample-search.max-candidates", 1_000_000), 1_000_000)
 
         if candidates > max_candidates:
             raise QueryParametersException(
@@ -329,9 +593,22 @@ class SearchTikTokSample(Search):
             "start_time": start,
             "duration": duration,
             "milliseconds": milliseconds,
-            "max_patterns": max_patterns,
-            "machine_ids": machine_ids
+            "pattern_coverage": coverage,
+            **machine_query
         }
+
+    @staticmethod
+    def parse_coverage(value):
+        """
+        Read a coverage target
+
+        :param value:  Value from the query form or from dataset parameters
+        :return float:  A percentage between 0 and 100; 100 if unreadable
+        """
+        try:
+            return min(100.0, max(0.0, float(value)))
+        except (TypeError, ValueError):
+            return 100.0
 
     def get_items(self, query):
         """
@@ -340,31 +617,33 @@ class SearchTikTokSample(Search):
         :param dict query:  Search query parameters
         """
         tails, source, tail_problem = self.get_known_tails(self.config)
-        if not tails and tail_problem:
-            self.dataset.finish_with_error(tail_problem)
+        if not tails:
+            self.dataset.finish_with_error(tail_problem or NOT_SEEDED_YET)
             return
-        elif not tails:
-            tails, seed_problem = self.seed_tails()
-            source = "seeded from public TikTok datasets on this server"
-
-            if not tails:
-                self.dataset.finish_with_error(seed_problem or NO_PATTERNS_ANYWHERE)
-                return
 
         self.dataset.log(f"Using {len(tails):,} ID patterns ({source}).")
         if tail_problem:
             self.dataset.log(tail_problem)
 
-        selected = self.select_tails(tails, query["max_patterns"], query["machine_ids"])
+        # the patterns are re-seeded daily, so which machine IDs a query's
+        # settings resolve to can have changed since it was submitted
+        machine_data = self.get_machines(self.config)
+        machines, machine_problem = self.resolve_machines(query, tails, machine_data)
+        if machine_problem:
+            self.dataset.log(machine_problem)
+
+        coverage = self.parse_coverage(query.get("pattern_coverage"))
+        selected = self.select_tails(tails, machines=machines, coverage=coverage)
         if not selected:
-            self.dataset.finish_with_error("The chosen limits on ID patterns and machine IDs leave no patterns to "
-                                           "sample with.")
+            self.dataset.finish_with_error(("The chosen limits on ID patterns and machine IDs leave no patterns to "
+                                            "sample with. " + machine_problem).strip())
             return
 
         # the number of patterns may have changed since the query was validated
         # (e.g. because they had not been seeded yet), so check the budget
         # again and drop the rarest patterns if it no longer fits
-        max_candidates = convert_to_int(self.config.get("tiktok-sample-search.max-candidates", 1_000_000), 1_000_000)
+        max_candidates = convert_to_int(self.config.get("tiktok-sample-search.max-candidates", 1_000_000),
+                                        1_000_000)
         per_pattern = query["duration"] * query["milliseconds"]
         if len(selected) * per_pattern > max_candidates:
             fits = max_candidates // per_pattern
@@ -381,15 +660,27 @@ class SearchTikTokSample(Search):
             selected = selected[:fits]
 
         candidates = len(selected) * per_pattern
-        machines = sorted({int(tail[TAIL_MACHINE_SLICE[0]:TAIL_MACHINE_SLICE[1]], 2) for tail in selected})
+        used_machines = sorted({int(tail[TAIL_MACHINE_SLICE[0]:TAIL_MACHINE_SLICE[1]], 2) for tail in selected})
         start_readable = datetime.fromtimestamp(query["start_time"], tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         # record exactly what was sampled, so the dataset can be reproduced
         self.dataset.log(f"Sampling {query['duration']} second(s) from {start_readable} UTC "
                          f"(timestamps {query['start_time']} to {query['start_time'] + query['duration'] - 1}).")
         self.dataset.log(f"Sampling milliseconds 0 to {query['milliseconds'] - 1} of each second.")
-        self.dataset.log(f"Using {len(selected):,} ID pattern(s) covering {len(machines)} machine ID(s): "
-                         f"{', '.join(str(machine) for machine in machines)}.")
+        self.dataset.log(f"Machine ID selection: {query.get('machine_id_mode', 'all')}.")
+        if coverage < 100:
+            # the denominator is the patterns left after the machine ID limits,
+            # not every pattern known here, since that is what the coverage
+            # target was applied to
+            available = len(self.select_tails(tails, machines=machines))
+            scope = "the selected machine IDs" if machines is not None else "this 4CAT instance"
+            self.dataset.log(f"Limited to the most common ID patterns covering {coverage:g}% of the posts known here "
+                             f"for {scope}: {len(selected):,} of {available:,} pattern(s). Posts made through the "
+                             f"patterns left out are not sampled.")
+        self.dataset.log(f"Using {len(selected):,} ID pattern(s) covering {len(used_machines)} machine ID(s), with "
+                         f"the locations recorded for them:")
+        for machine in used_machines:
+            self.dataset.log(f"  {machine}: {self.describe_locations(machine_data.get(machine, {}).get('locations', {}))}")
         self.dataset.log("ID patterns used (bits 42-63 of the post ID):\n" + "\n".join(selected))
 
         self.dataset.update_status(f"Requesting {candidates:,} candidate TikTok post IDs")
@@ -402,6 +693,7 @@ class SearchTikTokSample(Search):
         outcomes = {}
         interrupted = False
         warned = False
+        started = time.time()
 
         for url, response in self.iterate_proxied_requests(urls, preserve_order=False,
                                                            headers=TikTokScraper.headers, timeout=30):
@@ -435,9 +727,16 @@ class SearchTikTokSample(Search):
                     f"in use most likely do not match the IDs TikTok currently mints: check that they were derived "
                     f"from video post IDs, using bits 42-63 of the 64-bit ID.")
 
-            if requested % 500 == 0:
+            if requested == 1 or requested % 50 == 0:
+                # the rate so far, carried forward. proxies come and go and
+                # TikTok's own pace varies, so this is an order of magnitude
+                # rather than an estimate
+                elapsed = time.time() - started
+                left = f", about {timify(elapsed / requested * (candidates - requested))} left" \
+                    if elapsed > 10 and requested < candidates else ""
+
                 self.dataset.update_status(f"Requested {requested:,} of {candidates:,} candidate IDs, found "
-                                           f"{collected:,} post(s)"
+                                           f"{collected:,} post(s){left}"
                                            + (" - no hits yet, see the dataset log" if warned else ""))
                 self.dataset.update_progress(requested / candidates)
 
@@ -537,150 +836,10 @@ class SearchTikTokSample(Search):
                     post_id = int(prefix + tail, 2)
                     yield f"https://www.tiktok.com/@{DUMMY_USERNAME}/video/{post_id}"
 
-    def seed_tails(self):
-        """
-        Collect ID patterns from the public TikTok datasets on this server
-
-        Reads post IDs from public, finished TikTok datasets, most recent first,
-        until enough of them have been seen. Only IDs of video posts count -
-        other entities (users, comments, livestreams) use the same ID scheme but
-        different patterns, and including those would inflate the search space
-        for nothing.
-
-        The result is cached so the query form can tell users how large a range
-        they can sample before they submit anything.
-
-        :return tuple:  Patterns of 22 bits mapped to how often they occurred,
-          and an explanation of why there are none (empty if there are some)
-        """
-        limit = convert_to_int(self.config.get("tiktok-sample-search.seed-limit", 250000), 250000)
-        data_path = self.config.get("PATH_DATA")
-
-        datasets = self.db.fetchall(
-            "SELECT key, type, result_file FROM datasets WHERE type IN %s AND is_finished = TRUE "
-            "AND is_private = FALSE AND key_parent = '' ORDER BY timestamp DESC", (SEEDED_TYPES,))
-
-        if not datasets:
-            return {}, NO_PATTERNS_ANYWHERE
-
-        self.dataset.update_status(f"Looking for TikTok ID patterns in {len(datasets):,} public dataset(s) on this "
-                                   f"server")
-
-        seen = set()
-        tails = {}
-        scanned = 0
-
-        for record in datasets:
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while seeding TikTok ID patterns")
-
-            if len(seen) >= limit:
-                break
-
-            if not record["result_file"]:
-                continue
-
-            path = data_path.joinpath(record["result_file"])
-            if not path.exists():
-                continue
-
-            scanned += 1
-            for index, post_id in enumerate(self.iterate_post_ids(path)):
-                if index % 10000 == 0 and self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while seeding TikTok ID patterns")
-
-                if post_id in seen:
-                    continue
-
-                seen.add(post_id)
-                tail = f"{post_id:0{ID_LENGTH}b}"[TAIL_SLICE[0]:TAIL_SLICE[1]]
-                if int(tail[TAIL_TYPE_SLICE[0]:TAIL_TYPE_SLICE[1]], 2) == VIDEO_ENTITY_TYPE:
-                    tails[tail] = tails.get(tail, 0) + 1
-
-                if len(seen) >= limit:
-                    break
-
-            self.dataset.update_status(f"Found {len(tails):,} ID pattern(s) in {len(seen):,} post ID(s) from "
-                                       f"{scanned:,} dataset(s)")
-
-        self.dataset.log(f"Harvested {len(tails):,} ID pattern(s) from {len(seen):,} unique post ID(s) across "
-                         f"{scanned:,} public dataset(s).")
-
-        if tails:
-            self.save_tail_cache(tails, len(seen), scanned)
-            return tails, ""
-
-        # there were datasets to read, but nothing usable came out of them - say
-        # which of the two ways that happened, since the fix differs
-        if not scanned:
-            return {}, (f"Found {len(datasets):,} public TikTok dataset(s), but none of their result files could be "
-                        f"read; they have most likely been deleted from disk. {ASK_FOR_PATTERNS}")
-
-        return {}, (f"Read {len(seen):,} post ID(s) from {scanned:,} public TikTok dataset(s), but none of them were "
-                    f"video post IDs, so there are no patterns to sample with. {ASK_FOR_PATTERNS}")
-
-    @staticmethod
-    def iterate_post_ids(path):
-        """
-        Read TikTok post IDs from a dataset result file
-
-        :param Path path:  Path to an .ndjson or .csv dataset result file
-        :return:  Yields post IDs, as integers
-        """
-        try:
-            if path.suffix == ".ndjson":
-                with path.open(encoding="utf-8") as infile:
-                    for line in infile:
-                        try:
-                            post_id = int(json.loads(line).get("id"))
-                        except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
-                            continue
-
-                        if 0 < post_id < 2 ** ID_LENGTH:
-                            yield post_id
-
-            elif path.suffix == ".csv":
-                with path.open(encoding="utf-8") as infile:
-                    reader = csv.DictReader(infile)
-                    if "id" not in (reader.fieldnames or []):
-                        return
-
-                    for row in reader:
-                        try:
-                            post_id = int(row["id"])
-                        except (TypeError, ValueError):
-                            continue
-
-                        if 0 < post_id < 2 ** ID_LENGTH:
-                            yield post_id
-
-        except (OSError, csv.Error, UnicodeDecodeError):
-            return
-
-    def save_tail_cache(self, tails, posts_scanned, datasets_scanned):
-        """
-        Cache seeded ID patterns so the query form can use them
-
-        :param dict tails:  Patterns mapped to how often they occurred
-        :param int posts_scanned:  Unique post IDs the patterns were found in
-        :param int datasets_scanned:  Datasets those posts came from
-        """
-        try:
-            path = self.config.get("PATH_CONFIG").joinpath(TAIL_CACHE_FILE)
-            with path.open("w", encoding="utf-8") as outfile:
-                json.dump({
-                    "created": int(time.time()),
-                    "posts_scanned": posts_scanned,
-                    "datasets_scanned": datasets_scanned,
-                    "tails": tails
-                }, outfile)
-        except (OSError, TypeError) as e:
-            self.dataset.log(f"Could not cache seeded TikTok ID patterns: {e}")
-
     @staticmethod
     def count_seedable_datasets(config):
         """
-        Count the public TikTok datasets ID patterns could be seeded from
+        Count the TikTok datasets ID patterns could be seeded from
 
         Used to tell someone that a query cannot work *before* they wait for it
         to be picked up, rather than after.
@@ -692,7 +851,7 @@ class SearchTikTokSample(Search):
         try:
             counted = config.db.fetchone(
                 "SELECT COUNT(*) AS num FROM datasets WHERE type IN %s AND is_finished = TRUE "
-                "AND is_private = FALSE AND key_parent = ''", (SEEDED_TYPES,))
+                "AND key_parent = ''", (SEEDED_TYPES,))
             return counted["num"] if counted else 0
         except (AttributeError, TypeError, KeyError, psycopg2.Error):
             # no database from this context, or the query failed; leave it to
@@ -727,28 +886,184 @@ class SearchTikTokSample(Search):
             return {}, "", (
                 f"The 'Known TikTok ID patterns' setting is filled in, but none of its entries can be used: "
                 f"{summary}. A pattern is bits 42-63 of a video post's 64-bit ID, written as {TAIL_LENGTH} binary "
-                f"digits with the leading zeros intact. Printing int(bits) rather than the bit string itself, or "
-                f"taking the IDs from a user, comment or music column instead of the post column, both produce lists "
-                f"that parse but can never match a real video.")
+                f"digits with the leading zeros intact.")
+
+        cache = cls.read_cache(config)
+        tails = {tail: count for tail, count in cache.get("tails", {}).items() if len(tail) == TAIL_LENGTH}
+        if not tails:
+            return {}, "", ""
+
+        seeded = datetime.fromtimestamp(cache.get("created", 0), tz=timezone.utc).strftime("%d %B %Y")
+        return tails, (f"seeded from {cache.get('posts_scanned', 0):,} post IDs in "
+                       f"{cache.get('datasets_scanned', 0):,} dataset(s) on this server on {seeded}"), ""
+
+    @staticmethod
+    def read_cache(config):
+        """
+        Read what the seeding worker last found
+
+        :param ConfigManager|None config:  Configuration reader
+        :return dict:  Cache contents, or an empty dictionary if there is no
+          readable cache
+        """
+        if not config:
+            return {}
 
         try:
             path = config.get("PATH_CONFIG").joinpath(TAIL_CACHE_FILE)
             if not path.exists():
-                return {}, "", ""
+                return {}
 
             with path.open(encoding="utf-8") as infile:
                 cache = json.load(infile)
 
-            tails = {tail: count for tail, count in cache.get("tails", {}).items() if len(tail) == TAIL_LENGTH}
-            if not tails:
-                return {}, "", ""
-
-            seeded = datetime.fromtimestamp(cache.get("created", 0), tz=timezone.utc).strftime("%d %B %Y")
-            return tails, (f"seeded from {cache.get('posts_scanned', 0):,} post IDs in "
-                           f"{cache.get('datasets_scanned', 0):,} public dataset(s) on this server on {seeded}"), ""
+            return cache if type(cache) is dict else {}
 
         except (OSError, AttributeError, ValueError, json.JSONDecodeError):
-            return {}, "", ""
+            return {}
+
+    @classmethod
+    def get_machines(cls, config):
+        """
+        Get the machine IDs this 4CAT instance knows about, and where they post
+
+        Only available for seeded patterns: a list configured by an
+        administrator says nothing about where its patterns were seen, and
+        pairing it with a location breakdown from a seeding run it has nothing
+        to do with would be worse than having no breakdown at all.
+
+        Every country a machine's posts named is kept here; the query form
+        names only the most common few of them per machine, and it is those
+        that a selection acts on, so that what someone picks is what they saw.
+
+        :param ConfigManager|None config:  Configuration reader
+        :return dict:  Machine IDs (as integers) mapped to dictionaries with a
+          `posts` count, a `located` count of those posts that named a country,
+          and a `locations` dictionary of country code counts
+        """
+        if not config:
+            return {}
+
+        configured, _ = cls.parse_tail_setting(config.get("tiktok-sample-search.id-patterns", "") or "")
+        if configured:
+            return {}
+
+        machines = {}
+        for machine, data in cls.read_cache(config).get("machines", {}).items():
+            machine = convert_to_int(machine, -1)
+            if not 0 <= machine < 2 ** MACHINE_ID_LENGTH or type(data) is not dict:
+                continue
+
+            # caches written before `located` was recorded still have the counts
+            # it was the total of, so fall back to those
+            located = convert_to_int(data.get("located", sum(data.get("locations", {}).values())), 0)
+
+            locations = {code: count for code, count in data.get("locations", {}).items()
+                         if type(code) is str and len(code) == 2}
+
+            machines[machine] = {
+                "posts": convert_to_int(data.get("posts"), 0),
+                "located": located,
+                "locations": locations
+            }
+
+        return machines
+
+    @staticmethod
+    def describe_locations(locations, limit=MACHINE_LOCATION_LIMIT):
+        """
+        Summarise where a machine ID's posts were created
+
+        :param dict locations:  Country codes mapped to how often they occurred
+        :param int limit:  Name at most this many countries
+        :return str:  Something like `US (50%), NL (10%), GB (5%)`
+        """
+        total = sum(locations.values())
+        if not total:
+            return "no locations recorded"
+
+        described = []
+        for code, count in sorted(locations.items(), key=lambda item: (-item[1], item[0]))[:limit]:
+            share = count / total
+            described.append(f"{code} ({'<1%' if share < 0.005 else format(share, '.0%')})")
+
+        return andify(described)
+
+    @staticmethod
+    def machine_locations(machine, limit=MACHINE_LOCATION_LIMIT):
+        """
+        The countries a machine ID is taken to belong to
+
+        This is the same set of countries the query form names for the machine,
+        so that what someone selects is what they saw.
+
+        :param dict machine:  Machine data, with a `locations` dictionary
+        :param int limit:  Consider at most this many countries
+        :return list:  Country codes, most common first
+        """
+        locations = machine.get("locations", {})
+        return [code for code, _ in sorted(locations.items(), key=lambda item: (-item[1], item[0]))[:limit]]
+
+    @staticmethod
+    def count_machines(tails):
+        """
+        Count how many of the known posts each machine ID minted
+
+        Counted from the patterns rather than from the seeded machine data, so
+        that this also works with a list of patterns configured by an
+        administrator.
+
+        :param dict tails:  Patterns mapped to how often they occurred
+        :return dict:  Machine IDs, as integers, mapped to a post count
+        """
+        machines = {}
+        for tail, count in tails.items():
+            machine = int(tail[TAIL_MACHINE_SLICE[0]:TAIL_MACHINE_SLICE[1]], 2)
+            machines[machine] = machines.get(machine, 0) + count
+
+        return machines
+
+    @classmethod
+    def rank_machines(cls, tails):
+        """
+        Order machine IDs by how many of the known posts they minted
+
+        :param dict tails:  Patterns mapped to how often they occurred
+        :return list:  Machine IDs, as integers, most common first
+        """
+        counted = cls.count_machines(tails)
+        return [machine for machine, _ in sorted(counted.items(), key=lambda item: (-item[1], item[0]))]
+
+    @staticmethod
+    def parse_machine_ids(value):
+        """
+        Read a list of machine IDs from user input
+
+        A machine ID is six bits, so it may be written either as six binary
+        digits or as the number those digits represent. Six binary digits are
+        always read as bits: the only values that could be read both ways are
+        `000000` and `000001`, which mean the same thing either way.
+
+        :param str value:  Newline- or comma-separated machine IDs
+        :return tuple:  A set of machine IDs as integers, and a list of the
+          entries that could not be read
+        """
+        machines = set()
+        rejected = []
+
+        for token in re.split(r"[\s,;]+", str(value)):
+            token = token.strip()
+            if not token:
+                continue
+
+            if re.fullmatch(r"[01]{%i}" % MACHINE_ID_LENGTH, token):
+                machines.add(int(token, 2))
+            elif token.isdigit() and int(token) < 2 ** MACHINE_ID_LENGTH:
+                machines.add(int(token))
+            else:
+                rejected.append(token)
+
+        return machines, rejected
 
     @staticmethod
     def parse_tail_setting(value):
@@ -820,39 +1135,142 @@ class SearchTikTokSample(Search):
 
         return tails, rejected
 
-    @staticmethod
-    def select_tails(tails, max_patterns=0, machine_ids=0):
+    @classmethod
+    def select_tails(cls, tails, machine_ids=0, machines=None, coverage=100):
         """
         Narrow down and order the ID patterns to sample with
 
         Patterns are ordered by how often they were observed, so that dropping
         some of them drops the rarest first.
 
+        The coverage limit is applied after the machine ID limits, so that
+        asking for 99% coverage of a handful of machine IDs means 99% of what
+        *those* machines posted, rather than a number that silently means
+        something else once the machines are narrowed down.
+
         :param dict tails:  Patterns mapped to how often they occurred
-        :param int max_patterns:  Keep at most this many patterns; 0 for all
         :param int machine_ids:  Keep only patterns belonging to this many of
           the most common machine IDs; 0 for all
+        :param set|None machines:  Keep only patterns belonging to these machine
+          IDs; `None` for all
+        :param float coverage:  Keep the most common patterns accounting for at
+          least this percentage of the known posts; 100 for all
         :return list:  Patterns of 22 bits, most common first
         """
         if not tails:
             return []
 
         if machine_ids > 0:
-            machines = {}
-            for tail, count in tails.items():
-                machine = int(tail[TAIL_MACHINE_SLICE[0]:TAIL_MACHINE_SLICE[1]], 2)
-                machines[machine] = machines.get(machine, 0) + count
+            keep = set(cls.rank_machines(tails)[:machine_ids])
+            machines = keep if machines is None else (machines & keep)
 
-            keep = {machine for machine, _ in sorted(machines.items(), key=lambda item: (-item[1], item[0]))
-                    [:machine_ids]}
+        if machines is not None:
             tails = {tail: count for tail, count in tails.items()
-                     if int(tail[TAIL_MACHINE_SLICE[0]:TAIL_MACHINE_SLICE[1]], 2) in keep}
+                     if int(tail[TAIL_MACHINE_SLICE[0]:TAIL_MACHINE_SLICE[1]], 2) in machines}
 
-        ordered = sorted(tails.items(), key=lambda item: (-item[1], item[0]))
-        if max_patterns > 0:
-            ordered = ordered[:max_patterns]
+        ordered = [tail for tail, _ in sorted(tails.items(), key=lambda item: (-item[1], item[0]))]
+        if coverage >= 100:
+            return ordered
 
-        return [tail for tail, _ in ordered]
+        # take patterns from the most common down until the ones taken account
+        # for the requested share of the posts we know about
+        total = sum(tails.values())
+        wanted = total * coverage / 100
+        taken = 0
+        for position, tail in enumerate(ordered):
+            taken += tails[tail]
+            if taken >= wanted:
+                return ordered[:position + 1]
+
+        return ordered
+
+    @classmethod
+    def get_pattern_options(cls, tails):
+        """
+        Build the 'limit by most common ID patterns' dropdown
+
+        Every candidate ID costs a request, and the rarest patterns cost the
+        same as the common ones while almost never yielding a post - so leaving
+        them out buys a better hit rate. What it costs is coverage, which is the
+        whole point of the method, so each option says what it gives up and what
+        it buys rather than only how many patterns are left.
+
+        Targets that come out at the same number of patterns are folded into
+        one, which is what keeps a thinly seeded instance from offering eight
+        options that all do the same thing.
+
+        :param dict tails:  Patterns mapped to how often they occurred
+        :return dict:  Option values (a coverage target) mapped to a label
+        """
+        if not tails:
+            return {}
+
+        total = sum(tails.values())
+        options = {}
+        sizes = set()
+
+        for target in PATTERN_COVERAGE_TARGETS:
+            kept = cls.select_tails(tails, coverage=target)
+            if not kept or len(kept) in sizes:
+                continue
+
+            sizes.add(len(kept))
+            share = sum(tails[tail] for tail in kept) / total
+            rate = share / (len(kept) / len(tails))
+
+            options[f"{target:g}"] = f"all {len(tails):,}/{len(tails):,} (100%)" if len(kept) == len(tails) \
+                else f"{len(kept):,}/{len(tails):,} ({share:.1%} of posts, ~{rate:.1f}x hit rate)"
+
+            if len(options) >= MAX_PATTERN_OPTIONS:
+                break
+
+        return options
+
+    @classmethod
+    def resolve_machines(cls, query, tails, machine_data):
+        """
+        Work out which machine IDs a query wants to sample with
+
+        :param dict query:  Query parameters
+        :param dict tails:  Patterns mapped to how often they occurred
+        :param dict machine_data:  Machine IDs mapped to their post and location
+          counts, as returned by `get_machines()`
+        :return tuple:  A set of machine IDs, or `None` to use all of them, and
+          a description of what could not be resolved (empty if all is well)
+        """
+        mode = query.get("machine_id_mode", "all")
+
+        if mode == "location":
+            wanted = query.get("machine_id_locations", [])
+            if type(wanted) is str:
+                wanted = [code for code in re.split(r"[\s,;]+", wanted) if code]
+
+            if not wanted:
+                return None, "No locations were selected."
+
+            wanted = set(wanted)
+            machines = {machine for machine, data in machine_data.items()
+                        if wanted & set(cls.machine_locations(data))}
+
+            if not machines:
+                return set(), (f"No machine IDs are associated with {', '.join(sorted(wanted))}. The locations known "
+                               f"to this 4CAT instance may have changed since this query was made.")
+
+            return machines, ""
+
+        elif mode == "common":
+            amount = max(0, convert_to_int(query.get("machine_id_count"), 0))
+            return (set(cls.rank_machines(tails)[:amount]) if amount else None), ""
+
+        elif mode == "custom":
+            machines, rejected = cls.parse_machine_ids(query.get("machine_id_custom", ""))
+            if not machines:
+                return set(), "No machine IDs could be read from the custom list."
+
+            return machines, (f"Ignored {len(rejected)} entry/entries in the custom machine ID list that could not be "
+                              f"read: {', '.join(rejected[:10])}." if rejected else "")
+
+        return None, ""
 
     @staticmethod
     def map_item(item):
