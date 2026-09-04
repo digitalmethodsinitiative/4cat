@@ -82,6 +82,27 @@ def stream_link(stream_data):
     return ""
 
 
+def first_timestamp(*sources):
+    """
+    Get the time a post was made from the first place that holds it.
+
+    Douyin pages keep this in different places, and some pages leave it out
+    altogether, so the places are tried in order and the first one holding a
+    number wins. Each source is paired with the number of units it counts per
+    second, because some of them are in milliseconds. A key that is present
+    but null counts as holding nothing, since the page did not say when the
+    post was made either way.
+
+    :param sources:  (value, units per second) pairs, preferred source first
+    :return:  When the post was made, or None if no source holds a number
+    """
+    for value, per_second in sources:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        return datetime.fromtimestamp(value / per_second)
+    return None
+
+
 def download_prevented(download):
     """
     Work out whether Douyin blocks downloading a video.
@@ -142,8 +163,11 @@ class SearchDouyin(Search):
             if stream_data:
                 # These appear to be streams
                 subject = "Stream"
-                post_timestamp = datetime.fromtimestamp(stream_data.get("createtime", item.get(
-                    "requestTime") / 1000))  # These may only have the timestamp of the request
+                # A stream may only carry the time of the request that fetched it
+                post_timestamp = first_timestamp(
+                    (stream_data.get("createtime"), 1),
+                    (item.get("requestTime"), 1000),
+                )
                 video_url = stream_link(stream_data)
                 video_thumbnail = stream_data.get("video", {}).get("cover")
                 video_description = stream_data.get("title")
@@ -218,9 +242,13 @@ class SearchDouyin(Search):
             if stream_data:
                 subject = "Stream"
                 stream_data = json.loads(stream_data)
-                post_timestamp = datetime.fromtimestamp(
-                    stream_data.get("create_time", item.get("create_time", metadata.get(
-                        "timestamp_collected") / 1000)))  # Some posts appear to have no timestamp! We substitute collection time
+                # Some posts appear to have no timestamp; the time of collection
+                # stands in for those
+                post_timestamp = first_timestamp(
+                    (stream_data.get("create_time"), 1),
+                    (item.get("create_time"), 1),
+                    (metadata.get("timestamp_collected"), 1000),
+                )
                 video_url = stream_link(stream_data)
                 video_thumbnail = stream_data.get("video", {}).get("cover")
                 video_description = stream_data.get("title")
@@ -323,7 +351,7 @@ class SearchDouyin(Search):
             "thread_id": item[group_id_key],
             "subject": subject,
             "body": video_description,
-            "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S") if post_timestamp else MissingMappedField(""),
             # Adding this as different Douyin pages contain different data
             "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}" if subject == "Post" else f"https://live.douyin.com/{author.get('web_rid')}",
             "region": item.get("region", ""),
@@ -367,7 +395,7 @@ class SearchDouyin(Search):
             "collection_id": collection_id,
             "collection_name": collection_name,
             "place_in_collection": mix_current_episode,
-            "unix_timestamp": int(post_timestamp.timestamp()),
+            "unix_timestamp": int(post_timestamp.timestamp()) if post_timestamp else MissingMappedField(-1),
         })
 
     @staticmethod
