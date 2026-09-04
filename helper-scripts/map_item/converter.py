@@ -361,6 +361,52 @@ ITEM_SHAPE_BLOCK = (
     "remember `formatUtcTimestamp` wants seconds.\n\n"
 )
 
+# The module is shown to the model so it can see `capture()`, which decides the
+# shape of the item `map_item` receives, and so the translation matches the
+# module's style. What it must NOT show is the auto-generated block, because
+# that is a previous answer to the very question being asked: a complete,
+# plausible `map_item` for nearly the same Python. Given one, a model will
+# reproduce it rather than translate the Python again, and the copy looks
+# right — most so when the Python has not changed, since then the old block
+# genuinely is a correct answer and nothing signals that copying is wrong.
+#
+# The generated block is 34-58% of these modules, so leaving it out also makes
+# the prompt about a fifth shorter.
+_GENERATED_BLOCK_PLACEHOLDER = (
+    "// === the auto-generated map_item block belongs here ===\n"
+    "// Left out of this prompt on purpose. It holds the previous translation,\n"
+    "// which your answer replaces in full. Translate the Python above; do not\n"
+    "// try to reconstruct what used to be here.\n"
+    "// === end ==="
+)
+
+
+def strip_generated_blocks(module_source: str) -> str:
+    """
+    Replace the auto-generated marker blocks in a module with a placeholder.
+
+    Used on the module before it goes into the prompt. Everything hand-written
+    stays — in the modules synced today that is `capture()` and its helpers,
+    all of which sit above the markers.
+
+    :param str module_source:  The Zeeschuimer module as it is on disk
+    :return str:  The same module with the generated blocks replaced
+    """
+    stripped = re.sub(
+        re.escape(BLOCK_MARKER_START) + r".*?" + re.escape(BLOCK_MARKER_END),
+        lambda _match: _GENERATED_BLOCK_PLACEHOLDER,
+        module_source,
+        flags=re.DOTALL,
+    )
+    # The imports block is generated too, and equally a previous answer.
+    return re.sub(
+        re.escape(IMPORTS_MARKER_START) + r".*?" + re.escape(IMPORTS_MARKER_END) + r"\n?",
+        "",
+        stripped,
+        flags=re.DOTALL,
+    )
+
+
 def build_user_prompt(python_source: str, existing_module_source: str, python_rel: str) -> str:
     helpers_block = _format_available_helpers()
     past_errors_block = _format_past_errors(RULES)
@@ -375,8 +421,10 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "# Existing Zeeschuimer module\n"
         "This module's `capture()` function returns the raw items that will be "
         "passed to `map_item(item)` as `item`. Use it to understand the input shape "
-        "and to match the existing code style (ES modules, `export` keyword, etc.).\n\n"
-        f"```javascript\n{existing_module_source}\n```\n\n"
+        "and to match the existing code style (ES modules, `export` keyword, etc.). "
+        "The auto-generated block has been left out of this listing: it holds "
+        "the previous translation, which your answer replaces in full.\n\n"
+        f"```javascript\n{strip_generated_blocks(existing_module_source)}\n```\n\n"
         "# Available Zeeschuimer JS helpers (globals)\n"
         "Zeeschuimer loads `js/lib.js` as a plain `<script>`, NOT as an ES "
         "module. Its top-level declarations are global — available everywhere "
@@ -407,10 +455,17 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "The `helpers_to_add` field must contain a complete declaration for everything "
         "`map_item` uses that is not on the globals list above — one entry each, and "
         "including every module-level function, `@staticmethod` and class constant that "
-        "the Python file defines and `map_item` uses. Whatever you leave out is not in "
-        "the module: the whole "
-        "auto-generated block is replaced by what you return here, so a helper the "
-        "previous version of the block defined is gone unless you emit it again."
+        "the Python file defines and `map_item` uses.\n\n"
+        # Last thing the model reads, and so the one that carries most weight.
+        # The same point is made in the opening section, tens of thousands of
+        # characters earlier; this is where it has to hold.
+        "# What you are translating\n"
+        "Translate the Python `map_item` above. That file is the only source of "
+        "truth for which fields exist and what goes in them. The JavaScript module "
+        "is context: read `capture()` for the shape of `item`, and follow the "
+        "module's style. Where the two disagree, the Python is right and the "
+        "JavaScript is out of date — that is usually why this translation was "
+        "asked for."
     )
 
 

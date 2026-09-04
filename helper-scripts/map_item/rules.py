@@ -109,11 +109,9 @@ RULES: list[TranslationError] = [
             "Every name `map_item_function` uses must exist somewhere: declared "
             "inside the function itself, emitted in `helpers_to_add`, on the "
             "Zeeschuimer globals list above, or provided by JavaScript itself. "
-            "Nothing else is available — the module keeps only what you return, so "
-            "anything you leave out is gone, including a helper that was in the "
-            "module before. A name with nothing behind it is not a warning you can "
-            "leave for the reviewer: the module throws on its first item and the "
-            "whole datasource maps nothing."
+            "Nothing else is available. A name with nothing behind it is not a "
+            "warning you can leave for the reviewer: the module throws on its "
+            "first item and the whole datasource maps nothing."
         ),
         verify=(
             "Every name used in `map_item_function` is declared in it, listed in "
