@@ -30,13 +30,17 @@ Those records have `lint_pattern=None`; the bespoke check is the lint.
 Some records have `lint_pattern=None` and no check behind them either, because
 nothing here can catch them:
 
-- `class_level_members` and `undefined_identifier` are about what the finished
+- `python_file_helpers` and `undefined_identifier` are about what the finished
   module ends up containing, not about the translation on its own. Each piece
   of a translation can be valid JavaScript while the module they are spliced
-  into refers to something nobody defined.
-- A regex for `or_vs_nullish_coalescing` would match far too much to be
-  useful: `?? default` is also the correct translation of
-  `dict.get(k, default)`, so it is everywhere in this output.
+  into refers to something nobody defined. Comparing what the generated code
+  uses against what it defines is a job for a JavaScript linter, and it is
+  planned for Zeeschuimer, where the globals sit next to the file that
+  declares them.
+- A regex for `python-or-vs-js-falsy-vs-nullish` or for
+  `-swallowing-a-deliberate-null` would have to flag `??`, which is also
+  correct in `?? null`, `?? ''` and `?? new MissingMappedField(...)`, so it is
+  everywhere in this output.
 
 For those, the prompt and the checklist are the whole of it.
 """
@@ -172,16 +176,29 @@ RULES: list[TranslationError] = [
     TranslationError(
         id="dict_get",
         prompt_rule=(
-            "Python `dict.get(k)` / `dict.get(k, default)` does not exist in JavaScript. "
-            "Replace every `.get(k)` with `[k]` and every `.get(k, default)` with `[k] ?? default`."
+            "Python `dict.get(k)` / `dict.get(k, default)` does not exist in "
+            "JavaScript. Both forms become the global `py_get` listed above: "
+            "`d.get(k)` is `py_get(d, k)` and `d.get(k, default)` is "
+            "`py_get(d, k, default)`, which hands back the default only when the "
+            "key is absent, exactly as Python does. Do NOT write `d[k] ?? default` "
+            "for a `.get`: that also replaces a key the source did send as null, "
+            "which Python keeps. Bare `d[k]` is fine where the value is only "
+            "tested or passed straight on, but as a field of the mapped item it "
+            "gives `undefined`, and the key then disappears from the output."
         ),
-        bad="user.get('name', 'anonymous')",
-        good="user['name'] ?? 'anonymous'",
-        verify="The function contains zero `.get(` calls.",
+        bad=(
+            "user.get('name', 'anonymous')    // Python, not JavaScript\n"
+            "user['name'] ?? 'anonymous'      // replaces a real null as well"
+        ),
+        good="py_get(user, 'name', 'anonymous')",
+        verify=(
+            "The function contains zero `.get(` calls, and every Python "
+            "`.get(k, default)` became `py_get(d, k, default)`."
+        ),
         lint_pattern=re.compile(r"\.get\("),
         lint_message=(
             "`.get(` call found. Python `dict.get(k[, default])` does not exist "
-            "in JavaScript — use `[k]` / `[k] ?? default`. NOTE: this check is a "
+            "in JavaScript — use the `py_get` global. NOTE: this check is a "
             "plain substring match, so it also flags legitimate JS `.get()` on "
             "`Map`, `URLSearchParams`, `Headers`, etc. — ignore the warning if "
             "the receiver is one of those."
@@ -191,27 +208,72 @@ RULES: list[TranslationError] = [
     # ---- Falling back on a missing value: `||` and `??` are not the same ----
 
     TranslationError(
-        id="or_vs_nullish_coalescing",
+        id="python-or-vs-js-falsy-vs-nullish",
         prompt_rule=(
             "Python `a or b` falls back on ANY falsy left side: `None`, `''`, `0`, "
             "`False`, `[]`, `{}`. JavaScript `a ?? b` falls back ONLY on `null` and "
             "`undefined`, so an empty string or a zero on the left is kept and the "
             "fallback never runs. Translate Python `or` as JavaScript `||`, which "
             "falls back on the same values Python does. Save `??` for an explicit "
-            "Python `is not None` test. This does not change the "
-            "`dict.get(k, default)` rule above: `[k] ?? default` is right there, "
-            "because it stands in for a key that is not in the object at all."
+            "Python `is not None` test. Both examples below broke real output: X "
+            "carries an empty string in its newer `core` / `avatar` / `banner` "
+            "objects while the real value is still in `legacy`, so `??` blanked "
+            "the author name, full name and avatar and left the post link pointing "
+            "at `/i/web/status/<id>`; Instagram sends an empty-string author id, "
+            "so `??` returns that instead of falling through to `pk`. A "
+            "`dict.get(k, default)` is not an `or` and takes neither operator "
+            "— it is `py_get(d, k, default)`."
         ),
-        bad="core['screen_name'] ?? legacy['screen_name'] ?? ''",
-        good="core['screen_name'] || legacy['screen_name'] || ''",
+        bad=(
+            "core['screen_name'] ?? legacy['screen_name'] ?? ''   // twitter map_user\n"
+            "author['id'] ?? author['pk']                         // instagram get_author_id"
+        ),
+        good=(
+            "core['screen_name'] || legacy['screen_name'] || ''\n"
+            "author['id'] || author['pk']"
+        ),
         verify=(
             "Every fallback that Python wrote with `or` uses `||`; `??` appears "
-            "only where Python tested `is not None` or where it stands in for a "
-            "`dict.get` default."
+            "only where Python tested for null."
         ),
-        # A regex flagging every `??` would bury the real cases: `?? default` is
-        # the right translation of `dict.get(k, default)` and is everywhere in
-        # this output. Prompt and checklist guidance only.
+        # A regex flagging every `??` would bury the real cases: `?? null`,
+        # `?? ''` and `?? new MissingMappedField(...)` are all correct and are
+        # everywhere in this output. Prompt and checklist guidance only.
+        lint_pattern=None,
+    ),
+    TranslationError(
+        id="-swallowing-a-deliberate-null",
+        prompt_rule=(
+            "The mirror image of the rule above, and it bites even where the "
+            "Python has no `or` in it at all. `??` is not a general-purpose "
+            "fallback operator; it translates one specific Python idiom, an "
+            "explicit test for null. Python's `dict.get(key, default)` hands back "
+            "the default ONLY when the key is absent, so a key that is present and "
+            "null gives null. `data?.[key] ?? default` collapses those two cases "
+            "and turns a null the platform deliberately sent into the fallback. "
+            "Use `py_get` for a `.get`, and reach for `??` only where the Python "
+            "itself asked whether the value was null."
+        ),
+        bad=(
+            "function defined(data, key, defaultValue = null) {\n"
+            "    const value = data?.[key] ?? defaultValue;  // present null -> default\n"
+            "    return value === '$undefined' ? defaultValue : value;\n"
+            "}"
+        ),
+        good=(
+            "function defined(data, key, defaultValue = null) {\n"
+            "    const value = py_get(data, key, defaultValue);\n"
+            "    return value === '$undefined' ? defaultValue : value;\n"
+            "}"
+        ),
+        verify=(
+            "No `??` stands in for a Python `dict.get(k, default)` — those are "
+            "`py_get(d, k, default)`."
+        ),
+        # Linting this means linting `??`, which the record above already
+        # explains is far too common in correct output to flag. The two records
+        # are one misuse seen from either side, so they get the same treatment:
+        # prompt and checklist guidance only.
         lint_pattern=None,
     ),
 
@@ -263,6 +325,56 @@ RULES: list[TranslationError] = [
         bad="const user = node.user ?? {};\nif (user) { /* always true */ }",
         good="const user = node.user;\nif (user) { /* meaningful */ }",
         verify="No `if (x)` guards where `x` was defaulted to `{}` or `[]` (always true in JS).",
+    ),
+    TranslationError(
+        id="empty-collections-are-falsy-in-python-truthy-in-javascript",
+        prompt_rule=(
+            "The same difference bites without any default being added. Python "
+            "counts `[]`, `{}`, `''` and `0` as false; JavaScript counts only `''` "
+            "and `0`, so an empty array or object is TRUE there. `if some_list:` "
+            "and `if (someList)` therefore take opposite branches on an empty "
+            "list, and the JavaScript walks into the branch that reads "
+            "`someList[0]` and throws. Write a Python truthy test on a list as "
+            "`Array.isArray(x) && x.length`, and on an object as "
+            "`Object.keys(x).length`. `if not some_list:` is the same bug "
+            "mirrored: Python takes the 'nothing here' branch for `[]` and "
+            "`if (!someList)` does not."
+        ),
+        bad=(
+            "const videos_list = item['video']?.['bitRateList'];\n"
+            "if (videos_list) {                     // [] is true in JavaScript\n"
+            "    video_url = videos[0]['playApi'];  // TypeError on an empty list\n"
+            "}"
+        ),
+        good=(
+            "const videos_list = item['video']?.['bitRateList'];\n"
+            "if (Array.isArray(videos_list) && videos_list.length) {\n"
+            "    video_url = videos[0]['playApi'];\n"
+            "}"
+        ),
+        verify=(
+            "Every truthy test on a list or an object checks its contents "
+            "(`Array.isArray(x) && x.length`, `Object.keys(x).length`) rather than "
+            "the value itself."
+        ),
+        # Goes by the shape of the guard, since nothing here can know the type:
+        # a bare truthy test on something *named* like a collection. Over the
+        # twelve generated blocks currently in Zeeschuimer it flags two lines,
+        # both of them this bug. Names that read as booleans (`isX`, `hasX`) are
+        # excluded, which is what the one false positive there looked like.
+        lint_pattern=re.compile(
+            r"if\s*\(\s*!?(?!(?:is|has)[A-Z])[a-zA-Z_$][A-Za-z0-9_$]*"
+            r"(?:[Ll]ist|s)\s*\)"
+        ),
+        lint_message=(
+            "Bare truthy check on a name that looks like a collection. An empty "
+            "`[]` or `{}` is false in Python and true in JavaScript, so this takes "
+            "the opposite branch on an empty list, and the code inside then "
+            "indexes element `[0]` of it. Use `Array.isArray(x) && x.length` (or "
+            "`Object.keys(x).length`). NOTE: the check goes by the name, so a "
+            "plural holding a string or a boolean is a false positive — ignore "
+            "the warning if the value is not a list or an object."
+        ),
     ),
 
     # ---- Object identity ----

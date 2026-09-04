@@ -155,6 +155,11 @@ SYSTEM_PROMPT = (
 # level declarations are global — they must NOT be imported. Anything not on
 # this list must be inlined or added to `helpers_to_add`. Update this list
 # whenever new helpers are added to `js/lib.js`.
+#
+# `wrap_for_map_item` is a `js/lib.js` global too, but is deliberately left off:
+# Zeeschuimer applies it before storing an item, so `map_item` is handed an
+# already-unpacked item and must never call it itself. Listing it here would
+# invite the model to unpack the item a second time.
 AVAILABLE_JS_HELPERS = [
     {
         "name": "MappedItem",
@@ -171,6 +176,35 @@ AVAILABLE_JS_HELPERS = [
             "the value processors fall back on — so pick one that cannot pass "
             "for a real value: -1 for a count rather than 0. Always instantiate "
             "with `new`."
+        ),
+    },
+    {
+        "name": "py_get",
+        "kind": "function",
+        "usage": "py_get(obj, key, fallback)",
+        "note": (
+            "Port of Python's `dict.get(key, default)`: it returns the fallback "
+            "ONLY when the key is absent, and returns whatever the source sent "
+            "otherwise — including `null`, `0`, `false` and `''`. Use it for every "
+            "`.get(k, default)` in the Python. Do not write `obj[key] ?? fallback` "
+            "instead: that also replaces a key the source did send as null, which "
+            "Python keeps. The fallback defaults to `null`, so `py_get(obj, key)` "
+            "is the exact translation of `obj.get(key)`, where bare `obj[key]` "
+            "would give `undefined` and lose the field from the output."
+        ),
+    },
+    {
+        "name": "value_or_missing",
+        "kind": "function",
+        "usage": "value_or_missing(obj, key, fallback)",
+        "note": (
+            "Port of 4CAT's `value_or_missing` — `py_get` with a "
+            "`MissingMappedField` for its fallback, so an absent key becomes a "
+            "missing field while everything the source did send is kept as it is. "
+            "Translate a Python `value_or_missing(...)` call as this one for one. "
+            "A datasource that treats an absent key AND a null as equally missing "
+            "(Instagram does) needs the third form instead: "
+            "`obj[key] ?? new MissingMappedField(fallback)`."
         ),
     },
     {
