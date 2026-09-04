@@ -116,8 +116,15 @@ LLM_SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
             "description": (
-                "Full source of any helper functions map_item depends on (e.g. a JS "
-                "port of normalize_url_encoding). Empty array if none needed."
+                "Full source of everything map_item depends on that is not already "
+                "a global. One complete declaration per entry. That means every "
+                "helper defined elsewhere in the Python file and used by map_item: "
+                "module-level functions written outside the class, `@staticmethod` "
+                "helpers on it, and class constants such as a media-type value or a "
+                "compiled regex. Functions become `function`s, constants become "
+                "`const`s. Anything map_item calls or reads and you do not put here "
+                "does not exist in the module, and the module will throw. Empty "
+                "array only when map_item needs nothing beyond the globals."
             ),
         },
         "commentary": {
@@ -158,8 +165,13 @@ AVAILABLE_JS_HELPERS = [
     {
         "name": "MissingMappedField",
         "kind": "class",
-        "usage": "new MissingMappedField(value, label)",
-        "note": "Represents a field that may legitimately be missing. Always instantiate with `new`.",
+        "usage": "new MissingMappedField(fallbackValue)",
+        "note": (
+            "Marks a field the source told us nothing about. Takes ONE argument, "
+            "the value processors fall back on — so pick one that cannot pass "
+            "for a real value: -1 for a count rather than 0. Always instantiate "
+            "with `new`."
+        ),
     },
     {
         "name": "normalize_url_encoding",
@@ -176,8 +188,22 @@ AVAILABLE_JS_HELPERS = [
     {
         "name": "formatUtcTimestamp",
         "kind": "function",
-        "usage": "formatUtcTimestamp(timestamp)",
-        "note": "Formats a UTC timestamp as a readable string.",
+        "usage": "formatUtcTimestamp(unixSeconds)",
+        "note": (
+            "Formats a UTC timestamp the way Python's "
+            "`strftime('%Y-%m-%d %H:%M:%S')` does. Takes SECONDS, not "
+            "milliseconds — divide a millisecond value by 1000 first."
+        ),
+    },
+    {
+        "name": "traverse_data",
+        "kind": "function",
+        "usage": "traverse_data(obj, (value, key) => ...)",
+        "note": (
+            "Walks a nested object and yields whatever the callback returns for "
+            "each value it visits. Mostly used by `capture()`; `map_item` rarely "
+            "needs it, but it is there if the Python walks nested data."
+        ),
     },
     {
         "name": "MapItemException",
@@ -272,6 +298,35 @@ def discover_bootstrap_files(repo_root: Path, zeeschuimer_root: Path) -> list[Pa
     return found
 
 
+# What `map_item` is handed. Zeeschuimer stores a captured object inside a
+# record with some notes about where it came from, then unpacks that record
+# before calling `map_item`; 4CAT's importer builds the same shape (see
+# `wrap_for_map_item` in Zeeschuimer's `js/lib.js` and `common/lib/helpers.py`
+# in 4CAT). Nothing else in the prompt says where `__import_meta` comes from,
+# so the model has to be told, along with the unit trap in its timestamps.
+ITEM_SHAPE_BLOCK = (
+    "# What `item` is\n"
+    "`item` is not quite what `capture()` returned. Zeeschuimer stores each "
+    "captured object together with some notes about where it came from, and "
+    "unpacks that record before handing it to `map_item`: the captured object's "
+    "own fields sit at the top level, and everything else is gathered under a "
+    "single `__import_meta` key. 4CAT builds exactly the same shape when it "
+    "imports the data, which is why one `map_item` can serve both.\n\n"
+    "So `item['__import_meta']` is always there, and holds:\n"
+    "- `source_platform` — which Zeeschuimer module captured this\n"
+    "- `source_platform_url` — the site the capture came from\n"
+    "- `source_url` — the page the user was on\n"
+    "- `item_id`, `nav_index` — Zeeschuimer's own bookkeeping\n"
+    "- `timestamp_collected`, `last_updated` — IN MILLISECONDS, which is why the "
+    "Python divides them by 1000\n"
+    "- `user_agent`\n\n"
+    "Two things follow from that. The unpacking has already happened, so never "
+    "call `wrap_for_map_item` yourself. And a time taken from `__import_meta` is "
+    "in milliseconds while a time taken from the captured data is usually in "
+    "seconds — keep whichever conversion the Python does for each one, and "
+    "remember `formatUtcTimestamp` wants seconds.\n\n"
+)
+
 def build_user_prompt(python_source: str, existing_module_source: str, python_rel: str) -> str:
     helpers_block = _format_available_helpers()
     past_errors_block = _format_past_errors(RULES)
@@ -282,6 +337,7 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "class is the source of truth — your JavaScript translation must produce an "
         "object with the same field names and equivalent values.\n\n"
         f"```python\n{python_source}\n```\n\n"
+        f"{ITEM_SHAPE_BLOCK}"
         "# Existing Zeeschuimer module\n"
         "This module's `capture()` function returns the raw items that will be "
         "passed to `map_item(item)` as `item`. Use it to understand the input shape "
@@ -314,7 +370,13 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "Use `export function map_item(item) { ... }` to match this module's ES-module style. "
         "Return raw JavaScript source — do NOT wrap fields in markdown code fences. "
         "The `imports_to_add` field is normally an empty array (the helpers above are global, not imported). "
-        "The `helpers_to_add` field should contain full helper-function source (each entry one complete function)."
+        "The `helpers_to_add` field must contain a complete declaration for everything "
+        "`map_item` uses that is not on the globals list above — one entry each, and "
+        "including every module-level function, `@staticmethod` and class constant that "
+        "the Python file defines and `map_item` uses. Whatever you leave out is not in "
+        "the module: the whole "
+        "auto-generated block is replaced by what you return here, so a helper the "
+        "previous version of the block defined is gone unless you emit it again."
     )
 
 

@@ -26,6 +26,19 @@ code in `converter.lint_translation`:
 - `regex_in_use` — heuristic regex-use detection.
 
 Those records have `lint_pattern=None`; the bespoke check is the lint.
+
+Some records have `lint_pattern=None` and no check behind them either, because
+nothing here can catch them:
+
+- `class_level_members` and `undefined_identifier` are about what the finished
+  module ends up containing, not about the translation on its own. Each piece
+  of a translation can be valid JavaScript while the module they are spliced
+  into refers to something nobody defined.
+- A regex for `or_vs_nullish_coalescing` would match far too much to be
+  useful: `?? default` is also the correct translation of
+  `dict.get(k, default)`, so it is everywhere in this output.
+
+For those, the prompt and the checklist are the whole of it.
 """
 import re
 from dataclasses import dataclass
@@ -48,6 +61,64 @@ class TranslationError:
 
 
 RULES: list[TranslationError] = [
+
+    # ---- Everything map_item uses has to exist ----
+
+    TranslationError(
+        id="python_file_helpers",
+        prompt_rule=(
+            "`map_item` is never the whole of what you have to translate. It leans on "
+            "other things defined elsewhere in the same Python file, and every one of "
+            "those it uses becomes an entry in `helpers_to_add`. There are three "
+            "kinds, and all three have been dropped before: module-level functions "
+            "written outside the class (douyin's `defined`, `stream_link`, "
+            "`first_link`, `absolute_link`, `download_prevented`), `@staticmethod` "
+            "helpers on the class (`get_chinese_number`, `get_centroid`, "
+            "`_screen_name_from_media`, `extract_hashtags`), and class constants "
+            "(`MEDIA_TYPE_PHOTO`, `HASHTAG_REGEX`). Read the whole file, not just "
+            "`map_item`. Functions become `function`s and constants become `const`s, "
+            "and the class prefix goes: Python `SearchDouyin.get_chinese_number(n)` "
+            "becomes `getChineseNumber(n)`. Only ever write that call if you also "
+            "emitted the function. Ignore the class's own settings — `type`, "
+            "`category`, `title`, `description`, `extension`, `references` and the "
+            "like are 4CAT bookkeeping and mean nothing in JavaScript."
+        ),
+        bad=(
+            "map_item_function: `count: getChineseNumber(stats['user_count_str'])`\n"
+            "helpers_to_add: []   // the function was never emitted"
+        ),
+        good=(
+            "map_item_function: `count: getChineseNumber(stats['user_count_str'])`\n"
+            "helpers_to_add: ['function getChineseNumber(num) { ... }']"
+        ),
+        verify=(
+            "Every module-level function, `@staticmethod` and class constant that "
+            "`map_item` uses has a matching entry in `helpers_to_add`."
+        ),
+        # Nothing here can catch this: it only shows up once the translation
+        # has been spliced into the module. Prompt and checklist only.
+        lint_pattern=None,
+    ),
+    TranslationError(
+        id="undefined_identifier",
+        prompt_rule=(
+            "Every name `map_item_function` uses must exist somewhere: declared "
+            "inside the function itself, emitted in `helpers_to_add`, on the "
+            "Zeeschuimer globals list above, or provided by JavaScript itself. "
+            "Nothing else is available — the module keeps only what you return, so "
+            "anything you leave out is gone, including a helper that was in the "
+            "module before. A name with nothing behind it is not a warning you can "
+            "leave for the reviewer: the module throws on its first item and the "
+            "whole datasource maps nothing."
+        ),
+        verify=(
+            "Every name used in `map_item_function` is declared in it, listed in "
+            "`helpers_to_add`, a Zeeschuimer global, or a JavaScript built-in."
+        ),
+        # Nothing here can catch this: it only shows up once the translation
+        # has been spliced into the module. Prompt and checklist only.
+        lint_pattern=None,
+    ),
 
     # ---- Python syntax that does not exist in JavaScript ----
 
