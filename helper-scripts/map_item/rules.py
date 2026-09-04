@@ -117,6 +117,33 @@ RULES: list[TranslationError] = [
         ),
     ),
 
+    # ---- Falling back on a missing value: `||` and `??` are not the same ----
+
+    TranslationError(
+        id="or_vs_nullish_coalescing",
+        prompt_rule=(
+            "Python `a or b` falls back on ANY falsy left side: `None`, `''`, `0`, "
+            "`False`, `[]`, `{}`. JavaScript `a ?? b` falls back ONLY on `null` and "
+            "`undefined`, so an empty string or a zero on the left is kept and the "
+            "fallback never runs. Translate Python `or` as JavaScript `||`, which "
+            "falls back on the same values Python does. Save `??` for an explicit "
+            "Python `is not None` test. This does not change the "
+            "`dict.get(k, default)` rule above: `[k] ?? default` is right there, "
+            "because it stands in for a key that is not in the object at all."
+        ),
+        bad="core['screen_name'] ?? legacy['screen_name'] ?? ''",
+        good="core['screen_name'] || legacy['screen_name'] || ''",
+        verify=(
+            "Every fallback that Python wrote with `or` uses `||`; `??` appears "
+            "only where Python tested `is not None` or where it stands in for a "
+            "`dict.get` default."
+        ),
+        # A regex flagging every `??` would bury the real cases: `?? default` is
+        # the right translation of `dict.get(k, default)` and is everywhere in
+        # this output. Prompt and checklist guidance only.
+        lint_pattern=None,
+    ),
+
     # ---- `in` operator: substring check vs key existence ----
 
     TranslationError(
