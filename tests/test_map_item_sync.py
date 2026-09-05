@@ -624,3 +624,62 @@ def test_the_new_rules_reach_the_prompt_and_the_checklist():
         rule = _rule_by_id(rule_id)
         assert rule_id in prompt
         assert rule.verify in prompt
+
+
+# --------------------------------------------------------------------------- #
+# Rules added after the twitter run of 52e641e7
+#
+# Both defects that survived that round came from a rule being applied past its
+# edge, so these tests pin the boundaries rather than the recommendations.
+# --------------------------------------------------------------------------- #
+
+def test_dict_get_bad_examples_include_the_or_form():
+    """`userResult.is_blue_verified || ''` shipped. `||` discards a stored
+    `false` exactly as `??` discards a stored `null`, so every unverified
+    account was written out as '' instead of false. The or-vs-nullish rule
+    actively recommends `||`, so the two rules meet on this shape and the
+    examples are what settle it."""
+    rule = _rule_by_id("dict_get")
+    assert "is_blue_verified || ''" in rule.bad
+    assert "discards a stored `false`" in rule.prompt_rule
+    assert "`||` or `??`" in rule.verify
+
+
+def test_or_rule_shows_where_it_stops():
+    """Stating the boundary only in prose did not hold: the or-vs-nullish rule
+    already said a `.get` takes neither operator, and `||` was put on one
+    anyway. The counter-example has to be in the `bad` list."""
+    rule = _rule_by_id("python-or-vs-js-falsy-vs-nullish")
+    assert "is_blue_verified" in rule.bad
+    assert "NOT an `or`" in rule.bad
+    assert "neither operator was put on" in rule.verify
+
+
+def test_chain_rule_keeps_each_link_as_python_wrote_it():
+    """X's Python indexes four links then guards the last two; the translation
+    guarded the first four and read `.legacy.screen_name` off the result, which
+    throws whenever a post has no `legacy`."""
+    rule = _rule_by_id("translate-a-get-chain-link-by-link")
+    assert ".legacy.screen_name" in rule.bad          # the shape that shipped
+    assert "local variables" in rule.prompt_rule      # how to keep it readable
+    assert "['result']['core']" in rule.good          # brackets stay brackets
+    # a regex cannot balance the nesting needed to tell this apart from
+    # `py_get(...).map(...)`, so this one is deliberately prompt-only
+    assert rule.lint_pattern is None
+
+
+def test_registry_docstring_records_the_boundary_lesson():
+    """Three rounds running, a record naming a preferred operator produced an
+    over-application in the next batch. Whoever writes the next record should
+    find that written down."""
+    import rules as rules_module
+    doc = rules_module.__doc__
+    assert "say where the rule STOPS" in doc
+    assert "in the examples" in doc.lower()
+
+
+def test_new_chain_rule_reaches_the_prompt_and_the_checklist():
+    prompt = mic.build_user_prompt("class X: pass\n", "export function capture(){}\n", "x/search_x.py")
+    rule = _rule_by_id("translate-a-get-chain-link-by-link")
+    assert "translate-a-get-chain-link-by-link" in prompt
+    assert rule.verify in prompt

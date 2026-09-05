@@ -18,6 +18,14 @@ Cross-repo workflow:
   here using the same `id` as the md heading slug. Not every md entry
   needs a record — this is a curated subset.
 
+Writing a record: say where the rule STOPS, and say it in the examples.
+Every record here that has named a preferred operator has produced an
+over-application in the next generated batch - `||` was over-applied to a
+`dict.get` right after the record recommending it landed. The model follows
+the `bad` and `good` lines more closely than the prose, so a boundary that
+appears only in `prompt_rule` does not hold. Put the wrong-but-tempting form
+in `bad` with a comment saying which rule it came from.
+
 Three lint checks are too complex for a single regex and live as bespoke
 code in `converter.lint_translation`:
 
@@ -212,21 +220,29 @@ RULES: list[TranslationError] = [
             "the whole translation is `py_get(d, k)` \u2014 two arguments. Supplying "
             "an empty string there is not a harmless tidy-up: it writes `''` into "
             "the dataset where 4CAT writes null, and it is the mistake these "
-            "translations have repeated most often."
+            "translations have repeated most often. Neither `??` NOR `||` belongs "
+            "on a `.get`. The rule below asking you to prefer `||` over `??` is "
+            "about translating Python's `or`; it stops at the edge of a `.get`, "
+            "where the answer is `py_get` and no operator at all. `||` discards a "
+            "stored `false` exactly as `??` discards a stored `null`."
         ),
         bad=(
             "user.get('name', 'anonymous')    // Python, not JavaScript\n"
             "user['name'] ?? 'anonymous'      // replaces a real null as well\n"
-            "py_get(tweet, 'lang', '')        // Python was .get('lang'): no default to give"
+            "py_get(tweet, 'lang', '')        // Python was .get('lang'): no default to give\n"
+            "userResult.is_blue_verified || ''  // Python was .get('is_blue_verified', ''):\n"
+            "                                   // || also discards a stored false"
         ),
         good=(
             "py_get(user, 'name', 'anonymous')   // Python: user.get('name', 'anonymous')\n"
-            "py_get(tweet, 'lang')               // Python: tweet.get('lang') -> null, not ''"
+            "py_get(tweet, 'lang')               // Python: tweet.get('lang') -> null, not ''\n"
+            "py_get(userResult, 'is_blue_verified', '')   // keeps a stored false"
         ),
         verify=(
             "The function contains zero `.get(` calls; every Python "
             "`.get(k, default)` became `py_get(d, k, default)`, and every bare "
-            "`.get(k)` became `py_get(d, k)` with no second argument invented."
+            "`.get(k)` became `py_get(d, k)` with no second argument invented. No "
+            "`.get` was translated with `||` or `??`."
         ),
         lint_pattern=re.compile(r"\.get\("),
         lint_message=(
@@ -259,7 +275,9 @@ RULES: list[TranslationError] = [
         ),
         bad=(
             "core['screen_name'] ?? legacy['screen_name'] ?? ''   // twitter map_user\n"
-            "author['id'] ?? author['pk']                         // instagram get_author_id"
+            "author['id'] ?? author['pk']                         // instagram get_author_id\n"
+            "userResult.is_blue_verified || ''                    // NOT an `or`: the Python\n"
+            "                                                     // is .get(k, '') -> py_get"
         ),
         good=(
             "core['screen_name'] || legacy['screen_name'] || ''\n"
@@ -267,7 +285,8 @@ RULES: list[TranslationError] = [
         ),
         verify=(
             "Every fallback that Python wrote with `or` uses `||`; `??` appears "
-            "only where Python tested for null."
+            "only where Python tested for null; and neither operator was put on "
+            "a `.get`."
         ),
         # A regex flagging every `??` would bury the real cases: `?? null`,
         # `?? ''` and `?? new MissingMappedField(...)` are all correct and are
@@ -307,6 +326,45 @@ RULES: list[TranslationError] = [
         # explains is far too common in correct output to flag. The two records
         # are one misuse seen from either side, so they get the same treatment:
         # prompt and checklist guidance only.
+        lint_pattern=None,
+    ),
+
+    TranslationError(
+        id="translate-a-get-chain-link-by-link",
+        prompt_rule=(
+            "A chain of lookups is translated one link at a time, and each link "
+            "keeps the form the Python gave THAT link. `obj['k']` stays `obj['k']` "
+            "\u2014 the Python author chose to let it throw if the key is missing. "
+            "`obj.get('k', d)` becomes `py_get(obj, 'k', d)`. Do not move the "
+            "guarding to a different part of the chain, and do not drop the last "
+            "links because the nesting is getting deep: that is where it went "
+            "wrong. X's Python indexes four links and then guards the last two; "
+            "the translation guarded the first four and then read `.legacy` and "
+            "`.screen_name` straight off the result, which throws the moment a "
+            "post has no `legacy`. When a chain runs past two or three links, put "
+            "the intermediate results in local variables instead of nesting "
+            "`py_get` inside itself \u2014 the nested form is where links get lost."
+        ),
+        bad=(
+            "// Python: retweet['result']['core']['user_results']['result']\n"
+            "//             .get('legacy', {}).get('screen_name', '')\n"
+            "py_get(py_get(py_get(py_get(o, 'result', {}), 'core', {}), 'user_results', {}),\n"
+            "       'result', {}).legacy.screen_name   // guards moved; throws on a missing legacy"
+        ),
+        good=(
+            "const userResult = o['result']['core']['user_results']['result'];\n"
+            "const legacy = py_get(userResult, 'legacy', {});\n"
+            "const screenName = py_get(legacy, 'screen_name', '');"
+        ),
+        verify=(
+            "Every lookup chain has the same guarded and unguarded links as its "
+            "Python, in the same order, with nothing read straight off the end of "
+            "a `py_get`."
+        ),
+        # Catching this means telling `py_get(...).x` (wrong) from
+        # `py_get(...).map(...)` (fine) through nested brackets, which a regular
+        # expression cannot balance. It is a value- and crash-level bug, so it
+        # belongs to the comparator tier rather than to another pattern here.
         lint_pattern=None,
     ),
 
