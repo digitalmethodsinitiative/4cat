@@ -110,8 +110,8 @@ class SearchTwitterViaZeeschuimer(Search):
         # name from any quoted media expanded_url when that happens.
         quote_author = ""
         quote_body = ""
-        quote_images = set()
-        quote_videos = set()
+        quote_images = []
+        quote_videos = []
         if quote_tweet and not quote_withheld:
             quote_result = quote_tweet["result"]
             quote_user_result = quote_result.get("core", {}).get("user_results", {}).get("result") or {}
@@ -388,10 +388,10 @@ class SearchTwitterViaZeeschuimer(Search):
         they cannot be downloaded as a single file.
 
         :param dict tweet:  A post object.
-        :return tuple:  A set of image URLs and a set of video URLs.
+        :return tuple:  A list of image URLs and a list of video URLs, both without duplicates.
         """
-        images = set()
-        videos = set()
+        images = []
+        videos = []
 
         legacy = tweet.get("legacy") or {}
         # extended_entities lists every attachment; entities may list only the
@@ -404,7 +404,7 @@ class SearchTwitterViaZeeschuimer(Search):
                 continue
 
             # the still image, both for photos and as a video thumbnail
-            images.add(media["media_url_https"])
+            images.append(media["media_url_https"])
 
             if media.get("type") not in ("video", "animated_gif"):
                 continue
@@ -415,9 +415,9 @@ class SearchTwitterViaZeeschuimer(Search):
             ]
             if video_variants:
                 video_variants.sort(key=lambda variant: variant.get("bitrate", 0), reverse=True)
-                videos.add(video_variants[0]["url"])
+                videos.append(video_variants[0]["url"])
 
-        return images, videos
+        return list(dict.fromkeys(images)), list(dict.fromkeys(videos))
 
     @staticmethod
     def _screen_name_from_url(url):
