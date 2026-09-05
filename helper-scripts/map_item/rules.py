@@ -122,6 +122,30 @@ RULES: list[TranslationError] = [
         lint_pattern=None,
     ),
 
+    # ---- Each Python function is its own translation ----
+
+    TranslationError(
+        id="sibling-parsers-deliberately-differ",
+        prompt_rule=(
+            "Where the Python holds several near-identical functions \u2014 Instagram's "
+            "`parse_polaris_item`, `parse_graph_item` and `parse_itemlist_item`, X's "
+            "`map_item_modern` and `map_item_legacy` \u2014 translate each one from its "
+            "own body and leave the differences between them alone. They read "
+            "different pages, which carry different data, so where they disagree "
+            "they disagree on purpose. `parse_graph_item` writes "
+            "`node['location'].get('name')` where `parse_itemlist_item` writes "
+            "`node['location'].get('name') or ''`; carrying that `or ''` across "
+            "turned a null into an empty string in the parser that wanted the null."
+        ),
+        bad="// the graph parser given `|| ''` because the itemlist parser beside it has one",
+        good="// each parser keeps exactly the defaulting written in its own Python body",
+        verify=(
+            "Each Python function was translated from its own body; no default or "
+            "guard was carried across from a similar function beside it."
+        ),
+        lint_pattern=None,
+    ),
+
     # ---- Python syntax that does not exist in JavaScript ----
 
     TranslationError(
@@ -182,16 +206,27 @@ RULES: list[TranslationError] = [
             "for a `.get`: that also replaces a key the source did send as null, "
             "which Python keeps. Bare `d[k]` is fine where the value is only "
             "tested or passed straight on, but as a field of the mapped item it "
-            "gives `undefined`, and the key then disappears from the output."
+            "gives `undefined`, and the key then disappears from the output. "
+            "Count the arguments before you write the call. A `.get(k)` with no "
+            "default hands back `None` when the key is missing, which is `null`, so "
+            "the whole translation is `py_get(d, k)` \u2014 two arguments. Supplying "
+            "an empty string there is not a harmless tidy-up: it writes `''` into "
+            "the dataset where 4CAT writes null, and it is the mistake these "
+            "translations have repeated most often."
         ),
         bad=(
             "user.get('name', 'anonymous')    // Python, not JavaScript\n"
-            "user['name'] ?? 'anonymous'      // replaces a real null as well"
+            "user['name'] ?? 'anonymous'      // replaces a real null as well\n"
+            "py_get(tweet, 'lang', '')        // Python was .get('lang'): no default to give"
         ),
-        good="py_get(user, 'name', 'anonymous')",
+        good=(
+            "py_get(user, 'name', 'anonymous')   // Python: user.get('name', 'anonymous')\n"
+            "py_get(tweet, 'lang')               // Python: tweet.get('lang') -> null, not ''"
+        ),
         verify=(
-            "The function contains zero `.get(` calls, and every Python "
-            "`.get(k, default)` became `py_get(d, k, default)`."
+            "The function contains zero `.get(` calls; every Python "
+            "`.get(k, default)` became `py_get(d, k, default)`, and every bare "
+            "`.get(k)` became `py_get(d, k)` with no second argument invented."
         ),
         lint_pattern=re.compile(r"\.get\("),
         lint_message=(
@@ -336,7 +371,9 @@ RULES: list[TranslationError] = [
             "`Array.isArray(x) && x.length`, and on an object as "
             "`Object.keys(x).length`. `if not some_list:` is the same bug "
             "mirrored: Python takes the 'nothing here' branch for `[]` and "
-            "`if (!someList)` does not."
+            "`if (!someList)` does not. This is about whether a collection holds "
+            "anything at all. It is NOT the translation of `any(xs)`, which asks "
+            "whether any element is itself truthy \u2014 see the next rule."
         ),
         bad=(
             "const videos_list = item['video']?.['bitRateList'];\n"
@@ -373,6 +410,40 @@ RULES: list[TranslationError] = [
             "plural holding a string or a boolean is a false positive — ignore "
             "the warning if the value is not a list or an object."
         ),
+    ),
+
+    TranslationError(
+        id="translate-the-test-not-one-that-looks-like-it",
+        prompt_rule=(
+            "Write the test the Python wrote, not one that looks near enough. Two "
+            "substitutions have gone wrong. First, Python `if x:` is a truthiness "
+            "test, and for a plain value JavaScript's `if (x)` is the same test: "
+            "`0`, `''`, `null` and `undefined` are false on both sides. "
+            "`if (x != null)` is a DIFFERENT test \u2014 it keeps `0` and `''`, which "
+            "Python drops. Instagram guards its coordinates with "
+            "`if node['location'].get('lat')`, so a latitude of exactly 0 leaves "
+            "`location_latlong` empty; written as `!= null` it produces `'0,4.9'`. "
+            "Second, Python `any(xs)` asks whether any ELEMENT is truthy, which is "
+            "`xs.some(Boolean)` \u2014 NOT `xs.length`. A list of empty strings has a "
+            "length but nothing truthy in it, so `xs.length` joins them into `','` "
+            "where Python returns `''`. For a truthy test on a list or object "
+            "itself, the rule above applies instead."
+        ),
+        bad=(
+            "node.location.lat != null ? `${lat},${lng}` : ''   // Python: if ....get('lat')\n"
+            "coauthors.length ? coauthors.join(',') : ''        // Python: if any(coauthors)"
+        ),
+        good=(
+            "node.location.lat ? `${lat},${lng}` : ''\n"
+            "coauthors.some(Boolean) ? coauthors.join(',') : ''"
+        ),
+        verify=(
+            "Every Python truthiness test is a plain truthy test in JavaScript "
+            "rather than a null check, and every `any(xs)` is `xs.some(Boolean)`."
+        ),
+        # Linting this means flagging `!= null` and `.length`, both of which are
+        # right far more often than they are wrong here. Prompt and checklist only.
+        lint_pattern=None,
     ),
 
     # ---- Object identity ----
@@ -434,6 +505,33 @@ RULES: list[TranslationError] = [
         bad="collected_at: new Date(node.taken_at * 1000).toISOString()",
         good="collected_at: formatUtcTimestamp(node.taken_at)",
         lint_pattern=re.compile(r"new\s+Date\([^)]+\)\.toISOString\(\)"),
+    ),
+
+    TranslationError(
+        id="str-round-is-not-tofixed",
+        prompt_rule=(
+            "Python `str(round(x, n))` and JavaScript `x.toFixed(n)` do not produce "
+            "the same string. `toFixed` always writes n decimal places, padding with "
+            "zeros, so `(4.85).toFixed(6)` is `'4.850000'`. Python prints only what "
+            "it needs, so `str(round(4.85, 6))` is `'4.85'`. X's `get_centroid` "
+            "builds its coordinates this way, and the padded form went into the "
+            "dataset as `'4.850000,52.350000'`. Round first and then let the number "
+            "print itself: `String(Number(x.toFixed(n)))`."
+        ),
+        bad="const lon = ((ring[0][0] + ring[1][0]) / 2).toFixed(6);   // '4.850000'",
+        good="const lon = String(Number(((ring[0][0] + ring[1][0]) / 2).toFixed(6)));   // '4.85'",
+        verify=(
+            "No `.toFixed(...)` result is used as the string itself where the Python "
+            "wrote `str(round(...))`."
+        ),
+        lint_pattern=re.compile(r"\.toFixed\("),
+        lint_message=(
+            "`.toFixed(` found. It pads with zeros where Python's "
+            "`str(round(x, n))` does not, turning a coordinate like `4.85` into "
+            "`4.850000`. NOTE: the corrected form `String(Number(x.toFixed(n)))` "
+            "contains `.toFixed(` as well \u2014 ignore the warning where the result "
+            "is already wrapped in `Number(`."
+        ),
     ),
 
     # ---- Regex translation traps ----
