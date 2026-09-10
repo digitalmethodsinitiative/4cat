@@ -63,6 +63,28 @@ def test_a_custom_field_list_replaces_the_default():
     assert replacer.filter_row(row) == {"sender_name": "REDACTED", "author": "ada"}
 
 
+def test_names_are_matched_whatever_their_case():
+    """
+    Platforms name their fields however they like, and 4CAT runs on more than
+    one operating system. Without this, a field called `Author` would be
+    replaced on a Windows machine and left alone on a Linux server.
+    """
+    replacer = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE)
+
+    assert replacer.filter_row({"Author": "ada"})["Author"] == "REDACTED"
+    assert replacer.filter_item({"User": {"name": "ada"}})["User"]["name"] == "REDACTED"
+
+
+def test_patterns_are_matched_whatever_their_case():
+    """A field list typed in the processor's form may be capitalised."""
+    replacer = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE, fields=["Author*", "SENDER"])
+
+    assert replacer.filter_row({"author_id": "1", "sender": "ada"}) == {
+        "author_id": "REDACTED",
+        "sender": "REDACTED",
+    }
+
+
 def test_fields_that_do_not_match_are_left_alone():
     """Nothing outside the chosen names is touched, in either shape."""
     replacer = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE, fields=["author*"])

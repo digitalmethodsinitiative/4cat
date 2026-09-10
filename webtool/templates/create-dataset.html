@@ -37,10 +37,12 @@
 
                 <div id="data-options">
                     {% if __user_config("ui.offer_hashing") %}
-                    <p class="form-intro dataset-anonymisation">4CAT can remove information it identifies as relating to an item's author, or
-                        replace it with a <a href="https://techterms.com/definition/hash">hashed</a> value. Other
-                        personal information may persist; it is your responsibility to further anonymise data where
-                        appropriate.</p>
+                    <p class="form-intro dataset-anonymisation">{{ __user_config("4cat.name") }} can remove information it identifies as relating to an item's
+                        author, or replace it with a <a href="https://techterms.com/definition/hash">hashed</a> value.
+                        It finds that information by field name, so how much it covers differs per platform, and other
+                        personal information may persist. Once the dataset is ready, check what was replaced &mdash;
+                        you can replace more with the 'Pseudonymise or anonymise' processor. It is your responsibility
+                        to further anonymise data where appropriate.</p>
                     <div class="form-element dataset-anonymisation">
                         <label for="data-pseudonymise">Pseudonymise:</label>
                         <div class="filter-parameters">
