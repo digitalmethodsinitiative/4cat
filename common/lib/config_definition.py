@@ -689,13 +689,6 @@ config_definition = {
         "default": False,
         "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
     },
-    "ui.offer_anonymisation": {
-        "type": UserInput.OPTION_TOGGLE,
-        "help": "Offer anonymisation options",
-        "default": True,
-        "tooltip": "Offer users the option to anonymise their datasets at the time of creation. It is strongly "
-                   "recommended to leave this enabled."
-    },
     "ui.advertise_install": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Advertise local 4CAT",
@@ -728,8 +721,11 @@ config_definition = {
     "ui.offer_hashing": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
-        "help": "Offer pseudonymisation",
-        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
+        "help": "Offer pseudonymisation and anonymisation",
+        "tooltip": "Adds a control to the 'Create dataset' page where people choose what happens to author details: "
+                   "replace them with a hash, replace them with 'REDACTED', or leave them as they are. It is strongly "
+                   "recommended to leave this enabled. Turning it off does not stop people hiding author details "
+                   "afterwards with the 'Pseudonymise or anonymise' processor."
     },
     "ui.option_email": {
         "type": UserInput.OPTION_CHOICE,
