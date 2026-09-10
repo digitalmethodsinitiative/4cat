@@ -3,15 +3,14 @@ Blank all columns containing author information
 """
 import itertools
 import fnmatch
-import hashlib
-import secrets
 import shutil
 import json
 import csv
 
 from backend.lib.processor import BasicProcessor
+from common.lib.author_info import AuthorInfoReplacer
 from common.lib.compatibility import Compatibility
-from common.lib.helpers import dict_search_and_update, UserInput, HashCache
+from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -51,8 +50,9 @@ class AuthorInfoRemover(BasicProcessor):
                     "pseudonymise": "Replace values with a salted hash"
                 },
                 "tooltip": "When replacing values with a hash, a Blake2b hash is calculated for the value with a "
-                           "randomised salt, so it is no longer possible to derive the original value from the hash but it "
-                           "remains possible to see if two fields contain the same value.",
+                           "randomised salt, so it is no longer possible to derive the original value from the hash "
+                           "but it remains possible to see if two fields contain the same value. The salt is different "
+                           "every run, so hashes cannot be compared between datasets.",
                 "default": "anonymise"
             },
             "fields": {
@@ -91,24 +91,19 @@ class AuthorInfoRemover(BasicProcessor):
 
     def process(self):
         """
-        Reads a CSV file, removing content from all columns starting with "author"
-        """
-        # hasher for pseudonymisation
-        salt = secrets.token_bytes(16)
-        hasher = hashlib.blake2b(digest_size=24, salt=salt)
-        hash_cache = HashCache(hasher)
+        Read the source file, replacing the values of the chosen fields
 
+        A random salt is used, so the same name gets a different hash every time
+        this runs.
+        """
         mode = self.parameters.get("mode")
-        fields = self.parameters.get("fields")
-        if type(fields) is str:
-            fields = [field.strip() for field in fields.split(",")]
+        author_filter = AuthorInfoReplacer(mode, fields=self.parameters.get("fields"))
 
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
             processed_items = 0
 
             if self.source_file.suffix.lower() == ".csv":
                 writer = None
-                filterable_fields = []
 
                 for item in self.source_dataset.iterate_items(self):
                     if not writer:
@@ -119,35 +114,18 @@ class AuthorInfoRemover(BasicProcessor):
                         writer = csv.DictWriter(outfile, fieldnames=item.keys())
                         writer.writeheader()
 
-                        # figure out which fields to filter (same for every item)
-                        for field in item.keys():
-                            if any([fnmatch.fnmatch(field, pattern) for pattern in fields]):
-                                filterable_fields.append(field)
-
                     processed_items += 1
                     if processed_items % 500 == 0:
                         self.dataset.update_status(f"Processed {processed_items:,} of "
                                                    f"{self.source_dataset.num_rows:,} items")
                         self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
 
-                    for field in filterable_fields:
-                        if mode == "anonymise":
-                            item[field] = "REDACTED"
-                        elif mode == "pseudonymise":
-                            item[field] = hash_cache.update_cache(item[field])
-
-                    writer.writerow(item)
+                    writer.writerow(author_filter.filter_row(item))
 
             elif self.source_file.suffix.lower() == ".ndjson":
                 # Iterating through items
                 for item in self.source_dataset.iterate_items(self):
-                    item = item.original
-
-                    # Filter author data
-                    if mode == "anonymise":
-                        item = dict_search_and_update(item, fields, lambda v: "REDACTED")
-                    else:
-                        item = dict_search_and_update(item, fields, hash_cache.update_cache)
+                    item = author_filter.filter_item(item.original)
 
                     # Write modified item
                     outfile.write(json.dumps(item, ensure_ascii=False) + "\n")
