@@ -143,6 +143,94 @@ def test_nested_and_flat_shapes_agree():
     assert replacer.filter_row({"author": "ada"})["author"] == replacer.filter_item({"author": "ada"})["author"]
 
 
+# --- saying what was actually done -------------------------------------------
+
+def test_a_report_says_what_was_asked_for_and_what_happened():
+    replacer = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE, fields=["author*"])
+    replacer.filter_row({"author": "ada", "author_id": "1", "body": "hi"})
+
+    assert replacer.report() == {"modes": ["anonymise"], "fields": ["author*"], "replaced": 2}
+
+
+def test_a_mode_that_replaced_nothing_is_not_claimed():
+    """A run that found none of its fields did nothing, so it claims nothing."""
+    replacer = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE, fields=["nowhere*"])
+    replacer.filter_row({"author": "ada"})
+
+    assert replacer.report()["modes"] == []
+    assert replacer.report()["fields"] == ["nowhere*"]
+
+
+# --- going over the same file more than once ---------------------------------
+
+def test_a_second_run_adds_to_the_first():
+    """Hashing some fields and removing others is two runs over one file."""
+    first = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE, fields=["author*"])
+    first.filter_row({"author": "ada", "author_id": "1"})
+
+    second = AuthorInfoReplacer(AuthorInfoReplacer.PSEUDONYMISE, fields=["user*"])
+    second.filter_row({"user_name": "ada"})
+
+    assert second.report(previous=first.report()) == {
+        "modes": ["anonymise", "pseudonymise"],
+        "fields": ["author*", "user*"],
+        "replaced": 3,
+    }
+
+
+def test_a_later_run_that_matches_nothing_keeps_the_earlier_one():
+    """
+    Otherwise a harmless second run marks a hidden dataset as untouched.
+
+    Overwriting the record would leave a count of zero, which the interface
+    reads as "the fields were never found" - on a file that was in fact hidden.
+    """
+    first = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE, fields=["author*"])
+    first.filter_row({"author": "ada"})
+
+    second = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE, fields=["nowhere*"])
+    second.filter_row({"author": "ada"})
+
+    combined = second.report(previous=first.report())
+
+    assert combined["replaced"] == 1
+    assert combined["modes"] == ["anonymise"]
+
+
+def test_replacements_are_counted_across_items():
+    """The count covers a whole dataset, not one row."""
+    replacer = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE)
+    replacer.filter_row({"author": "ada"})
+    replacer.filter_row({"author": "grace"})
+
+    assert replacer.report()["replaced"] == 2
+
+
+def test_nested_replacements_are_counted_too():
+    """Nested items go through the same counter as flat rows."""
+    replacer = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE)
+    replacer.filter_item({"author": {"handle": "ada", "did": "did:plc:x"}})
+
+    assert replacer.report()["replaced"] == 2
+
+
+def test_a_count_of_zero_means_nothing_was_found():
+    """
+    What the interface needs to tell the two cases apart.
+
+    A dataset whose author fields were never found looks exactly like one that
+    was hidden properly, unless the count says otherwise.
+    """
+    replacer = AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE, fields=["author*"])
+    replacer.filter_item({"_sender": {"username": "ada"}, "message": "hi"})
+
+    assert replacer.report()["replaced"] == 0
+
+
+def test_nothing_is_counted_before_anything_runs():
+    assert AuthorInfoReplacer(AuthorInfoReplacer.ANONYMISE).report()["replaced"] == 0
+
+
 # --- the salt ----------------------------------------------------------------
 
 def test_a_fixed_salt_gives_the_same_hash_every_time():

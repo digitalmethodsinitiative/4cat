@@ -65,6 +65,9 @@ class AuthorInfoReplacer:
         self.mode = mode
         self.fields = self.parse_fields(fields)
 
+        #: How many values have been replaced so far
+        self.replaced = 0
+
         # which names in a given set of field names match the patterns, so the
         # patterns are compared to a set of names only once
         self._matches = {}
@@ -106,13 +109,51 @@ class AuthorInfoReplacer:
         """
         Get what a single value should be replaced with
 
+        Every replacement passes through here, whether the item was flat or
+        nested, so this is also where they are counted.
+
         :param value:  Original value
         :return:  A hash of the value, or `REDACTED`
         """
+        self.replaced += 1
+
         if self.mode == self.ANONYMISE:
             return self.REDACTED
 
         return self.hash_cache.update_cache(value)
+
+    def report(self, previous=None):
+        """
+        Describe what has been replaced
+
+        A dataset stores this so that the interface can say what was done to it
+        rather than what was asked for. A count of zero means the field names
+        were looked for but never found, and the data was left as it was.
+
+        The same file can be gone over more than once, for instance to hash
+        some fields and remove others. Pass what the dataset already records to
+        add this run to it; leave it out when the file was written from scratch,
+        as anything recorded earlier then describes data that is no longer there.
+
+        A mode only counts once it has replaced something, so that a run which
+        found none of its fields does not claim to have done anything. The
+        patterns are kept either way, since they explain why nothing was found.
+
+        :param dict previous:  An earlier report for the same file, if any
+        :return dict:  The modes that replaced something, the field name
+        patterns looked for, and how many values were replaced in total
+        """
+        previous = previous or {"modes": [], "fields": [], "replaced": 0}
+
+        modes = set(previous["modes"])
+        if self.replaced:
+            modes.add(self.mode)
+
+        return {
+            "modes": sorted(modes),
+            "fields": sorted({*previous["fields"], *self.fields}),
+            "replaced": previous["replaced"] + self.replaced
+        }
 
     def matching_names(self, names):
         """

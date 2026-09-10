@@ -142,5 +142,21 @@ class AuthorInfoRemover(BasicProcessor):
         # replace original dataset with updated one
         shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
 
+        # the original dataset now holds the updated file, so record there what
+        # was done to it. This file may have been through here before, e.g. to
+        # hash some fields and remove others, so add to what it already records.
+        # An empty dataset has nothing to replace, which says nothing about
+        # whether the field names were right, so do not record that
+        if processed_items:
+            self.source_dataset.author_info_replaced = author_filter.report(
+                previous=self.source_dataset.parameters.get("author_info_replaced"))
+
+        if processed_items and not author_filter.replaced:
+            self.dataset.update_status(
+                f"None of the fields to {mode} were found, so the data was left as it is. Check the field names "
+                f"against the dataset's own columns and try again.", is_final=True)
+            self.dataset.finish(processed_items)
+            return
+
         self.dataset.update_status(f"Data {mode}d, original dataset updated.", is_final=True)
         self.dataset.finish(processed_items)

@@ -8,12 +8,35 @@
     <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-expires">This dataset will be deleted on {{ dataset.is_expiring(config=__config)|datetime|safe }}</span>
 {% endif %}
 
-{% if "pseudonymise" in dataset.parameters and (dataset.parameters.pseudonymise == True or dataset.parameters.pseudonymise == "pseudonymise") %}
-    <i class="fa fa-user-secret tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-pseudonymised"></i> <span class="sr-only">Author data has been pseudonymised</span>
-    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-pseudonymised">Author data has been pseudonymised</span>
-{% elif "pseudonymise" in dataset.parameters and dataset.parameters.pseudonymise == "anonymise" %}
-    <i class="fa fa-ghost tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-anonymised"></i> <span class="sr-only">Author data has been anonymised</span>
-    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-anonymised">Author data has been anonymised</span>
+{# What was done to the author data. Only datasets that record it can say what
+   actually happened; for the rest all we know is what was asked for when they
+   were made, so those say that instead. #}
+{% set author_info = dataset.parameters.get("author_info_replaced") %}
+{% set author_requested = dataset.parameters.get("pseudonymise") %}
+{% if author_info %}
+    {% set author_modes = author_info.modes %}
+    {% set author_count %}{{ author_info.replaced|commafy }} value{{ "" if author_info.replaced == 1 else "s" }}{% endset %}
+{% elif author_requested == True %}
+    {% set author_modes = ["pseudonymise"] %}
+{% elif author_requested in ("pseudonymise", "anonymise") %}
+    {% set author_modes = [author_requested] %}
+{% else %}
+    {% set author_modes = [] %}
+{% endif %}
+{% set author_unknown = ". 4CAT did not record what was replaced, so how much of it was covered is not known" %}
+
+{% if author_info and not author_info.replaced %}
+    <i class="fa fa-triangle-exclamation tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-not-replaced"></i> <span class="sr-only">Author data was left as it is: the fields to replace were not found</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-not-replaced">Author data was left as it is. None of the fields to replace ({{ author_info.fields|join(", ") }}) were found in this dataset.</span>
+{% elif "pseudonymise" in author_modes and "anonymise" in author_modes %}
+    <i class="fa fa-user-secret tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-both"></i> <span class="sr-only">Author data has been pseudonymised and anonymised</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-both">Author data has been pseudonymised and anonymised: {{ author_count }} replaced in total, some with a hash and some with 'REDACTED'.</span>
+{% elif "pseudonymise" in author_modes %}
+    <i class="fa fa-user-secret tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-pseudonymised"></i> <span class="sr-only">Author data {{ "has been" if author_info else "was set to be" }} pseudonymised</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-pseudonymised">Author data {% if author_info %}has been pseudonymised: {{ author_count }} replaced with a hash{% else %}was set to be pseudonymised when this dataset was made{{ author_unknown }}{% endif %}.</span>
+{% elif "anonymise" in author_modes %}
+    <i class="fa fa-ghost tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-anonymised"></i> <span class="sr-only">Author data {{ "has been" if author_info else "was set to be" }} anonymised</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-anonymised">Author data {% if author_info %}has been anonymised: {{ author_count }} replaced with 'REDACTED'{% else %}was set to be anonymised when this dataset was made{{ author_unknown }}{% endif %}.</span>
 {% endif %}
 
 {% for parameter in dataset.parameters %}
@@ -37,7 +60,7 @@
             {{ dataset.parameters[parameter]|string }}
         {% endif %}
         </span>
-    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "next", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label", "expires-after", "email-complete", "original_timestamp", "session_id") %}
+    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "author_info_replaced", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "next", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label", "expires-after", "email-complete", "original_timestamp", "session_id") %}
         {# standard parameters, except those blacklisted #}
         {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
         <span class="inline-label property-badge copy-to-clipboard tooltip-trigger" data-clipboard-value="{{ dataset.parameters[parameter]|string }}" aria-controls="tooltip-clipboard">{{ parameter }}</span>

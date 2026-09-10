@@ -327,6 +327,11 @@ class Search(BasicProcessor, ABC):
 				row = remove_nuls(row)
 				writer.writerow(row)
 
+		# an empty dataset has nothing to replace, which says nothing about
+		# whether the field names were right, so do not record that
+		if author_filter and processed:
+			self.dataset.author_info_replaced = author_filter.report()
+
 		return processed
 
 	def items_to_ndjson(self, items, filepath):
@@ -362,6 +367,11 @@ class Search(BasicProcessor, ABC):
 
 				outfile.write(json.dumps(item) + "\n")
 				processed += 1
+
+		# an empty dataset has nothing to replace, which says nothing about
+		# whether the field names were right, so do not record that
+		if author_filter and processed:
+			self.dataset.author_info_replaced = author_filter.report()
 
 		return processed
 
