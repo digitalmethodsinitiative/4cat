@@ -1074,7 +1074,8 @@ def dict_search_and_update(item, keyword_matches, function):
         if isinstance(d_or_l, dict):
             # Iterate through dictionary
             for key, value in iter(d_or_l.items()):
-                if match_terms == 'True' or any([fnmatch.fnmatch(key, match_term) for match_term in match_terms]):
+                # both sides are lower cased before comparing
+                if match_terms == 'True' or any([fnmatch.fnmatchcase(key.lower(), match_term) for match_term in match_terms]):
                     # Match found; apply function to all items and sub-items
                     if isinstance(value, (list, dict)):
                         # Pass item through again with match_terms = True

@@ -165,8 +165,9 @@ class AuthorInfoReplacer:
         names = tuple(names)
         if names not in self._matches:
             # This guards against the possibility of different field names (e.g. via map_item)
+            # names are lower cased before comparing, since the patterns are too
             self._matches[names] = [name for name in names if
-                                    any(fnmatch.fnmatch(name, pattern) for pattern in self.fields)]
+                                    any(fnmatch.fnmatchcase(name.lower(), pattern) for pattern in self.fields)]
 
         return self._matches[names]
 
