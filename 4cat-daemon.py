@@ -63,15 +63,8 @@ if not args.no_version_check:
 # the config manager can be run properly
 from common.config_manager import ConfigManager  # noqa: E402
 from common.lib.helpers import call_api  # noqa: E402
-# ---------------------------------------------
-#     Check validity of configuration file
-# (could be expanded to check for other values)
-# ---------------------------------------------
+
 config = ConfigManager()
-if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "REPLACE_THIS":
-    print(
-        "You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
-    sys.exit(1)
 
 # ---------------------------------------------
 #   Running as a daemon is only supported on
