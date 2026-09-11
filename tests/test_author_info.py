@@ -11,12 +11,14 @@ Hiding the people behind collected items, and what that can and cannot reach.
 two items from the same person can still be told apart from two items by
 different people, or replace them with REDACTED, which drops that link too.
 
-Both are offered in two places - while a dataset is being collected, and
-afterwards through the 'Pseudonymise or anonymise' processor. Those used to be
-separate pieces of code, and they drifted: the collection side read the chosen
-mode from one parameter name for hashing and a different, never-written one for
-redacting, so asking for REDACTED on an NDJSON data source quietly did nothing
-at all while the interface said it had. Both sides now share
+Both are offered in three places - while a dataset is being collected, while a
+CSV file is uploaded, and afterwards through the 'Pseudonymise or anonymise'
+processor. Those used to be separate pieces of code, and they drifted: the
+collection side read the chosen mode from one parameter name for hashing and a
+different, never-written one for redacting, so asking for REDACTED on an NDJSON
+data source quietly did nothing at all while the interface said it had, and the
+CSV upload looked only for names starting with a lower case 'author', leaving a
+'username' or 'Author' column in the clear. All three now share
 `AuthorInfoReplacer`, and these tests hold that shared behaviour in place.
 
 What is deliberately not tested here, because it is not what this code does:
