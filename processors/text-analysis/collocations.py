@@ -40,7 +40,7 @@ class GetCollocations(BasicProcessor):
 		return {
 			"n_size": {
 				"type": UserInput.OPTION_CHOICE,
-				"default": 2,
+				"default": "2",
 				"options": {
 					"2": "2 (bigrams)",
 					"3": "3 (trigrams)"},

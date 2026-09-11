@@ -1552,6 +1552,8 @@ class DataSet(FourcatModule):
             data={"parameters": json.dumps(self.parameters)},
             where={"key": self.key},
         )
+        # keep data["parameters"] consistent, since get_parameters() reads it
+        self.data["parameters"] = json.dumps(self.parameters)
         return datasource
 
     def reserve_result_file(self, parameters=None, extension="csv"):
@@ -1866,9 +1868,107 @@ class DataSet(FourcatModule):
         )
 
         if instant:
+            # keep both in-memory stores consistent with the database:
+            # get_parameters() reads data["parameters"], so updating only
+            # self.parameters would leave it returning the deleted value
             self.parameters = parameters
+            self.data["parameters"] = json.dumps(parameters)
 
         return updated > 0
+
+    def remove_sensitive_parameters(self, config):
+        """
+        Delete stored values of options marked as sensitive
+
+        Workers can mark an option as "sensitive" in their option definitions.
+        This is used for values such as API keys, which should spend as little
+        time in the database as possible. This method deletes those values
+        from the stored parameters. It is called as soon as a dataset starts
+        running (the worker keeps the values in memory for the run), and
+        periodically for datasets that were created but never picked up by a
+        worker.
+
+        :param config:  Configuration reader, used to determine the worker's
+          options. Which options exist (and which are sensitive) can depend on
+          the configuration.
+        """
+        # check the options of both the processor that created this dataset
+        # and the processor matching its current type. These can differ after
+        # adopt_type() has rewritten the type. get_own_processor is purely
+        # defensive: the record is scrubbed before a type is ever adopted, and
+        # the periodic cleanup only sees datasets that never ran - but this
+        # keeps the check correct for future callers.
+        for worker in {self.get_producer_processor(), self.get_own_processor()}:
+            if not worker:
+                continue
+
+            for option, settings in worker.get_options(self.get_parent(), config=config).items():
+                if settings.get("sensitive"):
+                    self.delete_parameter(option)
+
+    def remove_sensitive_parameters_from_next(self, config):
+        """
+        Remove sensitive option values from queued follow-up parameters
+
+        A dataset's parameters can contain a `next` chain: parameters for
+        follow-up processors that run once this dataset finishes. Those
+        parameters may hold sensitive values (e.g. an API key a follow-up
+        processor needs). Once the follow-up datasets have been created they
+        hold their own copy and remove it themselves when they run, so those
+        values are no longer needed here and can be removed from this dataset's
+        stored `next` chain, where they would otherwise remain indefinitely.
+
+        Call this *after* the follow-up datasets have been created (at the end
+        of after_process), not before, or the follow-ups will not receive the
+        values.
+
+        :param config:  Configuration reader, used to determine each follow-up
+          processor's options (which options are sensitive can depend on it).
+        """
+        if not isinstance(self.parameters.get("next"), list):
+            return
+
+        if self._remove_sensitive_from_next_steps(self.parameters["next"], config):
+            self.db.update("datasets", where={"key": self.key},
+                           data={"parameters": json.dumps(self.parameters)})
+            self.data["parameters"] = json.dumps(self.parameters)
+
+    def _remove_sensitive_from_next_steps(self, steps, config):
+        """
+        Recursively remove sensitive option values from a list of `next` steps.
+
+        :param list steps:  A list of `next` steps, each a dict with a `type`
+          and `parameters`.
+        :param config:  Configuration reader.
+        :return bool:  Whether anything was removed.
+        """
+        removed = False
+        for step in steps:
+            parameters = step.get("parameters")
+            if not isinstance(parameters, dict):
+                continue
+
+            processor = self.modules.processors.get(step.get("type")) if self.modules else None
+            if processor:
+                try:
+                    # the immediate follow-ups run on this dataset, so this 
+                    # dataset is their parent context; pass self so options 
+                    # depedant on the parent resolve.
+                    options = processor.get_options(self, config=config)
+                except Exception:
+                    # never let a follow-up's get_options failure block cleanup
+                    options = {}
+                for option, settings in options.items():
+                    if settings.get("sensitive") and option in parameters:
+                        del parameters[option]
+                        removed = True
+
+            # a step can itself queue further steps
+            if isinstance(parameters.get("next"), list):
+                if self._remove_sensitive_from_next_steps(parameters["next"], config):
+                    removed = True
+
+        return removed
 
     def get_version_url(self, file):
         """
