@@ -32,8 +32,12 @@ for (const a in annotation_fields) {
 
 <span id="current-username" style="display: none">{{ current_user.get_name() }}</span>
 
-<!-- Don't show certain data if the dataset is pseudonymised -->
-{% set pseudonymised = True if dataset.parameters and dataset.parameters.get('pseudonymise', False) %}
+<!-- Don't show certain data if the dataset is pseudonymised.
+     Author details can be hidden when a dataset is made, or afterwards with the
+     'Pseudonymise or anonymise' processor - the only option for a dataset that
+     was imported rather than collected. -->
+{% set author_info = (dataset.parameters or {}).get('author_info_replaced') or {} %}
+{% set pseudonymised = True if (dataset.parameters or {}).get('pseudonymise') or author_info.get('replaced') else False %}
 
 {% set key = dataset.data.key %}
 
