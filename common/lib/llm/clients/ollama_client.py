@@ -3,6 +3,7 @@ Centralized HTTP client for communicating with an Ollama server.
 """
 import requests
 
+from common.lib.exceptions import LLMServerException
 from common.lib.llm.llm_client import LLMServerClient
 
 
@@ -46,7 +47,7 @@ class OllamaClient(LLMServerClient):
         **Primary path**: reads `meta["capabilities"]`:
         - `"completion"` → `"text"`
         - `"vision"`     → `"image"`
-        - `"embedding"`  → `"embedding"`
+        - `"embedding"`  → `"text"` (an embedder still consumes text)
 
         **Fallback path** (used when capabilities are absent or only yield `"text"`):
         inspects GGUF `model_info` / `details` for vision signals and adds
@@ -57,16 +58,16 @@ class OllamaClient(LLMServerClient):
           Returns `[]` when `meta` is `None` (unknown — callers should
           include the model, not block it).
         """
-        if meta is None or not meta.get("metadata"):
+        if meta is None or not (meta.get("metadata") or meta.get("capabilities")):
             return []
 
-        capabilities = meta["metadata"].get("capabilities", [])
+        capabilities = self._get_capabilities(meta)
         media_types: list[str] = []
 
         _cap_map = {
             "completion": "text",
+            "embedding": "text",
             "vision": "image",
-            "embedding": "embedding",
         }
         for cap in capabilities:
             mapped = _cap_map.get(cap)
@@ -87,6 +88,109 @@ class OllamaClient(LLMServerClient):
                 media_types.append("image")
 
         return media_types
+
+    @staticmethod
+    def _get_capabilities(meta: dict) -> list[str]:
+        """
+        Read a model's capability list.
+
+        Ollama reports capabilities in two places: nested under `metadata` for
+        the `/api/show` response `list_models()` attaches, and inline on the
+        `/api/tags` entry itself. Prefer the former and fall back to the latter,
+        so a model whose `/api/show` request failed is still classified.
+
+        :param dict meta:  Model metadata, or `None`.
+        :returns list[str]:  Ollama capability strings, or `[]` if unknown.
+        """
+        if not meta:
+            return []
+
+        metadata = meta.get("metadata") or {}
+        return metadata.get("capabilities") or meta.get("capabilities") or []
+
+    def parse_supported_tasks(self, meta: dict) -> list[str]:
+        """
+        Derive the tasks a model supports from its Ollama capabilities.
+
+        :param dict meta:  `/api/show` response dict, or `None`.
+        :returns list[str]:  Supported tasks - `"generate"`, `"embed"`, or both.
+        """
+        capabilities = self._get_capabilities(meta)
+
+        tasks = []
+        if "completion" in capabilities:
+            tasks.append("generate")
+        if "embedding" in capabilities:
+            tasks.append("embed")
+
+        # An unreachable or partial /api/show leaves nothing to go on. Assume
+        # generation, matching the base class, rather than hiding the model
+        # from every processor at once.
+        return tasks if tasks else ["generate"]
+
+    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300) -> list[list[float]]:
+        """
+        Embed inputs via Ollama's `/api/embed` endpoint.
+
+        The endpoint accepts a list and returns one vector per item, so a caller
+        that batches its inputs gets one round-trip per batch rather than per
+        item.
+
+        Text only. `/api/embed` takes `model`, `input`, `truncate`, `options`,
+        `keep_alive` and `dimensions` - there is no image parameter, and Ollama
+        *silently discards* an `images` field rather than rejecting it, handing
+        back a text-only vector that looks entirely valid (verified against
+        Ollama 0.34.1; see ollama/ollama#5304 and #7677, both still open). So
+        refuse media here explicitly: a quiet wrong answer is worse than a loud
+        failure, and this is the only place that can tell the difference.
+
+        :param str model_id:  Ollama model name, e.g. `"mxbai-embed-large:latest"`.
+        :param list inputs:  Strings to embed.
+        :param list media:  Not supported; passing any raises.
+        :param int timeout:  Request timeout in seconds.
+        :returns list[list[float]]:  One vector per input, in input order.
+        :raises LLMServerException:  If media is passed, if the server errors,
+          or if it returns a number of vectors that does not match the number of
+          inputs (which would silently misalign vectors with their items).
+        """
+        if media:
+            raise LLMServerException(
+                "Ollama cannot produce multimodal embeddings: its /api/embed endpoint has no image parameter and "
+                "ignores one without reporting an error, which would yield text-only vectors that look valid. Use a "
+                "server that supports multimodal embedding instead.")
+
+        if not inputs:
+            return []
+
+        try:
+            response = self._session.post(
+                f"{self.base_url}/api/embed",
+                headers=self._headers,
+                json={"model": model_id, "input": inputs},
+                timeout=timeout,
+            )
+        except requests.RequestException as e:
+            raise LLMServerException(f"Could not reach Ollama server at {self.base_url}: {e}")
+
+        if response.status_code != 200:
+            raise LLMServerException(
+                f"Ollama server returned status {response.status_code} while embedding with model "
+                f"'{model_id}': {response.text}")
+
+        try:
+            embeddings = response.json().get("embeddings")
+        except ValueError as e:
+            raise LLMServerException(f"Ollama server returned invalid JSON while embedding: {e}")
+
+        if not embeddings:
+            raise LLMServerException(f"Ollama server returned no embeddings for model '{model_id}'")
+
+        if len(embeddings) != len(inputs):
+            raise LLMServerException(
+                f"Ollama server returned {len(embeddings)} embeddings for {len(inputs)} inputs; cannot map "
+                f"vectors back to items")
+
+        return embeddings
 
     def format_display_name(self, meta: dict) -> str:
         """

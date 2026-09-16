@@ -13,6 +13,7 @@ from common.lib.exceptions import (
     QueryNeedsExplicitConfirmationException,
 )
 
+from common.lib.llm.models import supports_task
 from processors.machine_learning.llm_prompter import LLMPrompter
 
 class PromptCompassRunner(ProcessorPreset):
@@ -89,7 +90,9 @@ class PromptCompassRunner(ProcessorPreset):
         if not config.get("llm.access"):
             enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
 
-        enabled_models = {k: v for k, v in available_models.items() if k in enabled_model_ids}
+        # generative models only
+        enabled_models = {k: v for k, v in available_models.items()
+                          if k in enabled_model_ids and supports_task(v, "generate")}
 
         options = {
             "model": {
