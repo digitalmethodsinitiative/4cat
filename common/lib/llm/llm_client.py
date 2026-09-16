@@ -128,8 +128,45 @@ class LLMServerClient:
             "server": self.server_config["_id"],
             "wrapper": self.server_config["type"],
             "supported_media_types": self.parse_supported_media_types(meta),
+            "supported_tasks": self.parse_supported_tasks(meta),
             "metadata": meta,
         }
+
+    def parse_supported_tasks(self, meta: dict) -> list[str]:
+        """
+        Derive the tasks a model can be used for from its metadata.
+
+        The default is `["generate"]`: every server 4CAT talks to serves chat
+        completions, while embedding endpoints are the exception.
+
+        :param dict meta:  Model metadata, or `None` if unavailable.
+        :returns list[str]:  Supported tasks - `"generate"`, `"embed"`, or both.
+        """
+        return ["generate"]
+
+    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300) -> list[list[float]]:
+        """
+        Embed one or more inputs, returning one vector per input.
+
+        Deliberately *not* routed through `LLMAdapter`/LangChain. LangChain's
+        embedding interface is text-only (`embed_documents(list[str])`), so it
+        cannot handle multimodal embeddings.
+
+        A client that cannot embed media **must raise** when `media` is given
+        rather than embedding the text alone. Returning a text-only vector for
+        a request that asked for media is silent data corruption: the caller
+        gets a plausible vector back and has no way to tell it does not describe
+        what it asked about.
+
+        :param str model_id:  Model ID *within this server's context* (i.e. a
+          `local_id`, not a global model ID).
+        :param list inputs:  Inputs to embed.
+        :param list media:  Media to embed alongside `inputs`, for servers that
+          support multimodal embedding. The payload shape is server-specific.
+        :param int timeout:  Request timeout in seconds.
+        :returns list[list[float]]:  One vector per input, in input order.
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not support embedding")
 
     def get_model_card_url(self, meta: dict) -> str:
         """
