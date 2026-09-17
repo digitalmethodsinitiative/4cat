@@ -19,7 +19,7 @@ from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
 from common.lib.llm.adapter import LLMAdapter
-from common.lib.llm.models import get_model_library
+from common.lib.llm.llm_client import get_model_library
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 

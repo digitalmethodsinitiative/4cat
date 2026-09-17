@@ -13,7 +13,7 @@ from common.lib.exceptions import (
     QueryNeedsExplicitConfirmationException,
 )
 
-from common.lib.llm.models import supports_task
+from common.lib.llm.llm_client import supports_task
 from processors.machine_learning.llm_prompter import LLMPrompter
 
 class PromptCompassRunner(ProcessorPreset):
