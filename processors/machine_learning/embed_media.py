@@ -324,9 +324,13 @@ class EmbedMedia(BasicProcessor):
         annotations = []
 
         embedded = 0
+        failed_embeddings = 0
+        max_failed_embeddings = 10
         skipped = 0
         processed = 0
         total_sent = 0
+
+        embedding_error = ""
 
         self.dataset.update_status(f"Embedding {self.media_label_plural} with {model['local_id']}")
 
@@ -368,55 +372,68 @@ class EmbedMedia(BasicProcessor):
                     skipped += 1
                     continue
 
-                try:
-                    vector = client.embed(model["local_id"], [instruction], media=[payload])[0]
-                except LLMServerException as e:
-                    if embedded:
-                        self.dataset.finish_with_warning(
-                            embedded, f"Not all {self.media_label_plural} were embedded: {e}")
-                    else:
-                        self.dataset.finish_with_error(str(e))
-                    return
+                # do the actual embedding
+                max_retries = 3
+                retries = 0
+                vector = None
+                while retries < max_retries:
+                    try:
+                        vector = client.embed(model["local_id"], [instruction], media=[payload])[0]
+                        break  # success!
+                    except LLMServerException as e:
+                        retries += 1
+                        self.dataset.log(f"Error embedding {media_path.name}: {e}. Retrying ({retries}/{max_retries})...")
+                        if retries >= max_retries:
+                            embedding_error = f"Failed to embed {media_path.name} after {max_retries} attempts: {e}"
+                            failed_embeddings += 1
+                            break  # not a success...
+                        time.sleep(2)  # wait a bit before retrying
 
-                # the filename is a hash, so carry the posts it came from into
-                # the result: processors downstream cannot reach .metadata.json
-                # themselves and would otherwise annotate the hash
-                post_ids = post_id_map.get(media_path.stem, [])
+                if vector:
+                    # the filename is a hash, so carry the posts it came from into
+                    # the result: processors downstream cannot reach .metadata.json
+                    # themselves and would otherwise annotate the hash
+                    post_ids = post_id_map.get(media_path.stem, [])
 
-                time_created = int(time.time())
-                outfile.write(json.dumps({
-                    "id": media_path.stem,
-                    "text": media_path.name,
-                    "filename": media_path.name,
-                    "post_ids": post_ids,
-                    "embedding": vector,
-                    "dimensions": len(vector),
-                    "model": model["local_id"],
-                    "original_bytes": original_size,
-                    "sent_bytes": sent_size,
-                    "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
-                    "time_created_utc": time_created,
-                }) + "\n")
+                    time_created = int(time.time())
+                    outfile.write(json.dumps({
+                        "id": media_path.stem,
+                        "text": media_path.name,
+                        "filename": media_path.name,
+                        "post_ids": post_ids,
+                        "embedding": vector,
+                        "dimensions": len(vector),
+                        "model": model["local_id"],
+                        "original_bytes": original_size,
+                        "sent_bytes": sent_size,
+                        "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
+                        "time_created_utc": time_created,
+                    }) + "\n")
 
-                if save_annotations:
-                    # one vector can belong to several posts, and each gets its
-                    # own annotation
-                    for post_id in post_ids:
-                        annotations.append({
-                            "item_id": post_id,
-                            "label": self.annotation_label,
-                            "value": " ".join([str(value) for value in vector]),
-                            "type": "text",
-                        })
+                    if save_annotations:
+                        # one vector can belong to several posts, and each gets its
+                        # own annotation
+                        for post_id in post_ids:
+                            annotations.append({
+                                "item_id": post_id,
+                                "label": self.annotation_label,
+                                "value": " ".join([str(value) for value in vector]),
+                                "type": "text",
+                            })
 
-                embedded += 1
-                total_sent += sent_size
+                    embedded += 1
+                    total_sent += sent_size
 
                 if embedded % self.annotation_batch_size == 0:
                     outfile.flush()
                     if annotations:
                         self.save_annotations(annotations, hide_in_explorer=True)
                         annotations = []
+
+                if failed_embeddings >= max_failed_embeddings:
+                    self.save_annotations(annotations, hide_in_explorer=True)
+                    self.dataset.finish_with_error(f"Too many failed embeddings ({failed_embeddings}); {embedding_error}")
+                    return
 
                 self.dataset.update_progress(processed / max_processed)
 
@@ -433,6 +450,13 @@ class EmbedMedia(BasicProcessor):
         status = f"Embedded {embedded:,} {self.media_label_plural} ({total_sent / 1024 / 1024:.1f} MB sent in total)"
         if skipped:
             status += f", skipped {skipped:,}"
+
+        if failed_embeddings:
+            self.dataset.finish_with_warning(
+                embedded, f"{status}. {failed_embeddings:,} {self.media_label_plural} could not be embedded; see "
+                          f"the log for details.")
+            return
+
         self.dataset.update_status(status, is_final=True)
         self.dataset.finish(embedded)
 
