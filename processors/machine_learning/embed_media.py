@@ -391,8 +391,7 @@ class EmbedMedia(BasicProcessor):
 
                 if vector:
                     # the filename is a hash, so carry the posts it came from into
-                    # the result: processors downstream cannot reach .metadata.json
-                    # themselves and would otherwise annotate the hash
+                    # the result: makes it easier for child processors to reach .metadata.json
                     post_ids = post_id_map.get(media_path.stem, [])
 
                     time_created = int(time.time())
@@ -477,8 +476,6 @@ class EmbedMedia(BasicProcessor):
             "id": item.get("id"),
             "text": item.get("text"),
             "filename": item.get("filename"),
-            # without this the field is dropped by the mapper, and a processor
-            # reading these embeddings falls back to the filename hash
             "post_ids": ", ".join([str(post_id) for post_id in item.get("post_ids", [])]),
             "model": item.get("model"),
             "dimensions": item.get("dimensions"),
