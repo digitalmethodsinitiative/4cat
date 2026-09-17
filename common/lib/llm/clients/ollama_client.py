@@ -134,17 +134,12 @@ class OllamaClient(LLMServerClient):
 
         The endpoint accepts a list and returns one vector per item, so a caller
         that batches its inputs gets one round-trip per batch rather than per
-        item.
+        item. NOTE: Ollama currently only supports text embeddings.
 
-        Text only. `/api/embed` takes `model`, `input`, `truncate`, `options`,
-        `keep_alive` and `dimensions` - there is no image parameter, and Ollama
-        *silently discards* an `images` field rather than rejecting it, handing
-        back a text-only vector that looks entirely valid (verified against
-        Ollama 0.34.1; see ollama/ollama#5304 and #7677, both still open). So
-        refuse media here explicitly: a quiet wrong answer is worse than a loud
-        failure, and this is the only place that can tell the difference.
+        todo: revise later, since Ollama notes that OpenAI-like embedding endpoints are coming soon,
+         https://ollama.com/blog/embedding-models
 
-        :param str model_id:  Ollama model name, e.g. `"mxbai-embed-large:latest"`.
+        :param str model_id:  Ollama model name.
         :param list inputs:  Strings to embed.
         :param list media:  Not supported; passing any raises.
         :param int timeout:  Request timeout in seconds.
@@ -155,9 +150,8 @@ class OllamaClient(LLMServerClient):
         """
         if media:
             raise LLMServerException(
-                "Ollama cannot produce multimodal embeddings: its /api/embed endpoint has no image parameter and "
-                "ignores one without reporting an error, which would yield text-only vectors that look valid. Use a "
-                "server that supports multimodal embedding instead.")
+                "Ollama does not support non-text inputs yet. Use a "
+                "server and model that supports multimodal embeddings, like vLLM.")
 
         if not inputs:
             return []

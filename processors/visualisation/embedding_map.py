@@ -23,14 +23,13 @@ class EmbeddingMap(BasicProcessor):
     """
     type = "embedding-map"  # job type ID
     category = "Visual"  # category
-    title = "Embedding map"  # title displayed in UI
-    description = ("Reduce the embeddings of each item to two dimensions and plot them as an interactive map, so "
-                   "items with similar meanings sit near each other. Scroll to zoom, drag to pan, and hover over a "
-                   "point to read its text. Note that distances in the map are a compressed approximation of the "
-                   "original embedding space: clusters are meaningful, exact distances less so.")
+    title = "Plot embeddings"  # title displayed in UI
+    description = ("Reduce the embeddings of each embedding to two dimensions and plot them as an interactive map, so "
+                   "items with similar meanings sit near each other. Note that distances may be meaningless (see "
+                   "references).")
     extension = "html"  # extension of result file, used internally and in UI
 
-    compatibility = Compatibility(types={"text-embeddings"})
+    compatibility = Compatibility(types={"text-embeddings", "video-embeddings"})
 
     references = [
         "[McInnes, Leland, John Healy, and James Melville. 2018. 'UMAP: Uniform Manifold Approximation and Projection "

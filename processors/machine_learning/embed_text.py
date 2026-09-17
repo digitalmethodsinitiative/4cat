@@ -10,8 +10,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import LLMServerException, ProcessorInterruptedException, QueryParametersException
 from common.lib.item_mapping import MappedItem
-from common.lib.llm.llm_client import LLMServerClient
-from common.lib.llm.models import get_model_library
+from common.lib.llm.llm_client import LLMServerClient, get_model_library
 from common.lib.user_input import UserInput
 
 __author__ = "Sal Hagen"
@@ -27,13 +26,20 @@ class GenerateTextEmbeddings(BasicProcessor):
     """
     type = "text-embeddings"  # job type ID
     category = "Text analysis"  # category
-    title = "Generate text embeddings via LLM"  # title displayed in UI
+    title = "Generate text embeddings"  # title displayed in UI
     description = ("Generate a numerical representation (an 'embedding') of the text of each item using an LLM embedding "
-                   "model. Embeddings can be used to e.g. retrieve similar kinds of texts. Requires an embedding model "
-                   "be installed on this server.")
+                   "model. Embeddings can be used to e.g. map, cluster, and retrieve similar kinds of texts. Requires "
+                   "an embedding model to be installed on this server.")
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     compatibility = Compatibility(extensions={"csv", "ndjson"})
+
+    #: Hard-coded label the embeddings are written back under, when saved as
+    #: annotations. Not user-editable: a vector is only meaningful next to the
+    #: model that produced it, so a free-form label invites mismatched columns.
+    annotation_label = "text embedding"
+    #: How many annotations to buffer before writing them to the database
+    annotation_batch_size = 100
 
     references = [
         "[Ollama embedding models](https://ollama.com/blog/embedding-models)",
@@ -90,7 +96,8 @@ class GenerateTextEmbeddings(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Column(s) to embed",
                 "default": "body",
-                "tooltip": "Values of multiple columns are joined with a space before being embedded.",
+                "inline": True,
+                "tooltip": "Values of multiple columns are joined with a newline before being embedded.",
             },
             "amount": {
                 "type": UserInput.OPTION_TEXT,
@@ -110,6 +117,16 @@ class GenerateTextEmbeddings(BasicProcessor):
                 "coerce_type": int,
                 "tooltip": "How many items to send to the server at once. Higher is faster but uses more memory on the "
                            "server; lower this if requests time out.",
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_ANNOTATION,
+                # must match the label the annotations are written under, below:
+                # the form renders this as "Add <label> as annotations", so a
+                # different string here promises a column that never appears
+                "label": cls.annotation_label,
+                "tooltip": "Add embeddings as annotations to the parent dataset.",
+                "default": False,
+                "hide_in_explorer": True
             },
         }
 
@@ -183,6 +200,9 @@ class GenerateTextEmbeddings(BasicProcessor):
         self.dataset.update_status(f"Connecting to LLM server '{server['_id']}' with model '{model['local_id']}'")
         self.dataset.log(f"Embedding with model '{model['local_id']}' on server '{server['_id']}'")
 
+        self.save_annotations_enabled = self.parameters.get("save_annotations", False)
+        self.annotations = []
+
         embedded = 0
         skipped = 0
         processed = 0
@@ -199,7 +219,7 @@ class GenerateTextEmbeddings(BasicProcessor):
 
                     processed += 1
 
-                    text = " ".join([str(item.get(column, "")) for column in columns]).strip()
+                    text = "\n".join([str(item.get(column, "")) for column in columns]).strip()
                     if not text:
                         # nothing to embed; an all-zero vector would be
                         # indistinguishable from a real one, so leave the item out
@@ -221,7 +241,12 @@ class GenerateTextEmbeddings(BasicProcessor):
                 # text, which would otherwise strand the batch it sits behind.
                 embedded += self.embed_batch(client, model, batch, outfile)
 
+            self.flush_annotations(force=True)
+
         except LLMServerException as e:
+            # the vectors already written are still good, and so are their
+            # annotations; losing them would mean redoing the whole run
+            self.flush_annotations(force=True)
             if embedded:
                 self.dataset.finish_with_warning(embedded, f"Not all items were embedded: {e}")
             else:
@@ -238,6 +263,26 @@ class GenerateTextEmbeddings(BasicProcessor):
             status += f" (skipped {skipped:,} items with no text in the selected columns)"
         self.dataset.update_status(status, is_final=True)
         self.dataset.finish(embedded)
+
+    def flush_annotations(self, force: bool = False) -> None:
+        """
+        Write buffered annotations to the database.
+
+        Buffered rather than collected until the end: a large dataset would
+        otherwise hold every vector in memory a second time over, and lose the
+        pending annotations entirely if the run is interrupted.
+
+        Hidden in the Explorer - a vector is data for computation, not something
+        a reader can make sense of next to a post.
+
+        :param bool force:  Write whatever is buffered, however little.
+        """
+        if not self.annotations:
+            return
+
+        if force or len(self.annotations) >= self.annotation_batch_size:
+            self.save_annotations(self.annotations, hide_in_explorer=True)
+            self.annotations = []
 
     def embed_batch(self, client, model, batch, outfile) -> int:
         """
@@ -265,6 +310,21 @@ class GenerateTextEmbeddings(BasicProcessor):
                 "time_created": datetime.fromtimestamp(time_created).strftime("%Y-%m-%d %H:%M:%S"),
                 "time_created_utc": time_created,
             }) + "\n")
+
+            if self.save_annotations_enabled:
+                # a text item is already one post, so its own id is what the
+                # annotation attaches to - unlike media, where the file is named
+                # after a hash and has to be looked up in .metadata.json
+                self.annotations.append({
+                    "item_id": item_id,
+                    "label": self.annotation_label,
+                    "value": " ".join([str(value) for value in vector]),
+                    "type": "text",
+                })
+
+        # written and flushed per batch so an interrupted run keeps its results
+        outfile.flush()
+        self.flush_annotations()
 
         return len(batch)
 

@@ -12,6 +12,8 @@ from abc import abstractmethod
 import requests
 import re
 
+from common.lib.exceptions import LLMServerException
+
 class LLMServerClient:
     _headers = {}
     server_config = {}
@@ -59,14 +61,29 @@ class LLMServerClient:
 
         self.base_url = server_config["url"].rstrip("/")
         if self.base_url.endswith("v1"):
-            # get rid of the 'v1' - we'll add this in the path
-            self.base_url = f"{self.base_url[:-2]}"
+            # get rid of the 'v1' - we'll add this in the path.
+            self.base_url = self.base_url[:-2].rstrip("/")
 
         self._session = requests.Session()
         self._headers = {"Content-Type": "application/json"}
 
         if self.auth_type:
-            self._headers[self.auth_type] = self.auth_key
+            # The setting asks for a header *name*, but "Authorization: Bearer"
+            # is the natural thing to type and is what people paste from curl
+            # examples. As a header name that is malformed - requests raises
+            # InvalidHeader, which surfaces as "server unavailable" and sends
+            # people hunting for a network problem. So accept both spellings:
+            # anything after a colon is treated as a prefix on the value.
+            header_name, _, value_prefix = self.auth_type.partition(":")
+            header_name = header_name.strip()
+            value_prefix = value_prefix.strip()
+
+            auth_value = self.auth_key or ""
+            if value_prefix and not auth_value.lower().startswith(value_prefix.lower()):
+                auth_value = f"{value_prefix} {auth_value}".strip()
+
+            if header_name:
+                self._headers[header_name] = auth_value
 
         self.log = log
 
@@ -136,20 +153,32 @@ class LLMServerClient:
         """
         Derive the tasks a model can be used for from its metadata.
 
-        The default is `["generate"]`: every server 4CAT talks to serves chat
-        completions, while embedding endpoints are the exception.
+        Most servers do not report this. An OpenAI-compatible `/v1/models` lists
+        an id and nothing else, so there is no capability field to read. The
+        fallback is therefore the model's own name: an id containing "embed"
+        (Qwen3-VL-Embedding, mxbai-embed-large, nomic-embed-text) reads as an
+        embedder, anything else as generative.
+
+        # todo: check if there's a more rigid way of separating later.
 
         :param dict meta:  Model metadata, or `None` if unavailable.
         :returns list[str]:  Supported tasks - `"generate"`, `"embed"`, or both.
         """
-        return ["generate"]
+        try:
+            model_id = str(self.get_model_id(meta) or "")
+        except (KeyError, TypeError):
+            # nothing to go on; assume generative, which is how every server
+            # behaved before embedding support existed
+            return ["generate"]
+
+        return ["embed"] if "embed" in model_id.lower() else ["generate"]
 
     def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300) -> list[list[float]]:
         """
         Embed one or more inputs, returning one vector per input.
 
         Deliberately *not* routed through `LLMAdapter`/LangChain. LangChain's
-        embedding interface is text-only (`embed_documents(list[str])`), so it
+        embedding interface is text-only, so it
         cannot handle multimodal embeddings.
 
         A client that cannot embed media **must raise** when `media` is given
@@ -161,12 +190,21 @@ class LLMServerClient:
         :param str model_id:  Model ID *within this server's context* (i.e. a
           `local_id`, not a global model ID).
         :param list inputs:  Inputs to embed.
-        :param list media:  Media to embed alongside `inputs`, for servers that
-          support multimodal embedding. The payload shape is server-specific.
+        :param list media:  Optional media to embed, one entry per input and
+          paired by index, for servers that support multimodal embedding. Each
+          entry is a descriptor dict::
+
+              {"type": "video"|"image", "mime": "video/mp4", "data": "<base64>"}
+
+          or, in place of `data`, a `"url"` the server can fetch itself. Each
+          client translates this to whatever its own API expects.
         :param int timeout:  Request timeout in seconds.
         :returns list[list[float]]:  One vector per input, in input order.
         """
-        raise NotImplementedError(f"{self.__class__.__name__} does not support embedding")
+        raise LLMServerException(
+            f"Embedding is not supported for {self.server_config.get('type', 'this')} connections, so the model "
+            f"'{model_id}' cannot be used to generate embeddings. Use a model on an Ollama or OpenAI-compatible "
+            f"connection instead.")
 
     def get_model_card_url(self, meta: dict) -> str:
         """
@@ -233,3 +271,44 @@ class LLMServerClient:
         domain = re.sub(r"^https?://", "", self.server_config["url"])
         domain = domain.rstrip("/")
         return f"{self.server_config['type']}://{domain}/{self.get_model_id(meta)}"
+
+
+def supports_task(model: dict, task: str = "generate") -> bool:
+    """
+    Check whether a model entry can be used for a given task.
+
+    :param dict model:  A single `llm.available_models` entry.
+    :param str task:  Task to check for - `"generate"` or `"embed"`.
+    :return bool:  Whether the model supports the task.
+    """
+    return task in model.get("supported_tasks", ["generate"])
+
+
+def get_model_library(config, task: str = "generate") -> dict:
+    """
+    Get the LLM models available for a given task, grouped by server.
+
+    :param config:  4CAT config reader (context-aware, so per-user `llm.access`
+      is respected)
+    :param str task:  Task the model must support - `"generate"` or `"embed"`.
+    :return dict:  `{server name: {model ID: model display name}}`, shaped for
+      a `UserInput.OPTION_CHOICE` option.
+    """
+    available_models = config.get("llm.available_models", {})
+    enabled_model_ids = config.get("llm.enabled_models", [])
+    servers = config.get("llm.servers", {})
+    if not config.get("llm.access"):
+        enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
+
+    models_option = {}
+    for key, value in {k: v for k, v in available_models.items() if k in enabled_model_ids}.items():
+        if not supports_task(value, task):
+            continue
+
+        server = servers[value["server"]]
+        if server["name"] not in models_option:
+            models_option[server["name"]] = {}
+
+        models_option[server["name"]][key] = value["name"]
+
+    return models_option
