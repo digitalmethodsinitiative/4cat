@@ -113,7 +113,7 @@ class AttributeRanker(BasicProcessor):
             },
             "negate-filter": {
                 "type": UserInput.OPTION_TOGGLE,
-                "default": "",
+                "default": False,
                 "help": "Negate filter",
                 "tooltip": "Only match items that do *not* match the filter configured above"
             },
