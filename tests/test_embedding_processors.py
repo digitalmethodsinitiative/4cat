@@ -5,10 +5,13 @@ Tests for the media-embedding processors:
   stay abstract so it is never registered as a processor in its own right.
 - `embed_videos.py` / `embed_images.py` — that both keep the same option shape
   and wording, and that media-specific behaviour stays media-specific.
+- `reduce_embeddings.py` and `embedding_map.py` — reduction to N dimensions,
+  and the map drawn from a two-dimensional reduction.
 
 These import the processor classes directly and never touch a server.
 """
 import inspect
+from pathlib import Path
 
 import pytest
 
@@ -141,53 +144,148 @@ def test_map_item_matches_the_text_embedding_shape(processor):
 # --------------------------------------------------------------------------- #
 # the map has to survive the round trip to the preview pane
 
+class Item(dict):
+    """Stands in for a DatasetItem, whose `original` is the unmapped record."""
+
+    @property
+    def original(self):
+        return self
+
+
+class Collector:
+    """Stands in for the dataset a processor writes to."""
+
+    def __init__(self, path, parameters=None):
+        self.path, self.error, self.rows, self.key = path, None, 0, "testkey"
+        self.parameters = parameters or {}
+
+    def get_results_path(self):
+        return self.path
+
+    def update_status(self, message, is_final=False):
+        pass
+
+    def update_progress(self, progress):
+        pass
+
+    def log(self, message):
+        pass
+
+    def finish(self, rows):
+        self.rows = rows
+
+    def finish_with_error(self, error):
+        self.error = error
+
+
+class Source:
+    """Stands in for the dataset a processor reads from."""
+
+    def __init__(self, items, parameters=None, parent=None):
+        self.items, self.parameters, self._parent = items, parameters or {}, parent
+
+    @property
+    def num_rows(self):
+        return len(self.items)
+
+    def get_parent(self):
+        return self._parent
+
+    def iterate_items(self, processor=None, **kwargs):
+        return iter(self.items)
+
+
+def make_embeddings(texts, dimensions=8):
+    return [Item({"id": i, "text": text, "embedding": [float((i * 7 + j) % 11) for j in range(dimensions)]})
+            for i, text in enumerate(texts)]
+
+
+def run_reducer(tmp_path, items, **parameters):
+    """Reduce the given embedding items and return the processor."""
+    from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
+
+    processor = ReduceEmbeddings.__new__(ReduceEmbeddings)
+    processor.parameters = {"algorithm": "pca", "dimensions": 2, "amount": 0, **parameters}
+    processor.dataset = Collector(tmp_path / "reduced.ndjson", processor.parameters)
+    processor.source_dataset, processor.interrupted = Source(items), False
+    processor.process()
+    return processor
+
+
+def read_reduced(processor):
+    import json
+    with processor.dataset.path.open(encoding="utf-8") as infile:
+        return [Item(json.loads(line)) for line in infile]
+
+
 def build_map(tmp_path, texts, algorithm="pca"):
-    """Render a map for the given hover texts and return the HTML."""
+    """Reduce embeddings for the given hover texts, map them and return the HTML."""
     from processors.visualisation.embedding_map import EmbeddingMap
 
-    class Dataset:
-        def __init__(self):
-            self.path, self.error, self.rows, self.key = tmp_path / "map.html", None, 0, "testkey"
-
-        def get_results_path(self):
-            return self.path
-
-        def update_status(self, message, is_final=False):
-            pass
-
-        def update_progress(self, progress):
-            pass
-
-        def log(self, message):
-            pass
-
-        def finish(self, rows):
-            self.rows = rows
-
-        def finish_with_error(self, error):
-            self.error = error
-
-    class Source:
-        def __init__(self, items):
-            self.items = items
-
-        @property
-        def num_rows(self):
-            return len(self.items)
-
-        def iterate_items(self, processor=None, **kwargs):
-            return iter(self.items)
-
-    items = [{"id": i, "text": text, "embedding": [float((i * 7 + j) % 11) for j in range(8)]}
-             for i, text in enumerate(texts)]
+    reducer = run_reducer(tmp_path, make_embeddings(texts), algorithm=algorithm)
+    assert reducer.dataset.error is None, reducer.dataset.error
 
     processor = EmbeddingMap.__new__(EmbeddingMap)
-    processor.dataset, processor.source_dataset, processor.interrupted = Dataset(), Source(items), False
-    processor.parameters = {"algorithm": algorithm, "amount": 0, "max_text_length": 100}
+    processor.dataset = Collector(tmp_path / "map.html")
+    processor.source_dataset = Source(read_reduced(reducer), parameters=reducer.parameters)
+    processor.interrupted = False
+    processor.parameters = {"max_text_length": 100}
     processor.process()
 
     assert processor.dataset.error is None, processor.dataset.error
     return processor.dataset.path
+
+
+@pytest.mark.parametrize("algorithm,dimensions", [("pca", 1), ("pca", 3), ("umap", 3), ("tsne", 3)])
+def test_reducer_writes_the_requested_number_of_dimensions(tmp_path, algorithm, dimensions):
+    texts = [f"item {i}" for i in range(12)]
+    reducer = run_reducer(tmp_path, make_embeddings(texts, dimensions=8), algorithm=algorithm, dimensions=dimensions,
+                          n_neighbors=5, perplexity=3)
+    assert reducer.dataset.error is None, reducer.dataset.error
+
+    records = read_reduced(reducer)
+    assert reducer.dataset.rows == len(records) == 12
+    assert all(len(record["coordinates"]) == dimensions for record in records)
+    # the embedding itself stays behind; only what labels and traces an item
+    assert [record["text"] for record in records] == texts
+    assert "embedding" not in records[0]
+
+
+def test_reducer_keeps_media_fields_for_thumbnails_and_tracing(tmp_path):
+    items = make_embeddings([f"f{i}.jpg" for i in range(5)])
+    for item in items:
+        item.update({"filename": item["text"], "post_ids": [f"post-{item['id']}"]})
+
+    record = read_reduced(run_reducer(tmp_path, items))[0]
+    assert record["filename"] == "f0.jpg" and record["post_ids"] == ["post-0"]
+
+
+def test_reducer_maps_one_column_per_dimension():
+    from common.lib.item_mapping import MissingMappedField
+    from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
+
+    row = ReduceEmbeddings.map_item({"id": "a", "text": "t", "coordinates": [0.5, -1.0, 2.0],
+                                     "algorithm": "umap"}).get_item_data()
+    assert (row["dimension_1"], row["dimension_2"], row["dimension_3"]) == (0.5, -1.0, 2.0)
+    assert "dimension_4" not in row
+    # text embeddings have no files: missing, not an empty filename
+    assert isinstance(ReduceEmbeddings.map_item({"id": "a", "coordinates": []}).data["filename"], MissingMappedField)
+
+
+@pytest.mark.parametrize("dimensions,count,fragment", [(8, 12, "cannot be"), (5, 6, "needs at least")])
+def test_reducer_refuses_impossible_dimensions(tmp_path, dimensions, count, fragment):
+    reducer = run_reducer(tmp_path, make_embeddings([str(i) for i in range(count)], dimensions=8),
+                          dimensions=dimensions)
+    assert fragment in reducer.dataset.error
+
+
+def test_reducer_refuses_tsne_beyond_three_dimensions():
+    from common.lib.exceptions import QueryParametersException
+    from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
+
+    with pytest.raises(QueryParametersException):
+        ReduceEmbeddings.validate_query({"algorithm": "tsne", "dimensions": 4}, None, None)
+    assert ReduceEmbeddings.validate_query({"algorithm": "umap", "dimensions": 4}, None, None)
 
 
 NON_ASCII = ["Álvaro posted this \U0001F44D", "café au lait", "你好世界",
@@ -375,11 +473,28 @@ def test_read_sprite_rejects_anything_that_is_not_one(tmp_path):
 # --------------------------------------------------------------------------- #
 # the map finds sprite sheets made from the same media, and offers them
 
-def test_map_accepts_every_embedding_type():
+def test_reducer_accepts_every_embedding_type():
     """Image embeddings were missing, which is where thumbnails matter most."""
-    from processors.visualisation.embedding_map import EmbeddingMap
+    from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
 
-    assert EmbeddingMap.compatibility.types == {"text-embeddings", "video-embeddings", "image-embeddings"}
+    assert ReduceEmbeddings.compatibility.types == {"text-embeddings", "video-embeddings", "image-embeddings"}
+
+
+def test_map_only_runs_on_two_dimensional_reductions(monkeypatch):
+    from processors.visualisation import embedding_map as module
+    from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
+
+    # FakeDataset stands in for a DataSet here, so the check treats it as one
+    monkeypatch.setattr(module, "DataSet", FakeDataset)
+    for dimensions, expected in ((2, True), (3, False), (1, False)):
+        reduced = FakeDataset(Path("."), dataset_type="reduce-embeddings", parameters={"dimensions": dimensions})
+        assert module.EmbeddingMap.is_compatible_with(reduced) is expected
+
+    embeddings = FakeDataset(Path("."), dataset_type="text-embeddings")
+    assert module.EmbeddingMap.is_compatible_with(embeddings) is False
+
+    # as a suggested follow-up, before any dataset exists
+    assert module.EmbeddingMap.is_compatible_with(ReduceEmbeddings) is True
 
 
 def test_map_finds_sprites_beside_the_embeddings(tmp_path):
@@ -395,8 +510,9 @@ def test_map_finds_sprites_beside_the_embeddings(tmp_path):
     archive = FakeDataset(tmp_path, name="archive", dataset_type="video-downloader",
                           children=[sprite, unfinished, unrelated])
     embeddings = FakeDataset(tmp_path, name="emb", dataset_type="video-embeddings", parent=archive)
+    reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=embeddings)
 
-    found = EmbeddingMap.find_sprite_datasets(embeddings)
+    found = EmbeddingMap.find_sprite_datasets(reduced)
     assert list(found) == ["sprite1"], "only finished sprite sheets should be offered"
     assert "48px" in found["sprite1"] and "120" in found["sprite1"]
 
@@ -408,8 +524,9 @@ def test_map_offers_no_sprites_for_non_media(tmp_path, dataset_type):
     sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 48}, rows=5)
     archive = FakeDataset(tmp_path, name="archive", children=[sprite])
     parent = FakeDataset(tmp_path, name="p", dataset_type=dataset_type, parent=archive)
+    reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=parent)
 
-    assert EmbeddingMap.find_sprite_datasets(parent) == {}
+    assert EmbeddingMap.find_sprite_datasets(reduced) == {}
     assert EmbeddingMap.find_sprite_datasets(None) == {}
 
 
@@ -419,8 +536,9 @@ def test_map_option_is_a_picker_when_sprites_exist(tmp_path):
     sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 48}, rows=9)
     archive = FakeDataset(tmp_path, name="archive", children=[sprite])
     embeddings = FakeDataset(tmp_path, name="emb", dataset_type="image-embeddings", parent=archive)
+    reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=embeddings)
 
-    options = EmbeddingMap.get_options(parent_dataset=embeddings, config=None)
+    options = EmbeddingMap.get_options(parent_dataset=reduced, config=None)
     assert options["thumbnails"]["type"] == "choice"
     # "no thumbnails" has to stay available, and be the default
     assert options["thumbnails"]["default"] == ""
@@ -433,8 +551,9 @@ def test_map_explains_how_to_get_thumbnails_when_there_are_none(tmp_path):
 
     archive = FakeDataset(tmp_path, name="archive", children=[])
     embeddings = FakeDataset(tmp_path, name="emb", dataset_type="video-embeddings", parent=archive)
+    reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=embeddings)
 
-    options = EmbeddingMap.get_options(parent_dataset=embeddings, config=None)
+    options = EmbeddingMap.get_options(parent_dataset=reduced, config=None)
     assert "thumbnails" not in options
     assert "Extract thumbnails" in options["thumbnails_info"]["help"]
 
@@ -561,7 +680,7 @@ def test_link_base_points_at_the_archive_download_route(tmp_path):
             return {"flask.server_name": self.server, "flask.https": self.https}.get(key, default)
 
     processor = EmbeddingMap.__new__(EmbeddingMap)
-    processor.source_dataset = embeddings
+    processor.source_dataset = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=embeddings)
 
     # root-relative when the instance does not know its own hostname
     processor.config = Config()
@@ -576,7 +695,8 @@ def test_no_link_base_without_an_archive(tmp_path):
     from processors.visualisation.embedding_map import EmbeddingMap
 
     processor = EmbeddingMap.__new__(EmbeddingMap)
-    processor.source_dataset = FakeDataset(tmp_path, name="emb", dataset_type="text-embeddings")
+    embeddings = FakeDataset(tmp_path, name="emb", dataset_type="text-embeddings")
+    processor.source_dataset = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=embeddings)
     assert processor.media_link_base() is None
 
 
@@ -591,3 +711,184 @@ def test_only_items_with_a_tile_get_a_link(tmp_path, monkeypatch):
     result = processor.load_sprite(["a.jpg", "not-in-the-sheet.jpg"])
 
     assert result["files"] == ["a.jpg", ""]
+
+
+# --------------------------------------------------------------------------- #
+# the 3D plot: a 3D reduction as is, or a 2D one lifted by a column
+
+class TopSource(Source):
+    """A reduced dataset whose original dataset can be read for a column."""
+
+    def __init__(self, items, parameters=None, top=None):
+        super().__init__(items, parameters=parameters)
+        self.top = top
+
+    def top_parent(self):
+        return self.top
+
+
+def plot_3d(tmp_path, records, dimensions, top_items=(), **parameters):
+    """Run the 3D plot over reduced records; return the processor."""
+    from processors.visualisation.embedding_map_3d import EmbeddingMap3D
+
+    processor = EmbeddingMap3D.__new__(EmbeddingMap3D)
+    processor.dataset = FakeDataset(tmp_path, name="plot3d")
+    processor.dataset.path = tmp_path / "plot3d.html"
+    processor.source_dataset = TopSource([Item(record) for record in records],
+                                         parameters={"dimensions": dimensions, "algorithm": "umap"},
+                                         top=Source([Item(item) for item in top_items]))
+    processor.interrupted = False
+    processor.parameters = {"max_text_length": 100, "axis_column": "timestamp", "axis_spacing": "rank",
+                            **parameters}
+    processor.process()
+    return processor
+
+
+def read_payload(path):
+    import json
+    import re
+    html = path.read_text(encoding="utf-8")
+    return json.loads(re.search(r"var data = (.*?);\n", html).group(1))
+
+
+def test_3d_plot_runs_on_two_and_three_dimensional_reductions(monkeypatch):
+    from processors.visualisation import embedding_map_3d as module
+    from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
+
+    monkeypatch.setattr(module, "DataSet", FakeDataset)
+    for dimensions, expected in ((2, True), (3, True), (4, False), (1, False)):
+        reduced = FakeDataset(Path("."), dataset_type="reduce-embeddings", parameters={"dimensions": dimensions})
+        assert module.EmbeddingMap3D.is_compatible_with(reduced) is expected
+    assert module.EmbeddingMap3D.is_compatible_with(ReduceEmbeddings) is True
+
+
+def test_3d_plot_only_asks_for_a_column_when_it_needs_one(tmp_path):
+    from processors.visualisation.embedding_map_3d import EmbeddingMap3D
+
+    class Top(FakeDataset):
+        def get_columns(self):
+            return ["id", "body", "timestamp"]
+
+    top = Top(tmp_path, name="top")
+    flat = FakeDataset(tmp_path, name="flat", dataset_type="reduce-embeddings", parameters={"dimensions": 2})
+    flat.top_parent = lambda: top
+    options = EmbeddingMap3D.get_options(parent_dataset=flat, config=None)
+    assert options["axis_column"]["type"] == "choice"
+    assert options["axis_column"]["default"] == "timestamp"
+    assert options["axis_spacing"]["default"] == "rank"
+
+    cube = FakeDataset(tmp_path, name="cube", dataset_type="reduce-embeddings", parameters={"dimensions": 3})
+    assert "axis_column" not in EmbeddingMap3D.get_options(parent_dataset=cube, config=None)
+
+
+def test_3d_reduction_keeps_its_proportions(tmp_path):
+    """Stretching each axis to fill the cube would distort the reduction."""
+    records = [{"id": str(i), "text": f"t{i}", "coordinates": [i * 10.0, i * 1.0, 0.0]} for i in range(5)]
+    processor = plot_3d(tmp_path, records, dimensions=3)
+    assert processor.dataset.error is None, processor.dataset.error
+
+    points = read_payload(processor.dataset.path)["points"]
+    xs, ys = [p[0] for p in points], [p[1] for p in points]
+    assert max(xs) - min(xs) == pytest.approx(1.0)
+    assert max(ys) - min(ys) == pytest.approx(0.1)
+
+
+def test_2d_reduction_gets_its_height_from_the_original_dataset(tmp_path):
+    records = [{"id": str(i), "text": f"t{i}", "coordinates": [float(i), float(i % 2)]} for i in range(4)]
+    top = [{"id": str(i), "timestamp": f"2024-0{i + 1}-01 00:00:00"} for i in range(4)]
+
+    processor = plot_3d(tmp_path, records, dimensions=2, top_items=top)
+    assert processor.dataset.error is None, processor.dataset.error
+
+    payload = read_payload(processor.dataset.path)
+    assert [point[2] for point in payload["points"]] == pytest.approx([0, 1 / 3, 2 / 3, 1], abs=1e-4)
+    assert payload["axis"]["title"] == "timestamp"
+    assert "timestamp: 2024-01-01 00:00:00" in payload["labels"][0]
+
+
+def test_media_posted_more_than_once_appears_once_per_post(tmp_path):
+    records = [{"id": "img", "text": "img.jpg", "filename": "img.jpg", "post_ids": ["a", "b", "c"],
+                "coordinates": [0.0, 0.0]},
+               {"id": "other", "text": "other.jpg", "filename": "other.jpg", "post_ids": ["d"],
+                "coordinates": [1.0, 1.0]}]
+    top = [{"id": post_id, "timestamp": f"2024-01-0{day}"} for day, post_id in enumerate("abcd", start=1)]
+
+    payload = read_payload(plot_3d(tmp_path, records, dimensions=2, top_items=top).dataset.path)
+    # the same spot on the map, at three heights
+    assert [point[:2] for point in payload["points"]][:3] == [[0.0, 0.0]] * 3
+    assert len({point[2] for point in payload["points"][:3]}) == 3
+
+
+def test_items_without_a_value_are_left_out_with_a_warning(tmp_path):
+    records = [{"id": str(i), "text": f"t{i}", "coordinates": [float(i), float(i)]} for i in range(5)]
+    top = [{"id": str(i), "timestamp": "" if i == 4 else f"2024-01-0{i + 1}"} for i in range(5)]
+
+    processor = plot_3d(tmp_path, records, dimensions=2, top_items=top)
+    assert processor.dataset.num_rows == 4
+    assert any("no value" in message for message in processor.dataset.logs)
+
+
+def test_a_column_nobody_has_is_an_error(tmp_path):
+    records = [{"id": str(i), "text": "t", "coordinates": [float(i), 0.0]} for i in range(3)]
+    processor = plot_3d(tmp_path, records, dimensions=2, top_items=[{"id": "0"}], axis_column="author")
+    assert "author" in processor.dataset.error
+
+
+@pytest.mark.parametrize("spacing", ["rank", "value"])
+def test_a_text_column_can_be_the_height(tmp_path, spacing):
+    """Author names and the like: subtracting them to place ticks used to crash."""
+    records = [{"id": str(i), "text": f"t{i}", "coordinates": [float(i), float(i % 2)]} for i in range(4)]
+    top = [{"id": str(i), "author": name} for i, name in enumerate(["bob", "Alice", "carol", "bob"])]
+
+    processor = plot_3d(tmp_path, records, dimensions=2, top_items=top, axis_column="author", axis_spacing=spacing)
+    assert processor.dataset.num_rows == 4
+
+    payload = read_payload(processor.dataset.path)
+    assert [point[2] for point in payload["points"]] == [0.5, 0.0, 1.0, 0.5]
+    assert [tick[1] for tick in payload["axis"]["ticks"]] == ["Alice", "bob", "carol"]
+
+
+def test_rank_spacing_gives_equal_values_one_height():
+    from processors.visualisation.embedding_map_3d import EmbeddingMap3D
+
+    axis = EmbeddingMap3D.build_axis(["2024-01-01", "2024-01-01", "2024-06-01", "2025-01-01"], "rank")
+    assert axis["kind"] == "date"
+    assert axis["positions"] == [0.0, 0.0, 0.5, 1.0]
+
+
+def test_value_spacing_follows_the_values():
+    from processors.visualisation.embedding_map_3d import EmbeddingMap3D
+
+    axis = EmbeddingMap3D.build_axis([0, 1, 10], "value")
+    assert axis["kind"] == "number"
+    assert axis["positions"] == pytest.approx([0, 0.1, 1])
+    assert [tick[0] for tick in axis["ticks"]] == pytest.approx([0, 0.2, 0.4, 0.6, 0.8, 1])
+
+
+def test_text_columns_fall_back_to_rank():
+    from processors.visualisation.embedding_map_3d import EmbeddingMap3D
+
+    axis = EmbeddingMap3D.build_axis(["banana", "Apple", "cherry"], "value")
+    assert axis["kind"] == "text" and axis["fallback"]
+    # case does not decide the order
+    assert axis["positions"] == [0.5, 0.0, 1.0]
+
+
+@pytest.mark.parametrize("column,values,kind", [
+    ("timestamp", [1700000000, 1710000000], "date"),
+    ("unix_timestamp", ["1700000000", "1710000000"], "date"),
+    ("likes", [1700000000, 1710000000], "number"),
+    # small numbers are counts, whatever the column is called
+    ("time_watched", [12, 300], "number"),
+    ("weekday", ["may", "june"], "text"),
+])
+def test_value_kinds_are_recognised(column, values, kind):
+    from processors.visualisation.embedding_map_3d import EmbeddingMap3D
+    assert EmbeddingMap3D.parse_values(values, column)[0] == kind
+
+
+def test_3d_plot_escapes_item_text(tmp_path):
+    records = [{"id": str(i), "text": "</script><img src=x onerror=alert(1)>", "coordinates": [float(i), 0.0, 1.0]}
+               for i in range(3)]
+    html = plot_3d(tmp_path, records, dimensions=3).dataset.path.read_text(encoding="utf-8")
+    assert "</script><img" not in html

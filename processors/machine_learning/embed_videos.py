@@ -38,7 +38,7 @@ class EmbedVideos(EmbedMedia):
         media_types={"video"},
         type_prefixes={"video-downloader"},
         required_settings={("video-downloader.ffmpeg_path", is_executable)},
-        preferred_followups=["embedding-map", "embedding-similarity"],
+        preferred_followups=["reduce-embeddings", "embedding-similarity"],
     )
 
     references = [
