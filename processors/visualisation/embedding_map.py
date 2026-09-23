@@ -1,12 +1,11 @@
 """
-Project embeddings to two dimensions and render them as an interactive map.
+Plot two-dimensional reduced embeddings as an interactive map.
 """
 import json
 
 import numpy as np
 
 from backend.lib.processor import BasicProcessor
-from common.lib.compatibility import Compatibility
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -23,25 +22,44 @@ MEDIA_EMBEDDINGS = ("image-embeddings", "video-embeddings")
 
 class EmbeddingMap(BasicProcessor):
     """
-    Reduce item embeddings to two dimensions and write a self-contained,
-    interactive HTML scatter plot.
+    Write a self-contained, interactive HTML scatter plot of embeddings that
+    were reduced to two dimensions by the 'Reduce dimensions of embeddings'
+    processor.
     """
     type = "embedding-map"  # job type ID
     category = "Visual"  # category
     title = "Plot embeddings"  # title displayed in UI
-    description = ("Reduce the embeddings of each embedding to two dimensions and plot them as an interactive map, so "
-                   "items with similar meanings sit near each other. Note that distances may be meaningless (see "
-                   "references).")
+    description = ("Plot embeddings that were reduced to two dimensions as an interactive map, so items with similar "
+                   "meanings sit near each other. Note that distances may be meaningless (see references).")
     extension = "html"  # extension of result file, used internally and in UI
 
-    compatibility = Compatibility(types={"text-embeddings", "video-embeddings", "image-embeddings"})
-
     references = [
-        "[McInnes, Leland, John Healy, and James Melville. 2018. 'UMAP: Uniform Manifold Approximation and Projection "
-        "for Dimension Reduction.' arXiv:1802.03426.](https://arxiv.org/abs/1802.03426)",
         "[Understanding UMAP](https://pair-code.github.io/understanding-umap/)",
         "[How to Use t-SNE Effectively](https://distill.pub/2016/misread-tsne/)",
     ]
+
+    @classmethod
+    def is_compatible_with(cls, module=None, config=None):
+        """
+        Allow processor on reduced embeddings with exactly two dimensions
+
+        A map has two axes, so anything else would either drop dimensions or
+        need a projection of its own; neither belongs here.
+
+        :param module: Dataset or processor to determine compatibility with
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        """
+        if getattr(module, "type", None) != "reduce-embeddings":
+            return False
+
+        # a processor class has no parameters yet, and can produce 2D output
+        if not isinstance(module, DataSet):
+            return True
+
+        try:
+            return int(module.parameters.get("dimensions", 2)) == 2
+        except (TypeError, ValueError):
+            return False
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -54,59 +72,6 @@ class EmbeddingMap(BasicProcessor):
         :return dict:   Options for this processor
         """
         options = {
-            "algorithm": {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "Reduction algorithm",
-                "options": {
-                    "umap": "UMAP (recommended)",
-                    "tsne": "t-SNE",
-                    "pca": "PCA",
-                },
-                "default": "umap",
-                "tooltip": "UMAP keeps both local and global structure and is usually the most readable. t-SNE "
-                           "separates local clusters sharply but its global layout means little. PCA is fast and "
-                           "fully deterministic, but flattens subtle structure.",
-            },
-            "n_neighbors": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "UMAP: neighbours",
-                "default": 15,
-                "min": 2,
-                "max": 200,
-                "coerce_type": int,
-                "tooltip": "How much of the dataset each point is compared against. Low values emphasise small local "
-                           "clusters, high values emphasise overall shape.",
-                "requires": "algorithm==umap",
-            },
-            "min_dist": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "UMAP: minimum distance",
-                "default": 0.1,
-                "min": 0.0,
-                "max": 0.99,
-                "coerce_type": float,
-                "tooltip": "How tightly points may be packed together. Lower values give denser clumps.",
-                "requires": "algorithm==umap",
-            },
-            "perplexity": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "t-SNE: perplexity",
-                "default": 30,
-                "min": 2,
-                "max": 100,
-                "coerce_type": int,
-                "tooltip": "Roughly how many neighbours each point is balanced against. Lowered automatically if the "
-                           "dataset is too small.",
-                "requires": "algorithm==tsne",
-            },
-            "amount": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "No. of items",
-                "default": 2000,
-                "min": 0,
-                "coerce_type": int,
-                "tooltip": "Use '0' for all items. Reduction slows down sharply on very large datasets.",
-            },
             "max_text_length": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Hover text length",
@@ -122,6 +87,7 @@ class EmbeddingMap(BasicProcessor):
         # allow showing media on the map for media datasets, reusing a sprite
         # sheet extracted earlier rather than decoding the media again here
         sprites = cls.find_sprite_datasets(parent_dataset)
+        embeddings = cls.get_embeddings_dataset(parent_dataset)
         if sprites:
             options["thumbnails"] = {
                 "type": UserInput.OPTION_CHOICE,
@@ -131,14 +97,31 @@ class EmbeddingMap(BasicProcessor):
                 "tooltip": "Draw each item as its thumbnail instead of a dot, using a sprite sheet made earlier by "
                            "the 'Extract thumbnails' processor.",
             }
-        elif parent_dataset and parent_dataset.type in MEDIA_EMBEDDINGS:
+        elif embeddings and embeddings.type in MEDIA_EMBEDDINGS:
             options["thumbnails_info"] = {
                 "type": UserInput.OPTION_INFO,
-                "help": "Run **Extract thumbnails** on the media this dataset came from to draw items as thumbnails "
-                        "here instead of dots. It only has to be run once: every map made afterwards can reuse it.",
+                "help": "Run **Extract thumbnails** on the media these embeddings came from to draw items as "
+                        "thumbnails here instead of dots. It only has to be run once: every map made afterwards can "
+                        "reuse it.",
             }
 
         return options
+
+    @staticmethod
+    def get_embeddings_dataset(reduced_dataset):
+        """
+        Get the embeddings dataset the reduced embeddings were made from.
+
+        :param reduced_dataset:  The reduced embeddings the map would run on
+        :return DataSet|None:  The embeddings, or `None` if there is no parent
+        """
+        if not reduced_dataset:
+            return None
+
+        try:
+            return reduced_dataset.get_parent()
+        except DataSetException:
+            return None
 
     def media_link_base(self) -> str | None:
         """
@@ -155,7 +138,10 @@ class EmbeddingMap(BasicProcessor):
         :return str|None:  Prefix to append a filename to, or `None` when there
           is no archive to link into.
         """
-        archive = self.source_dataset.get_parent()
+        # the archive is the parent of the embeddings, which are the parent of
+        # the reduced embeddings this map is made from
+        embeddings = self.get_embeddings_dataset(self.source_dataset)
+        archive = embeddings.get_parent() if embeddings else None
         if not archive:
             return None
 
@@ -177,13 +163,14 @@ class EmbeddingMap(BasicProcessor):
         both were derived from. One extraction then serves every map, including
         maps of embeddings made later with a different model.
 
-        :param parent_dataset:  The embeddings dataset the map would run on
+        :param parent_dataset:  The reduced embeddings the map would run on
         :return dict:  `{dataset key: label}`, empty when there are none.
         """
-        if not parent_dataset or parent_dataset.type not in MEDIA_EMBEDDINGS:
+        embeddings = cls.get_embeddings_dataset(parent_dataset)
+        if not embeddings or embeddings.type not in MEDIA_EMBEDDINGS:
             return {}
 
-        archive = parent_dataset.get_parent()
+        archive = embeddings.get_parent()
         if not archive:
             return {}
 
@@ -197,103 +184,44 @@ class EmbeddingMap(BasicProcessor):
 
         return sprites
 
-    def reduce(self, vectors, point_count):
-        """
-        Reduce vectors to two dimensions.
-
-        Imports are deliberately local: `ModuleCollector` imports every
-        processor at startup, and importing UMAP pulls in numba, whose JIT setup
-        makes that noticeably slower for a module most installs never run.
-
-        :param vectors:  2D numpy array of embeddings, one row per item
-        :param int point_count:  Number of items
-        :return:  2D numpy array of `(x, y)` coordinates
-        """
-        algorithm = self.parameters.get("algorithm", "umap")
-
-        if algorithm == "pca":
-            from sklearn.decomposition import PCA
-            return PCA(n_components=2, random_state=42).fit_transform(vectors)
-
-        if algorithm == "tsne":
-            from sklearn.manifold import TSNE
-            # perplexity must stay below the item count or sklearn refuses to run
-            perplexity = min(self.parameters.get("perplexity", 30), max(2.0, (point_count - 1) / 3))
-            self.dataset.log(f"Running t-SNE with perplexity {perplexity}")
-            return TSNE(n_components=2, perplexity=perplexity, metric="cosine", init="pca",
-                        random_state=42).fit_transform(vectors)
-
-        import umap
-        # n_neighbors cannot exceed the number of other points available
-        n_neighbors = min(self.parameters.get("n_neighbors", 15), point_count - 1)
-        min_dist = self.parameters.get("min_dist", 0.1)
-        self.dataset.log(f"Running UMAP with n_neighbors={n_neighbors}, min_dist={min_dist}")
-
-        # cosine is the metric embeddings are meant to be compared under, and a
-        # fixed random_state keeps the map reproducible - 4CAT results should be
-        # retraceable, which a different layout on every run would undermine
-        return umap.UMAP(n_components=2, n_neighbors=n_neighbors, min_dist=min_dist, metric="cosine",
-                         random_state=42).fit_transform(vectors)
-
     def process(self):
         """
-        Reduce the embeddings and write the interactive map.
+        Read the reduced embeddings and write the interactive map.
         """
-        limit = self.parameters.get("amount", 2000)
-        max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
         max_text_length = self.parameters.get("max_text_length", 250)
 
-        vectors = []
+        coordinates = []
         labels = []
         filenames = []
-        dimensions = None
 
-        self.dataset.update_status("Reading embeddings")
+        self.dataset.update_status("Reading reduced embeddings")
         for item in self.source_dataset.iterate_items(self):
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while reading embeddings")
+                raise ProcessorInterruptedException("Interrupted while reading reduced embeddings")
 
-            if len(vectors) >= max_processed:
-                break
-
-            vector = item.get("embedding")
-            # map_item flattens the vector to a space-separated string; the raw
-            # NDJSON keeps it as a list. Accept either.
-            if isinstance(vector, str):
-                vector = [float(value) for value in vector.split() if value]
-
-            if not vector:
+            # the mapped item spreads the coordinates over one column per
+            # dimension; the original NDJSON record keeps them as a list
+            original = item.original
+            point = original.get("coordinates")
+            if not point or len(point) != 2:
                 continue
 
-            if dimensions is None:
-                dimensions = len(vector)
-            elif len(vector) != dimensions:
-                # a ragged matrix cannot be reduced; this means the dataset mixes
-                # models, which should not happen but is worth saying out loud
-                self.dataset.finish_with_error("The parent dataset contains embeddings of different sizes, so they "
-                                               "cannot be mapped together.")
-                return
-
-            vectors.append(vector)
-            text = str(item.get("text", "") or "")
+            coordinates.append(point)
+            text = str(original.get("text", "") or "")
             labels.append(text[:max_text_length] + ("…" if len(text) > max_text_length else ""))
-            filenames.append(str(item.get("filename", "") or ""))
+            filenames.append(str(original.get("filename", "") or ""))
 
-        point_count = len(vectors)
+        point_count = len(coordinates)
         if point_count < 3:
-            self.dataset.finish_with_error(f"Not enough embeddings to build a map (found {point_count}, need at "
-                                           f"least 3).")
+            self.dataset.finish_with_error(f"Not enough two-dimensional points to build a map (found {point_count}, "
+                                           f"need at least 3).")
             return
-
-        self.dataset.update_status(f"Reducing {point_count:,} embeddings of {dimensions} dimensions to 2D; this may "
-                                   f"take a while")
-        coordinates = self.reduce(np.asarray(vectors, dtype=np.float32), point_count)
 
         atlas = self.load_sprite(filenames) if any(filenames) else None
 
         self.dataset.update_status("Rendering map")
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-            outfile.write(self.get_html(coordinates, labels, atlas))
+            outfile.write(self.get_html(np.asarray(coordinates, dtype=np.float64), labels, atlas))
 
         self.dataset.update_status(f"Mapped {point_count:,} items", is_final=True)
         self.dataset.finish(point_count)
@@ -345,6 +273,31 @@ class EmbeddingMap(BasicProcessor):
             "base": self.media_link_base() or "",
         }
 
+    @staticmethod
+    def encode_payload(data: dict, atlas: dict | None = None) -> str:
+        """
+        Serialise the map's data for embedding in a `<script>` tag.
+
+        Item text is untrusted - it comes from whatever platform the dataset
+        was collected from - and this page is injected into 4CAT's own DOM
+        unescaped. Escaping the angle brackets and ampersand means no item can
+        close the script tag or inject markup, whatever it contains.
+
+        :param dict data:  Points, labels and anything else the page reads
+        :param dict atlas:  Sprite sheet from `load_sprite()`, or `None`
+        :return str:  JSON, safe to place inside a script tag
+        """
+        data = dict(data)
+        if atlas:
+            # base64 is alphanumeric plus + / =, so the escaping below leaves it
+            # untouched
+            data.update({"atlas": atlas["uri"], "tile": atlas["tile"],
+                         "cols": atlas["cols"], "tiles": atlas["tiles"],
+                         "files": atlas["files"], "base": atlas["base"]})
+
+        payload = json.dumps(data, ensure_ascii=False)
+        return payload.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
     def get_html(self, coordinates, labels, atlas: dict | None = None) -> str:
         """
         Build the self-contained HTML page.
@@ -371,23 +324,11 @@ class EmbeddingMap(BasicProcessor):
 
         points = [[round(float(x), 5), round(float(y), 5)] for x, y in normalised]
 
-        # Item text is untrusted - it comes from whatever platform the dataset
-        # was collected from - and this page is injected into 4CAT's own DOM
-        # unescaped. Escaping the angle brackets and ampersand means no item can
-        # close the script tag or inject markup, whatever it contains.
-        data = {"points": points, "labels": labels}
-        if atlas:
-            # base64 is alphanumeric plus + / =, so the escaping below leaves it
-            # untouched
-            data.update({"atlas": atlas["uri"], "tile": atlas["tile"],
-                         "cols": atlas["cols"], "tiles": atlas["tiles"],
-                         "files": atlas["files"], "base": atlas["base"]})
-
-        payload = json.dumps(data, ensure_ascii=False)
-        payload = payload.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+        payload = self.encode_payload({"points": points, "labels": labels}, atlas)
 
         container = f"embedding-map-{self.dataset.key}"
-        subtitle = f"{len(points):,} items &middot; {self.parameters.get('algorithm', 'umap').upper()}"
+        algorithm = self.source_dataset.parameters.get("algorithm", "umap")
+        subtitle = f"{len(points):,} items &middot; {algorithm.upper()}"
         if atlas:
             drawn = sum(1 for tile in atlas["tiles"] if tile > -1)
             subtitle += f" &middot; {drawn:,} thumbnails"

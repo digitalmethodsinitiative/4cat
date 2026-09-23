@@ -35,7 +35,7 @@ class EmbedImages(EmbedMedia):
     compatibility = Compatibility(
         media_types={"image"},
         type_prefixes={"image-downloader"},
-        preferred_followups=["embedding-map", "embedding-similarity"],
+        preferred_followups=["reduce-embeddings", "embedding-similarity"],
     )
 
     @classmethod
