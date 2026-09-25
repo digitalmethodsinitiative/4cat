@@ -128,7 +128,8 @@ class OllamaClient(LLMServerClient):
         # from every processor at once.
         return tasks if tasks else ["generate"]
 
-    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300) -> list[list[float]]:
+    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300,
+              text_as_instruction: bool = False) -> list[list[float]]:
         """
         Embed inputs via Ollama's `/api/embed` endpoint.
 
@@ -143,6 +144,8 @@ class OllamaClient(LLMServerClient):
         :param list inputs:  Strings to embed.
         :param list media:  Not supported; passing any raises.
         :param int timeout:  Request timeout in seconds.
+        :param bool text_as_instruction:  Ignored; only relevant with media,
+          which Ollama does not support.
         :returns list[list[float]]:  One vector per input, in input order.
         :raises LLMServerException:  If media is passed, if the server errors,
           or if it returns a number of vectors that does not match the number of

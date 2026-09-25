@@ -153,9 +153,10 @@ class EmbedMedia(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "[optional] Prompt",
                 "default": f"Represent the {cls.media_label}.",
-                "tooltip": f"A small instruction sent alongside each {cls.media_label}. Models like "
-                           f"Qwen3-VL-Embedding use this to steer what the embedding captures; tailoring it to your "
-                           f"research question can improve results.",
+                "tooltip": f"An instruction sent to the model as a system prompt with each {cls.media_label}. It is "
+                           f"not embedded itself: instruction-aware models like Qwen3-VL-Embedding use it to steer "
+                           f"what the embedding captures, so tailoring it to your research question can improve "
+                           f"results. Leave empty to use the model's own default.",
             },
         }
 
@@ -313,6 +314,7 @@ class EmbedMedia(BasicProcessor):
             return
 
         instruction = self.parameters.get("instruction", "").strip()
+
         limit = self.parameters.get("amount", 100)
         max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
 
@@ -320,7 +322,9 @@ class EmbedMedia(BasicProcessor):
         output_path = staging_area.joinpath(self.working_filename)
 
         save_annotations = self.parameters.get("save_annotations", False)
-        post_id_map = self.load_post_id_map() if save_annotations else {}
+        # always, not only for annotations: the posts behind each file are what
+        # later steps (clustering annotations, plotting by a post's date) need
+        post_id_map = self.load_post_id_map()
         annotations = []
 
         embedded = 0
@@ -378,7 +382,8 @@ class EmbedMedia(BasicProcessor):
                 vector = None
                 while retries < max_retries:
                     try:
-                        vector = client.embed(model["local_id"], [instruction], media=[payload])[0]
+                        vector = client.embed(model["local_id"], [instruction], media=[payload],
+                                              text_as_instruction=True)[0]
                         break  # success!
                     except LLMServerException as e:
                         retries += 1
