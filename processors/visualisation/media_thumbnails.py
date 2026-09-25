@@ -39,8 +39,8 @@ class MediaThumbnails(BasicProcessor):
     """
     type = "media-thumbnails"  # job type ID
     category = "Visual"  # category
-    title = "Extract thumbnails"  # title displayed in UI
-    description = ("Reduce every image or frame from a video to a small square thumbnail. Thumbnails are saved "
+    title = "Generate thumbnails"  # title displayed in UI
+    description = ("Reduce every image or video frame to a small square thumbnail. Thumbnails are saved "
                    "as separate files as well as a single image (a sprite sheet).")
     extension = "zip"  # extension of result file, used internally and in UI
 
