@@ -17,6 +17,10 @@ __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
+# Embeddings with a cluster per item; the model and media archive belong to
+# the embeddings dataset above them
+CLUSTERED_EMBEDDINGS = "cluster-embeddings"
+
 
 class EmbeddingSimilarity(BasicProcessor):
     """
@@ -30,7 +34,8 @@ class EmbeddingSimilarity(BasicProcessor):
                    "Similarity is measured as cosine similarity, from -1 (opposite) to 1 (identical).")
     extension = "csv"  # extension of result file, used internally and in UI
 
-    compatibility = Compatibility(types={"text-embeddings", "video-embeddings", "image-embeddings"})
+    compatibility = Compatibility(types={"text-embeddings", "video-embeddings", "image-embeddings",
+                                         "cluster-embeddings"})
 
     annotation_batch_size = 100
 
@@ -115,7 +120,8 @@ class EmbeddingSimilarity(BasicProcessor):
         # The query has to be embedded by the same model that produced the
         # parent's vectors - vectors from different models live in different
         # spaces, so comparing them yields a number that means nothing.
-        model_id = self.source_dataset.parameters.get("model")
+        embeddings = self.get_embeddings_dataset()
+        model_id = embeddings.parameters.get("model") if embeddings else None
         available_models = {
             k: v for k, v in self.config.get("llm.available_models", {}).items()
             if k in self.config.get("llm.enabled_models", [])
@@ -183,6 +189,8 @@ class EmbeddingSimilarity(BasicProcessor):
                 "similarity": float(np.dot(query_vector, vector) / (query_norm * norm)),
                 "compared_to": query_text,
                 "model": item.get("model", model["local_id"]),
+                # only clustered embeddings have one
+                "cluster": item.get("cluster", ""),
             })
 
             if i % 250 == 0:
@@ -195,9 +203,12 @@ class EmbeddingSimilarity(BasicProcessor):
         if self.parameters.get("sort", True):
             results.sort(key=lambda row: row["similarity"], reverse=True)
 
+        fieldnames = ["id", "post_ids", "text", "similarity", "compared_to", "model"]
+        if self.source_dataset.type == CLUSTERED_EMBEDDINGS:
+            fieldnames.append("cluster")
+
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
-            writer = csv.DictWriter(outfile, fieldnames=["id", "post_ids", "text", "similarity", "compared_to",
-                                                         "model"])
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames, extrasaction="ignore")
             writer.writeheader()
             for row in results:
                 writer.writerow({**row, "post_ids": ", ".join([str(_) for _ in row["post_ids"]])})
@@ -211,6 +222,20 @@ class EmbeddingSimilarity(BasicProcessor):
         self.dataset.update_status(status, is_final=True)
         self.dataset.finish(len(results))
 
+    def get_embeddings_dataset(self):
+        """
+        Get the dataset the embeddings were made in, past any clustering step.
+
+        Clustered embeddings carry the same vectors, but the model and the
+        media archive belong to the embeddings they were made from.
+
+        :return DataSet|None:  The embeddings dataset
+        """
+        dataset = self.source_dataset
+        while dataset is not None and getattr(dataset, "type", None) == CLUSTERED_EMBEDDINGS:
+            dataset = dataset.get_parent()
+        return dataset
+
     def load_post_id_map(self) -> dict:
         """
         Look up post IDs for media embeddings, via the archive they came from.
@@ -219,7 +244,8 @@ class EmbeddingSimilarity(BasicProcessor):
 
         :return dict:  `{filename without extension: [post ID, ...]}`
         """
-        parent = self.source_dataset.get_parent()
+        embeddings = self.get_embeddings_dataset()
+        parent = embeddings.get_parent() if embeddings else None
         if not parent:
             return {}
 

@@ -76,18 +76,22 @@ class OpenAICompatibleClient(LLMServerClient):
 
         return super().list_models()
 
-    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300) -> list[list[float]]:
+    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300,
+              text_as_instruction: bool = False) -> list[list[float]]:
         """
         Embed via the server's OpenAI-compatible `/v1/embeddings` endpoint.
 
-        Two request shapes, because the OpenAI spec only covers the first:
+        Two request shapes, because the OpenAI only handles text embeddings for now:
 
         * text only -> `{"input": [...]}`, the standard batched form, one vector
           per input.
         * with media -> `{"messages": [...]}`, vLLM's format, where the
           content parts carry the media. A conversation is a single input, so
           this embeds exactly one item per request; `inputs` and `media` are
-          paired by index and each pair becomes its own call.
+          paired by index and each pair becomes its own call. The conversation
+          ends in an empty assistant turn left open with
+          `continue_final_message`, as in vLLM's Qwen3-VL-Embedding example,
+          so the prompt ends where such models take their vector.
 
         A server that is not running a pooling/embedding model has no
         `/v1/embeddings` route at all and answers 404.
@@ -98,6 +102,9 @@ class OpenAICompatibleClient(LLMServerClient):
         :param list media:  Optional media descriptors, one per input - see
           `LLMServerClient.embed`.
         :param int timeout:  Request timeout in seconds.
+        :param bool text_as_instruction:  With media, send `inputs[i]` as a
+          system message that steers the embedding (e.g. Qwen3-VL-Embedding's
+          instruction), rather than as text embedded along with the media.
         :returns list[list[float]]:  One vector per input, in input order.
         :raises LLMServerException:  On transport failure, an error response, or
           a vector count that does not match the input count.
@@ -115,11 +122,24 @@ class OpenAICompatibleClient(LLMServerClient):
 
         vectors = []
         for text, item_media in zip(inputs, media):
-            content = [self._media_content_part(item_media)]
-            if text:
-                content.append({"type": "text", "text": text})
+            messages = []
+            user_content = [self._media_content_part(item_media)]
 
-            payload = {"model": model_id, "messages": [{"role": "user", "content": content}]}
+            # an instruction steers the embedding; any other text is embedded along with the media
+            if text and text_as_instruction:
+                messages.append({"role": "system", "content": [{"type": "text", "text": text}]})
+            elif text:
+                user_content.append({"type": "text", "text": text})
+
+            messages.append({"role": "user", "content": user_content})
+            messages.append({"role": "assistant", "content": [{"type": "text", "text": ""}]})  # necessary for vLLM
+
+            payload = {
+                "model": model_id,
+                "messages": messages,
+                "continue_final_message": True,
+                "add_special_tokens": True,
+            }
             vectors += self._post_embeddings(payload, timeout, 1)
 
         return vectors
@@ -144,7 +164,7 @@ class OpenAICompatibleClient(LLMServerClient):
 
     def _post_embeddings(self, payload: dict, timeout: int, expected: int) -> list[list[float]]:
         """
-        POST one embeddings request and pull the vectors out of the response.
+        POST one embeddings request and get the vectors from the response.
 
         :param dict payload:  Request body.
         :param int timeout:  Request timeout in seconds.

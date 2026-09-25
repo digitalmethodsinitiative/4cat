@@ -173,7 +173,8 @@ class LLMServerClient:
 
         return ["embed"] if "embed" in model_id.lower() else ["generate"]
 
-    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300) -> list[list[float]]:
+    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300,
+              text_as_instruction: bool = False) -> list[list[float]]:
         """
         Embed one or more inputs, returning one vector per input.
 
@@ -181,24 +182,24 @@ class LLMServerClient:
         embedding interface is text-only, so it
         cannot handle multimodal embeddings.
 
-        A client that cannot embed media **must raise** when `media` is given
-        rather than embedding the text alone. Returning a text-only vector for
-        a request that asked for media is silent data corruption: the caller
-        gets a plausible vector back and has no way to tell it does not describe
-        what it asked about.
+        A client that cannot embed media must raise an exception when `media` is given
+        rather than embedding the text alone.
 
         :param str model_id:  Model ID *within this server's context* (i.e. a
           `local_id`, not a global model ID).
         :param list inputs:  Inputs to embed.
         :param list media:  Optional media to embed, one entry per input and
           paired by index, for servers that support multimodal embedding. Each
-          entry is a descriptor dict::
+          entry is a descriptor dict:
 
               {"type": "video"|"image", "mime": "video/mp4", "data": "<base64>"}
 
           or, in place of `data`, a `"url"` the server can fetch itself. Each
           client translates this to whatever its own API expects.
         :param int timeout:  Request timeout in seconds.
+        :param bool text_as_instruction:  With media, treat `inputs[i]` as an
+          instruction that steers the embedding rather than as text to embed
+          along with the media. Clients without such a distinction ignore it.
         :returns list[list[float]]:  One vector per input, in input order.
         """
         raise LLMServerException(

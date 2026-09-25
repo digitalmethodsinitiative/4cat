@@ -40,7 +40,7 @@ class ReduceEmbeddings(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     compatibility = Compatibility(
-        types={"text-embeddings", "video-embeddings", "image-embeddings"},
+        types={"text-embeddings", "video-embeddings", "image-embeddings", "cluster-embeddings"},
         preferred_followups=["embedding-map", "embedding-map-3d"],
     )
 
@@ -236,10 +236,10 @@ class ReduceEmbeddings(BasicProcessor):
 
             vectors.append(vector)
 
-            # carry over what later steps need to label the items and trace them
-            # back to their posts, but not the embedding itself
+            # carry over what later steps need to label, colour and trace the
+            # items back to their posts, but not the embedding itself
             record = {"id": original.get("id"), "text": original.get("text", "")}
-            for key in ("filename", "post_ids"):
+            for key in ("filename", "post_ids", "cluster"):
                 if key in original:
                     record[key] = original[key]
             records.append(record)
@@ -295,6 +295,8 @@ class ReduceEmbeddings(BasicProcessor):
             "post_ids": ", ".join([str(post_id) for post_id in item.get("post_ids", [])])
             if "post_ids" in item else value_or_missing(item, "post_ids", ""),
             "algorithm": item.get("algorithm"),
+            # only clustered embeddings have this
+            "cluster": value_or_missing(item, "cluster", ""),
         }
 
         for index, value in enumerate(item.get("coordinates", []), start=1):

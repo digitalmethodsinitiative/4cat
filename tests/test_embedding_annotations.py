@@ -348,3 +348,90 @@ def test_similarity_on_a_text_parent_needs_no_metadata(tmp_path):
 
     processor.source_dataset = Source(None)
     assert processor.load_post_id_map() == {}
+
+
+# --------------------------------------------------------------------------- #
+# similarity on clustered embeddings
+
+def test_similarity_runs_on_clustered_embeddings(tmp_path, monkeypatch):
+    """
+    Clustering sits between the embeddings and the similarity step. The model
+    and the media archive belong to the embeddings above it, and the output
+    gains the cluster of each item.
+    """
+    import csv
+    from processors.machine_learning import embedding_similarity as module
+
+    archive_path = make_archive(tmp_path, {
+        "https://example.test/1": {"post_ids": ["p1", "p2"], "files": [{"filename": "hash1.mp4"}]},
+    })
+
+    class Node:
+        def __init__(self, dataset_type, parameters=None, parent=None, path=None):
+            self.type, self.parameters, self.parent, self.path = dataset_type, parameters or {}, parent, path
+
+        def get_parent(self):
+            return self.parent
+
+        def get_results_path(self):
+            return self.path
+
+    archive = Node("video-downloader", path=archive_path)
+    embeddings = Node("video-embeddings", parameters={"model": "vllm-test-model"}, parent=archive)
+
+    class Clustered(Node):
+        num_rows = 2
+
+        def iterate_items(self, processor=None, **kwargs):
+            return iter([
+                {"id": "hash1", "text": "hash1.mp4", "filename": "hash1.mp4", "post_ids": "", "cluster": 3,
+                 "embedding": [1.0, 0.0]},
+                {"id": "hash2", "text": "hash2.mp4", "filename": "hash2.mp4", "post_ids": "", "cluster": -1,
+                 "embedding": [0.0, 1.0]},
+            ])
+
+    class Output(Recorder):
+        def __init__(self):
+            super().__init__()
+            self.path, self.error, self.rows = tmp_path / "similarity.csv", None, 0
+
+        def get_results_path(self):
+            return self.path
+
+        def update_progress(self, progress):
+            pass
+
+        def finish(self, rows):
+            self.rows = rows
+
+        def finish_with_error(self, error):
+            self.error = error
+
+    class Config:
+        def get(self, key, default=None):
+            return {
+                "llm.available_models": {"vllm-test-model": {"local_id": "m", "server": "s"}},
+                "llm.enabled_models": ["vllm-test-model"],
+                "llm.servers": {"s": {"type": "openai-like"}},
+            }.get(key, default)
+
+    class Client:
+        def embed(self, model_id, inputs, **kwargs):
+            return [[1.0, 0.0]]
+
+    monkeypatch.setattr(module.LLMServerClient, "get_client", staticmethod(lambda *args, **kwargs: Client()))
+
+    processor = EmbeddingSimilarity.__new__(EmbeddingSimilarity)
+    processor.dataset, processor.config, processor.log, processor.interrupted = Output(), Config(), None, False
+    processor.source_dataset = Clustered("cluster-embeddings", parent=embeddings)
+    processor.parameters = {"query_text": "a cat", "sort": True, "save_annotations": False}
+    processor.process()
+
+    assert processor.dataset.error is None, processor.dataset.error
+    with processor.dataset.path.open(encoding="utf-8") as infile:
+        rows = list(csv.DictReader(infile))
+
+    assert [row["id"] for row in rows] == ["hash1", "hash2"]
+    assert [row["cluster"] for row in rows] == ["3", "-1"]
+    # the posts behind the file come from the archive two steps up
+    assert rows[0]["post_ids"] == "p1, p2"

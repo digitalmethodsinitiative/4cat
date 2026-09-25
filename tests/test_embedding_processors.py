@@ -555,7 +555,7 @@ def test_map_explains_how_to_get_thumbnails_when_there_are_none(tmp_path):
 
     options = EmbeddingMap.get_options(parent_dataset=reduced, config=None)
     assert "thumbnails" not in options
-    assert "Extract thumbnails" in options["thumbnails_info"]["help"]
+    assert "Generate thumbnails" in options["thumbnails_info"]["help"]
 
 
 # --------------------------------------------------------------------------- #

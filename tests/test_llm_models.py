@@ -270,6 +270,52 @@ def test_media_embed_uses_messages_with_a_video_part(openai_client, monkeypatch)
     assert {"type": "text", "text": "describe"} in content
 
 
+def test_media_embed_can_send_the_text_as_an_instruction(openai_client, monkeypatch):
+    """
+    An instruction steers the embedding from the system turn; left in the user
+    turn it would be embedded along with the video.
+    """
+    sent = {}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        sent["body"] = json
+        return FakeResponse(payload={"data": [{"index": 0, "embedding": [1.0]}]})
+
+    monkeypatch.setattr(openai_client._session, "post", fake_post)
+    media = [{"type": "video", "mime": "video/mp4", "data": "QUJD"}]
+    openai_client.embed("m", ["Represent the video."], media=media, text_as_instruction=True)
+
+    system, user, assistant = sent["body"]["messages"]
+    assert system == {"role": "system", "content": [{"type": "text", "text": "Represent the video."}]}
+    assert user == {"role": "user",
+                    "content": [{"type": "video_url", "video_url": {"url": "data:video/mp4;base64,QUJD"}}]}
+    # left open, so the prompt ends where the model takes its vector
+    assert assistant == {"role": "assistant", "content": [{"type": "text", "text": ""}]}
+    assert sent["body"]["continue_final_message"] is True
+    assert sent["body"]["add_special_tokens"] is True
+
+
+def test_media_embed_without_text_sends_no_system_turn(openai_client, monkeypatch):
+    """No instruction means the model's chat template supplies its default."""
+    sent = {}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        sent["body"] = json
+        return FakeResponse(payload={"data": [{"index": 0, "embedding": [1.0]}]})
+
+    monkeypatch.setattr(openai_client._session, "post", fake_post)
+    openai_client.embed("m", [""], media=[{"type": "image", "mime": "image/jpeg", "data": "QUJD"}],
+                        text_as_instruction=True)
+
+    assert [message["role"] for message in sent["body"]["messages"]] == ["user", "assistant"]
+
+
+def test_ollama_accepts_the_instruction_flag_and_still_refuses_media(client):
+    """The media processor passes the flag to whichever client it has."""
+    with pytest.raises(LLMServerException, match="multimodal"):
+        client.embed("mxbai-embed-large:latest", ["x"], media=["<base64>"], text_as_instruction=True)
+
+
 def test_media_embed_rejects_a_length_mismatch(openai_client):
     with pytest.raises(LLMServerException, match="each input needs exactly one media entry"):
         openai_client.embed("m", ["a", "b"], media=[{"type": "video", "data": "x"}])
