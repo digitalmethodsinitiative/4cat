@@ -477,7 +477,8 @@ def test_reducer_accepts_every_embedding_type():
     """Image embeddings were missing, which is where thumbnails matter most."""
     from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
 
-    assert ReduceEmbeddings.compatibility.types == {"text-embeddings", "video-embeddings", "image-embeddings"}
+    assert ReduceEmbeddings.compatibility.types == {"text-embeddings", "video-embeddings", "image-embeddings",
+                                                    "cluster-embeddings"}
 
 
 def test_map_only_runs_on_two_dimensional_reductions(monkeypatch):
