@@ -893,3 +893,279 @@ def test_3d_plot_escapes_item_text(tmp_path):
                for i in range(3)]
     html = plot_3d(tmp_path, records, dimensions=3).dataset.path.read_text(encoding="utf-8")
     assert "</script><img" not in html
+
+
+# --------------------------------------------------------------------------- #
+# clustering embeddings, and showing the clusters
+
+def blobs(per_group=20, groups=3, dimensions=16, seed=3):
+    """Embedding items in well-separated groups; group sizes shrink by 5."""
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    items, truth = [], []
+    for group in range(groups):
+        centre = np.zeros(dimensions)
+        centre[group] = 10.0
+        for _ in range(per_group - group * 5):
+            items.append(Item({"id": str(len(items)), "text": f"group {group}",
+                               "embedding": list(map(float, centre + rng.normal(0, 0.3, dimensions)))}))
+            truth.append(group)
+    return items, truth
+
+
+def run_clustering(tmp_path, items, **parameters):
+    """Cluster the given embedding items; return the processor."""
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    processor = ClusterEmbeddings.__new__(ClusterEmbeddings)
+    processor.parameters = {"algorithm": "kmeans", "n_clusters": 3, "auto_clusters": False, "reduce_first": False,
+                            "amount": 0, "save_annotations": False, **parameters}
+    processor.dataset = FakeDataset(tmp_path, name="clustered")
+    processor.dataset.path = tmp_path / "clustered.ndjson"
+    processor.source_dataset, processor.interrupted = Source(items), False
+    processor.saved_annotations = []
+    processor.save_annotations = lambda annotations, **kwargs: processor.saved_annotations.extend(annotations)
+    processor.process()
+    return processor
+
+
+def read_records(path):
+    import json
+    with path.open(encoding="utf-8") as infile:
+        return [Item(json.loads(line)) for line in infile]
+
+
+def same_grouping(found, truth):
+    """Whether two labelings split the items the same way, whatever the numbers."""
+    return len(set(zip(found, truth))) == len(set(truth)) == len(set(found))
+
+
+def test_kmeans_finds_the_groups_and_numbers_them_by_size(tmp_path):
+    items, truth = blobs()
+    processor = run_clustering(tmp_path, items)
+    assert processor.dataset.error is None, processor.dataset.error
+
+    records = read_records(processor.dataset.path)
+    clusters = [record["cluster"] for record in records]
+    assert same_grouping(clusters, truth)
+    # group 0 is the largest, so it is cluster 0
+    assert clusters[0] == 0 and clusters[-1] == 2
+    # the embeddings themselves pass through untouched
+    assert records[0]["embedding"] == items[0]["embedding"]
+
+
+def test_kmeans_can_choose_the_number_of_clusters(tmp_path):
+    items, truth = blobs()
+    processor = run_clustering(tmp_path, items, n_clusters=6, auto_clusters=True)
+    clusters = [record["cluster"] for record in read_records(processor.dataset.path)]
+    assert same_grouping(clusters, truth)
+    assert any("Chose 3 clusters" in message for message in processor.dataset.logs)
+
+
+def test_hdbscan_leaves_outliers_out(tmp_path):
+    import numpy as np
+    items, truth = blobs()
+    # far from every group, and from each other
+    for index in range(3):
+        outlier = np.zeros(16)
+        outlier[10 + index] = -40.0
+        items.append(Item({"id": f"outlier{index}", "text": "outlier", "embedding": list(outlier)}))
+
+    processor = run_clustering(tmp_path, items, algorithm="hdbscan", min_cluster_size=5)
+    clusters = [record["cluster"] for record in read_records(processor.dataset.path)]
+    assert clusters[-3:] == [-1, -1, -1]
+    assert same_grouping(clusters[:-3], truth)
+
+
+def test_clustering_can_reduce_first(tmp_path):
+    items, truth = blobs()
+    processor = run_clustering(tmp_path, items, algorithm="hdbscan", min_cluster_size=5, reduce_first=True,
+                               reduce_dimensions=3)
+    assert processor.dataset.error is None, processor.dataset.error
+    assert any("UMAP" in message for message in processor.dataset.logs)
+    assert len(read_records(processor.dataset.path)) == len(items)
+
+
+def test_clusters_are_annotated_once_per_post(tmp_path):
+    items, _ = blobs(per_group=10, groups=2)
+    items[0].update({"filename": "0.jpg", "post_ids": ["a", "b"]})
+
+    processor = run_clustering(tmp_path, items, n_clusters=2, save_annotations=True)
+    annotated = [annotation["item_id"] for annotation in processor.saved_annotations]
+    # a media file stands for every post it appeared in; text for its own post
+    assert annotated[:3] == ["a", "b", "1"]
+    assert len(annotated) == len(items) + 1
+    assert processor.saved_annotations[0]["label"] == "embedding cluster"
+
+
+def test_media_without_post_ids_is_matched_through_the_archive(tmp_path):
+    """
+    Media embedded before post IDs were always recorded carry none. Their own
+    ID is a file hash that matches no post, so annotating it writes nothing.
+    """
+    import json
+    import zipfile
+
+    items, _ = blobs(per_group=10, groups=2)
+    for item in items:
+        item.update({"filename": f"{item['id']}.jpg", "post_ids": []})
+
+    archive = FakeDataset(tmp_path, name="archive", dataset_type="image-downloader")
+    metadata = {"https://example.com/0": {"post_ids": ["p0", "p0b"], "files": [{"filename": "0.jpg"}]},
+                "https://example.com/1": {"post_ids": ["p1"], "files": [{"filename": "1.jpg"}]}}
+    with zipfile.ZipFile(archive.path, "w") as handle:
+        handle.writestr(".metadata.json", json.dumps(metadata))
+
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+    processor = ClusterEmbeddings.__new__(ClusterEmbeddings)
+    processor.parameters = {"algorithm": "kmeans", "n_clusters": 2, "reduce_first": False, "amount": 0,
+                            "save_annotations": True}
+    processor.dataset = FakeDataset(tmp_path, name="clustered")
+    processor.dataset.path = tmp_path / "clustered.ndjson"
+    processor.source_dataset, processor.interrupted = Source(items, parent=archive), False
+    processor.saved_annotations = []
+    processor.save_annotations = lambda annotations, **kwargs: processor.saved_annotations.extend(annotations)
+    processor.process()
+
+    # only posts that exist are annotated; never a file hash
+    assert [annotation["item_id"] for annotation in processor.saved_annotations] == ["p0", "p0b", "p1"]
+    assert any(f"{len(items) - 2} files could not be linked" in message for message in processor.dataset.logs)
+
+
+def test_clustered_embeddings_map_like_embeddings_plus_a_cluster():
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    row = ClusterEmbeddings.map_item({"id": "a", "text": "t", "embedding": [0.5, 1.0], "cluster": 2,
+                                      "dimensions": 2}).get_item_data()
+    assert row["cluster"] == 2 and row["embedding"] == "0.5 1.0"
+
+
+def test_the_reducer_carries_the_cluster_along(tmp_path):
+    items, _ = blobs(per_group=10, groups=2)
+    for index, item in enumerate(items):
+        item["cluster"] = index % 2
+
+    records = read_reduced(run_reducer(tmp_path, items))
+    assert [record["cluster"] for record in records] == [index % 2 for index in range(len(items))]
+
+    from common.lib.item_mapping import MissingMappedField
+    from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
+    assert ReduceEmbeddings.map_item(records[0]).get_item_data()["cluster"] == 0
+    assert isinstance(ReduceEmbeddings.map_item({"id": "x", "coordinates": []}).data["cluster"], MissingMappedField)
+
+
+def test_plots_look_past_the_clustering_for_thumbnails(tmp_path):
+    """Thumbnails and media links hang off the archive, above the clustering."""
+    from processors.visualisation.embedding_map import EmbeddingMap
+
+    sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 48}, rows=5)
+    archive = FakeDataset(tmp_path, name="archive", children=[sprite])
+    embeddings = FakeDataset(tmp_path, name="emb", dataset_type="image-embeddings", parent=archive)
+    clustered = FakeDataset(tmp_path, name="clu", dataset_type="cluster-embeddings", parent=embeddings)
+    reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=clustered)
+
+    assert EmbeddingMap.get_embeddings_dataset(reduced) is embeddings
+    assert list(EmbeddingMap.find_sprite_datasets(reduced)) == ["sprite1"]
+    assert EmbeddingMap.has_clusters(reduced)
+    assert "colour_clusters" in EmbeddingMap.get_options(parent_dataset=reduced, config=None)
+
+    plain = FakeDataset(tmp_path, name="red2", dataset_type="reduce-embeddings", parent=embeddings)
+    assert not EmbeddingMap.has_clusters(plain)
+    assert "colour_clusters" not in EmbeddingMap.get_options(parent_dataset=plain, config=None)
+
+
+def test_cluster_colours_stay_fixed_and_do_not_cycle():
+    from processors.visualisation.embedding_map import CLUSTER_PALETTE, EmbeddingMap
+
+    clusters = [0, 0, 1, 7, 8, 9, 9, -1]
+    colours = EmbeddingMap.cluster_colours(clusters)
+    others, noise = len(CLUSTER_PALETTE), len(CLUSTER_PALETTE) + 1
+
+    assert colours["colour"] == [0, 0, 1, 7, others, others, others, noise]
+    labels = [entry[0] for entry in colours["legend"]]
+    assert labels == ["Cluster 0 (2)", "Cluster 1 (1)", "Cluster 7 (1)", "2 smaller clusters (3)", "No cluster (1)"]
+
+
+def test_the_map_colours_by_cluster_when_it_can(tmp_path):
+    from processors.visualisation.embedding_map import EmbeddingMap
+
+    records = [Item({"id": str(i), "text": f"t{i}", "coordinates": [float(i), float(i % 3)], "cluster": i % 2 - 1})
+               for i in range(6)]
+
+    def render(**parameters):
+        processor = EmbeddingMap.__new__(EmbeddingMap)
+        processor.dataset = Collector(tmp_path / "map.html")
+        processor.source_dataset = Source(records, parameters={"algorithm": "umap"})
+        processor.interrupted = False
+        processor.parameters = {"max_text_length": 100, **parameters}
+        processor.process()
+        return read_payload(processor.dataset.path)
+
+    payload = render()
+    assert payload["colour"][:2] == [len(payload["palette"]) - 1, 0]
+    assert payload["labels"][0].endswith("No cluster") and payload["labels"][1].endswith("Cluster 0")
+    assert "colour" not in render(colour_clusters=False)
+
+
+def test_the_3d_plot_keeps_clusters_in_step_with_repeated_points(tmp_path):
+    """A media file posted twice is two points, both in the file's cluster."""
+    records = [{"id": "img", "text": "img.jpg", "filename": "img.jpg", "post_ids": ["a", "b"], "cluster": 1,
+                "coordinates": [0.0, 0.0]},
+               {"id": "other", "text": "other.jpg", "filename": "other.jpg", "post_ids": ["c"], "cluster": 0,
+                "coordinates": [1.0, 1.0]},
+               {"id": "third", "text": "third.jpg", "filename": "third.jpg", "post_ids": ["d"], "cluster": -1,
+                "coordinates": [0.5, 1.0]}]
+    top = [{"id": post_id, "timestamp": f"2024-01-0{day}"} for day, post_id in enumerate("abcd", start=1)]
+
+    payload = read_payload(plot_3d(tmp_path, records, dimensions=2, top_items=top).dataset.path)
+    assert payload["colour"][:3] == [1, 1, 0]
+    assert payload["labels"][0].endswith("Cluster 1")
+    # the height axis keeps its ticks; only the colours come from the clusters
+    assert payload["axis"]["title"] == "timestamp"
+
+
+def test_3d_plot_links_media_to_posts_through_the_archive(tmp_path):
+    """
+    top dataset -> video archive -> video embeddings -> clusters -> reduction:
+    embeddings made before post IDs were always recorded have none, and their
+    own ID is a file hash, so the posts come from the archive's metadata.
+    """
+    import json
+    import zipfile
+    from processors.visualisation.embedding_map_3d import EmbeddingMap3D
+
+    archive = FakeDataset(tmp_path, name="archive", dataset_type="video-downloader")
+    metadata = {f"https://example.com/{name}": {"post_ids": posts, "files": [{"filename": f"{name}.mp4"}]}
+                for name, posts in (("v1", ["p1"]), ("v2", ["p2", "p3"]), ("v3", ["p4"]))}
+    with zipfile.ZipFile(archive.path, "w") as handle:
+        handle.writestr(".metadata.json", json.dumps(metadata))
+    embeddings = FakeDataset(tmp_path, name="emb", dataset_type="video-embeddings", parent=archive)
+    clustered = FakeDataset(tmp_path, name="clu", dataset_type="cluster-embeddings", parent=embeddings)
+
+    records = [Item({"id": name, "text": f"{name}.mp4", "filename": f"{name}.mp4", "post_ids": [], "cluster": 0,
+                     "coordinates": [float(index), float(index % 2)]})
+               for index, name in enumerate(("v1", "v2", "v3", "unknown"))]
+    top = Source([Item({"id": f"p{index}", "likes": index * 10}) for index in range(1, 5)])
+
+    processor = EmbeddingMap3D.__new__(EmbeddingMap3D)
+    processor.dataset = FakeDataset(tmp_path, name="plot3d")
+    processor.dataset.path = tmp_path / "plot3d.html"
+    processor.source_dataset = TopSource(records, parameters={"dimensions": 2, "algorithm": "umap"}, top=top)
+    processor.source_dataset._parent = clustered
+    processor.interrupted = False
+    processor.parameters = {"max_text_length": 100, "axis_column": "likes", "axis_spacing": "value"}
+    processor.process()
+
+    assert processor.dataset.error is None, processor.dataset.error
+    payload = read_payload(processor.dataset.path)
+    # v2 was posted twice, so it appears twice; the unknown file is left out
+    assert [label.split("\n")[1] for label in payload["labels"]] == ["likes: 10", "likes: 20", "likes: 30",
+                                                                    "likes: 40"]
+    assert any("1 files could not be linked" in message for message in processor.dataset.logs)
+
+
+def test_3d_plot_says_so_when_no_media_can_be_linked(tmp_path):
+    records = [{"id": f"v{index}", "text": "v.mp4", "filename": "v.mp4", "post_ids": [],
+                "coordinates": [float(index), 0.0]} for index in range(3)]
+    processor = plot_3d(tmp_path, records, dimensions=2, top_items=[{"id": "p1", "timestamp": "2024-01-01"}])
+    assert "could be linked to a post" in processor.dataset.error
