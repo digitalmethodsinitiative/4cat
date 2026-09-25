@@ -9,8 +9,9 @@ import numpy as np
 from dateutil import parser as dateutil_parser
 
 from common.lib.dataset import DataSet
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import DataSetException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
+from processors.machine_learning.embed_media import read_post_id_map
 from processors.visualisation.embedding_map import EmbeddingMap
 
 __author__ = "Sal Hagen"
@@ -163,11 +164,12 @@ class EmbeddingMap3D(EmbeddingMap):
             points = self.normalise_3d(coordinates) if records else []
             labels = [record["label"] for record in records]
             filenames = [str(record.get("filename", "") or "") for record in records]
+            clusters = [record.get("cluster") for record in records]
         else:
             result = self.lift_to_3d(records)
             if result is None:
                 return
-            points, labels, filenames, axis, warnings = result
+            points, labels, filenames, clusters, axis, warnings = result
 
         point_count = len(points)
         if point_count < 3:
@@ -177,9 +179,16 @@ class EmbeddingMap3D(EmbeddingMap):
 
         atlas = self.load_sprite(filenames) if any(filenames) else None
 
+        # cluster colours take over from the height colours: the height axis
+        # keeps its ticks either way
+        colours = None
+        if self.parameters.get("colour_clusters", True) and all(cluster is not None for cluster in clusters):
+            colours = self.cluster_colours(clusters)
+            labels = [f"{label}\n{self.cluster_label(cluster)}" for label, cluster in zip(labels, clusters)]
+
         self.dataset.update_status("Rendering plot")
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-            outfile.write(self.get_html_3d(points, labels, axis, atlas))
+            outfile.write(self.get_html_3d(points, labels, axis, atlas, colours))
 
         self.dataset.update_status(f"Plotted {point_count:,} points", is_final=True)
         if warnings:
@@ -213,16 +222,32 @@ class EmbeddingMap3D(EmbeddingMap):
         one point per post, so a file posted repeatedly shows as a column.
 
         :param list records:  Reduced embedding records
-        :return tuple|None:  `(points, labels, filenames, axis, warnings)`, or
-          `None` after finishing the dataset with an error
+        :return tuple|None:  `(points, labels, filenames, clusters, axis,
+          warnings)`, or `None` after finishing the dataset with an error
         """
         column = self.parameters.get("axis_column") or "timestamp"
         spacing = self.parameters.get("axis_spacing", "rank")
 
         wanted = set()
+        post_id_map = None
+        unlinked = 0
         for record in records:
+            # media embedded before post IDs were always recorded carry none;
+            # the archive's metadata still knows which posts a file came from
+            if "filename" in record and not record.get("post_ids"):
+                if post_id_map is None:
+                    post_id_map = self.load_media_post_ids()
+                record["post_ids"] = post_id_map.get(str(record.get("id")), [])
+
             record["post_ids"] = self.get_post_ids(record)
+            if not record["post_ids"]:
+                unlinked += 1
             wanted.update(record["post_ids"])
+
+        if unlinked == len(records):
+            self.dataset.finish_with_error("None of the items could be linked to a post in the original dataset, so "
+                                           "they cannot be given a height from one of its columns.")
+            return None
 
         values = self.read_column(column, wanted)
         if not values:
@@ -253,8 +278,12 @@ class EmbeddingMap3D(EmbeddingMap):
                   for (x, y), height in zip(flat, axis["positions"])]
         labels = [f"{record['label']}\n{column}: {self.shorten(raw)}" for record, raw in zip(placed, raw_values)]
         filenames = [str(record.get("filename", "") or "") for record in placed]
+        clusters = [record.get("cluster") for record in placed]
 
         warnings = []
+        if unlinked:
+            warnings.append(f"{unlinked:,} files could not be linked to a post in the original dataset and were left "
+                            f"out.")
         if missing:
             warnings.append(f"{missing:,} items had no value for '{column}' and were left out.")
         if axis["fallback"]:
@@ -262,18 +291,36 @@ class EmbeddingMap3D(EmbeddingMap):
         for warning in warnings:
             self.dataset.log(warning)
 
-        return points, labels, filenames, {"title": column, "ticks": axis["ticks"]}, warnings
+        return points, labels, filenames, clusters, {"title": column, "ticks": axis["ticks"]}, warnings
 
     @staticmethod
     def get_post_ids(record: dict) -> list:
         """
         Get the IDs of the posts a reduced embedding stands for.
 
+        A text embedding's own ID is its post's ID. A media file's ID is a hash
+        of the file that matches no post, so media only count their `post_ids`.
+
         :param dict record:  Reduced embedding record
         :return list:  Post IDs as strings, without duplicates
         """
-        post_ids = record.get("post_ids") or [record.get("id")]
+        post_ids = record.get("post_ids") or ([] if "filename" in record else [record.get("id")])
         return list(dict.fromkeys(str(post_id) for post_id in post_ids if post_id is not None))
+
+    def load_media_post_ids(self) -> dict:
+        """
+        Read which posts each media file came from, from the media archive.
+
+        :return dict:  `{filename without extension: [post ID, ...]}`, empty
+          when there is no archive or it has no metadata
+        """
+        embeddings = self.get_embeddings_dataset(self.source_dataset)
+        try:
+            archive = embeddings.get_parent() if embeddings else None
+        except DataSetException:
+            archive = None
+
+        return read_post_id_map(archive.get_results_path() if archive else None, log=self.dataset.log)
 
     def read_column(self, column: str, wanted: set) -> dict:
         """
@@ -471,7 +518,8 @@ class EmbeddingMap3D(EmbeddingMap):
         text = str(value)
         return text if len(text) <= length else text[:length - 1] + "…"
 
-    def get_html_3d(self, points: list, labels: list, axis: dict | None, atlas: dict | None = None) -> str:
+    def get_html_3d(self, points: list, labels: list, axis: dict | None, atlas: dict | None = None,
+                    colours: dict | None = None) -> str:
         """
         Build the self-contained HTML page.
 
@@ -485,9 +533,11 @@ class EmbeddingMap3D(EmbeddingMap):
           of the original dataset, `None` for a 3D reduction
         :param dict atlas:  Sprite sheet from `load_sprite()`, or `None` to draw
           plain dots
+        :param dict colours:  Cluster colours from `cluster_colours()`, or
+          `None` to colour by height (or not at all, for a 3D reduction)
         :return str:  HTML
         """
-        payload = self.encode_payload({"points": points, "labels": labels, "axis": axis}, atlas)
+        payload = self.encode_payload({"points": points, "labels": labels, "axis": axis, **(colours or {})}, atlas)
 
         container = f"embedding-map-3d-{self.dataset.key}"
         algorithm = self.source_dataset.parameters.get("algorithm", "umap").upper()
@@ -498,6 +548,8 @@ class EmbeddingMap3D(EmbeddingMap):
         if atlas:
             drawn = sum(1 for tile in atlas["tiles"] if tile > -1)
             subtitle += f" &middot; {drawn:,} thumbnails"
+        if colours:
+            subtitle += " &middot; coloured by cluster"
 
         return HTML_TEMPLATE_3D % {"container": container, "payload": payload, "subtitle": subtitle}
 
@@ -518,6 +570,8 @@ HTML_TEMPLATE_3D = """<meta charset="utf-8">
 #%(container)s .em-legend { position: absolute; bottom: 10px; left: 12px; font-size: 11px; color: #55555c; pointer-events: none; }
 #%(container)s .em-legend .em-ramp { width: 160px; height: 8px; margin: 3px 0 2px; border-radius: 2px; }
 #%(container)s .em-legend .em-ends { display: flex; justify-content: space-between; width: 160px; }
+#%(container)s .em-legend .em-key { display: flex; align-items: center; gap: 6px; line-height: 1.6; }
+#%(container)s .em-legend .em-swatch { flex: none; width: 9px; height: 9px; border-radius: 50%%; }
 #%(container)s .em-tip { position: absolute; max-width: 320px; padding: 8px 10px; font-size: 12px; line-height: 1.45; color: #1c1c20; background: #fff; border: 1px solid #cacad0; border-radius: 4px; box-shadow: 0 2px 10px #00000026; pointer-events: none; opacity: 0; transition: opacity .1s; white-space: pre-wrap; overflow-wrap: anywhere; z-index: 2; }
 #%(container)s .em-tip.visible { opacity: 1; }
 </style>
@@ -576,7 +630,10 @@ HTML_TEMPLATE_3D = """<meta charset="utf-8">
         return [0, 1, 2].map(function (c) { return Math.round(a[c] + (b[c] - a[c]) * f); });
     }
     var BUCKETS = 48, fills = [], bucket = null;
-    if (axis) {
+    if (data.colour) {
+        // coloured by cluster instead: an index into the cluster palette
+        fills = data.palette; bucket = data.colour;
+    } else if (axis) {
         for (var k = 0; k < BUCKETS; k++) fills.push("rgba(" + ramp(k / (BUCKETS - 1)).join(",") + ",0.8)");
         bucket = new Uint8Array(count);
         for (var p = 0; p < count; p++) bucket[p] = Math.round(points[p][2] * (BUCKETS - 1));
@@ -633,6 +690,12 @@ HTML_TEMPLATE_3D = """<meta charset="utf-8">
         }
         var sx = (tile %% atlasCols) * tileSize, sy = Math.floor(tile / atlasCols) * tileSize;
         ctx.drawImage(atlas, sx, sy, tileSize, tileSize, x - drawn / 2, y - drawn / 2, drawn, drawn);
+        // outline the thumbnail in its cluster's colour; items in no cluster
+        // (the last palette entry) get none
+        if (data.colour && data.colour[i] < data.palette.length - 1) {
+            ctx.strokeStyle = data.palette[data.colour[i]].slice(0, 7); ctx.lineWidth = 2;
+            ctx.strokeRect(x - drawn / 2, y - drawn / 2, drawn, drawn);
+        }
     }
 
     function line(a, b) {
@@ -822,7 +885,17 @@ HTML_TEMPLATE_3D = """<meta charset="utf-8">
         reset(); hideTip(); requestDraw();
     });
 
-    if (axis && axis.ticks.length) {
+    if (data.legend && data.legend.length) {
+        var keys = root.querySelector(".em-legend");
+        data.legend.forEach(function (entry) {
+            var key = document.createElement("div"), swatch = document.createElement("span");
+            key.className = "em-key"; swatch.className = "em-swatch"; swatch.style.background = entry[1];
+            // textContent, not markup: the legend is built from the data
+            key.appendChild(swatch); key.appendChild(document.createTextNode(entry[0]));
+            keys.appendChild(key);
+        });
+        keys.hidden = false;
+    } else if (axis && axis.ticks.length) {
         var legend = root.querySelector(".em-legend"), stops = [];
         for (var r = 0; r <= 4; r++) stops.push("rgb(" + ramp(r / 4).join(",") + ")");
         var title = document.createElement("div"), bar = document.createElement("div");
