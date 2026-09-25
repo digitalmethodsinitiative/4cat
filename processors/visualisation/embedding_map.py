@@ -2,6 +2,7 @@
 Plot two-dimensional reduced embeddings as an interactive map.
 """
 import json
+from collections import Counter
 
 import numpy as np
 
@@ -18,6 +19,17 @@ __email__ = "4cat@oilab.eu"
 
 #: Datasets whose items are media files, and so can be shown as thumbnails
 MEDIA_EMBEDDINGS = ("image-embeddings", "video-embeddings")
+
+#: Embeddings with a cluster per item, made by the 'Cluster embeddings'
+#: processor; sits between the embeddings and their reduction
+CLUSTERED_EMBEDDINGS = "cluster-embeddings"
+
+#: Colours for the largest clusters, in fixed order: cluster 0 (the largest)
+#: always gets the first. More clusters share one neutral colour rather than
+#: cycling, which would give different clusters the same colour
+CLUSTER_PALETTE = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948")
+OTHER_CLUSTERS_COLOUR = "#8a8a92"
+NOISE_COLOUR = "#c4c4cc"
 
 
 class EmbeddingMap(BasicProcessor):
@@ -84,6 +96,21 @@ class EmbeddingMap(BasicProcessor):
             },
         }
 
+        if cls.has_clusters(parent_dataset):
+            options["colour_clusters"] = {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Colour by cluster",
+                "default": True,
+                "tooltip": f"Colour items by the cluster found by 'Cluster embeddings'. The {len(CLUSTER_PALETTE)} "
+                           f"largest clusters get their own colour; smaller ones share a grey, and items in no "
+                           f"cluster are light grey. Hovering an item always shows its cluster.",
+            }
+        else:
+            options["colour_clusters_info"] = {
+                "type": UserInput.OPTION_INFO,
+                "help": "Run **Cluster embeddings** on the reduced embeddings to colour items by cluster.",
+            }
+
         # allow showing media on the map for media datasets, reusing a sprite
         # sheet extracted earlier rather than decoding the media again here
         sprites = cls.find_sprite_datasets(parent_dataset)
@@ -94,15 +121,13 @@ class EmbeddingMap(BasicProcessor):
                 "help": "Thumbnails",
                 "options": {"": "No thumbnails, just dots", **sprites},
                 "default": "",
-                "tooltip": "Draw each item as its thumbnail instead of a dot, using a sprite sheet made earlier by "
-                           "the 'Extract thumbnails' processor.",
+                "tooltip": "Draw each item as its thumbnail instead of a dot using the outputs of 'Generate thumbnails'.",
             }
         elif embeddings and embeddings.type in MEDIA_EMBEDDINGS:
             options["thumbnails_info"] = {
                 "type": UserInput.OPTION_INFO,
-                "help": "Run **Extract thumbnails** on the media these embeddings came from to draw items as "
-                        "thumbnails here instead of dots. It only has to be run once: every map made afterwards can "
-                        "reuse it.",
+                "help": "Run **Generate thumbnails** on the media these embeddings came from to show "
+                        "thumbnails on the map.",
             }
 
         return options
@@ -112,6 +137,9 @@ class EmbeddingMap(BasicProcessor):
         """
         Get the embeddings dataset the reduced embeddings were made from.
 
+        Skips a clustering step in between, so thumbnails and media links are
+        found whether or not the embeddings were clustered first.
+
         :param reduced_dataset:  The reduced embeddings the map would run on
         :return DataSet|None:  The embeddings, or `None` if there is no parent
         """
@@ -119,9 +147,70 @@ class EmbeddingMap(BasicProcessor):
             return None
 
         try:
-            return reduced_dataset.get_parent()
+            embeddings = reduced_dataset.get_parent()
+            while embeddings and embeddings.type == CLUSTERED_EMBEDDINGS:
+                embeddings = embeddings.get_parent()
+            return embeddings
         except DataSetException:
             return None
+
+    @staticmethod
+    def has_clusters(reduced_dataset) -> bool:
+        """
+        Whether the reduced embeddings were made from clustered embeddings.
+
+        :param reduced_dataset:  The reduced embeddings the map would run on
+        :return bool:  Whether the items carry a cluster
+        """
+        if not reduced_dataset:
+            return False
+
+        try:
+            parent = reduced_dataset.get_parent()
+        except DataSetException:
+            return False
+        return bool(parent) and parent.type == CLUSTERED_EMBEDDINGS
+
+    @staticmethod
+    def cluster_colours(clusters: list) -> dict:
+        """
+        Give each point its cluster's colour, and build a legend.
+
+        Colour follows the cluster number, not its size in this plot, so the
+        same cluster has the same colour in every plot of one clustering.
+
+        :param list clusters:  Cluster number per point; -1 for noise
+        :return dict:  `{palette, colour, legend}`: the fill styles, a palette
+          index per point, and `[label, colour]` legend entries
+        """
+        others = len(CLUSTER_PALETTE)
+        noise = others + 1
+        palette = [f"{colour}cc" for colour in CLUSTER_PALETTE] + [f"{OTHER_CLUSTERS_COLOUR}b3", f"{NOISE_COLOUR}b3"]
+
+        colour = [noise if cluster < 0 else min(cluster, others) for cluster in clusters]
+
+        sizes = Counter(clusters)
+        legend = [[f"Cluster {cluster} ({sizes[cluster]:,})", CLUSTER_PALETTE[cluster]]
+                  for cluster in sorted(cluster for cluster in sizes if 0 <= cluster < others)]
+
+        smaller = [cluster for cluster in sizes if cluster >= others]
+        if smaller:
+            legend.append([f"{len(smaller):,} smaller clusters ({sum(sizes[c] for c in smaller):,})",
+                           OTHER_CLUSTERS_COLOUR])
+        if sizes.get(-1):
+            legend.append([f"No cluster ({sizes[-1]:,})", NOISE_COLOUR])
+
+        return {"palette": palette, "colour": colour, "legend": legend}
+
+    @staticmethod
+    def cluster_label(cluster: int) -> str:
+        """
+        Describe a point's cluster for its hover text.
+
+        :param int cluster:  Cluster number; -1 for noise
+        :return str:  Line to add to the hover text
+        """
+        return "No cluster" if cluster < 0 else f"Cluster {cluster}"
 
     def media_link_base(self) -> str | None:
         """
@@ -193,6 +282,7 @@ class EmbeddingMap(BasicProcessor):
         coordinates = []
         labels = []
         filenames = []
+        clusters = []
 
         self.dataset.update_status("Reading reduced embeddings")
         for item in self.source_dataset.iterate_items(self):
@@ -210,6 +300,7 @@ class EmbeddingMap(BasicProcessor):
             text = str(original.get("text", "") or "")
             labels.append(text[:max_text_length] + ("…" if len(text) > max_text_length else ""))
             filenames.append(str(original.get("filename", "") or ""))
+            clusters.append(original.get("cluster"))
 
         point_count = len(coordinates)
         if point_count < 3:
@@ -219,9 +310,14 @@ class EmbeddingMap(BasicProcessor):
 
         atlas = self.load_sprite(filenames) if any(filenames) else None
 
+        colours = None
+        if self.parameters.get("colour_clusters", True) and all(cluster is not None for cluster in clusters):
+            colours = self.cluster_colours(clusters)
+            labels = [f"{label}\n{self.cluster_label(cluster)}" for label, cluster in zip(labels, clusters)]
+
         self.dataset.update_status("Rendering map")
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-            outfile.write(self.get_html(np.asarray(coordinates, dtype=np.float64), labels, atlas))
+            outfile.write(self.get_html(np.asarray(coordinates, dtype=np.float64), labels, atlas, colours))
 
         self.dataset.update_status(f"Mapped {point_count:,} items", is_final=True)
         self.dataset.finish(point_count)
@@ -298,7 +394,7 @@ class EmbeddingMap(BasicProcessor):
         payload = json.dumps(data, ensure_ascii=False)
         return payload.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
-    def get_html(self, coordinates, labels, atlas: dict | None = None) -> str:
+    def get_html(self, coordinates, labels, atlas: dict | None = None, colours: dict | None = None) -> str:
         """
         Build the self-contained HTML page.
 
@@ -315,6 +411,8 @@ class EmbeddingMap(BasicProcessor):
         :param list labels:  Hover text per point, in the same order
         :param dict atlas:  Sprite sheet from `build_atlas()`, or `None` to draw
           plain dots
+        :param dict colours:  Cluster colours from `cluster_colours()`, or
+          `None` to draw every point alike
         :return str:  HTML
         """
         # normalise to 0-1 so the client only deals with its own viewport
@@ -324,7 +422,7 @@ class EmbeddingMap(BasicProcessor):
 
         points = [[round(float(x), 5), round(float(y), 5)] for x, y in normalised]
 
-        payload = self.encode_payload({"points": points, "labels": labels}, atlas)
+        payload = self.encode_payload({"points": points, "labels": labels, **(colours or {})}, atlas)
 
         container = f"embedding-map-{self.dataset.key}"
         algorithm = self.source_dataset.parameters.get("algorithm", "umap")
@@ -332,6 +430,8 @@ class EmbeddingMap(BasicProcessor):
         if atlas:
             drawn = sum(1 for tile in atlas["tiles"] if tile > -1)
             subtitle += f" &middot; {drawn:,} thumbnails"
+        if colours:
+            subtitle += " &middot; coloured by cluster"
 
         interaction = "scroll to zoom, drag to pan"
         if atlas and atlas.get("base"):
@@ -352,10 +452,14 @@ HTML_TEMPLATE = """<meta charset="utf-8">
 #%(container)s .em-bar button { pointer-events: auto; font: inherit; font-size: 11px; padding: 3px 9px; border: 1px solid #cacad0; border-radius: 3px; background: #fff; color: #33333a; cursor: pointer; }
 #%(container)s .em-bar button:hover { background: #f0f0f3; }
 #%(container)s .em-tip { position: absolute; max-width: 320px; padding: 8px 10px; font-size: 12px; line-height: 1.45; color: #1c1c20; background: #fff; border: 1px solid #cacad0; border-radius: 4px; box-shadow: 0 2px 10px #00000026; pointer-events: none; opacity: 0; transition: opacity .1s; white-space: pre-wrap; overflow-wrap: anywhere; z-index: 2; }
+#%(container)s .em-legend { position: absolute; bottom: 10px; left: 12px; max-height: 45%%; overflow-y: auto; padding: 6px 8px; font-size: 11px; line-height: 1.6; color: #33333a; background: #fbfbfcd9; border-radius: 4px; pointer-events: none; }
+#%(container)s .em-key { display: flex; align-items: center; gap: 6px; }
+#%(container)s .em-swatch { flex: none; width: 9px; height: 9px; border-radius: 50%%; }
 #%(container)s .em-tip.visible { opacity: 1; }
 </style>
 <div class="em-bar"><span>%(subtitle)s &middot; %(interaction)s</span><button type="button" data-reset>Reset view</button></div>
 <canvas></canvas>
+<div class="em-legend" hidden></div>
 <div class="em-tip"></div>
 </div>
 <script>
@@ -368,6 +472,8 @@ HTML_TEMPLATE = """<meta charset="utf-8">
     var points = data.points, labels = data.labels;
     var tiles = data.tiles || null, tileSize = data.tile || 0, atlasCols = data.cols || 1;
     var files = data.files || null, linkBase = data.base || "";
+    // a fill per point when coloured by cluster: an index into the palette
+    var colour = data.colour || null, palette = data.palette || null;
 
     // the address of the media behind a point, or "" when there is none
     function linkFor(i) {
@@ -417,18 +523,25 @@ HTML_TEMPLATE = """<meta charset="utf-8">
         var sx = (tile %% atlasCols) * tileSize, sy = Math.floor(tile / atlasCols) * tileSize;
         ctx.drawImage(atlas, sx, sy, tileSize, tileSize,
                       xy[0] - drawn / 2, xy[1] - drawn / 2, drawn, drawn);
+        // outline the thumbnail in its cluster's colour; items in no cluster
+        // (the last palette entry) get none
+        if (colour && colour[i] < palette.length - 1) {
+            ctx.strokeStyle = palette[colour[i]].slice(0, 7); ctx.lineWidth = 2;
+            ctx.strokeRect(xy[0] - drawn / 2, xy[1] - drawn / 2, drawn, drawn);
+        }
     }
 
     function draw() {
         ctx.clearRect(0, 0, width, height);
         ctx.fillStyle = "rgba(40, 92, 168, 0.55)";
         var drawn = tiles ? thumbScale() : 0;
-        var margin = tiles ? drawn : 10;
+        var margin = tiles ? drawn : 10, fill = -1;
 
         for (var i = 0; i < points.length; i++) {
             if (i === hovered) continue;
             var xy = project(points[i]);
             if (xy[0] < -margin || xy[0] > width + margin || xy[1] < -margin || xy[1] > height + margin) continue;
+            if (colour && colour[i] !== fill) { fill = colour[i]; ctx.fillStyle = palette[fill]; }
             if (tiles) drawTile(i, xy, drawn);
             else { ctx.beginPath(); ctx.arc(xy[0], xy[1], RADIUS, 0, 6.2832); ctx.fill(); }
         }
@@ -533,6 +646,18 @@ HTML_TEMPLATE = """<meta charset="utf-8">
         hovered = -1; tip.classList.remove("visible");
         draw();
     });
+
+    if (data.legend && data.legend.length) {
+        var legend = root.querySelector(".em-legend");
+        data.legend.forEach(function (entry) {
+            var key = document.createElement("div"), swatch = document.createElement("span");
+            key.className = "em-key"; swatch.className = "em-swatch"; swatch.style.background = entry[1];
+            // textContent, not markup: the legend is built from the data
+            key.appendChild(swatch); key.appendChild(document.createTextNode(entry[0]));
+            legend.appendChild(key);
+        });
+        legend.hidden = false;
+    }
 
     window.addEventListener("resize", resize);
     resize();
