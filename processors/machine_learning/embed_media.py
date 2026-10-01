@@ -86,6 +86,9 @@ class EmbedMedia(BasicProcessor):
     annotation_label = "media_embedding"
     annotation_batch_size = 100
 
+    # Stop after this many files in a row could not be embedded.
+    max_consecutive_failures = 10
+
     @classmethod
     def get_queue_id(cls, remote_id, details, dataset) -> str:
         """
@@ -329,7 +332,8 @@ class EmbedMedia(BasicProcessor):
 
         embedded = 0
         failed_embeddings = 0
-        max_failed_embeddings = 10
+        consecutive_failures = 0
+        stopped = ""
         skipped = 0
         processed = 0
         total_sent = 0
@@ -391,6 +395,7 @@ class EmbedMedia(BasicProcessor):
                         if retries >= max_retries:
                             embedding_error = f"Failed to embed {media_path.name} after {max_retries} attempts: {e}"
                             failed_embeddings += 1
+                            consecutive_failures += 1
                             break  # not a success...
                         time.sleep(2)  # wait a bit before retrying
 
@@ -427,6 +432,7 @@ class EmbedMedia(BasicProcessor):
 
                     embedded += 1
                     total_sent += sent_size
+                    consecutive_failures = 0
 
                 if embedded % self.annotation_batch_size == 0:
                     outfile.flush()
@@ -434,10 +440,11 @@ class EmbedMedia(BasicProcessor):
                         self.save_annotations(annotations, hide_in_explorer=True)
                         annotations = []
 
-                if failed_embeddings >= max_failed_embeddings:
-                    self.save_annotations(annotations, hide_in_explorer=True)
-                    self.dataset.finish_with_error(f"Too many failed embeddings ({failed_embeddings}); {embedding_error}")
-                    return
+                if consecutive_failures >= self.max_consecutive_failures:
+                    stopped = (f"Stopped after {consecutive_failures} {self.media_label_plural} in a row could not "
+                               f"be embedded, which suggests a problem with the server rather than the files. "
+                               f"{embedding_error}")
+                    break
 
                 self.dataset.update_progress(processed / max_processed)
 
@@ -445,7 +452,7 @@ class EmbedMedia(BasicProcessor):
             self.save_annotations(annotations, hide_in_explorer=True)
 
         if not embedded:
-            self.dataset.finish_with_error(f"No {self.media_label_plural} could be embedded.")
+            self.dataset.finish_with_error(stopped or f"No {self.media_label_plural} could be embedded.")
             return
 
         if save_annotations and not post_id_map:
@@ -454,6 +461,12 @@ class EmbedMedia(BasicProcessor):
         status = f"Embedded {embedded:,} {self.media_label_plural} ({total_sent / 1024 / 1024:.1f} MB sent in total)"
         if skipped:
             status += f", skipped {skipped:,}"
+
+        if stopped:
+            self.dataset.finish_with_warning(
+                embedded, f"{status}. {stopped} {failed_embeddings:,} {self.media_label_plural} could not be "
+                          f"embedded in total; see the log for details.")
+            return
 
         if failed_embeddings:
             self.dataset.finish_with_warning(

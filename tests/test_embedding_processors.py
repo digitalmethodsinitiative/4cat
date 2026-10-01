@@ -1169,3 +1169,98 @@ def test_3d_plot_says_so_when_no_media_can_be_linked(tmp_path):
                 "coordinates": [float(index), 0.0]} for index in range(3)]
     processor = plot_3d(tmp_path, records, dimensions=2, top_items=[{"id": "p1", "timestamp": "2024-01-01"}])
     assert "could be linked to a post" in processor.dataset.error
+
+
+# --------------------------------------------------------------------------- #
+# failed files: a long run should survive the odd bad file, and keep its work
+
+class ScriptedClient:
+    """Embeds or fails each file in turn, following a script of True/False."""
+
+    def __init__(self, script, attempts=3):
+        self.script, self.attempts = list(script), attempts
+        self.file, self.tries = 0, 0
+
+    def embed(self, model_id, inputs, media=None, text_as_instruction=False):
+        from common.lib.exceptions import LLMServerException
+        succeeds = self.script[self.file]
+        if succeeds:
+            self.file, self.tries = self.file + 1, 0
+            return [[0.1, 0.2]]
+
+        self.tries += 1
+        if self.tries == self.attempts:
+            self.file, self.tries = self.file + 1, 0
+        raise LLMServerException("Server returned status 400: Failed to apply Qwen3VLProcessor")
+
+
+def run_media_embedder(tmp_path, monkeypatch, script):
+    """Embed one small image per script entry; return the processor."""
+    from PIL import Image
+    from processors.machine_learning import embed_media
+
+    monkeypatch.setattr(embed_media.time, "sleep", lambda seconds: None)
+
+    media = tmp_path / "images"
+    media.mkdir()
+
+    class MediaItem:
+        def __init__(self, file):
+            self.file = file
+
+    items = []
+    for index in range(len(script)):
+        path = media / f"img{index:03d}.jpg"
+        Image.new("RGB", (40, 30), (index % 255, 80, 120)).save(path)
+        items.append(MediaItem(path))
+
+    class Archive:
+        num_rows = len(items)
+
+        def iterate_items(self, processor=None, **kwargs):
+            return iter(items)
+
+    class Output(FakeDataset):
+        def finish_with_warning(self, rows, warning):
+            self.num_rows, self.warning = rows, warning
+
+    processor = EmbedImages.__new__(EmbedImages)
+    processor.dataset = Output(tmp_path, name="embeddings")
+    processor.dataset.path, processor.dataset.warning = tmp_path / "embeddings.ndjson", None
+    processor.source_dataset, processor.source_file, processor.interrupted = Archive(), None, False
+    processor.parameters = {"model": "m", "instruction": "", "amount": 0, "max_size": 64}
+    processor.resolve_model = lambda: ({"local_id": "m"}, ScriptedClient(script))
+    processor.save_annotations = lambda *args, **kwargs: None
+    processor.process()
+    return processor
+
+
+def test_scattered_failures_do_not_stop_a_run(tmp_path, monkeypatch):
+    """More failures in total than the limit, but never many in a row."""
+    script = ([True, True, False] * 15)[:45]
+    processor = run_media_embedder(tmp_path, monkeypatch, script)
+
+    assert processor.dataset.error is None
+    assert processor.dataset.num_rows == 30
+    assert "15 images could not be embedded" in processor.dataset.warning
+    assert "Stopped" not in processor.dataset.warning
+
+
+def test_failures_in_a_row_stop_but_keep_what_was_embedded(tmp_path, monkeypatch):
+    """A server that goes down fails every file; the work before that is kept."""
+    script = [True] * 5 + [False] + [True] + [False] * 12
+    processor = run_media_embedder(tmp_path, monkeypatch, script)
+
+    # finished with a warning, not an error, and with the vectors it made
+    assert processor.dataset.error is None
+    assert processor.dataset.num_rows == 6
+    assert "Stopped after 10 images in a row" in processor.dataset.warning
+    assert "11 images could not be embedded in total" in processor.dataset.warning
+    with processor.dataset.path.open(encoding="utf-8") as infile:
+        assert len(infile.readlines()) == 6
+
+
+def test_failing_from_the_start_is_still_an_error(tmp_path, monkeypatch):
+    processor = run_media_embedder(tmp_path, monkeypatch, [False] * 12)
+    assert "Stopped after 10 images in a row" in processor.dataset.error
+    assert processor.dataset.num_rows == 0
