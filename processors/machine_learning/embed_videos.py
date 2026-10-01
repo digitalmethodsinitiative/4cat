@@ -127,8 +127,10 @@ class EmbedVideos(EmbedMedia):
             self.ffmpeg, "-y", "-i", oslex.quote(str(media_path)),
             "-t", str(self.parameters.get("max_duration", 30)),
             # scale down only if the video is larger; -2 keeps the other side
-            # even, which H.264 requires
-            "-vf", f"scale='min({self.parameters.get('max_size', 448)},iw)':-2,fps={self.parameters.get('fps', 1)}",
+            # even, which H.264 requires. tpad repeats the last frame once: a
+            # clip of a second or less otherwise ends up as a single frame.
+            "-vf", f"scale='min({self.parameters.get('max_size', 448)},iw)':-2,fps={self.parameters.get('fps', 1)},"
+                   f"tpad=stop_mode=clone:stop=1",
             "-c:v", "libx264",
             "-crf", str(self.parameters.get("crf", 32)),
             "-preset", "veryfast",
