@@ -153,7 +153,7 @@ class SearchTwitterViaZeeschuimer(Search):
             "author_bio": author_bio,
             "author_location": author_location,
             "verified": author_verified,
-            "source": strip_tags(tweet["source"]),
+            "source": strip_tags(tweet.get("source", "")),
             "language_guess": tweet["legacy"].get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive", False) or tweet["legacy"].get("possibly_sensitive", False) else "no",
             "retweet_count": tweet["legacy"]["retweet_count"],
