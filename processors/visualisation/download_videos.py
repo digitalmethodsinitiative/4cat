@@ -178,6 +178,7 @@ class VideoDownloaderPlus(BasicProcessor):
         self.last_dl_status = None
         self.last_post_process_status = None
         self.warning_message = None
+        self.yt_dlp_archive_map = None
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -364,7 +365,7 @@ class VideoDownloaderPlus(BasicProcessor):
         last_domains = []
         total_urls = len(urls)
         self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
-        yt_dlp_archive_map = {}
+        self.yt_dlp_archive_map = {}
 
         # Process URLs in three tiers:
         # Tier 1: Check library and copy if available
@@ -437,7 +438,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 self.dataset.update_status("Downloading videos with YT-DLP")
                 ytdlp_results = self._process_ytdlp_downloads(
                     ytdlp_fallback_queue, urls, ydl_opts, results_path,
-                    amount, also_indirect, yt_dlp_archive_map, consecutive_errors
+                    amount, also_indirect, consecutive_errors
                 )
                 
                 self.failed_downloads += ytdlp_results["failed"]
@@ -830,18 +831,17 @@ class VideoDownloaderPlus(BasicProcessor):
 
         return result
 
-    def _process_ytdlp_downloads(self, url_list, urls_dict, ydl_opts, results_path, 
-                                  amount, also_indirect, yt_dlp_archive_map, consecutive_errors):
+    def _process_ytdlp_downloads(self, url_list, urls_dict, ydl_opts, results_path,
+                                  amount, also_indirect, consecutive_errors):
         """
         Process downloads using YT-DLP fallback
-        
+
         :param list url_list: List of URLs to download with YT-DLP
         :param dict urls_dict: URLs dictionary to update
         :param dict ydl_opts: YT-DLP options
         :param Path results_path: Path to staging area
         :param int amount: Maximum number of videos to download
         :param str also_indirect: Whether indirect downloads are allowed
-        :param dict yt_dlp_archive_map: Map of archive keys to file metadata
         :param int consecutive_errors: Current consecutive error count
         :return dict: Results dictionary with counters
         """
@@ -862,7 +862,7 @@ class VideoDownloaderPlus(BasicProcessor):
             self.videos_downloaded_from_url = set()
             ydl_opts["outtmpl"] = str(results_path) + '/' + re.sub(r"[^0-9a-z]+", "_", url.lower())[:100] + '_%(autonumber)s.%(ext)s'
             
-            ytdlp_result = self._download_single_ytdlp(url, ydl_opts, urls_dict, yt_dlp_archive_map)
+            ytdlp_result = self._download_single_ytdlp(url, ydl_opts, urls_dict)
             
             results["processed"] += 1
             
@@ -878,14 +878,13 @@ class VideoDownloaderPlus(BasicProcessor):
                     
         return results
 
-    def _download_single_ytdlp(self, url, ydl_opts, urls_dict, yt_dlp_archive_map):
+    def _download_single_ytdlp(self, url, ydl_opts, urls_dict):
         """
         Download a single URL using YT-DLP
-        
+
         :param str url: URL to download
         :param dict ydl_opts: YT-DLP options
         :param dict urls_dict: URLs dictionary to update
-        :param dict yt_dlp_archive_map: Map of archive keys to file metadata
         :return dict: Result dictionary with success flag
         """
         result = {"success": False, "should_stop": False}
@@ -910,12 +909,16 @@ class VideoDownloaderPlus(BasicProcessor):
                         info2 = ydl2.extract_info(url, download=False)
                         if info2:
                             archive_key = info2.get('extractor') + info2.get('id')
-                            if archive_key in yt_dlp_archive_map:
-                                self.url_files[info2.get('_filename', {})] = yt_dlp_archive_map[archive_key]
+                            if archive_key in self.yt_dlp_archive_map:
+                                self.url_files[info2.get('_filename', {})] = self.yt_dlp_archive_map[archive_key]
                             else:
-                                message = f"Video identified, but unable to identify which video from {url}"
+                                # yt-dlp's own archive file says this video was already downloaded,
+                                # but we have no record of which file that was (e.g. the earlier
+                                # download failed during post-processing after yt-dlp logged it as done)
+                                message = f"Video already downloaded according to yt-dlp, but the downloaded file could not be found for: {url}"
+                                urls_dict[url]['error'] = message
                                 self.dataset.log(message)
-                                self.log.warning(message)
+                                self.log.warning(f"{message} ({self.dataset.key})")
                 except Exception as e:
                     self.dataset.log(f"Error retrieving existing video info: {str(e)}")
                     
@@ -944,11 +947,6 @@ class VideoDownloaderPlus(BasicProcessor):
         # Store results
         urls_dict[url]["downloader"] = "yt_dlp"
         urls_dict[url]['files'] = list(self.url_files.values())
-        
-        for file in self.url_files.values():
-            archive_key = file.get('metadata', {}).get('extractor', '') + file.get('metadata', {}).get('id', '')
-            if archive_key:
-                yt_dlp_archive_map[archive_key] = file
 
         # Check if download was successful
         if self.last_dl_status.get('status') == 'finished' and self.last_post_process_status.get('status') == 'finished':
@@ -1019,12 +1017,21 @@ class VideoDownloaderPlus(BasicProcessor):
         """Can be used to gather information from yt-dlp while post processing the downloads"""
         self.last_post_process_status = d
         if d['status'] == 'finished':
-            self.videos_downloaded_from_url.add(d.get('info_dict',{}).get('_filename', {}))
-            self.url_files[d.get('info_dict',{}).get('_filename', {})] = {
-                "filename": Path(d.get('info_dict').get('_filename')).name,
-                "metadata": d.get('info_dict'),
+            info_dict = d.get('info_dict', {})
+            self.videos_downloaded_from_url.add(info_dict.get('_filename', {}))
+            file = {
+                "filename": Path(info_dict.get('_filename')).name,
+                "metadata": info_dict,
                 "success": True
             }
+            self.url_files[info_dict.get('_filename', {})] = file
+
+            # Record this in the archive map immediately, so a later video that yt-dlp recognises
+            # as already-downloaded can still be matched to the file that was written for it,
+            # even if this download goes on to fail during post-processing.
+            archive_key = info_dict.get('extractor', '') + info_dict.get('id', '')
+            if archive_key and self.yt_dlp_archive_map is not None:
+                self.yt_dlp_archive_map[archive_key] = file
         if self.interrupted:
             raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
