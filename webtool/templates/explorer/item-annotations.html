@@ -48,13 +48,13 @@
                                     </ul>
                                 </div>
                             {% elif type == "text" %}
-                                <input type="text" class="item-annotation-input" value="{{ annotation.value }}">
+                                <input type="text" class="item-annotation-input" value="{{ annotation.value }}"{% if not can_annotate %} disabled{% endif %}>
 
                             {% elif type == "textarea" %}
-                                <textarea class="item-annotation-input">{{ annotation.value }}</textarea>
+                                <textarea class="item-annotation-input"{% if not can_annotate %} disabled{% endif %}>{{ annotation.value }}</textarea>
 
                             {% elif type == "dropdown" %}
-                                <select class="item-annotation-input">
+                                <select class="item-annotation-input"{% if not can_annotate %} disabled{% endif %}>
                                     <option class="item-annotation-option" value=""></option>
 
                                 {% for option_id, option_label in annotation_fields[field_id]["options"].items() %}
@@ -67,7 +67,7 @@
                                 {% for option_id, option_label in annotation_fields[field_id]["options"].items() %}
                                     <div class="item-annotation-checkbox-container">
                                         {% set checked = "checked" if option_label in annotation.value else "" %}
-                                        <input type="checkbox" class="item-annotation-input option-{{ option_id }}" id="option-{{ item_id }}-{{ option_id }}" value="{{ option_label }}" {{ checked }}><label for="option-{{ item_id }}-{{ option_id }}">{{ option_label }}</label>
+                                        <input type="checkbox" class="item-annotation-input option-{{ option_id }}" id="option-{{ item_id }}-{{ option_id }}" value="{{ option_label }}" {{ checked }}{% if not can_annotate %} disabled{% endif %}><label for="option-{{ item_id }}-{{ option_id }}">{{ option_label }}</label>
                                     </div>
                                 {% endfor %}
                                 </div>
