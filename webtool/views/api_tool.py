@@ -1457,8 +1457,14 @@ def export_packed_dataset(key=None, component=None):
 	except DataSetException:
 		return error(404, error="Dataset not found.")
 
-	if not current_user.can_access_dataset(dataset=dataset, role="owner"):
-		return error(403, error=f"You cannot export this dataset. {current_user}")
+	# an export holds the dataset's full database record, including all
+	# parameters and the log, so viewing access is not enough: only owners and
+	# users who may view or manipulate all datasets can export it. this also
+	# applies to public datasets.
+	if not (g.config.get("privileges.admin.can_manipulate_all_datasets")
+			or g.config.get("privileges.can_view_private_datasets")
+			or dataset.is_accessible_by(current_user, "owner")):
+		return error(403, error="You cannot export this dataset.")
 
 	if not dataset.is_finished():
 		return error(403, error="You cannot export unfinished datasets.")
