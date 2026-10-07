@@ -2147,36 +2147,32 @@ class DataSet(FourcatModule):
         compatibility through. This may not be the same reader the dataset was
         instantiated with, e.g. when checking whether some other user should
         be able to run processors on this dataset.
-        :param bool exclude_hidden:  Exclude processors that should be displayed
-        in the UI? If `False`, all processors are returned.
+        :param bool exclude_hidden:  Exclude processors that should not be
+        displayed in the UI? If `False`, all processors are returned.
 
         :return dict:  Available processors, `name => properties` mapping
         """
-        if self.available_processors:
-            # Update to reflect exclude_hidden parameter which may be different from last call
-            # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-            return {
-                processor_type: processor
-                for processor_type, processor in self.available_processors.items()
-                if not exclude_hidden or not processor.is_hidden
-            }
+        # The cache always holds the full list, hidden processors included, so
+        # that every call can apply its own exclude_hidden to it
+        # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
+        if not self.available_processors:
+            processors = self.get_compatible_processors(config=config)
 
-        processors = self.get_compatible_processors(config=config)
+            for analysis in self.get_children(update=True):
+                if analysis.type not in processors:
+                    continue
 
-        for analysis in self.get_children(update=True):
-            if analysis.type not in processors:
-                continue
+                if not processors[analysis.type].get_options(parent_dataset=self, config=config):
+                    # No variable options; this processor has been run so remove
+                    del processors[analysis.type]
 
-            if not processors[analysis.type].get_options(parent_dataset=self, config=config):
-                # No variable options; this processor has been run so remove
-                del processors[analysis.type]
-                continue
+            self.available_processors = processors
 
-            if exclude_hidden and processors[analysis.type].is_hidden:
-                del processors[analysis.type]
-
-        self.available_processors = processors
-        return processors
+        return {
+            processor_type: processor
+            for processor_type, processor in self.available_processors.items()
+            if not exclude_hidden or not processor.is_hidden
+        }
 
     def link_job(self, job):
         """

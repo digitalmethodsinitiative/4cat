@@ -34,6 +34,9 @@ class ClarifaiAPIFetcher(BasicProcessor):
                   "requests will be credited by Clarifai to the owner of the API token you provide."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
 
+    # Clarifai API has been shutdown July 2026. Keeping hidden so existing datasets still appear and processors can run on them
+    is_hidden = True  # Hide this processor from the UI, since the API is no longer available
+
     # Allow on image sets
     compatibility = Compatibility(media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"])
 
