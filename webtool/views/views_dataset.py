@@ -437,7 +437,7 @@ def preview_items(key):
 
                 rows.append(row)
 
-        except NotImplementedError:
+        except (NotImplementedError, FileNotFoundError):
             return error(404)
 
         if not rows and dataset.num_rows > 0:

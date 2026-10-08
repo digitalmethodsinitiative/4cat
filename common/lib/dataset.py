@@ -583,7 +583,11 @@ class DataSet(FourcatModule):
             default_strategy = map_missing
             map_missing = {}
 
-        iterator = self._iterate_items if self.get_extension() != "zip" else self._iterate_archive_contents
+        extension = self.get_extension()
+        if extension is False:
+            raise FileNotFoundError(f"Results file for dataset {self.key} does not exist: {self.get_results_path()}")
+
+        iterator = self._iterate_items if extension != "zip" else self._iterate_archive_contents
 
         # Loop through items
         for i, item in enumerate(iterator(processor=processor, offset=offset, *args, **kwargs)):
