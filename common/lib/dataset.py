@@ -359,6 +359,16 @@ class DataSet(FourcatModule):
                     if i < offset:
                         continue
 
+                    # csv.DictReader does not fail on a row with more values
+                    # than the file has columns, but puts the extra values
+                    # under the key None. Nothing that reads items expects
+                    # that key, so stop here and say where the file is broken
+                    if None in item:
+                        raise DataSetException(
+                            f"Cannot read dataset {self.key}: line {reader.line_num} of its CSV file has "
+                            f"{len(item[None])} more value(s) than the file has columns"
+                        )
+
                     yield item
 
         elif path.suffix.lower() == ".ndjson":
