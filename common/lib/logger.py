@@ -445,7 +445,7 @@ class Logger:
         :param bool force_slack:  Also send the message to Slack (if a webhook
         is set up), whatever the Slack alert level
         """
-        self.log(message, logging.INFO, force_slack=force_slack)
+        self.log(message, logging.INFO, frame, force_slack=force_slack)
 
     def warning(self, message, frame=None, force_slack=False):
         """
