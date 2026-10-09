@@ -59,7 +59,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 # this is also done in the backend, but the frontend may not be able to connect
 # while the backend is, for example
 if config.get("MEMCACHE_SERVER"):
-    if config.get_memcache():
+    if config.cache.is_available():
         log.debug("Memcache connection initialized")
     else:
         log.warning(
@@ -140,7 +140,7 @@ app.login_manager.login_view = "user.show_login"
 
 # initialize rate limiter - memcache can serve as the storage backend, if not
 # available, direct memory storage will be used
-if config.get_memcache():
+if config.cache.is_available():
     app.limiter = Limiter(app=app, key_func=get_remote_address, storage_uri=f"memcached://{config.get('MEMCACHE_SERVER')}")
 else:
     app.limiter = Limiter(app=app, key_func=get_remote_address)

@@ -89,6 +89,35 @@ class WebHookLogHandler(HTTPHandler):
             self.handleError(record)
 
 
+class SlackAlertFilter(logging.Filter):
+    """
+    Decide which log messages are sent to Slack
+
+    Messages at or above the configured alert level are sent, and so are
+    messages logged with `force_slack=True`, whatever their level. The Slack
+    handler itself lets all messages through to this filter. Lowering the
+    handler's level for a single message instead would not be safe: the logger
+    is shared by many threads, and their messages could be sent to Slack in the
+    meantime.
+    """
+    def __init__(self, level):
+        """
+        :param int level:  Alert level; messages at this level or above are
+        sent to Slack
+        """
+        super().__init__()
+        self.level = level
+
+    def filter(self, record):
+        """
+        Check if a message should be sent to Slack
+
+        :param logging.LogRecord record:  Log record
+        :return bool:
+        """
+        return record.levelno >= self.level or getattr(record, "force_slack", False)
+
+
 class SlackLogHandler(WebHookLogHandler):
     """
     Slack webhook log handler
@@ -348,10 +377,11 @@ class Logger:
         """
         if config.get("logging.slack.webhook"):
             slack_handler = SlackLogHandler(config.get("logging.slack.webhook"), config=config)
-            slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
+            alert_level = self.levels.get(config.get("logging.slack.level"), self.levels[self.alert_level])
+            slack_handler.addFilter(SlackAlertFilter(alert_level))
             self.logger.addHandler(slack_handler)
 
-    def log(self, message, level=logging.INFO, frame=None):
+    def log(self, message, level=logging.INFO, frame=None, force_slack=False):
         """
         Log message
 
@@ -359,6 +389,8 @@ class Logger:
         :param level:  Severity level, should be a logger.* constant
         :param frame:  Traceback frame. If no frame is given, it is
         extrapolated
+        :param bool force_slack:  Also send the message to Slack (if a webhook
+        is set up), whatever the Slack alert level
         """
         if type(frame) is traceback.StackSummary:
             # Full stack was provided
@@ -377,9 +409,10 @@ class Logger:
 
         # Logging uses the location, Slack uses the full stack
         location = frame.filename.split("/")[-1] + ":" + str(frame.lineno)
-        self.logger.log(level, message, extra={"location": location, "frame": frame, "stack": stack})
+        self.logger.log(level, message, extra={"location": location, "frame": frame, "stack": stack,
+                                                  "force_slack": force_slack})
 
-    def debug2(self, message, frame=None):
+    def debug2(self, message, frame=None, force_slack=False):
         """
         Log DEBUG2 level message
 
@@ -387,59 +420,73 @@ class Logger:
 
         :param message: Message to log
         :param frame:  Traceback frame relating to the error
+        :param bool force_slack:  Also send the message to Slack (if a webhook
+        is set up), whatever the Slack alert level
         """
-        self.log(message, 5, frame)
+        self.log(message, 5, frame, force_slack=force_slack)
 
-    def debug(self, message, frame=None):
+    def debug(self, message, frame=None, force_slack=False):
         """
         Log DEBUG level message
 
         :param message: Message to log
         :param frame:  Traceback frame relating to the error
+        :param bool force_slack:  Also send the message to Slack (if a webhook
+        is set up), whatever the Slack alert level
         """
-        self.log(message, logging.DEBUG, frame)
+        self.log(message, logging.DEBUG, frame, force_slack=force_slack)
 
-    def info(self, message, frame=None):
+    def info(self, message, frame=None, force_slack=False):
         """
         Log INFO level message
 
         :param message: Message to log
         :param frame:  Traceback frame relating to the error
+        :param bool force_slack:  Also send the message to Slack (if a webhook
+        is set up), whatever the Slack alert level
         """
-        self.log(message, logging.INFO)
+        self.log(message, logging.INFO, force_slack=force_slack)
 
-    def warning(self, message, frame=None):
+    def warning(self, message, frame=None, force_slack=False):
         """
         Log WARNING level message
 
         :param message: Message to log
         :param frame:  Traceback frame relating to the error
+        :param bool force_slack:  Also send the message to Slack (if a webhook
+        is set up), whatever the Slack alert level
         """
-        self.log(message, logging.WARN, frame)
+        self.log(message, logging.WARN, frame, force_slack=force_slack)
 
-    def error(self, message, frame=None):
+    def error(self, message, frame=None, force_slack=False):
         """
         Log ERROR level message
 
         :param message: Message to log
         :param frame:  Traceback frame relating to the error
+        :param bool force_slack:  Also send the message to Slack (if a webhook
+        is set up), whatever the Slack alert level
         """
-        self.log(message, logging.ERROR, frame)
+        self.log(message, logging.ERROR, frame, force_slack=force_slack)
 
-    def critical(self, message, frame=None):
+    def critical(self, message, frame=None, force_slack=False):
         """
         Log CRITICAL level message
 
         :param message: Message to log
         :param frame:  Traceback frame relating to the error
+        :param bool force_slack:  Also send the message to Slack (if a webhook
+        is set up), whatever the Slack alert level
         """
-        self.log(message, logging.CRITICAL, frame)
+        self.log(message, logging.CRITICAL, frame, force_slack=force_slack)
 
-    def fatal(self, message, frame=None):
+    def fatal(self, message, frame=None, force_slack=False):
         """
         Log FATAL level message
 
         :param message: Message to log
         :param frame:  Traceback frame relating to the error
+        :param bool force_slack:  Also send the message to Slack (if a webhook
+        is set up), whatever the Slack alert level
         """
-        self.log(message, logging.FATAL, frame)
+        self.log(message, logging.FATAL, frame, force_slack=force_slack)
