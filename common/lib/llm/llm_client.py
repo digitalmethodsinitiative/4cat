@@ -33,8 +33,9 @@ class LLMServerClient:
         from common.lib.llm.clients.litellm_client import LiteLLMClient
         from common.lib.llm.clients.openai_client import OpenAICompatibleClient
         from common.lib.llm.clients.thirdparty_client import ThirdPartyClient
+        from common.lib.llm.clients.uva_litellm_client import UvALiteLLMClient
 
-        for client_type in (OllamaClient, LiteLLMClient, OpenAICompatibleClient, ThirdPartyClient):
+        for client_type in (UvALiteLLMClient, OllamaClient, LiteLLMClient, OpenAICompatibleClient, ThirdPartyClient):
             if client_type.type == server_config["type"]:
                 return client_type(config, server_config, log=log)
 
@@ -77,6 +78,7 @@ class LLMServerClient:
         :return:  `False` if the server is not responding, or an HTTP status code.
         """
         try:
+            print(f"{self.base_url}{self._models_info_path}")
             r = self._session.get(
                 f"{self.base_url}{self._models_info_path}",
                 headers=self._headers,

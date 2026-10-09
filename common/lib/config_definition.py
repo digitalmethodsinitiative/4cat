@@ -621,6 +621,7 @@ config_definition = {
                     "litellm": "LiteLLM",
                     "openai-like": "OpenAI compatible API (LM Studio, vLLM, etc)",
                     "thirdparty": "Third-party models from OpenAI, Anthropic, Mistral, etc",
+                    "litellm-uva": "LiteLLM (UvA version)",
                     "none": "None",
                 },
             },
