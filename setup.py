@@ -68,6 +68,7 @@ processor_packages = {
 	"scenedetect[opencv]>=0.7",  # video_scene_identifier
 	"scikit-learn",  # image_wall, histwords, tf_idf, topic_modeling, classification_evaluation, confusion_matrix
 	"Telethon~=1.36.0",  # search_telegram, download_telegram_videos, download-telegram-images
+	"umap-learn~=0.5.5",  # embedding_map
 	"unidecode~=1.3",  # accent_fold
 	"wordcloud~=1.8",  # word-cloud
 	# The https://github.com/akamhy/videohash is not being maintained anymore; these are two patches

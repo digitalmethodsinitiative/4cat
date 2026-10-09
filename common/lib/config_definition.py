@@ -636,13 +636,13 @@ config_definition = {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Authentication Header",
                 "default": "",
-                "tooltip": "The HTTP header used to authenticate with the server (e.g. 'X-API-KEY', 'Authorization'). Passed with the Authentication Key as value.",
+                "tooltip": "The HTTP header used to authenticate with the server (e.g. 'X-API-KEY', 'Authorization'). Passed with the Authentication Key as value. For a bearer token you can write either 'Authorization' with 'Bearer <key>' as the value, or 'Authorization: Bearer' with just the key.",
             },
             "auth_key": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "Authentication Key",
-                "tooltip": "The API key to access the LLM server, if required.",
+                "tooltip": "The API key to access the LLM server, if required. 'Bearer <key>' for bearer tokens.",
             },
         }
     },

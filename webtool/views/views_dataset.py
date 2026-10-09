@@ -420,7 +420,7 @@ def preview_items(key):
 
     elif dataset.get_extension() == "html":
         # just render the file!
-        with dataset.get_results_path().open() as infile:
+        with dataset.get_results_path().open(encoding="utf-8") as infile:
             return render_template("preview/html.html", html=infile.read())
 
     elif dataset.get_extension() not in ("json", "ndjson") or use_mapper:
@@ -467,7 +467,7 @@ def preview_items(key):
         if datafile.stat().st_size > preview_bytes:
             # larger than 3MB
             # is this a list?
-            with datafile.open() as infile:
+            with datafile.open(encoding="utf-8") as infile:
                 if infile.read(1) == "[":
                     # it's a list! use json_stream to stream the first items
                     infile.seek(0)
@@ -485,7 +485,7 @@ def preview_items(key):
                 else:
                     data = "Data file too large; cannot preview"
         else:
-            with datafile.open() as infile:
+            with datafile.open(encoding="utf-8") as infile:
                 data = infile.read()
 
         return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
@@ -498,7 +498,7 @@ def preview_items(key):
         truncated = False
         data = []
 
-        with datafile.open() as infile:
+        with datafile.open(encoding="utf-8") as infile:
             while infile.tell() < preview_bytes:
                 line = infile.readline()
                 if line == "":

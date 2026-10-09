@@ -162,3 +162,9 @@ class MediaSignatureException(FourcatException):
     Raise in media processors when the media cannot be read
     """
     pass
+
+class LLMServerException(FourcatException):
+    """
+    Raise when an LLM server request fails or returns something unusable
+    """
+    pass
