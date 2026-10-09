@@ -23,13 +23,19 @@ class ProcessorPreset(BasicProcessor):
 
 		pipeline = self.format_linear_pipeline(pipeline)
 
+		# the deeper pipeline steps are checked as they are created in
+		# after_process; the first step is created here, so check it here
+		self.warn_unexpected_parameters(
+			self.modules.processors.get(pipeline[0]["type"]), pipeline[0]["parameters"],
+			self.dataset, self.config, self.log)
+
 		analysis_pipeline = DataSet(
 			parameters=pipeline[0]["parameters"],
 			db=self.db,
 			type=pipeline[0]["type"],
 			owner=self.dataset.creator,
 			is_private=self.dataset.is_private,
-			parent=self.dataset.key, 
+			parent=self.dataset.key,
 			modules=self.modules)
 		
 		# give same ownership as parent dataset

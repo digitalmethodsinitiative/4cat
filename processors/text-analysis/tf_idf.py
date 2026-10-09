@@ -99,7 +99,7 @@ class TfIdf(BasicProcessor):
 			},
 			"n_size": {
 				"type": UserInput.OPTION_CHOICE,
-				"default": "",
+				"default": "1",
 				"options": {"1":"unigrams (1)", "2": "bigrams (2)", "3": "trigrams", "1-2": "uni- and bigrams (1-2)", "1-3": "uni-, bi-, and trigrams (1-3)"},
 				"help": "[scikit-learn] Amount of words to return",
 				"tooltip":  "Selecting a range can be useful to e.g. extract multi-word nouns like names.",

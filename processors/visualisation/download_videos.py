@@ -96,6 +96,11 @@ class VideoDownloaderPlus(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "video"  # media type of the processor
 
+    # `also_indirect` is offered as an option only when the admin allows
+    # indirect downloads, but it is always read, and the TikTok downloader
+    # preset deliberately passes it, so declare that it is accepted
+    accepted_parameters = ("also_indirect",)
+
     # Shared list -- other download_* processors reuse this as VideoDownloaderPlus.followups
     # (and preferred_followups below reuses it), so it stays a named attribute.
     followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]

@@ -216,6 +216,7 @@ class SearchCustom(BasicProcessor):
         else:
             self.dataset.finish(done)
 
+    @staticmethod
     def validate_query(query, request, config):
         """
         Validate custom data input
