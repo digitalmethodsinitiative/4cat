@@ -103,7 +103,7 @@ class LLMAdapter:
                 self.client_kwargs.setdefault("headers", {})[self.server["auth_header"]] = self.server["auth_key"]
             chat_params.update({"client_kwargs": self.client_kwargs})
 
-        elif wrapper in {"litellm", "litellm-uva", "openai-like"}:
+        elif wrapper in {"litellm", "openai-like"}:
             url = f"{self.server['url']}/" if not self.server["url"].endswith("/") else self.server['url']
             url += "v1/" if not url.endswith("v1/") else ""
 
