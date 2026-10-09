@@ -2,6 +2,7 @@
 Cache for data that can always be read from the database again
 """
 import threading
+import hashlib
 import time
 
 from pymemcache.client.base import Client as MemcacheClient
@@ -93,6 +94,7 @@ class DatabaseCache:
         :return:  The cached value, or `CacheMiss` if there is none or memcache
         cannot be used
         """
+        key = self._safe_key(key)
         return self._command(lambda client: client.get(key, default=CacheMiss), failed=CacheMiss)
 
     def set(self, key, value):
@@ -104,6 +106,7 @@ class DatabaseCache:
         :param bytes|str key:  Key
         :param value:  Value to cache
         """
+        key = self._safe_key(key)
         self._command(lambda client: client.set(key, value, expire=self.expire, noreply=False))
 
     def delete(self, key):
@@ -115,6 +118,7 @@ class DatabaseCache:
 
         :param bytes|str key:  Key
         """
+        key = self._safe_key(key)
         self._command(lambda client: client.delete(key, noreply=False), removes=True)
 
     def clear(self):
@@ -149,6 +153,28 @@ class DatabaseCache:
                     del self._connections.client
                 except AttributeError:
                     pass
+
+    def _safe_key(self, key):
+        """
+        Make a key that memcache accepts
+
+        Keys are made from setting names, tags and user names, which can
+        contain any character. Memcache only accepts keys of up to 250 bytes,
+        prefix included, without spaces or control characters, and pymemcache
+        only accepts ASCII text. A key that does not fit these rules is
+        replaced by a code made from it (a hash), so its value can still be
+        cached.
+
+        :param bytes|str key:  Key
+        :return bytes:  Key that memcache accepts
+        """
+        if isinstance(key, str):
+            key = key.encode("utf-8")
+
+        if len(self.key_prefix) + len(key) <= 250 and all(0x21 <= byte <= 0x7e for byte in key):
+            return key
+
+        return b"hash-" + hashlib.sha256(key).hexdigest().encode("ascii")
 
     def _connect(self):
         """

@@ -15,6 +15,7 @@ import threading
 import pytest
 
 from unittest.mock import MagicMock
+from pymemcache.client.base import check_key_helper
 from pymemcache.exceptions import MemcacheServerError, MemcacheUnexpectedCloseError
 
 import common.lib.database_cache
@@ -67,10 +68,12 @@ class FakeMemcacheClient:
         return b"1.6"
 
     def get(self, key, default=None):
+        check_key_helper(key, False, b"test")
         self._check()
         return self.server.values.get(key, default)
 
     def set(self, key, value, expire=0, noreply=None):
+        check_key_helper(key, False, b"test")
         self._check()
         if self.server.refuse_values:
             raise MemcacheServerError("object too large for cache")
@@ -79,6 +82,7 @@ class FakeMemcacheClient:
         return True
 
     def delete(self, key, noreply=None):
+        check_key_helper(key, False, b"test")
         self._check()
         if self.server.refuse_removals:
             raise MemcacheServerError("out of memory")
@@ -110,12 +114,42 @@ def time_for_next_attempt(cache):
     cache._next_attempt = 0
 
 
+def make_config_manager(memcache_server):
+    """
+    Config manager built without running __init__, which would read
+    config.ini and connect to the database
+    """
+    instance = object.__new__(ConfigManager)
+    instance.core_settings = {"MEMCACHE_SERVER": memcache_server}
+    instance.db = MagicMock()
+    instance.logger = MagicMock()
+    return instance
+
+
 def test_values_are_cached_and_expire(cache, server):
     cache.set("key", "value")
 
     assert cache.get("key") == "value"
-    assert server.expire["key"] == DatabaseCache.expire
+    assert server.expire[b"key"] == DatabaseCache.expire
     assert cache.get("other key") is CacheMiss
+
+
+def test_any_key_can_be_cached(cache, server):
+    """
+    Keys are made from setting names, tags and user names, which can contain
+    characters memcache does not accept in a key. Their values are cached all
+    the same.
+    """
+    keys = ["user:müller@example.com", "tag with spaces", "x" * 300]
+    for key in keys:
+        cache.set(key, key)
+
+    assert [cache.get(key) for key in keys] == keys
+    cache.logger.warning.assert_not_called()
+
+    cache.delete(keys[0])
+    assert cache.get(keys[0]) is CacheMiss
+    assert cache._down_since is None
 
 
 def test_restart_handled_by_reconnecting(cache, server):
@@ -160,7 +194,7 @@ def test_cleared_before_use_after_failed_removal(cache, server):
     # the removal and the retry time out, while memcache keeps its values
     server.timeouts = 2
     cache.delete("key")
-    assert server.values["key"] == "old value"
+    assert server.values[b"key"] == "old value"
     assert cache.get("key") is CacheMiss
 
     time_for_next_attempt(cache)
@@ -270,17 +304,8 @@ def test_config_manager_reads_changed_setting_after_failed_removal(server, monke
     """
     monkeypatch.setattr(ConfigManager, "_cache", None)
 
-    def config_manager():
-        # built without running __init__, which would read config.ini and
-        # connect to the database
-        instance = object.__new__(ConfigManager)
-        instance.core_settings = {"MEMCACHE_SERVER": "localhost:11211"}
-        instance.db = MagicMock()
-        instance.logger = MagicMock()
-        return instance
-
-    config = config_manager()
-    assert config.cache is config_manager().cache
+    config = make_config_manager("localhost:11211")
+    assert config.cache is make_config_manager("localhost:11211").cache
 
     config.db.fetchall.return_value = [{"tag": "", "value": json.dumps("old value")}]
     assert config.get("test.setting") == "old value"
@@ -292,3 +317,19 @@ def test_config_manager_reads_changed_setting_after_failed_removal(server, monke
 
     time_for_next_attempt(config.cache)
     assert config.get("test.setting") == "new value"
+
+
+@pytest.mark.parametrize("memcache_server", ["localhost:11211", None])
+def test_config_manager_reads_setting_for_any_user_name(server, monkeypatch, memcache_server):
+    """
+    A user name with characters memcache does not accept in a key does not
+    stop settings from being read, with or without memcache
+    """
+    monkeypatch.setattr(ConfigManager, "_cache", None)
+
+    config = make_config_manager(memcache_server)
+    config.db.fetchone.return_value = {"tags": []}
+    config.db.fetchall.return_value = [{"tag": "", "value": json.dumps("value")}]
+
+    assert config.get("test.setting", user="müller@example.com") == "value"
+    config.logger.warning.assert_not_called()

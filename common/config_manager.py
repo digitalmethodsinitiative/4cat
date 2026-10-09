@@ -563,7 +563,7 @@ class ConfigManager(BaseConfigReader):
         if tag_bit:
             memcache_id += f"-{'-'.join(tag_bit)}"
 
-        return memcache_id.encode("ascii")
+        return memcache_id
 
     def __getattr__(self, attr):
         """
