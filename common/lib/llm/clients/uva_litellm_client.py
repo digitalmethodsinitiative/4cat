@@ -3,12 +3,12 @@ Centralized HTTP client for communicating with a LiteLLM server.
 """
 from common.lib.llm.llm_client import LLMServerClient
 
-class LiteLLMClient(LLMServerClient):
-    type = "litellm"
+class UvALiteLLMClient(LLMServerClient):
+    type = "litellm-uva"
 
-    _models_info_path = "/model/info"
+    _models_info_path = "/v1/models"
     _models_info_key = "data"
-    _model_id_key = "model_name"
+    _model_id_key = "id"
 
     def parse_supported_media_types(self, meta: dict) -> list[str]:
         """
@@ -44,7 +44,9 @@ class LiteLLMClient(LLMServerClient):
         if meta.get("model_name"):
             model_name = meta["model_name"]
 
-        if meta["litellm_params"].get("model"):
+        if meta.get("litellm_params", {}).get("model"):
             model_name = "/".join(meta["litellm_params"].get("model").split("/")[1:])
+
+        model_name = meta[self._model_id_key]
 
         return model_name
