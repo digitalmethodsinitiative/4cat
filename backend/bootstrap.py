@@ -56,6 +56,7 @@ def run(as_daemon=True, log_level="INFO"):
 		log = Logger(output=not as_daemon, log_path=log_folder.joinpath("backend_4cat.log"), log_level=log_level)
 
 	log.info("4CAT Backend started, logger initialised")
+	config.with_logger(log)
 	db = Database(logger=log, appname="main",
 				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
 	queue = JobQueue(logger=log, database=db)
@@ -64,14 +65,11 @@ def run(as_daemon=True, log_level="INFO"):
 	db.commit()
 	queue.release_all()
 
-	# test memcache and clear upon backend restart
-	if config.get("MEMCACHE_SERVER"):
-		if config.get_memcache():
-			log.debug("Memcache connection initialized - clearing")
-			config.clear_cache()
-		else:
-			log.warning(f"Memcache server address configured, but connection could not be initialized at "
-						f"{config.get('MEMCACHE_SERVER')}. Back-end configuration cache inactive.")
+	# test memcache and clear upon backend restart. If it cannot be reached,
+	# the cache logs that itself, and clears memcache once it can.
+	if config.get("MEMCACHE_SERVER") and config.cache.is_available():
+		log.debug("Memcache connection initialized - clearing")
+		config.clear_cache()
 
 	# ensure database consistency for settings table
 	config.with_db(db)

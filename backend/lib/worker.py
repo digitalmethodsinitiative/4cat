@@ -163,11 +163,11 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
                 except Exception:
                     pass  # log likely broken already
             
-            # Explicitly close this thread's memcache client to avoid lingering sockets
+            # Explicitly close this thread's memcache connection to avoid lingering sockets
             try:
                 cfg = getattr(self.modules, "config", None)
                 if cfg:
-                    cfg.close_memcache()
+                    cfg.cache.close()
             except Exception:
                 pass
 
