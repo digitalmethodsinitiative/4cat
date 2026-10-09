@@ -6,11 +6,12 @@ import hashlib
 import time
 
 from pymemcache.client.base import Client as MemcacheClient
-from pymemcache.exceptions import MemcacheError, MemcacheClientError, MemcacheServerError, MemcacheUnexpectedCloseError
+from pymemcache.exceptions import MemcacheError, MemcacheClientError, MemcacheServerError, MemcacheIllegalInputError, \
+    MemcacheUnexpectedCloseError
 from pymemcache import serde
 
 # Errors that mean memcache cannot be used right now
-MEMCACHE_ERRORS = (MemcacheError, OSError, ValueError)
+MEMCACHE_ERRORS = (MemcacheError, OSError, ValueError, SystemError)
 
 
 class CacheMiss:
@@ -22,7 +23,7 @@ class CacheMiss:
 
 class DatabaseCache:
     """
-    Use memcache to server data faster than reading it from the database.
+    Use memcache to serve data faster than reading it from the database.
     
     4CAT does not depend on it as data can always be read from the database 
     again. When memcache cannot be used, `get()` returns `CacheMiss`
@@ -68,7 +69,8 @@ class DatabaseCache:
         :param str|None server:  Memcache server address, e.g.
         `localhost:11211`. If `None`, nothing is cached.
         :param bytes key_prefix:  Put in front of all keys, to keep them apart
-        from those of other users of the same memcache server
+        from those of other users of the same memcache server. Clearing the
+        cache still removes their values too; see `clear()`.
         :param logger:  4CAT logger to report problems with memcache to
         """
         self.server = server
@@ -78,7 +80,7 @@ class DatabaseCache:
         self._connections = threading.local()
 
         # whether memcache is down, and what to do about it; only changed
-        # while holding the lock
+        # while holding the lock.
         self._lock = threading.Lock()
         self._down_since = None
         self._last_failure = 0
@@ -124,6 +126,11 @@ class DatabaseCache:
     def clear(self):
         """
         Remove all cached values
+
+        This clears the whole memcache server, not only the keys with this
+        cache's prefix, because memcache cannot remove keys by prefix. Other
+        users of the same server lose their values too, e.g. the rate limiter
+        of 4CAT's web interface, which then starts counting again.
         """
         self._command(lambda client: client.flush_all(noreply=False), removes=True)
 
@@ -257,32 +264,33 @@ class DatabaseCache:
         """
         Check if memcache works, but refused a command
 
-        E.g. for a key memcache does not accept, or a value larger than it can
-        store. Nothing can be cached under such a key, so nothing wrong can be
-        read from it later; memcache can still be used for other values. But
-        when memcache itself answers a removal with an error, the value may
-        still be cached, so that counts as memcache failing.
+        E.g. a value larger than memcache can store. Memcache can still be used
+        for other values. A command that pymemcache refuses before sending it
+        changes nothing in memcache, so that never counts as memcache failing.
+        But when memcache itself answers a removal with an error, the value may
+        still be cached, so that does count as memcache failing.
 
         :param Exception error:  The error memcache ran into
         :param bool removes:  Whether the command removes cached values
         :return bool:
         """
-        if isinstance(error, MemcacheUnexpectedCloseError):
-            # the connection was closed
-            return False
-        if isinstance(error, MemcacheClientError):
+        if isinstance(error, MemcacheIllegalInputError):
+            # refused by pymemcache, before it was sent
             return True
-        return isinstance(error, MemcacheServerError) and not removes
+        if removes or isinstance(error, MemcacheUnexpectedCloseError):
+            # a removal that may not have happened, or a closed connection
+            return False
+        return isinstance(error, (MemcacheClientError, MemcacheServerError))
 
     def _ready(self):
         """
         Check if memcache can be used
 
         After memcache fails it is down: it is not used until it can be reached
-        again *and* has been cleared, because a cached value that could not be
-        removed in the meantime would otherwise be read again. One thread tries
-        this every `retry_interval` seconds; the other threads read from the
-        database meanwhile.
+        again *and* has been cleared (see `clear()`), because a cached value
+        that could not be removed in the meantime would otherwise be read
+        again. A thread tries this every `retry_interval` seconds while the other
+        threads read from the database meanwhile.
 
         :return bool:
         """
@@ -290,7 +298,7 @@ class DatabaseCache:
             return True
 
         with self._lock:
-            attempt_started = time.time()
+            attempt_started = time.monotonic()
             if self._down_since is None:
                 return True
             if attempt_started < self._next_attempt:
@@ -320,7 +328,7 @@ class DatabaseCache:
 
         if self.logger:
             self.logger.info(f"Memcache can be reached again after being down for "
-                             f"{self._describe_duration(time.time() - down_since)}. It was cleared and is used again.",
+                             f"{self._describe_duration(time.monotonic() - down_since)}. It was cleared and is used again.",
                              force_slack=True)
         return True
 
@@ -332,7 +340,7 @@ class DatabaseCache:
         """
         message = None
         with self._lock:
-            now = time.time()
+            now = time.monotonic()
             self._last_failure = now
             if self._down_since is None:
                 self._down_since = now
@@ -361,8 +369,9 @@ class DatabaseCache:
         :return bool:
         """
         with self._lock:
-            now = time.time()
-            if now - self._logged_at.get(kind, 0) < 60:
+            now = time.monotonic()
+            last_logged = self._logged_at.get(kind)
+            if last_logged is not None and now - last_logged < 60:
                 return False
             self._logged_at[kind] = now
             return True

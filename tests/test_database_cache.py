@@ -11,12 +11,13 @@ again.
 import json
 import socket
 import threading
+import time
 
 import pytest
 
 from unittest.mock import MagicMock
 from pymemcache.client.base import check_key_helper
-from pymemcache.exceptions import MemcacheServerError, MemcacheUnexpectedCloseError
+from pymemcache.exceptions import MemcacheServerError, MemcacheUnexpectedCloseError, MemcacheUnknownCommandError
 
 import common.lib.database_cache
 from common.lib.database_cache import DatabaseCache, CacheMiss
@@ -36,6 +37,7 @@ class FakeMemcacheServer:
         self.commands = 0
         self.refuse_values = False
         self.refuse_removals = False
+        self.refuse_clearing = False
 
     def restart(self):
         """
@@ -91,6 +93,8 @@ class FakeMemcacheClient:
 
     def flush_all(self, noreply=None):
         self._check()
+        if self.server.refuse_clearing:
+            raise MemcacheUnknownCommandError()
         self.server.values.clear()
         return True
 
@@ -231,6 +235,31 @@ def test_refused_removal_counts_as_failure(cache, server):
     assert cache.get("key") is CacheMiss
 
 
+def test_clearing_answered_with_error_counts_as_failure(cache, server):
+    """
+    When memcache answers a clearing with an error (e.g. a memcache proxy that
+    does not support it), old values may still be cached, so memcache is not
+    used until it has been cleared
+    """
+    server.refuse_clearing = True
+    cache.clear()
+    assert cache._down_since is not None
+
+
+def test_system_error_when_connecting(cache, monkeypatch):
+    """
+    A SystemError while connecting is handled like other connection problems:
+    data is read from the database instead
+    """
+    def broken_client(*args, **kwargs):
+        raise SystemError()
+
+    monkeypatch.setattr(common.lib.database_cache, "MemcacheClient", broken_client)
+
+    assert cache.get("key") is CacheMiss
+    assert cache._down_since is not None
+
+
 def test_one_attempt_at_a_time(cache, server, monkeypatch):
     """
     While one thread tries to reach memcache again, the others do not also try
@@ -277,6 +306,22 @@ def test_error_while_clearing_keeps_memcache_down(cache, server, monkeypatch):
 
     assert not cache._ready()
     assert cache._down_since is not None
+
+
+def test_clock_change_does_not_keep_memcache_down(cache, server, monkeypatch):
+    """
+    Changing the computer's clock (e.g. when it is synchronised) does not
+    change when memcache is tried again
+    """
+    server.reachable = False
+    cache.get("key")
+    server.reachable = True
+    time_for_next_attempt(cache)
+
+    an_hour_ago = time.time() - 3600
+    monkeypatch.setattr(time, "time", lambda: an_hour_ago)
+
+    assert cache._ready()
 
 
 def test_reminder_while_still_down(cache, server):
