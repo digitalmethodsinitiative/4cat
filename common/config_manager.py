@@ -609,7 +609,6 @@ class ConfigWrapper(BaseConfigReader):
             self.tags = tags if tags else config.tags
             self.request = request if request else config.request
             self.config = config.config
-            # legacy: previous versions cached a per-request memcache client; now resolved inside ConfigManager
         else:
             self.config = config
             self.user = user
@@ -632,8 +631,6 @@ class ConfigWrapper(BaseConfigReader):
         if "tag" not in kwargs and self.tags:
             kwargs["tag"] = self.tags
 
-        # ConfigManager resolves thread-local memcache internally
-
         return self.config.set(*args, **kwargs)
 
     def get_all(self, *args, **kwargs):
@@ -655,8 +652,6 @@ class ConfigWrapper(BaseConfigReader):
             kwargs["tags"] = self.tags if self.tags else []
             kwargs["tags"] = self.request_override(kwargs["tags"])
 
-        # ConfigManager resolves thread-local memcache internally
-
         return self.config.get_all(*args, **kwargs)
 
     def get(self, *args, **kwargs):
@@ -677,8 +672,6 @@ class ConfigWrapper(BaseConfigReader):
         if "tags" not in kwargs:
             kwargs["tags"] = self.tags if self.tags else []
             kwargs["tags"] = self.request_override(kwargs["tags"])
-
-        # ConfigManager resolves thread-local memcache internally
 
         return self.config.get(*args, **kwargs)
 
