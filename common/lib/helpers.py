@@ -1436,10 +1436,11 @@ def split_urls(url_string, allowed_schemes=None):
     Split URL text by \n and commas.
 
     4CAT allows users to input lists by either separating items with a newline or a comma. This function will split URLs
-    and also check for commas within URLs using schemes.
+    and also check for commas and commas followed by a space within URLs using schemes.
 
     Note: some urls may contain scheme (e.g., https://web.archive.org/web/20250000000000*/http://economist.com);
-    this function will work so long as the inner scheme does not follow a comma (e.g., "http://,https://" would fail).
+    this function will work so long as the inner scheme does not follow a comma (e.g., "http://archive.org/,https://something.com" 
+    and "http://archive.org/, https://something.com" will both be split).
     """
     if allowed_schemes is None:
         allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
@@ -1475,7 +1476,7 @@ def split_urls(url_string, allowed_schemes=None):
     return potential_urls
 
 
-def urls_in_text(text, split_commas=True):
+def urls_in_text(text, split_commas=True, allowed_schemes=None):
     """
     Find the URLs in a text, in the order they appear and each only once.
 
@@ -1487,8 +1488,9 @@ def urls_in_text(text, split_commas=True):
     - A URL with "/@" followed by a name with a dot in it, such as `https://www.tiktok.com/@maria.bg2/video/123`, is
       cut short by ural (`https://www.tiktok.com/@maria.bg`).
 
-    A space always ends a URL here. In ordinary text, a URL with a space in it cannot be told apart from a URL followed
-    by more words. For a value that holds nothing but URLs, which may contain spaces, use `split_urls` instead.
+    In ordinary text, a URL with a space in it cannot be told apart from a URL followed by more words. However, if 
+    split_commas=True, split_urls is used to separate URLs by commas and it will split a URL with a comma followed by
+    a space and a new URL (i.e. starting with a new scheme from allowed_schemes) into two URLs. See `split_urls` for details.
 
     :param str text:  Text to search
     :param bool split_commas:  Whether a comma directly followed by a new URL separates two URLs. If not, such a comma
@@ -1498,7 +1500,7 @@ def urls_in_text(text, split_commas=True):
     if not text:
         return []
 
-    pieces = split_urls(str(text)) if split_commas else [str(text)]
+    pieces = split_urls(str(text), allowed_schemes=allowed_schemes) if split_commas else [str(text)]
     urls = []
     for piece in pieces:
         # ural reads an "@" as the end of a user name, as in https://user:password@example.com, even when the "@" comes
