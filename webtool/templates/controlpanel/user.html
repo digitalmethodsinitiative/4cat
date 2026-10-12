@@ -59,7 +59,15 @@
                 {% endfor %}
                 <div class="form-element{% if "name" in incomplete %} missing{% endif %}">
                     <label for="user-name">Name (e-mail)</label>
+                    {% if mode == "edit" %}
+                    <div>
+                        <input type="text" id="user-name" value="{{ user.name }}" disabled>
+                        <button class="tooltip-trigger" aria-controls="tooltip-name-label" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-name-label" class="force-width">The name cannot be changed. This user's datasets, settings and API access are linked to it.</p>
+                    </div>
+                    {% else %}
                     <input type="text" name="name" id="user-name" value="{{ user.name }}">
+                    {% endif %}
                 </div>
                 <div class="form-element{% if "tags" in incomplete %} missing{% endif %}">
                     <label for="user-tags">Tags</label>

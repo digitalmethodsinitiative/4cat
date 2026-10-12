@@ -484,6 +484,12 @@ def manipulate_user(mode):
             flash("User name cannot contain whitespace.")
             incomplete.append("name")
 
+        # datasets, settings, API tokens etc are stored under the user name
+        # and would not move along with it, so the name is fixed once created
+        if mode == "edit" and request.form.get("name", user.get_id()) != user.get_id():
+            flash("User names cannot be changed.")
+            incomplete.append("name")
+
         # ensure there is always at least one admin user
         old_tags = user.tags if user else []
         new_tags = [re.sub(r"[^a-z0-9_]", "", t.strip().lower()) for t in request.form.get("tags", "").split(",")]
@@ -496,17 +502,17 @@ def manipulate_user(mode):
 
         if not incomplete:
             user_data = {
-                "name": request.form.get("name"),
                 "is_deactivated": request.form.get("is_deactivated") == "on",
                 "tags": json.dumps(new_tags)
             }
 
             if mode == "edit":
-                g.db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
-                user = User.get_by_name(g.db, user_data["name"])  # ensure updated data
+                g.db.update("users", where={"name": user.get_id()}, data=user_data)
+                user = User.get_by_name(g.db, user.get_id())  # ensure updated data
                 user.with_config(g.config)
 
             else:
+                user_data["name"] = request.form.get("name")
                 try:
                     g.db.insert("users", user_data)
                     user = User.get_by_name(g.db, user_data["name"])
