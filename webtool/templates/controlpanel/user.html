@@ -32,6 +32,7 @@
                             password, for you to pass on. Their current password keeps working until they do. Any
                             earlier link stops working.</p>
                     </li>
+                    {% if can_email %}
                     <li>
                         <a href="{{ url_for("admin.add_user") }}?force=1&amp;format=html&amp;email={{ user.name }}"
                            class="button-like confirm-first tooltip-trigger" aria-controls="tooltip-resend-mail"
@@ -41,6 +42,7 @@
                         <p role="tooltip" id="tooltip-resend-mail">Warning: this resets the user's password &
                             re-generates their reset token</p>
                     </li>
+                    {% endif %}
 
                 {% if __user_config("privileges.admin.can_manage_settings") %}
                     <li><a href="{{ url_for("admin.manipulate_settings") }}?tag=user:{{ user.name }}"

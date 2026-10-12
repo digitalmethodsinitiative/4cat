@@ -33,6 +33,20 @@ import common.lib.config_definition as config_definition
 
 component = Blueprint("admin", __name__)
 
+
+def looks_like_email_address(value):
+    """
+    Check if a value looks like an e-mail address
+
+    User names are usually, but not always, e-mail addresses. Only users
+    whose name is one can be sent e-mails.
+
+    :param str value:  Value to check
+    :return bool:
+    """
+    return bool(value and re.match(r"[^@]+\@.*?\.[a-zA-Z]+", value))
+
+
 @component.route("/admin/")
 @login_required
 def frontpage():
@@ -298,7 +312,7 @@ def add_user():
     force = request.form.get("force", request.args.get("force", None))
     redirect_to_page = False
 
-    if not email or not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", email):
+    if not looks_like_email_address(email):
         response = {**response, **{"message": "Please provide a valid e-mail address."}}
     else:
         username = email
@@ -587,8 +601,9 @@ def manipulate_user(mode):
         else:
             flash("Pleasure ensure all fields contain a valid value.")
 
+    can_email = mode == "edit" and looks_like_email_address(user.get_id())
     return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages(),
-                           mode=mode)
+                           mode=mode, can_email=can_email)
 
 
 @component.route("/admin/user-tags/", methods=["GET", "POST"])
