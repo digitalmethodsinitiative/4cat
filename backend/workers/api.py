@@ -155,7 +155,7 @@ class InternalAPI(BasicWorker):
 
 			response = json.dumps({"error": False, "response": response})
 		except (json.JSONDecodeError, InternalAPIException):
-			response = json.dumps({"error": "Invalid JSON"})
+			response = json.dumps({"error": "Invalid JSON", "response": None})
 		except Exception as e:
 			# an error while answering one request should not stop the API
 			# worker, because then nothing can reach the backend until it is
