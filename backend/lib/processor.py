@@ -371,7 +371,17 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                     # already finished, could happen (though it shouldn't)
                     pass
 
-                surrogate.update_status(self.dataset.get_status())
+                # status updates of the steps are copied to the preset, so it usually has this status already;
+                # setting it again would only repeat the line in the preset's log
+                if surrogate.get_status() != self.dataset.get_status():
+                    surrogate.update_status(self.dataset.get_status())
+
+                # the steps of a preset are hidden, and their logs have more details than the preset's own
+                surrogate.log("Each step of this preset has its own log, with more details (e.g. why individual items failed):")
+                for step in surrogate.get_all_children():
+                    step_processor = step.get_producer_processor()
+                    step_name = step_processor.title if step_processor else step.type
+                    surrogate.log(f"  {step_name}: {step.get_log_url()}")
 
             except DataSetException:
                 # dataset with key to attach to doesn't exist...
