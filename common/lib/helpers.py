@@ -1450,13 +1450,15 @@ def split_urls(url_string, allowed_schemes=None):
         parts = line.split(',')
         recombined_url = ""
         for part in parts:
-            if part.startswith(allowed_schemes):  # Other schemes exist
+            # Spaces before a scheme still mean a new URL starts (e.g. "url1, url2"). Other spaces are left
+            # alone, as a URL may contain them if it was not encoded (e.g. "https://example.com/?q=a, b")
+            if part.lstrip().startswith(allowed_schemes):  # Other schemes exist
                 # New URL start detected
                 if recombined_url:
                     # Already have a URL, add to list
                     potential_urls.append(recombined_url)
                 # Start new URL
-                recombined_url = part
+                recombined_url = part.lstrip()
             elif part:
                 if recombined_url:
                     # Add to existing URL
