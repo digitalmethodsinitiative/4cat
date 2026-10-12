@@ -451,6 +451,34 @@ def delete_user():
     return redirect(url_for("admin.frontpage"))
 
 
+@component.route("/admin/user-reset-link/", methods=["POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_users")
+def create_reset_link():
+    """
+    Create a new password reset link for a user
+
+    The link is shown to the admin instead of being e-mailed, so it can be
+    passed on in some other way, e.g. when the user name is not an e-mail
+    address. The user's current password is not cleared; it keeps working
+    until they set a new one via the link.
+
+    :return:  Redirect to the user's edit page, with the link as a message
+    """
+    username = request.form.get("name")
+    user = User.get_by_name(g.db, username) if username else None
+    if user is None:
+        return error(404, message="User not found")
+
+    if user.is_special:
+        return error(403, message="System users cannot have a password")
+
+    token = user.generate_token(regenerate=True)
+    link = url_for("user.reset_password", _external=True) + "?token=%s" % token
+    flash('New password reset link:<br><a href="%s">%s</a>' % (link, link))
+    return redirect(url_for("admin.manipulate_user", mode="edit", name=user.get_id()))
+
+
 @component.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
