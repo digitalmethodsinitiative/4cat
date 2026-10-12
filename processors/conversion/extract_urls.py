@@ -7,11 +7,10 @@ import csv
 import re
 import time
 import requests
-from ural import urls_from_text
 
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, urls_in_text
 from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
@@ -418,7 +417,7 @@ class ExtractURLs(BasicProcessor):
 
         # Use ural's URL extractor if we're looking for well-formed URLs
         if not eager:
-            urls |= set([url for url in urls_from_text(text)])
+            urls |= set(urls_in_text(text))
 
         # Else we're relying on our own eager regex
         else:
@@ -426,7 +425,7 @@ class ExtractURLs(BasicProcessor):
 
             # If we're only greedily extracting certain domain names,
             # also use the non-eager method and append the urls without a protocol
-            urls = set([url for url in urls_from_text(text)])
+            urls = set(urls_in_text(text))
             if eager_domains:
                 eager_urls = [eager_url for eager_url in eager_urls
                               if any(domain in eager_url for domain in eager_domains)]

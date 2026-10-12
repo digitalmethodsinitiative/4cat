@@ -12,7 +12,7 @@ import re
 from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
-from common.lib.helpers import convert_to_int, UserInput
+from common.lib.helpers import convert_to_int, UserInput, urls_in_text
 from common.lib.item_mapping import MappedItem, MissingMappedField
 
 from datetime import datetime
@@ -497,7 +497,7 @@ class SearchTelegram(Search):
 
                             if crawl_via_links:
                                 # t.me links
-                                all_links = ural.urls_from_text(serialized_message["message"])
+                                all_links = urls_in_text(serialized_message["message"])
                                 all_links = [link.split("t.me/")[1] for link in all_links if ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
                                 for link in all_links:
                                     if link.startswith("+"):
@@ -869,7 +869,7 @@ class SearchTelegram(Search):
 
         # t.me links
         linked_entities = set()
-        all_links = ural.urls_from_text(message["message"])
+        all_links = urls_in_text(message["message"])
         all_links = [link.split("t.me/")[1] for link in all_links if
                      ural.get_hostname(link) == "t.me" and len(link.split("t.me/")) > 1]
 

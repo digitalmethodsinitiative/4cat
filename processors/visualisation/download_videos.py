@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 
 import requests
 import yt_dlp
-from ural import urls_from_text
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
@@ -23,7 +22,7 @@ from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.compatibility import Compatibility
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
-from common.lib.helpers import UserInput, sets_to_lists, url_to_filename, split_urls
+from common.lib.helpers import UserInput, sets_to_lists, url_to_filename, split_urls, urls_in_text
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -1247,16 +1246,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
     def identify_video_urls_in_string(self, text):
         """Search string of text for URLs that may contain video links"""
-        split_comma = self.parameters.get("split-comma", True)
-        if split_comma:
-            texts = text.split(",")
-        else:
-            texts = [text]
-
-        urls = set()
-        for string in texts:
-            urls |= set([url for url in urls_from_text(string)])
-        return list(urls)
+        return urls_in_text(text, split_commas=self.parameters.get("split-comma", True))
 
     def copy_previous_video(self, previous_vid_metadata, staging_area, previous_downloaders):
         """Copy existing video to new staging area"""
