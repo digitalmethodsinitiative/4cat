@@ -26,26 +26,12 @@ from webtool.lib.helpers import error, Pagination, generate_css_colours, setting
 from common.lib.user import User
 from common.lib.dataset import DataSet
 from common.lib.job import Job
-from common.lib.helpers import call_api, send_email, UserInput, get_git_branch, find_extensions
+from common.lib.helpers import call_api, send_email, UserInput, get_git_branch, find_extensions, looks_like_email_address
 from common.lib.exceptions import DataSetException, JobNotFoundException, QueryParametersException
 import common.lib.config_definition as config_definition
 
 
 component = Blueprint("admin", __name__)
-
-
-def looks_like_email_address(value):
-    """
-    Check if a value looks like an e-mail address
-
-    User names are usually, but not always, e-mail addresses. Only users
-    whose name is one can be sent e-mails.
-
-    :param str value:  Value to check
-    :return bool:
-    """
-    return bool(value and re.match(r"[^@]+\@.*?\.[a-zA-Z]+", value))
-
 
 @component.route("/admin/")
 @login_required
@@ -229,21 +215,22 @@ def delete_job():
     except DataSetException:
         dataset = None
     
+    # Check if the user has permission to manipulate the dataset
+    if dataset and not g.config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
+        return error(403, message="Not allowed to delete this job's dataset")
+
+    # Tell backend to cancel job if running, before deleting anything, so
+    # nothing is left half-deleted if the backend cannot be reached
+    if job.is_claimed:
+        api_response = call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["jobtype"], "level": BasicWorker.INTERRUPT_CANCEL})
+        if api_response["status"] != "success":
+            return error(500,
+                            message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
+
+    # Delete the dataset
     if dataset:
-        # Check if the user has permission to manipulate the dataset
-        if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
-            return error(403, message="Not allowed to delete this job's dataset")
-        
-        # Delete the dataset
         dataset.delete()
 
-    # Tell backend to cancel job if running
-    try:
-        call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["jobtype"], "level": BasicWorker.INTERRUPT_CANCEL})
-    except ConnectionRefusedError:
-        return error(500,
-                        message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
-    
     # Delete the job
     job.finish(delete=True)
     message =  f"Job {job.data['jobtype']} #{job.data['id']} {'and associated dataset ' if dataset else ''}deleted successfully."

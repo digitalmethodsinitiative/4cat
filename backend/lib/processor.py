@@ -10,7 +10,6 @@ import copy
 import abc
 import csv
 import os
-import re
 import time
 
 from pathlib import PurePath, Path
@@ -19,7 +18,7 @@ from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet, StatusType
 from common.lib.compatibility import Compatibility
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
+from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5, looks_like_email_address
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
                                    DataSetException, MapItemException, AnnotationException)
 from common.config_manager import ConfigWrapper
@@ -390,17 +389,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
             owner = self.dataset.get_parameters().get("email-complete", False)
             # Check that username is email address
-            if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
-                from email.mime.multipart import MIMEMultipart
-                from email.mime.text import MIMEText
-                from smtplib import SMTPException
-                import socket
-                import html2text
-
-        if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
-            owner = self.dataset.get_parameters().get("email-complete", False)
-            # Check that username is email address
-            if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
+            if looks_like_email_address(owner):
                 from email.mime.multipart import MIMEMultipart
                 from email.mime.text import MIMEText
                 from smtplib import SMTPException

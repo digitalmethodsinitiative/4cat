@@ -1139,6 +1139,20 @@ def add_notification(db, user, notification, expires=None, allow_dismiss=True):
     }, safe=True)
 
 
+def looks_like_email_address(value):
+    """
+    Check if a value looks like an e-mail address
+
+    This is a loose check of the form, e.g. to see if a user name is an
+    e-mail address that 4CAT can send e-mails to. It does not check that the
+    address exists.
+
+    :param str value:  Value to check
+    :return bool:
+    """
+    return bool(value and re.match(r"[^@]+\@.*?\.[a-zA-Z]+", value))
+
+
 def send_email(recipient, message, mail_config):
     """
     Send an e-mail using the configured SMTP settings
