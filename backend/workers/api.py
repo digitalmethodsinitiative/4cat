@@ -1,3 +1,4 @@
+import traceback
 import socket
 import time
 import json
@@ -141,18 +142,28 @@ class InternalAPI(BasicWorker):
 
 		self.manager.log.debug("Received API request from %s:%s" % address)
 
+		request = None
 		try:
 			payload = json.loads(buffer)
 			if "request" not in payload:
 				raise InternalAPIException
 
-			response = self.process_request(payload["request"], payload)
+			request = payload["request"]
+			response = self.process_request(request, payload)
 			if not response:
 				raise InternalAPIException
 
 			response = json.dumps({"error": False, "response": response})
 		except (json.JSONDecodeError, InternalAPIException):
 			response = json.dumps({"error": "Invalid JSON"})
+		except Exception as e:
+			# an error while answering one request should not stop the API
+			# worker, because then nothing can reach the backend until it is
+			# restarted - so log it, answer with an error, and keep listening
+			stack = traceback.extract_tb(e.__traceback__)
+			location = "->".join([frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in stack])
+			self.manager.log.error(f"API request {request} raised exception {e.__class__.__name__}: {e} at {location}", frame=stack)
+			response = json.dumps({"error": f"Internal error ({e.__class__.__name__})", "response": None})
 
 		try:
 			response = client.sendall(response.encode("ascii"))
