@@ -2514,6 +2514,24 @@ class DataSet(FourcatModule):
         server = self.modules.config.get("flask.server_name")
         return f"{scheme}://{server}/download/{self.key}/"
 
+    def get_log_url(self):
+        """
+        Gets the 4CAT frontend URL of the dataset's log
+
+        Like `get_result_url()`, this uses the configured server name when
+        called outside the web app (e.g. in the backend).
+
+        :return str:  URL of the dataset log
+        """
+        from flask import has_app_context, url_for
+
+        if has_app_context():
+            return url_for("dataset.view_log", key=self.key, _external=True)
+
+        scheme = "https" if self.modules.config.get("flask.https") else "http"
+        server = self.modules.config.get("flask.server_name")
+        return f"{scheme}://{server}/results/{self.key}/log/"
+
     def warn_unmappable_item(self, item_count, processor=None, error_message=None):
         """
         Log a per-item map_item failure to the dataset's own log.
