@@ -3,6 +3,7 @@ Create a collage of items in a grid
 """
 import statistics
 import random
+import json
 import shutil
 import oslex
 import math
@@ -634,22 +635,21 @@ class VideoWallGenerator(BasicProcessor):
         0.
         """
         probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-show_entries",
-                         "stream=width,height,duration", "-of", "csv=p=0", oslex.quote(str(file_path))]
+                         "stream=width,height,duration", "-of", "json", str(file_path)]
 
         probe = self.run_interruptable_process(probe_command)
 
-        probe_output = probe.stdout.decode("utf-8")
-        probe_error = probe.stderr.decode("utf-8")
+        if probe.stderr:
+            raise MediaSignatureException(probe.stderr.decode("utf-8", errors="replace"))
 
-        if probe_error:
-            raise MediaSignatureException()
-
-        bits = probe_output.split(",")
-        length = (float(bits[-1]) if bits[-1].strip() != "N/A" else 0)
         try:
-            dimensions = (int(bits[0]), int(bits[1]))
-        except ValueError:
-            raise MediaSignatureException()
+            stream = json.loads(probe.stdout)["streams"][0]
+            dimensions = (int(stream["width"]), int(stream["height"]))
+        except (json.JSONDecodeError, KeyError, IndexError, ValueError) as e:
+            raise MediaSignatureException(str(e))
+
+        # ffprobe leaves out the duration when it is unknown, e.g. for images
+        length = float(stream.get("duration", 0))
 
         if sort_mode == "random":
             sort_value = random.random()
