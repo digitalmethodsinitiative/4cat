@@ -149,7 +149,9 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
             annotations = {
                 "file_name": image.file.name,
-                "post_ids": img_metadata[image.file.name],
+                # images from an archive without metadata (e.g. an upload or
+                # video frames) have no posts to connect to
+                "post_ids": img_metadata.get(image.file.name, []),
                 **annotations}
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:

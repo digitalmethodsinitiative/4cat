@@ -514,6 +514,59 @@ def test_read_raises_metadata_exception_on_malformed_json(tmp_path):
 		MediaArchiveMetadata.read(ds)
 
 
+def test_read_raises_metadata_exception_on_damaged_zip(tmp_path):
+	archive = tmp_path / "results.zip"
+	archive.write_bytes(b"this is not a zip file")
+	with pytest.raises(MetadataException, match="cannot be opened"):
+		MediaArchiveMetadata.read(FakeDataset("k", archive))
+
+
+def test_read_raises_metadata_exception_on_text_that_is_not_utf8(tmp_path):
+	folder = tmp_path / "folder_k"
+	folder.mkdir()
+	(folder / ".metadata.json").write_bytes(b'{"items": "\xff\xfe"}')
+	ds = FakeDataset("k", tmp_path / "results.csv", results_folder=folder)
+	with pytest.raises(MetadataException, match="not valid JSON"):
+		MediaArchiveMetadata.read(ds)
+
+
+def test_v1_read_rejects_items_that_are_not_an_object():
+	m = MediaArchiveMetadata()
+	with pytest.raises(MetadataException, match="items"):
+		m._populate_from_raw({"schema_version": 1, "items": ["a.jpg"]})
+
+
+def test_v1_read_tolerates_empty_and_malformed_entries():
+	"""Missing or null lists count as empty; entries that are not objects are skipped."""
+	m = MediaArchiveMetadata()
+	m._populate_from_raw({"schema_version": 1, "items": None, "failures": None})
+	assert len(m) == 0
+	assert m.failures == []
+
+	m = MediaArchiveMetadata()
+	m._populate_from_raw({
+		"schema_version": 1,
+		"items": {"a.jpg": {"filename": "a.jpg", "post_ids": ["1"]}, "b.jpg": "oops"},
+		"failures": [{"post_ids": ["2"], "reason": "error"}, "oops"],
+	})
+	assert list(m.items) == ["a.jpg"]
+	assert len(m.failures) == 1
+
+
+def test_legacy_source_dataset_key_is_read_as_from_dataset():
+	"""Video downloads from early 2023 recorded the source as `source_dataset`."""
+	legacy = {
+		"https://example.com/v": {
+			"success": True, "source_dataset": "src", "post_ids": ["p1"],
+			"files": [{"filename": "v.mp4", "success": True}],
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+	assert m.from_dataset == "src"
+	assert "source_dataset" not in m.get_entry("v.mp4").get("extra", {})
+
+
 def test_v1_read_normalizes_integer_post_ids():
 	"""Integer post_ids in a v1 file are coerced to strings on read."""
 	raw = {

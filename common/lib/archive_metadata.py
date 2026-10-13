@@ -105,15 +105,19 @@ class ArchiveMetadataFile:
 		Locate and JSON-decode the metadata file (zip member or folder).
 
 		:raises FileNotFoundError:  the file is not present.
-		:raises MetadataException:  the file is present but not valid JSON.
+		:raises MetadataException:  the archive is damaged, or the file is
+			present but not valid JSON.
 		"""
 		# if the dataset has a zip archive, look inside it
 		if results_file.suffix == ".zip":
-			with zipfile.ZipFile(results_file, "r") as archive:
-				if filename not in archive.namelist():
-					raise FileNotFoundError(f"No metadata file {filename} in archive {results_file.name}.")
-				with archive.open(filename) as f:
-					return cls._decode_json(f, filename)
+			try:
+				with zipfile.ZipFile(results_file, "r") as archive:
+					if filename not in archive.namelist():
+						raise FileNotFoundError(f"No metadata file {filename} in archive {results_file.name}.")
+					with archive.open(filename) as f:
+						return cls._decode_json(f, filename)
+			except zipfile.BadZipFile as e:
+				raise MetadataException(f"Archive {results_file.name} cannot be opened: {e}") from e
 
 		# it is possible we have a results folder w/ metadata instead; look there
 		results_folder = dataset.get_results_folder_path()
@@ -125,8 +129,8 @@ class ArchiveMetadataFile:
 		if not metadata_path.is_file():
 			raise FileNotFoundError(f"No metadata file {filename} in {results_folder}.")
 
-		# load the metadata!
-		with open(metadata_path) as f:
+		# load the metadata! (`write` always writes UTF-8)
+		with open(metadata_path, encoding="utf-8") as f:
 			return cls._decode_json(f, filename)
 
 	@staticmethod
@@ -134,12 +138,14 @@ class ArchiveMetadataFile:
 		"""
 		JSON-decode an open file object, surfacing decode errors as
 		`MetadataException`. Without this a corrupt metadata file raises
-		`json.JSONDecodeError`, which escapes the `(FileNotFoundError,
-		MetadataException)` handler every consumer uses.
+		`json.JSONDecodeError` (or `UnicodeDecodeError` for text that is not
+		UTF-8), which escapes the `(FileNotFoundError, MetadataException)`
+		handler every consumer uses.
 		"""
 		try:
 			return json.load(fp)
-		except json.JSONDecodeError as e:
+		except ValueError as e:
+			# JSONDecodeError and UnicodeDecodeError are both ValueErrors
 			raise MetadataException(f"Metadata file {filename} is not valid JSON: {e}") from e
 
 	@classmethod
@@ -271,16 +277,28 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			self.software_version = raw.get("software_version")
 			self.software_source = raw.get("software_source")
 
+			# archives can be imported from elsewhere, so the file may have
+			# been edited by hand: refuse a file whose overall layout is wrong,
+			# and skip single entries that are not what consumers expect
+			items = raw.get("items") or {}
+			failures = raw.get("failures") or []
+			if not isinstance(items, dict):
+				raise MetadataException("Metadata 'items' must be a JSON object.")
+			if not isinstance(failures, list):
+				raise MetadataException("Metadata 'failures' must be a list.")
+
 			# post_ids are string-coerced on write, but normalize on read too
 			# so consumers never have to: some source datasets use integer ids,
 			# and hand-edited or externally-produced files may carry them.
 			self.items = {
 				filename: self._normalize_entry_post_ids(entry)
-				for filename, entry in dict(raw.get("items", {})).items()
+				for filename, entry in items.items()
+				if isinstance(entry, dict)
 			}
 			self.failures = [
 				self._normalize_entry_post_ids(failure)
-				for failure in list(raw.get("failures", []))
+				for failure in failures
+				if isinstance(failure, dict)
 			]
 			return
 
@@ -317,9 +335,11 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					outer_key.startswith("http://") or outer_key.startswith("https://")):
 				url = outer_key
 
-			# existing `from_dataset` is correct if exists
-			if entry.get("from_dataset"):
-				self.from_dataset = entry["from_dataset"]
+			# existing `from_dataset` is correct if exists; video downloads
+			# from early 2023 called it `source_dataset`
+			recorded_source = entry.get("from_dataset") or entry.get("source_dataset")
+			if recorded_source:
+				self.from_dataset = recorded_source
 
 			success = entry.get("success", True)
 
@@ -377,8 +397,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 	# Legacy entry keys promoted to first-class v1 fields, or pure structure;
 	# every other key is producer data and is preserved under `extra`.
 	_LEGACY_NON_EXTRA_KEYS = frozenset({
-		"filename", "post_ids", "post_id", "url", "from_dataset", "success",
-		"files", "metadata", "extra",
+		"filename", "post_ids", "post_id", "url", "from_dataset", "source_dataset",
+		"success", "files", "metadata", "extra",
 	})
 	# Additionally promoted on the failure path: failures have no `extra` of
 	# their own, but carry these as first-class fields.
