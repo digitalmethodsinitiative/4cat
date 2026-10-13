@@ -132,28 +132,35 @@ class MediaArchiveLibrary:
 
 		A URL can map to entries from several archives (downloaded more than
 		once) and to several files within one archive (e.g. a playlist). A
-		file can also be reached through more than one URL (e.g. a short and
-		a long link to the same video): its `url` and every URL in its
-		`extra["other_urls"]` all lead to it.
+		file or failed download can also be reached through more than one URL
+		(e.g. a short and a long link to the same video, or a link that
+		redirected): see `_urls_of`.
 		"""
 		index = {}
 		for metadata in self.metadata_objects:
 			for filename, item in metadata.iter_entries():
-				other_urls = (item.get("extra") or {}).get("other_urls")
-				if not isinstance(other_urls, list):
-					other_urls = []
-				for url in [item.get("url"), *other_urls]:
-					if not url or not isinstance(url, str):
-						continue
+				for url in self._urls_of(item):
 					index.setdefault(url, {"items": [], "failures": []})
 					index[url]["items"].append((metadata, filename, item))
 			for failure in metadata.iter_failures():
-				url = failure.get("url")
-				if not url:
-					continue
-				index.setdefault(url, {"items": [], "failures": []})
-				index[url]["failures"].append((metadata, failure))
+				for url in self._urls_of(failure):
+					index.setdefault(url, {"items": [], "failures": []})
+					index[url]["failures"].append((metadata, failure))
 		return index
+
+	@staticmethod
+	def _urls_of(entry) -> list:
+		"""
+		All URLs that lead to an item or failed download: its `url`, and every
+		URL in its `extra["other_urls"]`.
+
+		:param dict entry:  item or failure from the metadata
+		:return list:  the URLs, leaving out any that are empty or not text
+		"""
+		other_urls = (entry.get("extra") or {}).get("other_urls")
+		if not isinstance(other_urls, list):
+			other_urls = []
+		return [url for url in [entry.get("url"), *other_urls] if url and isinstance(url, str)]
 
 	@property
 	def url_index(self) -> dict:

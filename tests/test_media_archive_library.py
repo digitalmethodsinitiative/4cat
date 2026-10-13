@@ -188,6 +188,20 @@ def test_find_through_other_url():
 	assert [fn for fn, _ in lib.find("https://youtube.com/watch?v=abc").entries] == ["v.mp4"]
 
 
+def test_find_failure_through_other_url():
+	"""A failed download can also be found through each of its URLs."""
+	m = _meta()
+	m.add_failure(post_ids=["p1"], reason="not_a_video", url="https://example.com/page",
+				  extra={"other_urls": ["http://example.com/page"]})
+	lib = MediaArchiveLibrary([m])
+
+	for url in ("https://example.com/page", "http://example.com/page"):
+		hit = lib.find(url)
+		assert not hit.is_success
+		assert hit.reasons == {"not_a_video"}
+		assert len(hit.failures) == 1
+
+
 def test_other_urls_that_are_not_a_list_are_ignored():
 	"""A hand-edited file may hold something else under `other_urls`."""
 	m = _meta()
