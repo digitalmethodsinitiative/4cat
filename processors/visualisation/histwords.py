@@ -78,7 +78,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                     "PCA": "PCA",
                     "TruncatedSVD": "Truncated SVD (randomised, 5 iterations)"
                 },
-                "default": "tsne"
+                "default": "t-SNE"
             },
             "num-words": {
                 "type": UserInput.OPTION_TEXT,

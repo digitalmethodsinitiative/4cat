@@ -63,6 +63,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             },
             "api_key": {
                 "type": UserInput.OPTION_TEXT,
+                "sensitive": True,
                 "help": "API Key",
                 "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this"
                         "key on console.cloud.google.com. You also need to enable billing and Vision API."
@@ -98,8 +99,9 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         with one column with image hashes, one with the first file name used
         for the image, and one with the amount of times the image was used
         """
+        # marked sensitive in get_options, so the stored value is already
+        # removed by the time this runs; the in-memory value is still available
         api_key = self.parameters.get("api_key")
-        self.dataset.delete_parameter("api_key")  # sensitive, delete after use
 
         features = self.parameters.get("features")
         features = [{"type": feature} for feature in features]

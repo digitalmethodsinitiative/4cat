@@ -51,7 +51,7 @@ class VideoSceneFrames(BasicProcessor):
         return {
             "frame_size": {
                 "type": UserInput.OPTION_CHOICE,
-                "default": "medium",
+                "default": "432x432",
                 "options": {
                     "no_modify": "Do not modify",
                     "144x144": "Tiny (144x144)",

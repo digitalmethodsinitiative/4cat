@@ -364,7 +364,7 @@ class Search4Chan(SearchWithScope):
                     "United Nations": "<span class='flag flag-t_un' title='United Nations'></span> United Nations",
                     "White Supremacist": "<span class='flag flag-t_wp' title='White Supremacist'></span> White Supremacist",
                 },
-                "default": ""
+                "default": []
             },
             "divider": {
                 "type": UserInput.OPTION_DIVIDER
@@ -839,6 +839,7 @@ class Search4Chan(SearchWithScope):
 
         return thread_sizes
 
+    @staticmethod
     def validate_query(query, request, config):
         """
         Validate input for a dataset query on the 4chan data source.
@@ -861,7 +862,12 @@ class Search4Chan(SearchWithScope):
                 and query.get("search_scope", "") != "match-ids":
             raise QueryParametersException("Please provide a message or subject search query")
 
-        query["min_date"], query["max_date"] = query["daterange"]
+        # only store date bounds that were actually set
+        after, before = query["daterange"]
+        if after:
+            query["min_date"] = after
+        if before:
+            query["max_date"] = before
 
         del query["daterange"]
         if query.get("search_scope") not in ("dense-threads",):

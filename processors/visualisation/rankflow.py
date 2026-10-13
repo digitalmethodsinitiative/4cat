@@ -107,7 +107,7 @@ class RankFlowRenderer(BasicProcessor):
                     "weight": "Value (items with a higher value are bigger)",
                     "none": "None (same size for all elements)",
                 },
-                "default": "change",
+                "default": "weight",
                 "help": "Size according to",
             },
             "only_adjacent_flows": {

@@ -159,6 +159,11 @@ class VideoHasher(BasicProcessor):
                 "default": 1,
                 "min": 0,
                 "max": 5,
+            },
+            "save_annotations": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Add hashes to top dataset",
+                "default": False
             }
         }
 
