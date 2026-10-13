@@ -27,6 +27,32 @@ from typing import Iterator, Optional
 from common.lib.exceptions import MetadataException
 from common.lib.helpers import get_software_commit
 
+# Files 4CAT adds to an archive next to its media or other content. They are
+# not items of the dataset: metadata files, the list in which yt-dlp notes
+# which videos it downloaded, and log files (e.g. from ffmpeg)
+SUPPORT_FILENAMES = frozenset({
+	".metadata.json",
+	".token_metadata.json",
+	".model_metadata.json",
+	"video_archive",
+})
+
+
+def is_support_file(filename: str) -> bool:
+	"""
+	Check if a file in an archive is a support file rather than an item
+
+	Iterating through an archive dataset skips these files, unless asked not
+	to. Read a metadata file with its own class instead, e.g. via
+	`DataSet.read_media_metadata()`.
+
+	:param str filename:  File name, can include folders (e.g. a path inside
+	  a zip archive)
+	:return bool:
+	"""
+	name = filename.split("/")[-1]
+	return name in SUPPORT_FILENAMES or name.endswith(".log")
+
 
 class ArchiveMetadataFile:
 	"""
