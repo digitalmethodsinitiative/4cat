@@ -325,8 +325,11 @@ class ViewMetadata(BasicProcessor):
 		# result is usable - and the front end shows it to the user as such.
 		if source_columns and matched < total:
 			unmatched = total - matched
-			warning = (f"{'None' if unmatched == total else f'{unmatched:,}'} of the {total:,} media file(s) could be traced back to an item in the dataset "
-						   "so the added columns are empty (e.g. ads or other unsupported items).")
+			if not matched:
+				warning = f"None of the {total:,} media file(s) could be traced back to an item in the dataset, "
+			else:
+				warning = f"{unmatched:,} of {total:,} media file(s) could not be traced back to an item in the dataset, "
+			warning += "so their added columns are empty (e.g. ads or other unsupported items)."
 			self.dataset.finish_with_warning(num_rows, warning)
 		else:
 			self.dataset.finish(num_rows)
