@@ -181,8 +181,9 @@ class Collector:
 class Source:
     """Stands in for the dataset a processor reads from."""
 
-    def __init__(self, items, parameters=None, parent=None):
+    def __init__(self, items, parameters=None, parent=None, dataset_type="reduce-embeddings"):
         self.items, self.parameters, self._parent = items, parameters or {}, parent
+        self.type = dataset_type
 
     @property
     def num_rows(self):
@@ -366,6 +367,12 @@ class FakeDataset:
 
     def get_children(self):
         return self._children
+
+    def top_parent(self):
+        return self._parent.top_parent() if self._parent else self
+
+    def get_columns(self):
+        return []
 
     def update_status(self, message, is_final=False):
         pass
@@ -1264,3 +1271,377 @@ def test_failing_from_the_start_is_still_an_error(tmp_path, monkeypatch):
     processor = run_media_embedder(tmp_path, monkeypatch, [False] * 12)
     assert "Stopped after 10 images in a row" in processor.dataset.error
     assert processor.dataset.num_rows == 0
+
+
+# --------------------------------------------------------------------------- #
+# sizing points by a column
+
+def test_sizes_scale_between_the_bounds_and_fill_gaps_with_the_median():
+    from processors.visualisation.embedding_map import SIZE_RANGE, EmbeddingMap
+
+    linear = EmbeddingMap.size_factors([0, 50, 100, "n/a"], "linear")
+    assert linear[0] == SIZE_RANGE[0] and linear[2] == SIZE_RANGE[1]
+    # not a number: counts as the median of the numbers, 50
+    assert linear[3] == linear[1] == pytest.approx(sum(SIZE_RANGE) / 2)
+
+    # on a log scale, ordinary values are not all squashed to the minimum
+    views = [10, 100, 1000, 1_000_000]
+    assert EmbeddingMap.size_factors(views, "log")[1] > EmbeddingMap.size_factors(views, "linear")[1] + 0.3
+    assert EmbeddingMap.size_factors(["a", None], "log") is None
+
+
+def test_the_map_sizes_a_reposted_file_by_its_largest_post(tmp_path):
+    from processors.visualisation.embedding_map import EmbeddingMap
+
+    records = [Item({"id": "v1", "text": "v1.mp4", "filename": "v1.mp4", "post_ids": ["a", "b"],
+                     "coordinates": [0.0, 0.0]}),
+               Item({"id": "v2", "text": "v2.mp4", "filename": "v2.mp4", "post_ids": ["c"],
+                     "coordinates": [1.0, 1.0]}),
+               Item({"id": "v3", "text": "v3.mp4", "filename": "v3.mp4", "post_ids": ["d"],
+                     "coordinates": [0.5, 0.2]})]
+    top = Source([Item({"id": post_id, "views": views}) for post_id, views in
+                  (("a", 10), ("b", 1000), ("c", 100), ("d", 10))])
+
+    processor = EmbeddingMap.__new__(EmbeddingMap)
+    processor.dataset = Collector(tmp_path / "map.html")
+    processor.dataset.log = lambda message: None
+    processor.source_dataset = TopSource(records, parameters={"algorithm": "umap"}, top=top)
+    processor.interrupted = False
+    processor.parameters = {"max_text_length": 100, "size_column": "views", "size_scale": "linear"}
+    processor.process()
+
+    sizes = read_payload(processor.dataset.path)["sizes"]
+    # v1's largest post has the most views of all
+    assert sizes[0] == max(sizes) and sizes[2] == min(sizes)
+
+
+# --------------------------------------------------------------------------- #
+# embedding streams: distance to a reference over time
+
+def stream_items(per_cluster=6, clusters=(0, 1), drift=0.0):
+    """
+    Clustered text embeddings, one post per day. Cluster c points along axis c,
+    and drifts towards the next axis by `drift` per day.
+    """
+    items, top = [], []
+    for cluster in clusters:
+        for day in range(per_cluster):
+            vector = [0.0] * 4
+            vector[cluster] = 1.0
+            vector[cluster + 2] = drift * day
+            post_id = f"p{cluster}-{day}"
+            items.append(Item({"id": post_id, "text": f"cluster {cluster} day {day}", "cluster": cluster,
+                               "embedding": vector}))
+            top.append(Item({"id": post_id, "timestamp": f"2024-01-{day + 1:02d} 12:00:00",
+                             "original_sound": "yes" if day % 2 else "no", "views": 10 ** day}))
+    return items, top
+
+
+def run_streams(tmp_path, items, top, source_type="cluster-embeddings", **parameters):
+    """Run the streams plot; return the processor and its payload (or None on error)."""
+    from processors.visualisation.embedding_streams import EmbeddingStreams
+
+    class Output(FakeDataset):
+        def finish_with_warning(self, rows, warning):
+            self.num_rows, self.warning = rows, warning
+
+    processor = EmbeddingStreams.__new__(EmbeddingStreams)
+    processor.dataset = Output(tmp_path, name="streams")
+    processor.dataset.path, processor.dataset.warning = tmp_path / "streams.html", None
+    processor.source_dataset = TopSource(items, top=Source(top))
+    processor.source_dataset.type = source_type
+    processor.interrupted, processor.config, processor.log = False, None, None
+    processor.parameters = {"max_text_length": 100, "time_column": "timestamp", "time_window": "day",
+                            "reference": "centre", "split": "alternate", "trend_lines": True,
+                            # the form's default for clustered embeddings
+                            "use_clusters": True, **parameters}
+    processor.process()
+    payload = read_payload(processor.dataset.path) if processor.dataset.error is None else None
+    return processor, payload
+
+
+def test_streams_run_on_embeddings_and_clustered_embeddings():
+    from processors.visualisation.embedding_streams import EmbeddingStreams
+    from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
+
+    for dataset_type in ("text-embeddings", "image-embeddings", "video-embeddings", "cluster-embeddings"):
+        assert EmbeddingStreams.is_compatible_with(FakeDataset(Path("."), dataset_type=dataset_type))
+    assert not EmbeddingStreams.is_compatible_with(FakeDataset(Path("."), dataset_type="reduce-embeddings"))
+    assert not EmbeddingStreams.is_compatible_with(ReduceEmbeddings)
+
+
+def test_streams_measure_each_cluster_against_its_own_centre(tmp_path):
+    items, top = stream_items()
+    processor, payload = run_streams(tmp_path, items, top)
+    assert processor.dataset.error is None, processor.dataset.error
+
+    # without drift, every item sits on its cluster's centre
+    assert all(point[1] == pytest.approx(0, abs=1e-5) for point in payload["points"])
+    # points are in time order, and each cluster alternates between the halves
+    # on its own, so no cluster ends up in one half
+    clusters = [label.rsplit("Cluster ", 1)[1] for label in payload["labels"]]
+    for cluster in ("0", "1"):
+        sides = [point[2] for point, label in zip(payload["points"], clusters) if label == cluster]
+        assert sides == [1, -1] * 3
+    # one trend line per cluster and half
+    assert len(payload["trend"]) == 4
+    assert {line["colour"] for line in payload["trend"]} == {"#2a78d6", "#eb6834"}
+
+
+def test_drift_shows_as_growing_distance_from_the_first_window(tmp_path):
+    items, top = stream_items(drift=0.5)
+    processor, payload = run_streams(tmp_path, items, top, reference="first_window", clusters="0")
+
+    distances = [point[1] for point in payload["points"]]
+    assert len(distances) == 6
+    assert distances[0] == pytest.approx(0, abs=1e-5)
+    assert distances == sorted(distances)
+
+
+def test_the_previous_window_leaves_out_each_clusters_first_window(tmp_path):
+    items, top = stream_items(drift=0.5)
+    processor, payload = run_streams(tmp_path, items, top, reference="previous_window")
+
+    # one first window per cluster has nothing before it
+    assert len(payload["points"]) == 10
+    assert "2 items in each cluster's first time window" in processor.dataset.warning
+
+
+def test_the_medoid_is_marked(tmp_path):
+    items, top = stream_items(drift=0.5)
+    processor, payload = run_streams(tmp_path, items, top, reference="medoid", clusters="1")
+
+    assert len(payload["marked"]) == 1 and payload["markedLabel"] == "medoid"
+    marked = payload["marked"][0]
+    assert payload["points"][marked][1] == pytest.approx(0, abs=1e-5)
+    assert payload["labels"][marked].endswith("(this cluster's medoid)")
+
+
+def test_distance_to_a_text_prompt(tmp_path, monkeypatch):
+    import numpy as np
+    from processors.visualisation import embedding_streams as module
+
+    monkeypatch.setattr(module, "embed_query", lambda *args, **kwargs: (np.asarray([1.0, 0, 0, 0]), {}, None))
+    items, top = stream_items()
+    processor, payload = run_streams(tmp_path, items, top, reference="text", reference_text="cats")
+
+    distances = sorted({round(point[1], 4) for point in payload["points"]})
+    # cluster 0 points the same way as the prompt; cluster 1 is orthogonal
+    assert distances == [0.0, 1.0]
+    assert "text prompt 'cats'" in payload["reference"]
+
+
+def test_distance_to_an_item_found_by_its_post_id(tmp_path):
+    items, top = stream_items(drift=0.5)
+    processor, payload = run_streams(tmp_path, items, top, reference="item", reference_item="p1-3")
+
+    assert payload["markedLabel"] == "reference" and len(payload["marked"]) == 1
+    assert payload["points"][payload["marked"][0]][1] == pytest.approx(0, abs=1e-5)
+
+    processor, payload = run_streams(tmp_path, items, top, reference="item", reference_item="nope")
+    assert "nope" in processor.dataset.error
+
+
+def test_a_yes_no_column_decides_the_half(tmp_path):
+    from processors.visualisation.embedding_streams import EmbeddingStreams
+
+    for value in ("true", "Yes", "x", "1", "anything"):
+        assert EmbeddingStreams.is_true(value), value
+    for value in ("false", "NO", "0", "0.0", "", None, False):
+        assert not EmbeddingStreams.is_true(value), value
+
+    items, top = stream_items()
+    processor, payload = run_streams(tmp_path, items, top, split="column", split_column="original_sound",
+                                     clusters="0")
+    # odd days have an original sound
+    assert [point[2] for point in payload["points"]] == [-1, 1, -1, 1, -1, 1]
+    assert payload["halves"] == {"top": "original_sound: yes", "bottom": "original_sound: no"}
+
+
+def test_streams_can_be_sized_by_a_column(tmp_path):
+    items, top = stream_items()
+    processor, payload = run_streams(tmp_path, items, top, size_column="views", size_scale="log", clusters="0")
+    assert payload["sizes"] == sorted(payload["sizes"])
+
+
+def test_time_windows_slice_by_calendar_unit():
+    import datetime
+    from processors.visualisation.embedding_streams import EmbeddingStreams
+
+    def at(text):
+        return datetime.datetime.fromisoformat(text).replace(tzinfo=datetime.timezone.utc).timestamp()
+
+    window = EmbeddingStreams.window_of
+    assert window(at("2024-01-31 23:00"), "month") != window(at("2024-02-01 00:00"), "month")
+    assert window(at("2024-01-01 00:00"), "year") == window(at("2024-12-31 23:59"), "year")
+    assert window(at("2024-01-01 10:59"), "hour") == window(at("2024-01-01 10:00"), "hour")
+    assert window(at("2024-01-01 23:59"), "day") != window(at("2024-01-02 00:00"), "day")
+
+
+def test_clusters_to_include_must_be_numbers():
+    from common.lib.exceptions import QueryParametersException
+    from processors.visualisation.embedding_streams import EmbeddingStreams
+
+    assert EmbeddingStreams.parse_clusters("0, 2,-1") == {0, 2, -1}
+    assert EmbeddingStreams.parse_clusters("") is None
+    with pytest.raises(QueryParametersException):
+        EmbeddingStreams.validate_query({"clusters": "0, two"}, None, None)
+    with pytest.raises(QueryParametersException):
+        EmbeddingStreams.validate_query({"reference": "text", "reference_text": " "}, None, None)
+
+
+def test_streams_need_dates(tmp_path):
+    items, top = stream_items()
+    for row in top:
+        row["timestamp"] = "not a date"
+    processor, payload = run_streams(tmp_path, items, top)
+    assert "does not hold dates" in processor.dataset.error
+
+
+def test_time_ticks_sit_at_window_starts():
+    import datetime
+    from processors.visualisation.embedding_streams import EmbeddingStreams
+
+    def at(text):
+        return datetime.datetime.fromisoformat(text).replace(tzinfo=datetime.timezone.utc).timestamp()
+
+    for unit, moment in (("day", "2024-03-05 00:00"), ("month", "2024-03-01 00:00"), ("year", "2024-01-01 00:00"),
+                         ("hour", "2024-03-05 13:00")):
+        window = EmbeddingStreams.window_of(at(moment), unit)
+        assert EmbeddingStreams.window_start(window, unit) == at(moment), unit
+
+    times = [at("2024-03-01 10:00"), at("2024-03-07 18:00")]
+    ticks = EmbeddingStreams.window_ticks(times, "day")
+    # every midnight within the range, none skipped
+    assert [label for _, label in ticks] == [f"2024-03-0{day}" for day in range(2, 8)]
+    assert all(0 <= position <= 1 for position, _ in ticks)
+
+
+# --------------------------------------------------------------------------- #
+# reading embeddings without holding them twice
+
+def embeddings_dataset(records):
+    """An embeddings dataset that yields the given records."""
+    return Source([Item(record) for record in records], dataset_type="text-embeddings")
+
+
+def test_vectors_are_read_into_one_float32_array(tmp_path):
+    from common.lib.embeddings import read_embedding_matrix
+
+    records = [{"id": "a", "embedding": [1.0, 2.0, 3.0]},
+               {"id": "b", "embedding": []},
+               {"id": "c", "embedding": [4.0, 5.0, 6.0]},
+               {"id": "d", "embedding": [7.0, 8.0, 9.0]}]
+    matrix, positions, kept = read_embedding_matrix(embeddings_dataset(records), limit=10)
+
+    assert matrix.dtype.name == "float32" and matrix.shape == (3, 3)
+    # the record without a vector is skipped, and the positions say where each row came from
+    assert positions == [0, 2, 3] and kept == []
+    assert matrix[1].tolist() == [4.0, 5.0, 6.0]
+
+    matrix, positions, _ = read_embedding_matrix(embeddings_dataset(records), limit=2)
+    assert positions == [0, 2]
+
+
+def test_reading_can_filter_and_keep_a_summary():
+    from common.lib.embeddings import read_embedding_matrix
+
+    records = [{"id": str(i), "cluster": i % 2, "embedding": [float(i), 1.0]} for i in range(6)]
+    matrix, positions, kept = read_embedding_matrix(embeddings_dataset(records), limit=6,
+                                                    accept=lambda record: record["cluster"] == 1,
+                                                    keep=lambda record: record["id"])
+    assert positions == [1, 3, 5] and kept == ["1", "3", "5"]
+    assert matrix[:, 0].tolist() == [1.0, 3.0, 5.0]
+
+
+def test_an_item_is_found_with_its_vector():
+    from common.lib.embeddings import find_embedding
+
+    records = [{"id": "a", "embedding": [1.0, 0.0]}, {"id": "b", "embedding": [0.0, 1.0]}]
+    vector, record = find_embedding(embeddings_dataset(records), lambda record: record["id"] == "b")
+    assert record["id"] == "b" and vector.tolist() == [0.0, 1.0]
+    assert find_embedding(embeddings_dataset(records), lambda record: False) == (None, None)
+
+
+def test_mixed_vector_sizes_are_refused(tmp_path):
+    from common.lib.embeddings import read_embedding_matrix
+
+    records = [{"id": "a", "embedding": [1.0, 2.0]}, {"id": "b", "embedding": [1.0, 2.0, 3.0]}]
+    with pytest.raises(ValueError):
+        read_embedding_matrix(embeddings_dataset(records), limit=10)
+
+
+def test_normalising_happens_in_place():
+    import numpy as np
+    from common.lib.embeddings import normalise_in_place
+
+    matrix = np.asarray([[3.0, 4.0], [0.0, 0.0]], dtype=np.float32)
+    result = normalise_in_place(matrix)
+    assert result is matrix
+    assert matrix[0].tolist() == pytest.approx([0.6, 0.8]) and matrix[1].tolist() == [0.0, 0.0]
+
+
+def test_clustering_writes_records_back_unchanged_but_for_the_cluster(tmp_path):
+    items, _ = blobs(per_group=10, groups=2)
+    for item in items:
+        item.update({"model": "m", "extra": {"nested": [1, 2]}, "text": "naïve 🎉"})
+
+    processor = run_clustering(tmp_path, items, n_clusters=2)
+    records = read_records(processor.dataset.path)
+    assert len(records) == len(items)
+    for item, record in zip(items, records):
+        cluster = record.pop("cluster")
+        assert cluster in (0, 1)
+        assert dict(record) == dict(item)
+
+
+def test_cluster_annotations_are_saved_in_batches(tmp_path):
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    items, _ = blobs(per_group=15, groups=2)
+    batches = []
+
+    processor = ClusterEmbeddings.__new__(ClusterEmbeddings)
+    processor.annotation_batch_size = 7
+    processor.parameters = {"algorithm": "kmeans", "n_clusters": 2, "reduce_first": False, "amount": 0,
+                            "save_annotations": True}
+    processor.dataset = FakeDataset(tmp_path, name="clustered")
+    processor.dataset.path = tmp_path / "clustered.ndjson"
+    processor.source_dataset = Source(items)
+    processor.interrupted = False
+    processor.save_annotations = lambda annotations, **kwargs: batches.append(list(annotations))
+    processor.process()
+
+    # 25 items: three full batches of 7 while writing, then the remaining 4
+    assert [len(batch) for batch in batches] == [7, 7, 7, 4]
+    assert sorted(annotation["item_id"] for batch in batches for annotation in batch) == \
+        sorted(item["id"] for item in items)
+
+
+def test_without_use_clusters_all_items_are_one_stream(tmp_path):
+    items, top = stream_items()
+    # the filter only applies with 'Use clusters', so it is ignored here
+    processor, payload = run_streams(tmp_path, items, top, use_clusters=False, clusters="0")
+
+    assert len(payload["points"]) == 12
+    # one shared centre: the clusters sit on either side of it, not on it
+    assert all(point[1] > 0.1 for point in payload["points"])
+    # one trend line per half, in the default colour
+    assert len(payload["trend"]) == 2
+    assert {line["colour"] for line in payload["trend"]} == {"#285ca8"}
+    assert ", per cluster" not in payload["reference"]
+    # the points can still be coloured by their cluster
+    assert "colour" in payload
+
+
+def test_use_clusters_is_only_offered_for_clustered_embeddings(tmp_path):
+    from processors.visualisation.embedding_streams import EmbeddingStreams
+
+    clustered = FakeDataset(tmp_path, name="clu", dataset_type="cluster-embeddings")
+    options = EmbeddingStreams.get_options(parent_dataset=clustered, config=None)
+    assert options["use_clusters"]["default"] is True
+    assert options["clusters"]["requires"] == "use_clusters==true"
+
+    plain = FakeDataset(tmp_path, name="emb", dataset_type="text-embeddings")
+    options = EmbeddingStreams.get_options(parent_dataset=plain, config=None)
+    assert "use_clusters" not in options and "clusters" not in options

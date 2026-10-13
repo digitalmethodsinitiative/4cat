@@ -22,6 +22,47 @@ __email__ = "4cat@oilab.eu"
 CLUSTERED_EMBEDDINGS = "cluster-embeddings"
 
 
+def embed_query(config, model_id: str, text: str, log=None) -> tuple:
+    """
+    Embed a text with the model a set of embeddings was made with.
+
+    The text has to be embedded by the same model that produced the vectors
+    it is compared with: vectors from different models live in different
+    spaces, so comparing them yields a number that means nothing.
+
+    :param config:  4CAT config reader
+    :param str model_id:  ID of the model the embeddings were made with
+    :param str text:  Text to embed
+    :param log:  Logger, passed on to the LLM client
+    :return tuple:  `(vector, model entry, None)` on success, or
+      `(None, None, error message)`
+    """
+    available_models = {
+        key: value for key, value in config.get("llm.available_models", {}).items()
+        if key in config.get("llm.enabled_models", [])
+    }
+
+    if model_id not in available_models:
+        return None, None, (f"The embedding model used for the parent dataset ('{model_id}') is no longer available, "
+                            f"so your text cannot be embedded in the same way. Ask an admin to re-enable it.")
+
+    model = available_models[model_id]
+    server = config.get("llm.servers", {}).get(model["server"])
+    if not server:
+        return None, None, f"The LLM server for model '{model_id}' is no longer configured."
+
+    try:
+        client = LLMServerClient.get_client(config, server, log)
+        vector = np.asarray(client.embed(model["local_id"], [text])[0], dtype=np.float64)
+    except (LLMServerException, ValueError, IndexError) as e:
+        return None, None, f"Could not embed your text: {e}"
+
+    if not np.linalg.norm(vector):
+        return None, None, "Your text produced an empty embedding; try a longer or different text."
+
+    return vector, model, None
+
+
 class EmbeddingSimilarity(BasicProcessor):
     """
     Embed a user-supplied text with the same model the parent dataset used, then
@@ -122,35 +163,14 @@ class EmbeddingSimilarity(BasicProcessor):
         # spaces, so comparing them yields a number that means nothing.
         embeddings = self.get_embeddings_dataset()
         model_id = embeddings.parameters.get("model") if embeddings else None
-        available_models = {
-            k: v for k, v in self.config.get("llm.available_models", {}).items()
-            if k in self.config.get("llm.enabled_models", [])
-        }
 
-        if model_id not in available_models:
-            self.dataset.finish_with_error(
-                f"The embedding model used for the parent dataset ('{model_id}') is no longer available, so your text "
-                f"cannot be embedded in the same way. Ask an admin to re-enable it.")
-            return
-
-        model = available_models[model_id]
-        server = self.config.get("llm.servers", {}).get(model["server"])
-        if not server:
-            self.dataset.finish_with_error(f"The LLM server for model '{model_id}' is no longer configured.")
-            return
-
-        self.dataset.update_status(f"Embedding your text with {model['local_id']}")
-        try:
-            client = LLMServerClient.get_client(self.config, server, self.log)
-            query_vector = np.asarray(client.embed(model["local_id"], [query_text])[0], dtype=np.float64)
-        except (LLMServerException, ValueError, IndexError) as e:
-            self.dataset.finish_with_error(f"Could not embed your text: {e}")
+        self.dataset.update_status(f"Embedding your text with {model_id}")
+        query_vector, model, error = embed_query(self.config, model_id, query_text, log=self.log)
+        if error:
+            self.dataset.finish_with_error(error)
             return
 
         query_norm = np.linalg.norm(query_vector)
-        if not query_norm:
-            self.dataset.finish_with_error("Your text produced an empty embedding; try a longer or different text.")
-            return
 
         post_id_map = self.load_post_id_map()
 
