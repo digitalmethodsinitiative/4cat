@@ -331,6 +331,101 @@ def test_add_item_replace_overwrites():
 	assert m.post_ids_for("a.jpg") == ["2"]
 
 
+def test_add_item_merge_keeps_posts_of_every_url():
+	"""One file reached through two URLs stays connected to the posts of both."""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("v.mp4", post_ids=["1", "2"], url="https://a.example/v",
+			   extra={"title": "first"})
+	m.add_item("v.mp4", post_ids=["2", "3"], url="https://b.example/v",
+			   extra={"title": "second", "downloader": "yt_dlp"}, merge=True)
+
+	entry = m.get_entry("v.mp4")
+	assert entry["post_ids"] == ["1", "2", "3"]
+	# the first URL and the data recorded with it are kept; only new keys are
+	# added, and the second URL is listed as another way to reach the file
+	assert entry["url"] == "https://a.example/v"
+	assert entry["extra"] == {
+		"title": "first", "downloader": "yt_dlp",
+		"other_urls": ["https://b.example/v"],
+	}
+
+
+def test_add_item_merge_lists_each_other_url_once():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("v.mp4", post_ids=["1"], url="https://a.example/v")
+	m.add_item("v.mp4", post_ids=["2"], url="https://b.example/v", merge=True)
+	m.add_item("v.mp4", post_ids=["3"], url="https://b.example/v", merge=True)
+	m.add_item("v.mp4", post_ids=["4"], url="https://c.example/v", merge=True)
+	# the same URL as the entry's own, or no URL at all, adds nothing
+	m.add_item("v.mp4", post_ids=["5"], url="https://a.example/v", merge=True)
+	m.add_item("v.mp4", post_ids=["6"], merge=True)
+
+	entry = m.get_entry("v.mp4")
+	assert entry["post_ids"] == ["1", "2", "3", "4", "5", "6"]
+	assert entry["extra"]["other_urls"] == ["https://b.example/v", "https://c.example/v"]
+
+
+def test_add_item_merge_fills_in_missing_url():
+	"""A file first recorded without a URL takes the next URL as its own."""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("v.mp4", post_ids=["1"])
+	m.add_item("v.mp4", post_ids=["2"], url="https://a.example/v", merge=True)
+	entry = m.get_entry("v.mp4")
+	assert entry["url"] == "https://a.example/v"
+	assert "extra" not in entry
+
+
+def test_add_item_merge_adds_new_file():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("v.mp4", post_ids=["1"], merge=True)
+	assert m.post_ids_for("v.mp4") == ["1"]
+
+
+def test_add_item_merge_and_replace_together_raises():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	with pytest.raises(MetadataException, match="either"):
+		m.add_item("v.mp4", post_ids=["1"], replace=True, merge=True)
+
+
+def test_legacy_file_shared_by_two_urls_keeps_all_post_ids():
+	"""
+	The old video downloader could list one file under two URLs, when yt-dlp
+	recognised a video it had already downloaded for an earlier URL. The second
+	URL was then marked unsuccessful, but still listed the file.
+	"""
+	legacy = {
+		"https://youtube.com/watch?v=abc": {
+			"success": True, "post_ids": ["p1"], "downloader": "yt_dlp",
+			"files": [{"filename": "abc.mp4", "success": True, "metadata": {"id": "abc"}}],
+		},
+		"https://youtu.be/abc": {
+			"success": False, "post_ids": ["p2"], "downloader": "yt_dlp",
+			"files": [{"filename": "abc.mp4", "success": True, "metadata": {"id": "abc"}}],
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+
+	assert m.post_ids_for("abc.mp4") == ["p1", "p2"]
+	assert m.get_entry("abc.mp4")["url"] == "https://youtube.com/watch?v=abc"
+	assert m.get_entry("abc.mp4")["extra"]["other_urls"] == ["https://youtu.be/abc"]
+	# the second URL did produce a file, so it is not also a failure
+	assert m.failures == []
+
+
+def test_legacy_unsuccessful_url_without_files_is_a_failure():
+	legacy = {
+		"https://example.com/gone": {
+			"success": False, "post_ids": ["p1"], "error": "404", "files": [],
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+	assert len(m) == 0
+	assert m.failures[0]["post_ids"] == ["p1"]
+	assert m.failures[0]["reason_description"] == "404"
+
+
 # -- validation --
 
 def test_validate_rejects_filename_mismatch(tmp_path):

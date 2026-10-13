@@ -640,6 +640,9 @@ class VideoDownloaderPlus(BasicProcessor):
             extra = dict(item.get("extra") or {})
             # `downloader` lived at URL level in the working dict, not per file
             downloader = downloader or extra.pop("downloader", None)
+            # the earlier archive's other URLs came from the posts of its own
+            # dataset; this archive records the URLs of this dataset's posts
+            extra.pop("other_urls", None)
             files.append({"filename": filename, "success": True, "metadata": extra})
         fields = {"success": True, "files": files}
         if downloader:
@@ -1023,11 +1026,13 @@ class VideoDownloaderPlus(BasicProcessor):
                 extra = dict(file.get("metadata") or {})
                 if data.get("downloader"):
                     extra["downloader"] = data["downloader"]
-                # replace=True: yt-dlp playlists can in theory produce duplicate
-                # filenames if the same video appears twice; last write wins,
-                # matching the physical file on disk
+                # merge=True: one file can belong to several URLs, e.g. when
+                # yt-dlp recognises a video it already downloaded for an earlier
+                # URL, or the same video appears twice in a playlist. Every URL's
+                # posts must stay connected to the file; the URLs after the first
+                # are listed in the file's extra["other_urls"].
                 metadata.add_item(filename, post_ids=post_ids, url=url,
-                                  extra=extra, replace=True)
+                                  extra=extra, merge=True)
                 had_successful_file = True
 
             if not had_successful_file:

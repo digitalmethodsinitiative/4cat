@@ -294,7 +294,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		Old format is a flat dict keyed by URL (image/video) or filename
 		(Telegram). Each entry has a `success` flag; failed entries become
 		`failures[]`, successful entries become `items[filename]`. The video
-		downloader's nested `files[]` list explodes to one item per file.
+		downloader's nested `files[]` list explodes to one item per file, and
+		a file listed under several URLs gets the post IDs of all of them.
 		All producer-specific data is carried across into `extra` (items) or
 		the failure dict (failures) so the migration loses nothing — see
 		`_legacy_extra`.
@@ -321,24 +322,20 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 
 			success = entry.get("success", True)
 
-			if not success:
-				self.failures.append(self._legacy_failure(
-					post_ids, url,
-					entry.get("reason"),
-					entry.get("reason_description") or entry.get("error"),
-					entry,
-				))
-				continue
-
-			# `files` key from video downloader due to channels and playlists
+			# `files` key from video downloader due to channels and playlists.
+			# A URL can list files even when the URL as a whole was not marked
+			# successful: e.g. yt-dlp recognised a video it had already
+			# downloaded for an earlier URL, or stopped part-way through a
+			# playlist. Those files are in the archive, so each one is recorded;
+			# the URL itself only counts as a failure if it has no file at all.
 			files = entry.get("files")
 			if isinstance(files, list) and files:
+				files_recorded = False
 				for file in files:
 					if not isinstance(file, dict):
 						continue
-					file_success = file.get("success", True)
 					file_filename = file.get("filename")
-					if not file_success:
+					if not file.get("success", True):
 						# the shared outer entry data is preserved alongside the
 						# per-file data so e.g. the video `downloader` survives
 						self.failures.append(self._legacy_failure(
@@ -347,17 +344,28 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 							file.get("reason_description") or file.get("error"),
 							entry, file,
 						))
+						files_recorded = True
 						continue
-					if not file_filename:
+					if not file_filename or not isinstance(file_filename, str):
 						continue
-					self.items[file_filename] = self._build_item(
-						file_filename, post_ids, url, self._legacy_extra(entry, file)
-					)
-			elif entry.get("filename"):
-				filename = entry["filename"]
-				self.items[filename] = self._build_item(
-					filename, post_ids, url, self._legacy_extra(entry)
-				)
+					# the same file can be listed under more than one URL;
+					# merge so the posts of every URL stay connected to it
+					self.add_item(file_filename, post_ids=post_ids, url=url,
+								  extra=self._legacy_extra(entry, file), merge=True)
+					files_recorded = True
+				if files_recorded or success:
+					continue
+
+			if not success:
+				self.failures.append(self._legacy_failure(
+					post_ids, url,
+					entry.get("reason"),
+					entry.get("reason_description") or entry.get("error"),
+					entry,
+				))
+			elif entry.get("filename") and isinstance(entry["filename"], str):
+				self.add_item(entry["filename"], post_ids=post_ids, url=url,
+							  extra=self._legacy_extra(entry), merge=True)
 			# else: malformed-but-tolerated; drop
 
 	# Legacy entry keys promoted to first-class v1 fields, or pure structure;
@@ -428,20 +436,51 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 	def add_item(self, filename: str, *, post_ids,
 				 url: Optional[str] = None,
 				 extra: Optional[dict] = None,
-				 replace: bool = False) -> None:
+				 replace: bool = False,
+				 merge: bool = False) -> None:
 		"""
 		Record a successfully produced file.
 
 		:param filename:  the file's name inside the archive. Must be unique
-			within this metadata instance unless `replace=True`.
+			within this metadata instance unless `replace` or `merge` is set.
 		:param post_ids:  list of source post IDs (string-coerced).
 		:param url:  optional originating URL.
 		:param extra:  optional free-form per-file data (e.g. yt-dlp dump).
 		:param replace:  overwrite an existing entry with the same filename.
+		:param merge:  if an entry with the same filename exists, add these
+			post IDs to it instead of overwriting it. Use this when one file
+			can be reached through several URLs (e.g. the same video linked in
+			different ways), so that every post linking to it stays connected
+			to the file. The existing URL is kept, and any other URL that led
+			to the same file is listed in `extra["other_urls"]`. The existing
+			extra data is kept; extra keys the entry does not have yet are
+			added.
 		"""
 		if not filename or not isinstance(filename, str):
 			raise MetadataException("add_item: 'filename' must be a non-empty string.")
-		if not replace and filename in self.items:
+		if replace and merge:
+			raise MetadataException("add_item: use either 'replace' or 'merge', not both.")
+
+		existing = self.items.get(filename)
+		if existing is not None and merge:
+			known_ids = existing.setdefault("post_ids", [])
+			for post_id in self._normalize_post_ids(post_ids):
+				if post_id not in known_ids:
+					known_ids.append(post_id)
+			if extra:
+				existing["extra"] = {**extra, **existing.get("extra", {})}
+			if url is not None:
+				if existing.get("url") is None:
+					existing["url"] = url
+				elif url != existing["url"]:
+					entry_extra = existing.setdefault("extra", {})
+					other_urls = list(entry_extra.get("other_urls", []))
+					if url not in other_urls:
+						other_urls.append(url)
+					entry_extra["other_urls"] = other_urls
+			return
+
+		if existing is not None and not replace:
 			raise MetadataException(f"add_item: filename {filename!r} already present.")
 		self.items[filename] = self._build_item(
 			filename, self._normalize_post_ids(post_ids), url, dict(extra) if extra else {}
