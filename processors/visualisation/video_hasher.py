@@ -189,7 +189,7 @@ class VideoHasher(BasicProcessor):
             video_metadata = self.source_dataset.read_media_metadata()
         except (FileNotFoundError, MetadataException):
             video_metadata = None
-        total_possible_videos = max((min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
+        total_possible_videos = max((min(self.source_dataset.num_rows, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
         processed_videos = 0
 
         self.dataset.update_status("Creating video hashes")

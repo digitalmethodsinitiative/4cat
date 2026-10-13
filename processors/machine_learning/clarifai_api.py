@@ -135,7 +135,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
         buffer = {}
         batch_size = 16
 
-        num_images = self.source_dataset.num_rows - 1  # .metadata.json
+        num_images = self.source_dataset.num_rows
         total_annotations = (num_images if limit == 0 else min(limit, num_images)) * len(models)
         errors = 0
         processed = 0

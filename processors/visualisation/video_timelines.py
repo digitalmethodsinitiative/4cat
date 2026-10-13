@@ -79,6 +79,7 @@ class VideoTimelines(BasicProcessor):
         offset_y = -base_height
         timeline = None
         iterator = self.source_dataset.iterate_items(self)
+        item = None
         looping = True
         timelines = []
         timeline_widths = {}
@@ -100,10 +101,9 @@ class VideoTimelines(BasicProcessor):
                 # this means that at the end of the iterator we complete one
                 # final iteration in which we finish things up (see below)
                 looping = False
-
-            # skip the metadata file (already read via read_media_metadata)
-            if item.file.name == ".metadata.json":
-                continue
+                if item is None:
+                    # the archive holds no files to make timelines from
+                    break
 
             # skip if file is a real file but not an image
             if looping and item.file.suffix not in (".jpeg", ".jpg", ".png", ".gif"):

@@ -1060,7 +1060,9 @@ class VideoDownloaderPlus(BasicProcessor):
     def _finish_processing(self, results_path, total_urls):
         """Finish processing and create result archive"""
         self.dataset.update_status("Writing downloaded videos to zip archive")
-        self.write_archive_and_finish(results_path, self.downloaded_videos + self.copied_videos, finish=False)
+        # videos copied from an earlier run are in the archive too
+        num_videos = self.downloaded_videos + self.copied_videos
+        self.write_archive_and_finish(results_path, num_videos, finish=False)
         
         status_msg = f"Downloaded {self.downloaded_videos} videos"
         if self.copied_videos > 0:
@@ -1074,10 +1076,10 @@ class VideoDownloaderPlus(BasicProcessor):
         
         if self.warning_message:
             self.dataset.update_status(status_msg)
-            self.dataset.finish_with_warning(self.downloaded_videos, f"Incomplete: {self.warning_message}")
+            self.dataset.finish_with_warning(num_videos, f"Incomplete: {self.warning_message}")
         else:
             self.dataset.update_status(status_msg, is_final=True)
-            self.dataset.finish(self.downloaded_videos)
+            self.dataset.finish(num_videos)
 
     def yt_dlp_monitor(self, d):
         """Can be used to gather information from yt-dlp while downloading"""

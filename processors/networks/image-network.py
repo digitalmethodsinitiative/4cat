@@ -135,8 +135,8 @@ class ImageGrapher(BasicProcessor):
             try:
                 hashed += 1
                 if hashed % 100 == 0:
-                    self.dataset.update_status(f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows-1:,} item(s)")
-                self.dataset.update_progress(hashed / (self.source_dataset.num_rows-1) * 0.5)
+                    self.dataset.update_status(f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows:,} item(s)")
+                self.dataset.update_progress(hashed / self.source_dataset.num_rows * 0.5)
                 file_hash = hash_file(image.file, hash_type)
                 file_hash_map[image.file.name] = file_hash
                 if file_hash not in hash_file_map:

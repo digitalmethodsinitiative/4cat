@@ -6,10 +6,10 @@ https://ffmpeg.org/
 """
 import shutil
 import zipfile
-from pathlib import Path
 import oslex
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import is_support_file
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 
@@ -66,7 +66,7 @@ class AudioExtractor(BasicProcessor):
         # Prepare staging areas for videos and video tracking
         output_dir = self.dataset.get_staging_area()
 
-        # Estimate how many actual video files we will attempt, excluding archive metadata.
+        # Estimate how many actual video files we will attempt, excluding metadata and the like.
         total_possible_videos = self.source_dataset.num_rows
         source_archive = self.source_dataset.get_results_path()
         if source_archive.exists() and source_archive.suffix.lower() == ".zip":
@@ -74,7 +74,7 @@ class AudioExtractor(BasicProcessor):
                 total_possible_videos = sum(
                     1
                     for archived_file in archive_file.infolist()
-                    if not archived_file.is_dir() and Path(archived_file.filename).name != ".metadata.json"
+                    if not archived_file.is_dir() and not is_support_file(archived_file.filename)
                 )
 
         if max_files != 0:
@@ -101,11 +101,6 @@ class AudioExtractor(BasicProcessor):
         for item in self.source_dataset.iterate_items(processor=self, get_annotations=False):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while determining image wall order")
-
-            # the source archive's metadata describes videos; we write our
-            # own (audio-keyed) metadata below, so skip the original
-            if item.file.name == '.metadata.json':
-                continue
 
             if max_files != 0 and processed_videos >= max_files:
                 break
