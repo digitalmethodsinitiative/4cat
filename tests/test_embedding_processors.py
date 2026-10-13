@@ -984,6 +984,20 @@ def test_hdbscan_leaves_outliers_out(tmp_path):
     assert same_grouping(clusters[:-3], truth)
 
 
+def test_hdbscan_min_samples_does_not_follow_min_cluster_size(tmp_path):
+    from unittest.mock import patch
+    import numpy as np
+
+    items, _ = blobs()
+    with patch("sklearn.cluster.HDBSCAN") as hdbscan:
+        hdbscan.return_value.fit_predict.side_effect = lambda matrix: np.zeros(len(matrix), dtype=int)
+        run_clustering(tmp_path, items, algorithm="hdbscan", min_cluster_size=20)
+
+    # the default, not the cluster size: the neighbour search holds items x min_samples values
+    assert hdbscan.call_args.kwargs["min_samples"] == 10
+    assert hdbscan.call_args.kwargs["algorithm"] == "kd_tree"
+
+
 def test_clustering_can_reduce_first(tmp_path):
     items, truth = blobs()
     processor = run_clustering(tmp_path, items, algorithm="hdbscan", min_cluster_size=5, reduce_first=True,
