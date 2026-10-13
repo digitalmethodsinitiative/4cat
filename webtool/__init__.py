@@ -57,15 +57,9 @@ app.wsgi_app = ProxyFix(app.wsgi_app, **proxy_overrides)
 
 # test memcache
 # this is also done in the backend, but the frontend may not be able to connect
-# while the backend is, for example
-if config.get("MEMCACHE_SERVER"):
-    if config.get_memcache():
-        log.debug("Memcache connection initialized")
-    else:
-        log.warning(
-            f"Memcache server address configured, but connection could not be initialized at "
-            f"{config.get('MEMCACHE_SERVER')}. Front-end configuration cache inactive."
-        )
+# while the backend is, for example. If it cannot, the cache logs that itself.
+if config.get("MEMCACHE_SERVER") and config.cache.is_available():
+    log.debug("Memcache connection initialized")
 
 # set up logging for Gunicorn
 # this redirects Gunicorn log messages to the logger instantiated above - more
@@ -139,9 +133,12 @@ app.login_manager.init_app(app)
 app.login_manager.login_view = "user.show_login"
 
 # initialize rate limiter - memcache can serve as the storage backend, if not
-# available, direct memory storage will be used
-if config.get_memcache():
-    app.limiter = Limiter(app=app, key_func=get_remote_address, storage_uri=f"memcached://{config.get('MEMCACHE_SERVER')}")
+# available, direct memory storage will be used. If memcache fails later (e.g.
+# when it is restarted), memory is used until it works again, instead of the
+# request failing.
+if config.cache.is_available():
+    app.limiter = Limiter(app=app, key_func=get_remote_address, storage_uri=f"memcached://{config.get('MEMCACHE_SERVER')}",
+                          in_memory_fallback_enabled=True, swallow_errors=True)
 else:
     app.limiter = Limiter(app=app, key_func=get_remote_address)
 
