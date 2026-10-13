@@ -514,7 +514,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 
 	def add_failure(self, *, post_ids, reason: str,
 					reason_description: Optional[str] = None,
-					url: Optional[str] = None) -> None:
+					url: Optional[str] = None,
+					extra: Optional[dict] = None) -> None:
 		"""
 		Record a download attempt that did not produce a file.
 
@@ -522,6 +523,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		:param reason:  structured failure code (e.g. "error", "no_media").
 		:param reason_description:  optional human-readable explanation.
 		:param url:  optional URL that was attempted.
+		:param extra:  optional free-form data about the attempt.
 		"""
 		if not reason or not isinstance(reason, str):
 			raise MetadataException("add_failure: 'reason' must be a non-empty string.")
@@ -533,6 +535,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			failure["url"] = url
 		if reason_description is not None:
 			failure["reason_description"] = reason_description
+		if extra:
+			failure["extra"] = dict(extra)
 		self.failures.append(failure)
 
 	@staticmethod

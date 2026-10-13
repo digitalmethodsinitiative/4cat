@@ -406,19 +406,26 @@ class ImageDownloader(BasicProcessor):
                         # before ending the loop and wrapping up
                         self.complete = True
 
+            # `url` is where the file was downloaded from, after following any
+            # redirects; the URL as it appeared in the dataset is kept as well
+            # when it is different
+            resolved_url = self.resolve_url(url)
+            url_extra = {"original_url": url} if resolved_url != url else {}
             if failure:
                 failures.append(url)
                 downloaded_file.unlink(missing_ok=True)
                 metadata.add_failure(
                     post_ids=item_map[url],
                     reason="error",
-                    url=url,
+                    url=resolved_url,
+                    extra=url_extra,
                 )
             else:
                 metadata.add_item(
                     filename=self.filenames[url],
                     post_ids=item_map[url],
-                    url=self.resolve_url(url),
+                    url=resolved_url,
+                    extra=url_extra,
                     replace=True,
                 )
 

@@ -74,7 +74,8 @@ class AudioExtractor(BasicProcessor):
                 total_possible_videos = sum(
                     1
                     for archived_file in archive_file.infolist()
-                    if not archived_file.is_dir() and Path(archived_file.filename).name != ".metadata.json"
+                    if not archived_file.is_dir()
+                    and Path(archived_file.filename).name not in (".metadata.json", "video_archive")
                 )
 
         if max_files != 0:
@@ -105,6 +106,9 @@ class AudioExtractor(BasicProcessor):
             # the source archive's metadata describes videos; we write our
             # own (audio-keyed) metadata below, so skip the original
             if item.file.name == '.metadata.json':
+                continue
+            elif item.file.name == "video_archive":
+                # yt-dlp's list of what it downloaded; not a video
                 continue
 
             if max_files != 0 and processed_videos >= max_files:

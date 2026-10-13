@@ -349,6 +349,16 @@ def test_add_item_replace_overwrites():
 	assert m.post_ids_for("a.jpg") == ["2"]
 
 
+def test_add_failure_keeps_extra():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_failure(post_ids=["1"], reason="error", url="https://cdn.example/a.jpg",
+				  extra={"original_url": "https://t.example/a"})
+	m.add_failure(post_ids=["2"], reason="error")
+	assert m.failures[0]["extra"] == {"original_url": "https://t.example/a"}
+	assert "extra" not in m.failures[1]
+	m.validate()
+
+
 def test_add_item_merge_keeps_posts_of_every_url():
 	"""One file reached through two URLs stays connected to the posts of both."""
 	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
