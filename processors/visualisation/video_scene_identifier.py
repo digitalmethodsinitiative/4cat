@@ -225,12 +225,6 @@ class VideoSceneDetector(BasicProcessor):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while detecting video scenes")
 
-			if original_video.file.name == ".metadata.json":
-				continue
-			elif original_video.file.name == "video_archive":
-				# yt-dlp file
-				continue
-
 			detector = self.get_scenes_scenedetect if self.parameters.get("detector_type") != "ffmpeg_select" else self.get_scenes_ffmpeg
 
 			self.dataset.update_progress(processed_videos / self.source_dataset.num_rows)

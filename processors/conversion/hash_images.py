@@ -144,8 +144,6 @@ class ImageHasher(BasicProcessor):
             if processed % 100 == 0:
                 self.dataset.update_status(f"Processed {processed:,} of {self.source_dataset.num_rows:,} images")
 
-            if item.file.name == ".metadata.json":
-                continue
             try:
                 image_hash = hash_image(item.file, hash_type, hash_size, as_string=False)
             except FileNotFoundError as e:

@@ -85,9 +85,6 @@ class UniqueImageFilter(BasicProcessor):
                                              f"found {dupes:,} duplicate(s)")
             processed += 1
 
-            if image.file.name == ".metadata.json":
-                continue
-
             image_hash = hash_file(image.file, hash_type)
 
             if image_hash not in seen_hashes:

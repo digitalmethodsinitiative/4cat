@@ -200,12 +200,6 @@ class VideoHasher(BasicProcessor):
             if max_videos != 0 and processed_videos >= max_videos:
                 break
 
-            if video.file.name == '.metadata.json':
-                continue
-            elif video.file.name == "video_archive":
-                # yt-dlp file
-                continue
-
             try:
                 videohash = VideoHash(path=str(video.file), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
             except FFmpegNotFound:

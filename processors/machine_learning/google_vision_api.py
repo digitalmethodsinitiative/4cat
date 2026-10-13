@@ -134,8 +134,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             self.dataset.update_progress(done / total)
 
             if image.file.name.startswith(".") or image.file.suffix in (".json", ".log"):
-                if image.file.name != ".metadata.json":
-                    self.dataset.log(f"Skipping file {image.file.name}, probably not an image.")
+                self.dataset.log(f"Skipping file {image.file.name}, probably not an image.")
                 continue
 
             try:

@@ -111,7 +111,6 @@ class ImageGrapher(BasicProcessor):
     def process(self):
         column = self.parameters.get("column")
         hash_type = self.parameters.get("deduplicate")
-        filename_filter = [".metadata.json"] if hash_type == "none" else []
         hashed = 0
 
         try:
@@ -129,9 +128,10 @@ class ImageGrapher(BasicProcessor):
         seen_hashes = set()
         id_file_map = {}
 
-        for image in self.source_dataset.iterate_items(filename_filter=filename_filter):
-            if image.file.name == ".metadata.json":
-                continue
+        # without deduplication, images are told apart by file name, so the
+        # images themselves do not need to be read
+        images = self.source_dataset.iterate_items() if hash_type != "none" else []
+        for image in images:
             try:
                 hashed += 1
                 if hashed % 100 == 0:

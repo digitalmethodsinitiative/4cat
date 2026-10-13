@@ -161,10 +161,6 @@ class VideoStack(BasicProcessor):
             if self.interrupted:
                 return ProcessorInterruptedException("Interrupted while unpacking videos")
 
-            # skip JSON
-            if video.file.name == '.metadata.json':
-                continue
-
             if len(videos) >= max_videos:
                 break
 
