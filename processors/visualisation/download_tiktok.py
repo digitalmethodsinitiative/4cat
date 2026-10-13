@@ -305,24 +305,16 @@ class TikTokImageDownloader(BasicProcessor):
 
     @staticmethod
     def map_metadata(filename, item):
-        """Yield CSV row(s) for a successful items[filename] entry."""
-        yield {
-            "url": item.get("url", ""),
-            "number_of_posts_with_url": len(item.get("post_ids", [])),
-            "post_ids": ", ".join(item.get("post_ids", [])),
-            "filename": filename,
-            "download_successful": True,
-        }
+        """
+        Yield CSV row(s) for a successful metadata entry, in the same format
+        as the general image downloader
+        """
+        yield from ImageDownloader.map_metadata(filename, item)
 
     @staticmethod
     def map_failure_metadata(failure):
-        """Yield CSV row(s) for a failures[] entry."""
-        yield {
-            "url": failure.get("url", ""),
-            "number_of_posts_with_url": len(failure.get("post_ids", [])),
-            "post_ids": ", ".join(failure.get("post_ids", [])),
-            "filename": "",
-            "download_successful": False,
-            "reason": failure.get("reason", ""),
-            "reason_description": failure.get("reason_description", ""),
-        }
+        """
+        Yield CSV row(s) for a failed download, in the same format as the
+        general image downloader
+        """
+        yield from ImageDownloader.map_failure_metadata(failure)

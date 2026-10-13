@@ -68,6 +68,15 @@ def test_round_trip_minimal(tmp_path):
 	}]
 
 
+def test_new_copies_software_version_from_dataset():
+	"""The version a processor runs with is already stored on its dataset."""
+	dataset = FakeDataset("k", None)
+	dataset.data = {"software_version": "abc123", "software_source": "https://github.com/x/4cat"}
+	meta = MediaArchiveMetadata.new(dataset, processor_type="image-downloader", from_dataset="src")
+	assert meta.software_version == "abc123"
+	assert meta.software_source == "https://github.com/x/4cat"
+
+
 def test_read_v1_from_zip(tmp_path):
 	meta = MediaArchiveMetadata.new(processor_type="image-downloader", from_dataset="src")
 	meta.add_item("a.jpg", post_ids=["1"], url="u")

@@ -1847,15 +1847,19 @@ class DataSet(FourcatModule):
         except AttributeError:
             processor_path = ""
 
+        version_data = {
+            "software_version": version[0],
+            "software_source": version[1],
+            "software_file": processor_path,
+        }
         updated = self.db.update(
             "datasets",
             where={"key": self.data["key"]},
-            data={
-                "software_version": version[0],
-                "software_source": version[1],
-                "software_file": processor_path,
-            },
+            data=version_data,
         )
+        # keep this object in step with the database, so code that runs later
+        # in the same processor (e.g. writing archive metadata) sees the version
+        self.data.update(version_data)
 
         return updated > 0
 

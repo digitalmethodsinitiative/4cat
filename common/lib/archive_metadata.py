@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import Iterator, Optional
 
 from common.lib.exceptions import MetadataException
-from common.lib.helpers import get_software_commit
 
 
 class ArchiveMetadataFile:
@@ -59,14 +58,15 @@ class ArchiveMetadataFile:
 		"""
 		Record the 4CAT commit / repository creating this metadata.
 
-		Called by `new()` on the producer path. A no-op without a dataset to
-		resolve against (e.g. metadata constructed outside a processor run).
+		Called by `new()` on the producer path. The dataset already records
+		the version its processor runs with (stored when the processor
+		starts), so it is copied from there. A no-op without a dataset (e.g.
+		metadata constructed outside a processor run).
 		"""
 		if self.dataset is None:
 			return
-		commit, source = get_software_commit(self.dataset.get_own_processor())
-		self.software_version = commit
-		self.software_source = source
+		self.software_version = self.dataset.data.get("software_version")
+		self.software_source = self.dataset.data.get("software_source")
 
 	@classmethod
 	def read(cls, dataset, *, filename: Optional[str] = None):
@@ -216,6 +216,11 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 	Keyed by output filename; each item records the source post IDs, the
 	originating URL (if any), and an `extra` blob of platform-specific data.
 	Download attempts that produced no file are recorded in `failures`.
+
+	An item or failure can be reached through more than one URL, e.g. a short
+	and a long link to the same video, or a link in a post that redirected to
+	the file. The entry's `url` is one of them; the others are listed in
+	`extra["other_urls"]`, so that the entry can be found by any of them.
 	"""
 
 	SCHEMA_VERSION = 1
