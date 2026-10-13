@@ -241,7 +241,7 @@ class VideoTimelines(BasicProcessor):
             if source_dataset is not None:
                 for item in source_dataset.iterate_items(self):
                     for filename in urls:
-                        if item["id"] in mapping_ids[filename]:
+                        if str(item["id"]) in mapping_ids[filename]:
                             labels[filename] = mapper(item)
 
         return labels
