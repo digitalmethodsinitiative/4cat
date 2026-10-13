@@ -91,6 +91,18 @@ class ClusterEmbeddings(BasicProcessor):
                            "clusters as well as more noise.",
                 "requires": "algorithm==hdbscan",
             },
+            "min_samples": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Minimum samples",
+                "default": 10,
+                "min": 1,
+                "max": 500,
+                "coerce_type": int,
+                "tooltip": "How many close neighbours an item needs to count as part of a dense area. Higher values "
+                           "make clustering more conservative: more items become noise and clusters are denser. "
+                           "Memory use grows with this number times the number of items.",
+                "requires": "algorithm==hdbscan",
+            },
             "n_clusters": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "K-means: number of clusters",
@@ -116,8 +128,7 @@ class ClusterEmbeddings(BasicProcessor):
                 "default": True,
                 "tooltip": "Cluster on a UMAP reduction of the embeddings instead of the full vectors. HDBSCAN finds "
                            "little in vectors with hundreds or thousands of dimensions, so for HDBSCAN this is "
-                           "strongly recommended; k-means usually benefits too. The reduction is only used to find "
-                           "the clusters: the output keeps the full embeddings.",
+                           "strongly recommended and k-means usually benefits too.",
             },
             "reduce_dimensions": {
                 "type": UserInput.OPTION_TEXT,
@@ -334,9 +345,16 @@ class ClusterEmbeddings(BasicProcessor):
         from sklearn.cluster import HDBSCAN
 
         min_cluster_size = min(self.parameters.get("min_cluster_size", 10), point_count)
-        self.dataset.log(f"Running HDBSCAN with a minimum cluster size of {min_cluster_size}")
-        # copy=False: the matrix is not used again, so no need to hold it twice
-        return HDBSCAN(min_cluster_size=min_cluster_size, copy=False).fit_predict(matrix)
+        # left unset, min_samples follows min_cluster_size, and finding each
+        # item's neighbours then holds items x min_samples distances and
+        # indices: over 10 GB for 130,000 items and a cluster size of 5,000
+        min_samples = min(self.parameters.get("min_samples", 10), point_count)
+        self.dataset.log(f"Running HDBSCAN with a minimum cluster size of {min_cluster_size} and {min_samples} "
+                         f"minimum samples")
+        # kd_tree: never fall back to brute force, which holds all distances
+        # between all items at once
+        return HDBSCAN(min_cluster_size=min_cluster_size, min_samples=min_samples,
+                       algorithm="kd_tree", copy=False).fit_predict(matrix)
 
     @staticmethod
     def renumber_by_size(labels) -> list:
