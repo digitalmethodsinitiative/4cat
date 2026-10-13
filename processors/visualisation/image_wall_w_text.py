@@ -103,26 +103,29 @@ class ImageTextWallGenerator(BasicProcessor):
         """
         Identify dataset types that are compatible with this processor
         """
+        if source_dataset is None:
+            return None, None
+
         # Datasets that have both images and captions
         # TODO: after metadata merge: text from metadata
         if source_dataset.type in ImageTextWallGenerator.combined_dataset:
             # This dataset has both images and captions
             return source_dataset, source_dataset
 
-        # Datasets that have separate images and captions
-        if source_dataset is None or source_dataset.get_parent() is None:
-            return None, None
-        
+        # Datasets that have separate images and captions: the captions come
+        # from one of the caption processors, run on a dataset with images.
+        # Check the type first, because looking up the parent queries the
+        # database and this runs for every dataset shown on a result page
         # TODO: add additional caption datasets, allow column selection for text dataset (need filename column + text column)
-        elif any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in
-                  ImageTextWallGenerator.caption_datasets]):
-            text_dataset = source_dataset
-            image_dataset = source_dataset.get_parent()
-            if not any([image_dataset.type.startswith(dataset_prefix) for dataset_prefix in
-                        ImageTextWallGenerator.image_datasets] + [image_dataset.get_media_type() == "image"]):
-                # Not a compatible dataset
-                return None, None
-        else:
+        if not any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in
+                    ImageTextWallGenerator.caption_datasets]):
+            return None, None
+
+        text_dataset = source_dataset
+        image_dataset = source_dataset.get_parent()
+        if image_dataset is None or not any([image_dataset.type.startswith(dataset_prefix) for dataset_prefix in
+                                             ImageTextWallGenerator.image_datasets] + [image_dataset.get_media_type() == "image"]):
+            # Not a compatible dataset
             return None, None
 
         return image_dataset, text_dataset

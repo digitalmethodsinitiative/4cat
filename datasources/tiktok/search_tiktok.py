@@ -94,6 +94,7 @@ class SearchTikTok(Search):
             "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
             "timestamp": datetime.utcfromtimestamp(int(post["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
             "unix_timestamp": int(post["createTime"]),
+            "is_image_post": "yes" if post.get("imagePost") else "no",
             "is_duet": "yes" if (post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False) else "no",
             "is_ad": "yes" if post.get("isAd", False) else "no",
             "is_paid_partnership": "yes" if post.get("adAuthorization") else "no",

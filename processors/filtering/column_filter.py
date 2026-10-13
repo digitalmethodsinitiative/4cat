@@ -239,7 +239,11 @@ class ColumnFilter(BaseFilter):
             date_compare = None
             for mapped_item in self.source_dataset.iterate_items(processor=self):
                 processed_items += 1
-                column_value = mapped_item.get(column).strip()
+                column_value = mapped_item.get(column)
+                # only strip strings
+                if type(column_value) is str:
+                    column_value = column_value.strip()
+
                 if processed_items % 500 == 0:
                     self.dataset.update_status(f"Processed {processed_items:,} items ({matching_items:,} matching)")
                     self.dataset.update_progress(processed_items / self.source_dataset.num_rows)

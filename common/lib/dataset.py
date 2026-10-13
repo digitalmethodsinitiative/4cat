@@ -359,6 +359,16 @@ class DataSet(FourcatModule):
                     if i < offset:
                         continue
 
+                    # csv.DictReader does not fail on a row with more values
+                    # than the file has columns, but puts the extra values
+                    # under the key None. Nothing that reads items expects
+                    # that key, so stop here and say where the file is broken
+                    if None in item:
+                        raise DataSetException(
+                            f"Cannot read dataset {self.key}: line {reader.line_num} of its CSV file has "
+                            f"{len(item[None])} more value(s) than the file has columns"
+                        )
+
                     yield item
 
         elif path.suffix.lower() == ".ndjson":
@@ -583,7 +593,11 @@ class DataSet(FourcatModule):
             default_strategy = map_missing
             map_missing = {}
 
-        iterator = self._iterate_items if self.get_extension() != "zip" else self._iterate_archive_contents
+        extension = self.get_extension()
+        if extension is False:
+            raise FileNotFoundError(f"Results file for dataset {self.key} does not exist: {self.get_results_path()}")
+
+        iterator = self._iterate_items if extension != "zip" else self._iterate_archive_contents
 
         # Loop through items
         for i, item in enumerate(iterator(processor=processor, offset=offset, *args, **kwargs)):
@@ -2147,36 +2161,32 @@ class DataSet(FourcatModule):
         compatibility through. This may not be the same reader the dataset was
         instantiated with, e.g. when checking whether some other user should
         be able to run processors on this dataset.
-        :param bool exclude_hidden:  Exclude processors that should be displayed
-        in the UI? If `False`, all processors are returned.
+        :param bool exclude_hidden:  Exclude processors that should not be
+        displayed in the UI? If `False`, all processors are returned.
 
         :return dict:  Available processors, `name => properties` mapping
         """
-        if self.available_processors:
-            # Update to reflect exclude_hidden parameter which may be different from last call
-            # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-            return {
-                processor_type: processor
-                for processor_type, processor in self.available_processors.items()
-                if not exclude_hidden or not processor.is_hidden
-            }
+        # The cache always holds the full list, hidden processors included, so
+        # that every call can apply its own exclude_hidden to it
+        # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
+        if not self.available_processors:
+            processors = self.get_compatible_processors(config=config)
 
-        processors = self.get_compatible_processors(config=config)
+            for analysis in self.get_children(update=True):
+                if analysis.type not in processors:
+                    continue
 
-        for analysis in self.get_children(update=True):
-            if analysis.type not in processors:
-                continue
+                if not processors[analysis.type].get_options(parent_dataset=self, config=config):
+                    # No variable options; this processor has been run so remove
+                    del processors[analysis.type]
 
-            if not processors[analysis.type].get_options(parent_dataset=self, config=config):
-                # No variable options; this processor has been run so remove
-                del processors[analysis.type]
-                continue
+            self.available_processors = processors
 
-            if exclude_hidden and processors[analysis.type].is_hidden:
-                del processors[analysis.type]
-
-        self.available_processors = processors
-        return processors
+        return {
+            processor_type: processor
+            for processor_type, processor in self.available_processors.items()
+            if not exclude_hidden or not processor.is_hidden
+        }
 
     def link_job(self, job):
         """
@@ -2378,7 +2388,7 @@ class DataSet(FourcatModule):
         # Default to text
         return self.parameters.get("media_type", "text")
 
-    def get_media_from_children(self, item_ids=[]) -> dict:
+    def get_media_from_children(self, item_ids=None) -> dict:
         """ Returns a list of media filenames that have been downloaded
             via video or image download child processors
 
@@ -2390,6 +2400,9 @@ class DataSet(FourcatModule):
         children = self.get_children()
         if not children:
             return {}
+
+        if item_ids is None:
+            item_ids = []
 
         media_datasets = [
             p for p in children
@@ -2491,6 +2504,24 @@ class DataSet(FourcatModule):
         scheme = "https" if self.modules.config.get("flask.https") else "http"
         server = self.modules.config.get("flask.server_name")
         return f"{scheme}://{server}/download/{self.key}/"
+
+    def get_log_url(self):
+        """
+        Gets the 4CAT frontend URL of the dataset's log
+
+        Like `get_result_url()`, this uses the configured server name when
+        called outside the web app (e.g. in the backend).
+
+        :return str:  URL of the dataset log
+        """
+        from flask import has_app_context, url_for
+
+        if has_app_context():
+            return url_for("dataset.view_log", key=self.key, _external=True)
+
+        scheme = "https" if self.modules.config.get("flask.https") else "http"
+        server = self.modules.config.get("flask.server_name")
+        return f"{scheme}://{server}/results/{self.key}/log/"
 
     def warn_unmappable_item(self, item_count, processor=None, error_message=None):
         """

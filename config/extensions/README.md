@@ -37,4 +37,39 @@ folder. An extension containing both processors and a data source could look lik
 │          ├─ search_my_datasource.py
 ```
 
-In this scenario, `my_extension` would be a git repository within which all other files are contained. 
+In this scenario, `my_extension` would be a git repository within which all other files are contained.
+
+## Settings your extension declares
+
+A processor or data source worker can declare its own settings by putting a `config` dict on the class. 4CAT collects
+those when it starts and shows them in the control panel alongside its own.
+
+A setting name has to be unique across the whole of 4CAT, so some declarations are refused:
+
+- A name 4CAT itself already uses is refused. 4CAT's own definition of a setting decides how a saved value is checked,
+  what applies when nothing is saved, and whether values set per user group count at all, so an extension cannot be
+  allowed to change it.
+- Some names are reserved for 4CAT even where it does not use them yet: anything starting with `privileges.`,
+  `flask.`, `4cat.`, `path.`, `datasources.`, `extensions.` or `logging.`. Note `extensions.` is among them despite
+  how it reads - those are 4CAT's own settings *about* extensions, not your extension's settings.
+- Where two modules declare the same name, the first one keeps it, and 4CAT's own modules go first. So an extension
+  cannot take a name a built-in processor or data source declares.
+
+Several classes sharing a base class that declares `config` is fine: the setting is registered once, and inheriting it
+is not treated as a clash.
+
+Refusals are written to the 4CAT log, naming the module responsible. If a setting of yours does not appear in the
+control panel, look there first. Giving your settings a prefix of your own - `my_extension.api_key` rather than
+`api_key` - avoids the question entirely.
+
+## Names an extension cannot take
+
+Three things have to be unique across the whole of 4CAT: a setting name, a worker's `type`, and a data source's
+`DATASOURCE` id. Where an extension and 4CAT itself claim the same one, **4CAT's own always wins**: its version is
+loaded, yours is skipped, and the clash is written to the log naming both sides.
+
+An extension therefore cannot replace a built-in processor or data source. If you want yours to behave differently
+from a built-in, give it a name of its own; if you need to change the built-in itself, that is a change to 4CAT.
+
+Where two *extensions* claim the same name, the first one loaded keeps it. Which one that is does not depend on the
+machine, but it is not something to rely on - pick names of your own and the question does not arise.

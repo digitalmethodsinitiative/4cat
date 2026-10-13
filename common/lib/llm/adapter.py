@@ -20,7 +20,7 @@ class LLMAdapter:
     def __init__(
             self,
             model: dict,
-            server: dict = None,
+            server: Optional[dict] = None,
             api_key: Optional[str] = None,
             temperature: float = 0.1,
             max_tokens: int = 1000,

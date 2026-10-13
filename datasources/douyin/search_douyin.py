@@ -9,6 +9,121 @@ from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.helpers import normalize_url_encoding
 
+
+def defined(data, key, default=None):
+    """
+    Read a value from Douyin page data.
+
+    Douyin pages embed data in which a value that was never set arrives as the
+    string "$undefined" instead of being left out. Treat that placeholder the
+    same as a missing key. A key that is present and null is left alone, since
+    a null may be the source saying "none" rather than "not set".
+
+    :param dict data:  Object to read from
+    :param str key:  Key to read
+    :param default:  Value to return if the key is absent or was never set
+    :return:  The stored value, or the default
+    """
+    value = data.get(key, default)
+    return default if value == "$undefined" else value
+
+
+def absolute_link(url):
+    """
+    Make a link openable.
+
+    Douyin sometimes leaves the "https:" off the front of a link, so that it
+    starts straight at "//". Put it back; leave other links as they are.
+
+    :param str url:  Link from the post data
+    :return str:  Link that can be opened
+    """
+    return "https:" + url if url.startswith("//") else url
+
+
+def first_link(*sources):
+    """
+    Get the first usable link from a number of places in the post data.
+
+    Douyin keeps links in a "url_list", but sometimes fills that list with
+    scrambled text instead, so an entry is only usable if it starts like a web
+    address. Sources are tried in order, so pass the preferred one first.
+
+    :param sources:  Objects that may hold a "url_list"
+    :return str:  The first usable link, or an empty string if there is none
+    """
+    for source in sources:
+        for url in (source or {}).get("url_list") or []:
+            if isinstance(url, str) and url.startswith(("http://", "https://", "//")):
+                return absolute_link(url)
+    return ""
+
+
+def stream_link(stream_data):
+    """
+    Get the best available video link for a live stream.
+
+    Douyin offers a stream at several qualities, but not always the same ones,
+    so work down from the best. An unfamiliar quality name is still better than
+    no link at all, so anything left over is used as a last resort.
+
+    :param dict stream_data:  The stream's own data, from "rawdata"
+    :return str:  Link to the stream, or an empty string if none is offered
+    """
+    qualities = (stream_data.get("stream_url") or {}).get("flv_pull_url") or {}
+    for quality in ("FULL_HD1", "HD1", "SD1", "SD2"):
+        if qualities.get(quality):
+            return absolute_link(qualities[quality])
+
+    for link in qualities.values():
+        if link:
+            return absolute_link(link)
+
+    return ""
+
+
+def first_timestamp(*sources):
+    """
+    Get the time a post was made from the first place that holds it.
+
+    Douyin pages keep this in different places, and some pages leave it out
+    altogether, so the places are tried in order and the first one holding a
+    number wins. Each source is paired with the number of units it counts per
+    second, because some of them are in milliseconds. A key that is present
+    but null counts as holding nothing, since the page did not say when the
+    post was made either way.
+
+    :param sources:  (value, units per second) pairs, preferred source first
+    :return:  When the post was made, or None if no source holds a number
+    """
+    for value, per_second in sources:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        return datetime.fromtimestamp(value / per_second)
+    return None
+
+
+def download_prevented(download):
+    """
+    Work out whether Douyin blocks downloading a video.
+
+    Two opposite flags have been used for this: "prevent", where true means
+    downloading is blocked, and the newer "allowDownload", where true means it
+    is allowed. Report a missing field when neither is there, rather than
+    guessing which way round it was.
+
+    :param dict download:  The post's "download" object
+    :return:  "yes", "no", or a MissingMappedField
+    """
+    if isinstance(download, dict):
+        if "prevent" in download:
+            return "yes" if download["prevent"] else "no"
+        if "allowDownload" in download:
+            return "no" if download["allowDownload"] else "yes"
+
+    return MissingMappedField("Unknown")
+
+
 class SearchDouyin(Search):
     """
     Import scraped Douyin data
@@ -44,17 +159,20 @@ class SearchDouyin(Search):
         if "ZS_collected_from_embed" in item and item["ZS_collected_from_embed"]:
             # HTML embedded posts formated differently than JSON posts
 
-            stream_data = item.get("cellRoom", {}).get("rawdata") if item.get("cellRoom") != "$undefined" else {}
+            stream_data = defined(item, "cellRoom", {}).get("rawdata")
             if stream_data:
                 # These appear to be streams
                 subject = "Stream"
-                post_timestamp = datetime.fromtimestamp(stream_data.get("createtime", item.get(
-                    "requestTime") / 1000))  # These may only have the timestamp of the request
-                video_url = stream_data.get("stream_url").get("flv_pull_url", {}).get("FULL_HD1")
+                # A stream may only carry the time of the request that fetched it
+                post_timestamp = first_timestamp(
+                    (stream_data.get("createtime"), 1),
+                    (item.get("requestTime"), 1000),
+                )
+                video_url = stream_link(stream_data)
                 video_thumbnail = stream_data.get("video", {}).get("cover")
                 video_description = stream_data.get("title")
                 duration = "Unknown"
-                prevent_download = None
+                prevent_download = MissingMappedField("Unknown")
                 stats = stream_data.get("stats")
 
                 # Author is stream owner
@@ -69,13 +187,13 @@ class SearchDouyin(Search):
                 if videos_list:
                     videos = sorted([vid for vid in item.get("video").get("bitRateList")], key=lambda d: d.get("bitRate"),
                                 reverse=True)
-                    video_url = "https" + videos[0]["playApi"]
+                    video_url = absolute_link(videos[0].get("playApi", ""))
                 else:
                     video_url = ""
                 video_thumbnail = item.get("video", {}).get("cover")
                 video_description = item["desc"]
                 duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
-                prevent_download = "yes" if item["download"]["prevent"] else "no"
+                prevent_download = download_prevented(defined(item, "download", {}))
                 stats = item["stats"]
 
                 # Author is, well, author
@@ -106,27 +224,38 @@ class SearchDouyin(Search):
             share_count = stats.get("shareCount", MissingMappedField("Unknown"))
             # live_watch_count = stats.get("liveWatchCount", MissingMappedField("Unknown"))
 
-            # This is a guess, I have not encountered it
-            video_tags = ",".join([tag["tagName"] for tag in item.get("videoTag", []) if tag.get("tagName")])
+            # Normally a list of tag objects. If the tags arrive as a plain string instead,
+            # keep what was sent rather than discarding it.
+            video_tag_list = defined(item, "videoTag")
+            if isinstance(video_tag_list, list):
+                video_tags = ",".join([tag["tagName"] for tag in video_tag_list if tag.get("tagName")])
+            elif isinstance(video_tag_list, str):
+                video_tags = video_tag_list
+            else:
+                video_tags = ""
 
-            mix_current_episode = item.get(mix_info_key, {}).get("currentEpisode", "N/A")
+            mix_info = defined(item, mix_info_key, {}) or {}
+            mix_current_episode = defined(mix_info, "currentEpisode", "N/A")
 
         else:
             stream_data = item.get("rawdata", item.get("cell_room", {}).get("rawdata"))
             if stream_data:
                 subject = "Stream"
                 stream_data = json.loads(stream_data)
-                post_timestamp = datetime.fromtimestamp(
-                    stream_data.get("create_time", item.get("create_time", metadata.get(
-                        "timestamp_collected") / 1000)))  # Some posts appear to have no timestamp! We substitute collection time
-                video_url = stream_data.get("stream_url").get("flv_pull_url", {}).get("FULL_HD1")
+                # Some posts appear to have no timestamp; the time of collection
+                # stands in for those
+                post_timestamp = first_timestamp(
+                    (stream_data.get("create_time"), 1),
+                    (item.get("create_time"), 1),
+                    (metadata.get("timestamp_collected"), 1000),
+                )
+                video_url = stream_link(stream_data)
                 video_thumbnail = stream_data.get("video", {}).get("cover")
                 video_description = stream_data.get("title")
                 duration = "Unknown"
 
                 # Author is stream owner
                 author = stream_data.get("owner")
-                video_tags = ",".join([tag for tag in stream_data.get("video_feed_tag").strip(",", ) if tag])
                 stats = stream_data.get("stats")
 
             else:
@@ -139,7 +268,9 @@ class SearchDouyin(Search):
                 else:
                     videos = sorted([vid for vid in item["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
                                 reverse=True)
-                    video_url = videos[0]["play_addr"].get("url_list", [''])[0] if len(videos) > 0 else ""
+                    # play_addr is sometimes scrambled rather than a link; download_addr
+                    # carries a working one for those posts
+                    video_url = first_link(videos[0].get("play_addr"), item.get("video", {}).get("download_addr"))
                     video_thumbnail = item.get("video", {}).get("cover",{}).get("url_list", [""])[0]
                 video_description = item["desc"]
                 duration = item.get("duration", item.get("video", {}).get("duration", "Unknown"))
@@ -148,7 +279,7 @@ class SearchDouyin(Search):
                 author = item["author"]
                 stats = item.get("statistics")
 
-            prevent_download = ("yes" if item["prevent_download"] else "no") if "prevent_download" in item else None
+            prevent_download = ("yes" if item["prevent_download"] else "no") if "prevent_download" in item else MissingMappedField("Unknown")
 
             # Keys
             aweme_id_key = "aweme_id"
@@ -176,12 +307,14 @@ class SearchDouyin(Search):
             share_count = stats.get("share_count") if stats else MissingMappedField("Unknown")
             # live_watch_count = stats.get("live_watch_count") if stats else MissingMappedField("Unknown")
 
+            # Covers streams too: they have no tags of their own. A stream's "video_feed_tag" is the
+            # caption of the "live now" badge shown on its thumbnail, not a topic, so it is not used here.
             video_tags = ",".join(
                 [tag["tag_name"] for tag in (item["video_tag"] if item["video_tag"] is not None else []) if
-                 "tag_name" in tag])
+                 tag.get("tag_name")])
 
-            mix_current_episode = item.get(mix_info_key).get("statis", {}).get("current_episode", "N/A") if item.get(
-                mix_info_key) else "N/A"
+            mix_info = defined(item, mix_info_key, {}) or {}
+            mix_current_episode = defined(mix_info.get("statis", {}), "current_episode", "N/A")
 
         # Stream Stats
         count_total_streams_viewers = stats.get("total_user", "N/A")
@@ -202,18 +335,15 @@ class SearchDouyin(Search):
                     image_urls.append(img["urlList"][0])
 
         # Music
-        music_author = item.get('music').get('author') if item.get('music') and item.get("music") != "$undefined" else ""
-        music_title = item.get('music').get('title') if item.get('music') and item.get("music") != "$undefined" else ""
-        music_url = item.get('music').get('play_url', {}).get('uri') if item.get('music') and item.get("music") != "$undefined" else ""
+        music = defined(item, "music", {}) or {}
+        music_author = music.get("author", "")
+        music_title = music.get("title", "")
+        music_url = music.get("play_url", {}).get("uri") if music else ""
 
         # Collection
-        mix_current_episode = mix_current_episode if mix_current_episode != "$undefined" else "N/A"
-        collection_id = item.get(mix_info_key).get(mix_id_key, "N/A") if item.get(mix_info_key) else "N/A"
-        collection_id = collection_id if collection_id != "$undefined" else "N/A"
-        collection_name = item.get(mix_info_key).get(mix_name_key, "N/A") if item.get(mix_info_key) else "N/A"
-        collection_name = collection_name if collection_name != "$undefined" else "N/A"
-        part_of_collection = "yes" if  item.get(mix_info_key) and mix_id_key in item[
-            mix_info_key] and collection_id != "N/A" else "no"
+        collection_id = defined(mix_info, mix_id_key, "N/A")
+        collection_name = defined(mix_info, mix_name_key, "N/A")
+        part_of_collection = "yes" if mix_id_key in mix_info and collection_id != "N/A" else "no"
 
         return MappedItem({
             "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url", "")),
@@ -221,7 +351,7 @@ class SearchDouyin(Search):
             "thread_id": item[group_id_key],
             "subject": subject,
             "body": video_description,
-            "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S") if post_timestamp else MissingMappedField(""),
             # Adding this as different Douyin pages contain different data
             "post_url": f"https://www.douyin.com/video/{item[aweme_id_key]}" if subject == "Post" else f"https://live.douyin.com/{author.get('web_rid')}",
             "region": item.get("region", ""),
@@ -265,7 +395,7 @@ class SearchDouyin(Search):
             "collection_id": collection_id,
             "collection_name": collection_name,
             "place_in_collection": mix_current_episode,
-            "unix_timestamp": int(post_timestamp.timestamp()),
+            "unix_timestamp": int(post_timestamp.timestamp()) if post_timestamp else MissingMappedField(-1),
         })
 
     @staticmethod

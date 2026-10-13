@@ -14,7 +14,7 @@ from ural import is_url
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import DataSetNotFoundException, ProcessorInterruptedException, MetadataException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
 from common.lib.dataset import DataSet
@@ -214,20 +214,34 @@ class VideoTimelines(BasicProcessor):
             labels[basename] = basename
 
         for dataset, urls in mapping_dataset.items():
-            dataset = DataSet(key=dataset, db=self.db, modules=self.modules).nearest("*-search")
+            try:
+                video_dataset = DataSet(key=dataset, db=self.db, modules=self.modules)
+            except DataSetNotFoundException:
+                # Imported media datasets may not have the source on this instance
+                self.dataset.log(f"Could not find source dataset {dataset} on 4CAT for video frame labels")
+                continue
+            
+            source_dataset = video_dataset.nearest("*-search")
+            if source_dataset is None:
+                # One type ignored a convention years ago...
+                source_dataset = video_dataset.nearest("*-import")
+            # If the source dataset is a search or import dataset, we can use its type to determine how to label the videos
+            source_dataset_type = source_dataset.type if source_dataset else None
 
             # determine appropriate label
             # is this the right place? should it be in the datasource?
-            if dataset.type == "tiktok-search":
+            if source_dataset_type == "tiktok-search":
                 mapper = lambda item: item.get("tiktok_url")  # noqa: E731
-            elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
+            elif source_dataset_type == "upload-search" and source_dataset.parameters.get("board") == "youtube-video-list":
                 mapper = lambda item: item.get("youtube_url")  # noqa: E731
             else:
                 mapper = lambda item: item.get("id")  # noqa: E731
 
-            for item in dataset.iterate_items(self):
-                for filename in urls:
-                    if item["id"] in mapping_ids[filename]:
-                        labels[filename] = mapper(item)
+            # There may not be a "nearest" source e.g. Media Imports
+            if source_dataset is not None:
+                for item in source_dataset.iterate_items(self):
+                    for filename in urls:
+                        if item["id"] in mapping_ids[filename]:
+                            labels[filename] = mapper(item)
 
         return labels

@@ -2,7 +2,6 @@
 Create an PixPlot of downloaded images
 """
 import shutil
-import ural
 from datetime import datetime
 import csv
 import os
@@ -11,7 +10,7 @@ from werkzeug.utils import secure_filename
 
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
 from common.lib.exceptions import MetadataException
-from common.lib.helpers import UserInput, ellipsiate
+from common.lib.helpers import UserInput, ellipsiate, urls_in_text
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 
@@ -410,7 +409,7 @@ class PixPlotGenerator(BasicProcessor):
         except ValueError:
             return content
 
-        for link in set(ural.urls_from_text(content)):
+        for link in urls_in_text(content):
             link_text = ellipsiate(link, 50, True, "[&hellip;]")
             content = content.replace(link,
                                       f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
