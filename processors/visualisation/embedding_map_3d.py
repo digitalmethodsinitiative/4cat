@@ -2,33 +2,17 @@
 Plot reduced embeddings in three dimensions: either a 3D reduction, or a 2D
 reduction with a column of the original dataset as the third axis.
 """
-import datetime
-import re
-
 import numpy as np
-from dateutil import parser as dateutil_parser
 
 from common.lib.dataset import DataSet
-from common.lib.exceptions import DataSetException, ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from processors.machine_learning.embed_media import read_post_id_map
 from processors.visualisation.embedding_map import EmbeddingMap
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
-
-# Numbers in a column whose name suggests a time are read as Unix timestamps
-# when all of them fall in this range (1973 up to roughly the year 5000). The
-# lower bound keeps small counts, like seconds watched, from becoming 1970s
-# dates
-EPOCH_RANGE = (1e8, 1e11)
-TIME_COLUMN = re.compile(r"time|date|created|published", re.IGNORECASE)
-
-# Most tick labels drawn along the third axis
-MAX_TICKS = 6
-
 
 class EmbeddingMap3D(EmbeddingMap):
     """
@@ -88,9 +72,7 @@ class EmbeddingMap3D(EmbeddingMap):
         if dimensions is not None and str(dimensions) != "2":
             return options
 
-        columns = []
-        if parent_dataset:
-            columns = parent_dataset.top_parent().get_columns()
+        columns = cls.get_top_columns(parent_dataset)
 
         axis_options = {
             "axis_info": {
@@ -165,11 +147,12 @@ class EmbeddingMap3D(EmbeddingMap):
             labels = [record["label"] for record in records]
             filenames = [str(record.get("filename", "") or "") for record in records]
             clusters = [record.get("cluster") for record in records]
+            sizes = self.get_sizes(records)
         else:
             result = self.lift_to_3d(records)
             if result is None:
                 return
-            points, labels, filenames, clusters, axis, warnings = result
+            points, labels, filenames, clusters, sizes, axis, warnings = result
 
         point_count = len(points)
         if point_count < 3:
@@ -188,7 +171,7 @@ class EmbeddingMap3D(EmbeddingMap):
 
         self.dataset.update_status("Rendering plot")
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-            outfile.write(self.get_html_3d(points, labels, axis, atlas, colours))
+            outfile.write(self.get_html_3d(points, labels, axis, atlas, colours, sizes))
 
         self.dataset.update_status(f"Plotted {point_count:,} points", is_final=True)
         if warnings:
@@ -222,48 +205,37 @@ class EmbeddingMap3D(EmbeddingMap):
         one point per post, so a file posted repeatedly shows as a column.
 
         :param list records:  Reduced embedding records
-        :return tuple|None:  `(points, labels, filenames, clusters, axis,
-          warnings)`, or `None` after finishing the dataset with an error
+        :return tuple|None:  `(points, labels, filenames, clusters, sizes,
+          axis, warnings)`, or `None` after finishing the dataset with an error
         """
         column = self.parameters.get("axis_column") or "timestamp"
         spacing = self.parameters.get("axis_spacing", "rank")
 
-        wanted = set()
-        post_id_map = None
-        unlinked = 0
-        for record in records:
-            # media embedded before post IDs were always recorded carry none;
-            # the archive's metadata still knows which posts a file came from
-            if "filename" in record and not record.get("post_ids"):
-                if post_id_map is None:
-                    post_id_map = self.load_media_post_ids()
-                record["post_ids"] = post_id_map.get(str(record.get("id")), [])
-
-            record["post_ids"] = self.get_post_ids(record)
-            if not record["post_ids"]:
-                unlinked += 1
-            wanted.update(record["post_ids"])
-
+        unlinked = self.link_posts(records)
         if unlinked == len(records):
             self.dataset.finish_with_error("None of the items could be linked to a post in the original dataset, so "
                                            "they cannot be given a height from one of its columns.")
             return None
 
-        values = self.read_column(column, wanted)
-        if not values:
+        size_column = self.parameters.get("size_column")
+        wanted = {post_id for record in records for post_id in record["post_ids"]}
+        rows = self.read_columns([column, size_column], wanted)
+        if not any(column in row for row in rows.values()):
             self.dataset.finish_with_error(f"None of the items have a value for '{column}' in the original dataset. "
                                            f"Choose another column.")
             return None
 
-        placed, raw_values = [], []
+        placed, raw_values, raw_sizes = [], [], []
         missing = 0
         for record in records:
             for post_id in record["post_ids"]:
-                if post_id not in values:
+                row = rows.get(post_id, {})
+                if column not in row:
                     missing += 1
                     continue
                 placed.append(record)
-                raw_values.append(values[post_id])
+                raw_values.append(row[column])
+                raw_sizes.append(row.get(size_column))
 
         axis = self.build_axis(raw_values, spacing, column)
 
@@ -280,6 +252,13 @@ class EmbeddingMap3D(EmbeddingMap):
         filenames = [str(record.get("filename", "") or "") for record in placed]
         clusters = [record.get("cluster") for record in placed]
 
+        # one point per post here, so each point is sized by its own post
+        sizes = None
+        if size_column:
+            sizes = self.size_factors(raw_sizes, self.parameters.get("size_scale", "log"))
+            if sizes is None:
+                self.dataset.log(f"Not sizing by '{size_column}': it holds no numbers.")
+
         warnings = []
         if unlinked:
             warnings.append(f"{unlinked:,} files could not be linked to a post in the original dataset and were left "
@@ -291,235 +270,10 @@ class EmbeddingMap3D(EmbeddingMap):
         for warning in warnings:
             self.dataset.log(warning)
 
-        return points, labels, filenames, clusters, {"title": column, "ticks": axis["ticks"]}, warnings
-
-    @staticmethod
-    def get_post_ids(record: dict) -> list:
-        """
-        Get the IDs of the posts a reduced embedding stands for.
-
-        A text embedding's own ID is its post's ID. A media file's ID is a hash
-        of the file that matches no post, so media only count their `post_ids`.
-
-        :param dict record:  Reduced embedding record
-        :return list:  Post IDs as strings, without duplicates
-        """
-        post_ids = record.get("post_ids") or ([] if "filename" in record else [record.get("id")])
-        return list(dict.fromkeys(str(post_id) for post_id in post_ids if post_id is not None))
-
-    def load_media_post_ids(self) -> dict:
-        """
-        Read which posts each media file came from, from the media archive.
-
-        :return dict:  `{filename without extension: [post ID, ...]}`, empty
-          when there is no archive or it has no metadata
-        """
-        embeddings = self.get_embeddings_dataset(self.source_dataset)
-        try:
-            archive = embeddings.get_parent() if embeddings else None
-        except DataSetException:
-            archive = None
-
-        return read_post_id_map(archive.get_results_path() if archive else None, log=self.dataset.log)
-
-    def read_column(self, column: str, wanted: set) -> dict:
-        """
-        Read one column of the original dataset for the given posts.
-
-        :param str column:  Column to read
-        :param set wanted:  IDs of the posts to read it for
-        :return dict:  `{post id: value}` for posts with a non-empty value
-        """
-        values = {}
-        seen = set()
-        self.dataset.update_status(f"Reading '{column}' from the original dataset")
-        for item in self.source_dataset.top_parent().iterate_items(self):
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while reading the original dataset")
-
-            post_id = str(item.get("id"))
-            if post_id not in wanted or post_id in seen:
-                continue
-
-            seen.add(post_id)
-            value = item.get(column)
-            if value is not None and str(value).strip() != "":
-                values[post_id] = value
-
-            if len(seen) == len(wanted):
-                break
-
-        return values
-
-    @classmethod
-    def build_axis(cls, raw_values: list, spacing: str, column: str = "") -> dict:
-        """
-        Turn column values into heights between 0 and 1, plus tick labels.
-
-        Values are read as numbers, then as dates, and otherwise as text. A
-        column that fails either for even one value is treated as text, which
-        still sorts ISO dates correctly.
-
-        :param list raw_values:  One value per point
-        :param str spacing:  "rank" to space unique values evenly in sort
-          order, "value" to space them proportionally (numbers and dates)
-        :param str column:  Column name, used to recognise Unix timestamps
-        :return dict:  `{positions, ticks, kind, fallback}`
-        """
-        kind, keys = cls.parse_values(raw_values, column)
-        fallback = spacing == "value" and kind == "text"
-
-        unique = sorted(set(keys))
-        if spacing == "value" and kind != "text":
-            low, high = unique[0], unique[-1]
-
-            def position(key):
-                return (key - low) / (high - low) if high != low else 0.5
-
-            position_of = {key: position(key) for key in unique}
-            # evenly spread over the range, so the gaps between ticks are equal
-            tick_keys = [low + (high - low) * index / (MAX_TICKS - 1) for index in range(MAX_TICKS)] \
-                if high != low else [low]
-            tick_positions = [position(key) for key in tick_keys]
-        else:
-            last = len(unique) - 1
-            position_of = {key: index / last if last else 0.5 for index, key in enumerate(unique)}
-            # an even pick of the actual values, so every tick names a real one
-            picks = sorted({round(index * last / (MAX_TICKS - 1)) for index in range(MAX_TICKS)}) if last else [0]
-            tick_keys = [unique[index] for index in picks]
-            tick_positions = [position_of[key] for key in tick_keys]
-
-        # one date format for all ticks, fine enough to tell them apart
-        date_format = "%Y-%m-%d"
-        if kind == "date":
-            span = unique[-1] - unique[0]
-            date_format = "%Y-%m" if span > 2 * 365 * 86400 else "%Y-%m-%d" if span > 2 * 86400 else "%Y-%m-%d %H:%M"
-
-        # text is sorted case-insensitively, but labelled as it was written
-        written = {}
-        if kind == "text":
-            for key, value in zip(keys, raw_values):
-                written.setdefault(key, str(value).strip())
-
-        ticks = [[round(position, 5), cls.format_tick(written.get(key, key), kind, date_format)]
-                 for position, key in zip(tick_positions, tick_keys)]
-
-        return {
-            "positions": [position_of[key] for key in keys],
-            "ticks": ticks,
-            "kind": kind,
-            "fallback": fallback,
-        }
-
-    @classmethod
-    def parse_values(cls, raw_values: list, column: str = "") -> tuple:
-        """
-        Work out what kind of values a column holds, and make them sortable.
-
-        :param list raw_values:  Column values
-        :param str column:  Column name, used to recognise Unix timestamps
-        :return tuple:  `(kind, keys)`, with kind "number", "date" or "text"
-          and one sortable key per value
-        """
-        numbers = []
-        for value in raw_values:
-            number = cls.to_number(value)
-            if number is None:
-                break
-            numbers.append(number)
-        else:
-            if TIME_COLUMN.search(column) and all(EPOCH_RANGE[0] < number < EPOCH_RANGE[1] for number in numbers):
-                return "date", numbers
-            return "number", numbers
-
-        # dates repeat, and dateutil is slow, so parse each distinct value once
-        parsed = {}
-        dates = []
-        for value in raw_values:
-            text = str(value).strip()
-            if text not in parsed:
-                parsed[text] = cls.to_timestamp(text)
-            if parsed[text] is None:
-                break
-            dates.append(parsed[text])
-        else:
-            return "date", dates
-
-        return "text", [str(value).strip().casefold() for value in raw_values]
-
-    @staticmethod
-    def to_number(value) -> float | None:
-        """
-        Read a value as a number.
-
-        :param value:  Value to read
-        :return float|None:  The number, or `None` if it is not one
-        """
-        if isinstance(value, bool):
-            return None
-        try:
-            number = float(value)
-        except (TypeError, ValueError):
-            return None
-        return number if np.isfinite(number) else None
-
-    @staticmethod
-    def to_timestamp(text: str) -> float | None:
-        """
-        Read a value as a date, as seconds since the epoch.
-
-        Dates without a timezone are taken to be UTC, which is how 4CAT writes
-        its own timestamps.
-
-        :param str text:  Value to read
-        :return float|None:  Timestamp, or `None` if it is not a date
-        """
-        try:
-            moment = datetime.datetime.fromisoformat(text)
-        except ValueError:
-            # dateutil reads almost anything, including lone words like
-            # "may"; a date worth plotting has at least some digits in it
-            if not re.search(r"\d", text):
-                return None
-            try:
-                moment = dateutil_parser.parse(text)
-            except (ValueError, OverflowError, dateutil_parser.ParserError):
-                return None
-
-        if moment.tzinfo is None:
-            moment = moment.replace(tzinfo=datetime.timezone.utc)
-        return moment.timestamp()
-
-    @classmethod
-    def format_tick(cls, key, kind: str, date_format: str) -> str:
-        """
-        Format an axis value for a tick label.
-
-        :param key:  Sortable key, as made by `parse_values()`
-        :param str kind:  "number", "date" or "text"
-        :param str date_format:  strftime format for dates
-        :return str:  Label
-        """
-        if kind == "date":
-            return datetime.datetime.fromtimestamp(key, tz=datetime.timezone.utc).strftime(date_format)
-        if kind == "number":
-            return f"{key:,.4g}" if abs(key) < 1e15 else f"{key:.3g}"
-        return cls.shorten(key)
-
-    @staticmethod
-    def shorten(value, length: int = 24) -> str:
-        """
-        Shorten a value for display.
-
-        :param value:  Value to show
-        :param int length:  Maximum length
-        :return str:  The value as text, cut off with an ellipsis if too long
-        """
-        text = str(value)
-        return text if len(text) <= length else text[:length - 1] + "…"
+        return points, labels, filenames, clusters, sizes, {"title": column, "ticks": axis["ticks"]}, warnings
 
     def get_html_3d(self, points: list, labels: list, axis: dict | None, atlas: dict | None = None,
-                    colours: dict | None = None) -> str:
+                    colours: dict | None = None, sizes: list | None = None) -> str:
         """
         Build the self-contained HTML page.
 
@@ -535,21 +289,26 @@ class EmbeddingMap3D(EmbeddingMap):
           plain dots
         :param dict colours:  Cluster colours from `cluster_colours()`, or
           `None` to colour by height (or not at all, for a 3D reduction)
+        :param list sizes:  Size factor per point from `size_factors()`, or
+          `None` to draw every point the same size
         :return str:  HTML
         """
-        payload = self.encode_payload({"points": points, "labels": labels, "axis": axis, **(colours or {})}, atlas)
+        payload = self.encode_payload({"points": points, "labels": labels, "axis": axis, "sizes": sizes,
+                                       **(colours or {})}, atlas)
 
         container = f"embedding-map-3d-{self.dataset.key}"
         algorithm = self.source_dataset.parameters.get("algorithm", "umap").upper()
         subtitle = f"{len(points):,} points &middot; {algorithm}"
         if axis:
             # the column name is user-chosen; keep it out of the markup
-            subtitle += " &middot; height: " + axis["title"].replace("&", "&amp;").replace("<", "&lt;")
+            subtitle += " &middot; height: " + self.escape(axis["title"])
         if atlas:
             drawn = sum(1 for tile in atlas["tiles"] if tile > -1)
             subtitle += f" &middot; {drawn:,} thumbnails"
         if colours:
             subtitle += " &middot; coloured by cluster"
+        if sizes:
+            subtitle += " &middot; sized by " + self.escape(self.parameters.get("size_column"))
 
         return HTML_TEMPLATE_3D % {"container": container, "payload": payload, "subtitle": subtitle}
 
@@ -591,6 +350,9 @@ HTML_TEMPLATE_3D = """<meta charset="utf-8">
     root.dataset.ready = "1";
 
     var data = %(payload)s;
+    // a size factor per point when sized by a column
+    var sizes = data.sizes || null;
+    function sizeOf(i) { return sizes ? sizes[i] : 1; }
     var points = data.points, labels = data.labels, axis = data.axis, count = points.length;
     var tiles = data.tiles || null, tileSize = data.tile || 0, atlasCols = data.cols || 1;
     var files = data.files || null, linkBase = data.base || "";
@@ -752,7 +514,7 @@ HTML_TEMPLATE_3D = """<meta charset="utf-8">
         var i, s;
         for (i = 0; i < count; i++) {
             s = toScreen(points[i][0] - 0.5, points[i][1] - 0.5, points[i][2] - 0.5);
-            screenX[i] = s[0]; screenY[i] = s[1]; depth[i] = s[2]; factor[i] = s[3];
+            screenX[i] = s[0]; screenY[i] = s[1]; depth[i] = s[2]; factor[i] = s[3] * sizeOf(i);
         }
         // painter's algorithm: furthest first, so nearer points cover them
         order.sort(function (a, b) { return depth[b] - depth[a]; });
@@ -772,13 +534,13 @@ HTML_TEMPLATE_3D = """<meta charset="utf-8">
         if (hovered > -1) {
             var hx = screenX[hovered], hy = screenY[hovered];
             if (tiles) {
-                var big = Math.min(tileSize * 1.5, drawn * 1.8);
+                var big = Math.min(tileSize * 1.5, drawn * 1.8) * sizeOf(hovered);
                 drawTile(hovered, hx, hy, big);
                 ctx.strokeStyle = "#d2451e"; ctx.lineWidth = 2;
                 ctx.strokeRect(hx - big / 2, hy - big / 2, big, big);
             } else {
                 ctx.fillStyle = "#d2451e";
-                ctx.beginPath(); ctx.arc(hx, hy, RADIUS + 2.5, 0, 6.2832); ctx.fill();
+                ctx.beginPath(); ctx.arc(hx, hy, RADIUS * sizeOf(hovered) + 2.5, 0, 6.2832); ctx.fill();
                 ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
             }
         }

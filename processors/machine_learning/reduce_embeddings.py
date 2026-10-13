@@ -3,10 +3,9 @@ Reduce embeddings to a chosen, smaller number of dimensions.
 """
 import json
 
-import numpy as np
-
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.embeddings import read_embedding_matrix
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException
 from common.lib.item_mapping import MappedItem, value_or_missing
 from common.lib.user_input import UserInput
@@ -191,6 +190,11 @@ class ReduceEmbeddings(BasicProcessor):
     def process(self):
         """
         Read the embeddings, reduce them, and write one record per item.
+
+        Two passes over the embeddings: the first reads only the vectors,
+        into one array; the second reads each record again to write it out
+        with its coordinates. Holding the records themselves in between would
+        keep every vector in memory a second time, as Python numbers.
         """
         limit = self.parameters.get("amount", 2000)
         max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
@@ -203,52 +207,20 @@ class ReduceEmbeddings(BasicProcessor):
             self.dataset.finish_with_error(f"t-SNE can reduce to at most {TSNE_MAX_DIMENSIONS} dimensions.")
             return
 
-        vectors = []
-        records = []
-        source_dimensions = None
-
         self.dataset.update_status("Reading embeddings")
-        for item in self.source_dataset.iterate_items(self):
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while reading embeddings")
+        try:
+            matrix, positions, _ = read_embedding_matrix(self.source_dataset, max_processed, self)
+        except ValueError:
+            self.dataset.finish_with_error("The parent dataset contains embeddings of different sizes, so they "
+                                           "cannot be reduced together.")
+            return
 
-            if len(vectors) >= max_processed:
-                break
-
-            # the mapped item flattens the vector to a space-separated string;
-            # the original NDJSON record keeps it as a list
-            original = item.original
-            vector = original.get("embedding")
-            if isinstance(vector, str):
-                vector = [float(value) for value in vector.split() if value]
-
-            if not vector:
-                continue
-
-            if source_dimensions is None:
-                source_dimensions = len(vector)
-            elif len(vector) != source_dimensions:
-                # a ragged matrix cannot be reduced; this means the dataset mixes
-                # models, which should not happen but is worth saying out loud
-                self.dataset.finish_with_error("The parent dataset contains embeddings of different sizes, so they "
-                                               "cannot be reduced together.")
-                return
-
-            vectors.append(vector)
-
-            # carry over what later steps need to label, colour and trace the
-            # items back to their posts, but not the embedding itself
-            record = {"id": original.get("id"), "text": original.get("text", "")}
-            for key in ("filename", "post_ids", "cluster"):
-                if key in original:
-                    record[key] = original[key]
-            records.append(record)
-
-        point_count = len(vectors)
+        point_count = len(positions)
         if point_count < 3:
             self.dataset.finish_with_error(f"Not enough embeddings to reduce (found {point_count}, need at least 3).")
             return
 
+        source_dimensions = matrix.shape[1]
         if dimensions >= source_dimensions:
             self.dataset.finish_with_error(f"The embeddings have {source_dimensions} dimensions, so they cannot be "
                                            f"reduced to {dimensions}.")
@@ -263,17 +235,37 @@ class ReduceEmbeddings(BasicProcessor):
 
         self.dataset.update_status(f"Reducing {point_count:,} embeddings of {source_dimensions} dimensions to "
                                    f"{dimensions} with {algorithm.upper()}; this may take a while")
-        coordinates = self.reduce(np.asarray(vectors, dtype=np.float32), dimensions)
+        coordinates = self.reduce(matrix, dimensions)
+        del matrix
 
         self.dataset.update_status("Writing reduced embeddings")
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-            for record, row in zip(records, coordinates):
+            # the second pass: the same items in the same order, so the
+            # positions from the first pass say which row each one is
+            row = 0
+            for position, item in enumerate(self.source_dataset.iterate_items(self, get_annotations=False)):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while writing reduced embeddings")
+                if row == point_count:
+                    break
+                if position != positions[row]:
+                    continue
+
+                original = item.original
+                # carry over what later steps need to label, colour and trace
+                # the items back to their posts, but not the embedding itself
+                record = {"id": original.get("id"), "text": original.get("text", "")}
+                for key in ("filename", "post_ids", "cluster"):
+                    if key in original:
+                        record[key] = original[key]
+
                 record.update({
-                    "coordinates": [round(float(value), 6) for value in row],
+                    "coordinates": [round(float(value), 6) for value in coordinates[row]],
                     "dimensions": dimensions,
                     "source_dimensions": source_dimensions,
                     "algorithm": algorithm,
                 })
+                row += 1
                 outfile.write(json.dumps(record, ensure_ascii=False) + "\n")
 
         self.dataset.update_status(f"Reduced {point_count:,} embeddings to {dimensions} dimensions", is_final=True)

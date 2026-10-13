@@ -8,6 +8,7 @@ import numpy as np
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.embeddings import normalise_in_place, read_embedding_matrix
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem, value_or_missing
 from common.lib.user_input import UserInput
@@ -44,6 +45,9 @@ class ClusterEmbeddings(BasicProcessor):
 
     # Label the clusters are written under when saved as annotations
     annotation_label = "embedding cluster"
+
+    # Annotations are saved in batches of this many while writing
+    annotation_batch_size = 1000
 
     references = [
         "[Campello, Ricardo J. G. B., Davoud Moulavi, and Jörg Sander. 2013. 'Density-Based Clustering Based on "
@@ -145,52 +149,30 @@ class ClusterEmbeddings(BasicProcessor):
     def process(self):
         """
         Read the embeddings, cluster them, and write them back with a cluster.
+
+        Two passes over the embeddings: the first reads only the vectors,
+        into one array; the second reads each record again to write it out
+        with its cluster. Holding the records themselves in between would keep
+        every vector in memory a second time, as Python numbers.
         """
         limit = self.parameters.get("amount", 0)
         max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
 
-        vectors = []
-        records = []
-        dimensions = None
-
         self.dataset.update_status("Reading embeddings")
-        for item in self.source_dataset.iterate_items(self):
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while reading embeddings")
+        try:
+            matrix, positions, _ = read_embedding_matrix(self.source_dataset, max_processed, self)
+        except ValueError:
+            self.dataset.finish_with_error("The parent dataset contains embeddings of different sizes, so they "
+                                           "cannot be clustered together.")
+            return
 
-            if len(vectors) >= max_processed:
-                break
-
-            # the mapped item flattens the vector to a space-separated string;
-            # the original NDJSON record keeps it as a list
-            original = item.original
-            vector = original.get("embedding")
-            if isinstance(vector, str):
-                vector = [float(value) for value in vector.split() if value]
-
-            if not vector:
-                continue
-
-            if dimensions is None:
-                dimensions = len(vector)
-            elif len(vector) != dimensions:
-                self.dataset.finish_with_error("The parent dataset contains embeddings of different sizes, so they "
-                                               "cannot be clustered together.")
-                return
-
-            # float32 rows rather than lists of Python floats: a fraction of
-            # the memory for large datasets
-            vectors.append(np.asarray(vector, dtype=np.float32))
-            records.append(original)
-
-        point_count = len(vectors)
+        point_count = len(positions)
         if point_count < 3:
             self.dataset.finish_with_error(f"Not enough embeddings to cluster (found {point_count}, need at least "
                                            f"3).")
             return
 
-        matrix = self.normalise(np.vstack(vectors))
-        del vectors
+        normalise_in_place(matrix)
 
         if self.parameters.get("reduce_first", True):
             matrix = self.reduce(matrix)
@@ -200,6 +182,7 @@ class ClusterEmbeddings(BasicProcessor):
 
         self.dataset.update_status(f"Clustering {point_count:,} embeddings")
         clusters = self.renumber_by_size(self.cluster(matrix))
+        del matrix
 
         sizes = Counter(clusters)
         noise = sizes.pop(-1, 0)
@@ -209,72 +192,85 @@ class ClusterEmbeddings(BasicProcessor):
         self.dataset.log(summary + ". Cluster sizes: " +
                          ", ".join(f"{cluster}: {size:,}" for cluster, size in sorted(sizes.items())))
 
-        self.dataset.update_status("Writing clustered embeddings")
-        with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-            for record, cluster in zip(records, clusters):
-                record["cluster"] = int(cluster)
-                outfile.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-        if self.parameters.get("save_annotations"):
-            self.dataset.update_status("Saving clusters as annotations")
-            self.save_annotations(self.get_annotations(records))
-
-        self.dataset.update_status(summary, is_final=True)
-        self.dataset.finish(point_count)
-
-    def get_annotations(self, records: list) -> list:
-        """
-        Build one cluster annotation per post in the original dataset.
-
-        :param list records:  Clustered embedding records
-        :return list:  Annotations for `save_annotations()`
-        """
+        save_annotations = self.parameters.get("save_annotations", False)
         annotations = []
         post_id_map = None
         unmatched = 0
 
-        for record in records:
-            if "filename" not in record:
-                post_ids = [record.get("id")]
-            else:
-                post_ids = record.get("post_ids")
-                if not post_ids:
+        self.dataset.update_status("Writing clustered embeddings")
+        with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
+            # the second pass: the same items in the same order, so the
+            # positions from the first pass say which row each one is
+            row = 0
+            for position, item in enumerate(self.source_dataset.iterate_items(self, get_annotations=False)):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while writing clustered embeddings")
+                if row == point_count:
+                    break
+                if position != positions[row]:
+                    continue
+
+                # a copy, so adding the cluster leaves the item itself alone
+                record = dict(item.original)
+                record["cluster"] = int(clusters[row])
+                row += 1
+                outfile.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+                if not save_annotations:
+                    continue
+
+                # media files are named after a hash that matches no post; the
+                # posts they appeared in come from the record or the archive
+                post_ids = self.get_post_ids(record)
+                if post_ids is None:
                     if post_id_map is None:
                         archive = self.source_dataset.get_parent()
                         post_id_map = read_post_id_map(archive.get_results_path() if archive else None,
                                                        log=self.dataset.log)
                     post_ids = post_id_map.get(str(record.get("id")), [])
+                if not post_ids:
+                    unmatched += 1
 
-            if not post_ids:
-                unmatched += 1
-
-            for post_id in post_ids:
-                annotations.append({
+                annotations.extend({
                     "item_id": str(post_id),
                     "label": self.annotation_label,
                     "value": str(record["cluster"]),
                     "type": "text",
-                })
+                } for post_id in post_ids)
 
+                # saved in batches as we go: progress shows, and a run that
+                # fails halfway keeps what it saved
+                if len(annotations) >= self.annotation_batch_size:
+                    self.save_annotations(annotations)
+                    annotations = []
+                    self.dataset.update_status(f"Writing clustered embeddings and annotations ({row:,}/"
+                                               f"{point_count:,})")
+
+        if annotations:
+            self.save_annotations(annotations)
         if unmatched:
             self.dataset.log(f"{unmatched:,} files could not be linked to a post in the original dataset, so their "
                              f"clusters were not added as annotations.")
 
-        return annotations
+        self.dataset.update_status(summary, is_final=True)
+        self.dataset.finish(point_count)
 
     @staticmethod
-    def normalise(matrix):
+    def get_post_ids(record: dict) -> list | None:
         """
-        Scale each vector to length 1.
+        Get the posts in the original dataset an embedding stands for.
 
-        Embeddings are compared by angle (cosine similarity), not length. On
-        unit vectors, the distances k-means and HDBSCAN use follow the angles.
+        A text embedding's ID is its post's ID. A media file's ID is a hash of
+        the file, which matches no post: it stands for the posts it appeared
+        in. Embeddings made before those were always recorded lack them.
 
-        :param matrix:  2D numpy array, one embedding per row
-        :return:  The same array with every non-zero row scaled to length 1
+        :param dict record:  Embedding record
+        :return list|None:  Post IDs, or `None` for a media file whose posts
+          were not recorded and have to be looked up in the archive
         """
-        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-        return matrix / np.where(norms == 0, 1, norms)
+        if "filename" not in record:
+            return [record.get("id")]
+        return record.get("post_ids") or None
 
     def reduce(self, matrix):
         """
