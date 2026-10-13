@@ -19,12 +19,16 @@ CURRENT_SCHEMA_VERSION = MediaArchiveMetadata.SCHEMA_VERSION
 class FakeDataset:
 	"""Just enough surface for MediaArchiveMetadata.read."""
 
-	def __init__(self, key, results_path, results_folder=None):
+	def __init__(self, key, results_path, results_folder=None, finished=True):
 		self.key = key
 		self._results = results_path
 		self._results_folder = results_folder
+		self._finished = finished
 
-	def check_dataset_finished(self):
+	def is_finished(self):
+		return self._finished
+
+	def get_results_path(self):
 		return self._results
 
 	def get_results_folder_path(self):
@@ -62,6 +66,15 @@ def test_round_trip_minimal(tmp_path):
 		"url": "https://example.com/c",
 		"reason_description": "boom",
 	}]
+
+
+def test_new_copies_software_version_from_dataset():
+	"""The version a processor runs with is already stored on its dataset."""
+	dataset = FakeDataset("k", None)
+	dataset.data = {"software_version": "abc123", "software_source": "https://github.com/x/4cat"}
+	meta = MediaArchiveMetadata.new(dataset, processor_type="image-downloader", from_dataset="src")
+	assert meta.software_version == "abc123"
+	assert meta.software_source == "https://github.com/x/4cat"
 
 
 def test_read_v1_from_zip(tmp_path):
@@ -203,6 +216,20 @@ def test_legacy_telegram_filename_keyed():
 	assert "url" not in m.failures[0]
 
 
+def test_legacy_not_a_video_keeps_its_reason():
+	"""The old video downloader marked URLs that were not videos with `retry: False`."""
+	legacy = {
+		"https://example.com/page": {
+			"success": False, "retry": False, "also_indirect": "none",
+			"post_ids": ["p1"], "error": "Not a video",
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+	assert m.failures[0]["reason"] == "not_a_video"
+	assert m.failures[0]["reason_description"] == "Not a video"
+
+
 def test_legacy_singular_post_id():
 	legacy = {
 		"https://example.com/a.jpg": {
@@ -331,6 +358,111 @@ def test_add_item_replace_overwrites():
 	assert m.post_ids_for("a.jpg") == ["2"]
 
 
+def test_add_failure_keeps_extra():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_failure(post_ids=["1"], reason="error", url="https://cdn.example/a.jpg",
+				  extra={"original_url": "https://t.example/a"})
+	m.add_failure(post_ids=["2"], reason="error")
+	assert m.failures[0]["extra"] == {"original_url": "https://t.example/a"}
+	assert "extra" not in m.failures[1]
+	m.validate()
+
+
+def test_add_item_merge_keeps_posts_of_every_url():
+	"""One file reached through two URLs stays connected to the posts of both."""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("v.mp4", post_ids=["1", "2"], url="https://a.example/v",
+			   extra={"title": "first"})
+	m.add_item("v.mp4", post_ids=["2", "3"], url="https://b.example/v",
+			   extra={"title": "second", "downloader": "yt_dlp"}, merge=True)
+
+	entry = m.get_entry("v.mp4")
+	assert entry["post_ids"] == ["1", "2", "3"]
+	# the first URL and the data recorded with it are kept; only new keys are
+	# added, and the second URL is listed as another way to reach the file
+	assert entry["url"] == "https://a.example/v"
+	assert entry["extra"] == {
+		"title": "first", "downloader": "yt_dlp",
+		"other_urls": ["https://b.example/v"],
+	}
+
+
+def test_add_item_merge_lists_each_other_url_once():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("v.mp4", post_ids=["1"], url="https://a.example/v")
+	m.add_item("v.mp4", post_ids=["2"], url="https://b.example/v", merge=True)
+	m.add_item("v.mp4", post_ids=["3"], url="https://b.example/v", merge=True)
+	m.add_item("v.mp4", post_ids=["4"], url="https://c.example/v", merge=True)
+	# the same URL as the entry's own, or no URL at all, adds nothing
+	m.add_item("v.mp4", post_ids=["5"], url="https://a.example/v", merge=True)
+	m.add_item("v.mp4", post_ids=["6"], merge=True)
+
+	entry = m.get_entry("v.mp4")
+	assert entry["post_ids"] == ["1", "2", "3", "4", "5", "6"]
+	assert entry["extra"]["other_urls"] == ["https://b.example/v", "https://c.example/v"]
+
+
+def test_add_item_merge_fills_in_missing_url():
+	"""A file first recorded without a URL takes the next URL as its own."""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("v.mp4", post_ids=["1"])
+	m.add_item("v.mp4", post_ids=["2"], url="https://a.example/v", merge=True)
+	entry = m.get_entry("v.mp4")
+	assert entry["url"] == "https://a.example/v"
+	assert "extra" not in entry
+
+
+def test_add_item_merge_adds_new_file():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("v.mp4", post_ids=["1"], merge=True)
+	assert m.post_ids_for("v.mp4") == ["1"]
+
+
+def test_add_item_merge_and_replace_together_raises():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	with pytest.raises(MetadataException, match="either"):
+		m.add_item("v.mp4", post_ids=["1"], replace=True, merge=True)
+
+
+def test_legacy_file_shared_by_two_urls_keeps_all_post_ids():
+	"""
+	The old video downloader could list one file under two URLs, when yt-dlp
+	recognised a video it had already downloaded for an earlier URL. The second
+	URL was then marked unsuccessful, but still listed the file.
+	"""
+	legacy = {
+		"https://youtube.com/watch?v=abc": {
+			"success": True, "post_ids": ["p1"], "downloader": "yt_dlp",
+			"files": [{"filename": "abc.mp4", "success": True, "metadata": {"id": "abc"}}],
+		},
+		"https://youtu.be/abc": {
+			"success": False, "post_ids": ["p2"], "downloader": "yt_dlp",
+			"files": [{"filename": "abc.mp4", "success": True, "metadata": {"id": "abc"}}],
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+
+	assert m.post_ids_for("abc.mp4") == ["p1", "p2"]
+	assert m.get_entry("abc.mp4")["url"] == "https://youtube.com/watch?v=abc"
+	assert m.get_entry("abc.mp4")["extra"]["other_urls"] == ["https://youtu.be/abc"]
+	# the second URL did produce a file, so it is not also a failure
+	assert m.failures == []
+
+
+def test_legacy_unsuccessful_url_without_files_is_a_failure():
+	legacy = {
+		"https://example.com/gone": {
+			"success": False, "post_ids": ["p1"], "error": "404", "files": [],
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+	assert len(m) == 0
+	assert m.failures[0]["post_ids"] == ["p1"]
+	assert m.failures[0]["reason_description"] == "404"
+
+
 # -- validation --
 
 def test_validate_rejects_filename_mismatch(tmp_path):
@@ -354,15 +486,31 @@ def test_validate_rejects_failure_without_reason():
 		m.validate()
 
 
-def test_read_raises_when_dataset_unfinished():
-	ds = FakeDataset("k", None)
+def test_read_raises_when_dataset_unfinished(tmp_path):
+	ds = FakeDataset("k", tmp_path / "results.zip", finished=False)
 	with pytest.raises(MetadataException, match="not finished"):
 		MediaArchiveMetadata.read(ds)
 
 
-def test_read_raises_when_dataset_empty():
-	ds = FakeDataset("k", "empty")
-	with pytest.raises(MetadataException, match="empty"):
+def test_read_finished_dataset_without_items(tmp_path):
+	"""
+	An archive in which every download failed (or every file was copied from an
+	earlier download) finishes with no items, but its metadata is still read.
+	"""
+	meta = MediaArchiveMetadata.new(processor_type="video-downloader", from_dataset="src")
+	meta.add_failure(post_ids=["1"], reason="not_a_video", url="https://example.com/page")
+	meta.write(tmp_path)
+	archive = tmp_path / "results.zip"
+	with zipfile.ZipFile(archive, "w") as zf:
+		zf.write(tmp_path / ".metadata.json", ".metadata.json")
+
+	loaded = MediaArchiveMetadata.read(FakeDataset("k", archive))
+	assert loaded.failures[0]["reason"] == "not_a_video"
+
+
+def test_read_raises_when_finished_dataset_has_no_archive(tmp_path):
+	ds = FakeDataset("k", tmp_path / "results.zip")
+	with pytest.raises(FileNotFoundError):
 		MediaArchiveMetadata.read(ds)
 
 
@@ -383,6 +531,59 @@ def test_read_raises_metadata_exception_on_malformed_json(tmp_path):
 	ds = FakeDataset("k", archive)
 	with pytest.raises(MetadataException, match="not valid JSON"):
 		MediaArchiveMetadata.read(ds)
+
+
+def test_read_raises_metadata_exception_on_damaged_zip(tmp_path):
+	archive = tmp_path / "results.zip"
+	archive.write_bytes(b"this is not a zip file")
+	with pytest.raises(MetadataException, match="cannot be opened"):
+		MediaArchiveMetadata.read(FakeDataset("k", archive))
+
+
+def test_read_raises_metadata_exception_on_text_that_is_not_utf8(tmp_path):
+	folder = tmp_path / "folder_k"
+	folder.mkdir()
+	(folder / ".metadata.json").write_bytes(b'{"items": "\xff\xfe"}')
+	ds = FakeDataset("k", tmp_path / "results.csv", results_folder=folder)
+	with pytest.raises(MetadataException, match="not valid JSON"):
+		MediaArchiveMetadata.read(ds)
+
+
+def test_v1_read_rejects_items_that_are_not_an_object():
+	m = MediaArchiveMetadata()
+	with pytest.raises(MetadataException, match="items"):
+		m._populate_from_raw({"schema_version": 1, "items": ["a.jpg"]})
+
+
+def test_v1_read_tolerates_empty_and_malformed_entries():
+	"""Missing or null lists count as empty; entries that are not objects are skipped."""
+	m = MediaArchiveMetadata()
+	m._populate_from_raw({"schema_version": 1, "items": None, "failures": None})
+	assert len(m) == 0
+	assert m.failures == []
+
+	m = MediaArchiveMetadata()
+	m._populate_from_raw({
+		"schema_version": 1,
+		"items": {"a.jpg": {"filename": "a.jpg", "post_ids": ["1"]}, "b.jpg": "oops"},
+		"failures": [{"post_ids": ["2"], "reason": "error"}, "oops"],
+	})
+	assert list(m.items) == ["a.jpg"]
+	assert len(m.failures) == 1
+
+
+def test_legacy_source_dataset_key_is_read_as_from_dataset():
+	"""Video downloads from early 2023 recorded the source as `source_dataset`."""
+	legacy = {
+		"https://example.com/v": {
+			"success": True, "source_dataset": "src", "post_ids": ["p1"],
+			"files": [{"filename": "v.mp4", "success": True}],
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+	assert m.from_dataset == "src"
+	assert "source_dataset" not in m.get_entry("v.mp4").get("extra", {})
 
 
 def test_v1_read_normalizes_integer_post_ids():

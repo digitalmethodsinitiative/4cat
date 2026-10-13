@@ -144,7 +144,9 @@ class ImageGrapher(BasicProcessor):
             except (FileNotFoundError, ValueError):
                 continue
 
-        file_url_map = {filename: item.get("url", "") for filename, item in metadata.iter_entries()}
+        # not every downloader records a URL (e.g. Telegram, Stable Diffusion);
+        # use the filename for those, so each image still gets its own node
+        file_url_map = {filename: item.get("url") or filename for filename, item in metadata.iter_entries()}
         for filename, item in metadata.iter_entries():
             for item_id in item.get("post_ids", []):
                 if self.source_dataset.type.endswith("-telegram"):
@@ -201,7 +203,7 @@ class ImageGrapher(BasicProcessor):
                 continue
 
             if self.parameters.get("image-value") == "url":
-                to_node = file_url_map[to_node]
+                to_node = file_url_map.get(to_node, to_node)
 
             to_node_id = f"image-{to_node}"
             if from_node_id not in network.nodes:

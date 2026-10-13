@@ -358,6 +358,9 @@ class VideoDownloaderPlus(BasicProcessor):
         self.downloaded_videos = 0
         self.failed_downloads = 0
         self.copied_videos = 0
+        # filename -> key of the earlier dataset it was copied from, so a video
+        # that several URLs lead to is copied (and counted) only once
+        self.files_copied_from_library = {}
         consecutive_errors = 0
         # not_a_video tracked within direct_results
         self.total_not_a_video = 0
@@ -640,6 +643,9 @@ class VideoDownloaderPlus(BasicProcessor):
             extra = dict(item.get("extra") or {})
             # `downloader` lived at URL level in the working dict, not per file
             downloader = downloader or extra.pop("downloader", None)
+            # the earlier archive's other URLs came from the posts of its own
+            # dataset; this archive records the URLs of this dataset's posts
+            extra.pop("other_urls", None)
             files.append({"filename": filename, "success": True, "metadata": extra})
         fields = {"success": True, "files": files}
         if downloader:
@@ -1023,11 +1029,13 @@ class VideoDownloaderPlus(BasicProcessor):
                 extra = dict(file.get("metadata") or {})
                 if data.get("downloader"):
                     extra["downloader"] = data["downloader"]
-                # replace=True: yt-dlp playlists can in theory produce duplicate
-                # filenames if the same video appears twice; last write wins,
-                # matching the physical file on disk
+                # merge=True: one file can belong to several URLs, e.g. when
+                # yt-dlp recognises a video it already downloaded for an earlier
+                # URL, or the same video appears twice in a playlist. Every URL's
+                # posts must stay connected to the file; the URLs after the first
+                # are listed in the file's extra["other_urls"].
                 metadata.add_item(filename, post_ids=post_ids, url=url,
-                                  extra=extra, replace=True)
+                                  extra=extra, merge=True)
                 had_successful_file = True
 
             if not had_successful_file:
@@ -1060,10 +1068,10 @@ class VideoDownloaderPlus(BasicProcessor):
     def _finish_processing(self, results_path, total_urls):
         """Finish processing and create result archive"""
         self.dataset.update_status("Writing downloaded videos to zip archive")
-        # videos copied from an earlier run are in the archive too
+        # videos copied from earlier downloads are in the archive too
         num_videos = self.downloaded_videos + self.copied_videos
         self.write_archive_and_finish(results_path, num_videos, finish=False)
-        
+
         status_msg = f"Downloaded {self.downloaded_videos} videos"
         if self.copied_videos > 0:
             status_msg += f"; {self.copied_videos} videos copied from previous downloads"
@@ -1322,11 +1330,15 @@ class VideoDownloaderPlus(BasicProcessor):
         Copy the file(s) of a previously downloaded video into the current
         staging area.
 
+        Several URLs can lead to the same earlier file (e.g. a short and a
+        long link to one video). A file that was already copied for another
+        URL in this run is not copied or counted again.
+
         :param MediaLibraryHit hit:  a successful library lookup; its
             `metadata.dataset` locates the source archive and `entries`
             lists the files to copy.
         :param Path staging_area:  where to extract the files to.
-        :return int:  number of files copied.
+        :return int:  number of files newly copied.
         """
         source_dataset = hit.metadata.dataset
         if source_dataset is None:
@@ -1339,11 +1351,28 @@ class VideoDownloaderPlus(BasicProcessor):
         num_copied = 0
         with zipfile.ZipFile(source_dataset.get_results_path(), "r") as archive_file:
             archive_contents = set(archive_file.namelist())
+
+            # check every file before copying any, so that a URL is never left
+            # with only some of its files copied
+            to_copy = []
             for filename in filenames:
                 if filename not in archive_contents:
                     raise FailedToCopy(f"Previously downloaded video {filename} not found")
+                copied_from = self.files_copied_from_library.get(filename)
+                if copied_from == source_dataset.key:
+                    self.dataset.log(f"Previously downloaded video {filename} was already copied for another URL")
+                    continue
+                if copied_from is not None:
+                    # a file of the same name from a different earlier dataset
+                    # may be a different video; copying it would overwrite the
+                    # one already copied
+                    raise FailedToCopy(f"A video named {filename} was already copied from dataset {copied_from}")
+                to_copy.append(filename)
+
+            for filename in to_copy:
                 self.dataset.log(f"Copying previously downloaded video {filename} to new staging area")
                 archive_file.extract(filename, staging_area)
+                self.files_copied_from_library[filename] = source_dataset.key
                 num_copied += 1
 
         return num_copied

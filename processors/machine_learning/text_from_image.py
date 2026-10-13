@@ -229,7 +229,7 @@ class ImageTextDetector(BasicProcessor):
                         # Need to include filename as there may be many images to a single post
                         detected_text = '%s:"""%s"""' % (image_name, result_data.get('simplified_text', {}).get('raw_text', ''))
 
-                        post_ids = filename_to_post_id[image_name]
+                        post_ids = filename_to_post_id.get(image_name, [])
                         for post_id in post_ids:
                             # Posts can have multiple images
                             if post_id in post_id_to_results.keys():

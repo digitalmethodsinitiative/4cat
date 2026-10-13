@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import Iterator, Optional
 
 from common.lib.exceptions import MetadataException
-from common.lib.helpers import get_software_commit
 
 # Files 4CAT adds to an archive next to its media or other content. They are
 # not items of the dataset: metadata files, the list in which yt-dlp notes
@@ -85,14 +84,15 @@ class ArchiveMetadataFile:
 		"""
 		Record the 4CAT commit / repository creating this metadata.
 
-		Called by `new()` on the producer path. A no-op without a dataset to
-		resolve against (e.g. metadata constructed outside a processor run).
+		Called by `new()` on the producer path. The dataset already records
+		the version its processor runs with (stored when the processor
+		starts), so it is copied from there. A no-op without a dataset (e.g.
+		metadata constructed outside a processor run).
 		"""
 		if self.dataset is None:
 			return
-		commit, source = get_software_commit(self.dataset.get_own_processor())
-		self.software_version = commit
-		self.software_source = source
+		self.software_version = self.dataset.data.get("software_version")
+		self.software_source = self.dataset.data.get("software_source")
 
 	@classmethod
 	def read(cls, dataset, *, filename: Optional[str] = None):
@@ -104,20 +104,21 @@ class ArchiveMetadataFile:
 			`DEFAULT_FILENAME`.
 
 		:raises FileNotFoundError:  the metadata file is not present.
-		:raises MetadataException:  the dataset is unfinished/empty, or the
-			file is malformed or claims an unsupported schema version.
+		:raises MetadataException:  the dataset is unfinished, or the file is
+			malformed or claims an unsupported schema version.
 		"""
 		filename = filename or cls.DEFAULT_FILENAME
 
-		# for reading, we check the dataset is actually finished and has results
-		results_file = dataset.check_dataset_finished()
-		if results_file is None:
+		# an unfinished dataset may still be writing its metadata. A finished
+		# dataset with no items is still read: an archive in which every
+		# download failed, or whose files were all copied from an earlier
+		# download, still has metadata worth reading. If there is no archive
+		# at all, reading it raises FileNotFoundError below.
+		if not dataset.is_finished():
 			raise MetadataException("Dataset is not finished; metadata may be incomplete.")
-		if results_file == "empty":
-			raise MetadataException("Dataset is empty; no metadata available.")
 
 		# load it
-		raw = cls._load_raw(dataset, Path(results_file), filename)
+		raw = cls._load_raw(dataset, Path(dataset.get_results_path()), filename)
 		# create the class
 		instance = cls(dataset, filename=filename)
 		# and populate
@@ -130,15 +131,19 @@ class ArchiveMetadataFile:
 		Locate and JSON-decode the metadata file (zip member or folder).
 
 		:raises FileNotFoundError:  the file is not present.
-		:raises MetadataException:  the file is present but not valid JSON.
+		:raises MetadataException:  the archive is damaged, or the file is
+			present but not valid JSON.
 		"""
 		# if the dataset has a zip archive, look inside it
 		if results_file.suffix == ".zip":
-			with zipfile.ZipFile(results_file, "r") as archive:
-				if filename not in archive.namelist():
-					raise FileNotFoundError(f"No metadata file {filename} in archive {results_file.name}.")
-				with archive.open(filename) as f:
-					return cls._decode_json(f, filename)
+			try:
+				with zipfile.ZipFile(results_file, "r") as archive:
+					if filename not in archive.namelist():
+						raise FileNotFoundError(f"No metadata file {filename} in archive {results_file.name}.")
+					with archive.open(filename) as f:
+						return cls._decode_json(f, filename)
+			except zipfile.BadZipFile as e:
+				raise MetadataException(f"Archive {results_file.name} cannot be opened: {e}") from e
 
 		# it is possible we have a results folder w/ metadata instead; look there
 		results_folder = dataset.get_results_folder_path()
@@ -150,8 +155,8 @@ class ArchiveMetadataFile:
 		if not metadata_path.is_file():
 			raise FileNotFoundError(f"No metadata file {filename} in {results_folder}.")
 
-		# load the metadata!
-		with open(metadata_path) as f:
+		# load the metadata! (`write` always writes UTF-8)
+		with open(metadata_path, encoding="utf-8") as f:
 			return cls._decode_json(f, filename)
 
 	@staticmethod
@@ -159,12 +164,14 @@ class ArchiveMetadataFile:
 		"""
 		JSON-decode an open file object, surfacing decode errors as
 		`MetadataException`. Without this a corrupt metadata file raises
-		`json.JSONDecodeError`, which escapes the `(FileNotFoundError,
-		MetadataException)` handler every consumer uses.
+		`json.JSONDecodeError` (or `UnicodeDecodeError` for text that is not
+		UTF-8), which escapes the `(FileNotFoundError, MetadataException)`
+		handler every consumer uses.
 		"""
 		try:
 			return json.load(fp)
-		except json.JSONDecodeError as e:
+		except ValueError as e:
+			# JSONDecodeError and UnicodeDecodeError are both ValueErrors
 			raise MetadataException(f"Metadata file {filename} is not valid JSON: {e}") from e
 
 	@classmethod
@@ -235,6 +242,11 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 	Keyed by output filename; each item records the source post IDs, the
 	originating URL (if any), and an `extra` blob of platform-specific data.
 	Download attempts that produced no file are recorded in `failures`.
+
+	An item or failure can be reached through more than one URL, e.g. a short
+	and a long link to the same video, or a link in a post that redirected to
+	the file. The entry's `url` is one of them; the others are listed in
+	`extra["other_urls"]`, so that the entry can be found by any of them.
 	"""
 
 	SCHEMA_VERSION = 1
@@ -296,16 +308,28 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			self.software_version = raw.get("software_version")
 			self.software_source = raw.get("software_source")
 
+			# archives can be imported from elsewhere, so the file may have
+			# been edited by hand: refuse a file whose overall layout is wrong,
+			# and skip single entries that are not what consumers expect
+			items = raw.get("items") or {}
+			failures = raw.get("failures") or []
+			if not isinstance(items, dict):
+				raise MetadataException("Metadata 'items' must be a JSON object.")
+			if not isinstance(failures, list):
+				raise MetadataException("Metadata 'failures' must be a list.")
+
 			# post_ids are string-coerced on write, but normalize on read too
 			# so consumers never have to: some source datasets use integer ids,
 			# and hand-edited or externally-produced files may carry them.
 			self.items = {
 				filename: self._normalize_entry_post_ids(entry)
-				for filename, entry in dict(raw.get("items", {})).items()
+				for filename, entry in items.items()
+				if isinstance(entry, dict)
 			}
 			self.failures = [
 				self._normalize_entry_post_ids(failure)
-				for failure in list(raw.get("failures", []))
+				for failure in failures
+				if isinstance(failure, dict)
 			]
 			return
 
@@ -320,7 +344,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		Old format is a flat dict keyed by URL (image/video) or filename
 		(Telegram). Each entry has a `success` flag; failed entries become
 		`failures[]`, successful entries become `items[filename]`. The video
-		downloader's nested `files[]` list explodes to one item per file.
+		downloader's nested `files[]` list explodes to one item per file, and
+		a file listed under several URLs gets the post IDs of all of them.
 		All producer-specific data is carried across into `extra` (items) or
 		the failure dict (failures) so the migration loses nothing — see
 		`_legacy_extra`.
@@ -341,30 +366,28 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					outer_key.startswith("http://") or outer_key.startswith("https://")):
 				url = outer_key
 
-			# existing `from_dataset` is correct if exists
-			if entry.get("from_dataset"):
-				self.from_dataset = entry["from_dataset"]
+			# existing `from_dataset` is correct if exists; video downloads
+			# from early 2023 called it `source_dataset`
+			recorded_source = entry.get("from_dataset") or entry.get("source_dataset")
+			if recorded_source:
+				self.from_dataset = recorded_source
 
 			success = entry.get("success", True)
 
-			if not success:
-				self.failures.append(self._legacy_failure(
-					post_ids, url,
-					entry.get("reason"),
-					entry.get("reason_description") or entry.get("error"),
-					entry,
-				))
-				continue
-
-			# `files` key from video downloader due to channels and playlists
+			# `files` key from video downloader due to channels and playlists.
+			# A URL can list files even when the URL as a whole was not marked
+			# successful: e.g. yt-dlp recognised a video it had already
+			# downloaded for an earlier URL, or stopped part-way through a
+			# playlist. Those files are in the archive, so each one is recorded;
+			# the URL itself only counts as a failure if it has no file at all.
 			files = entry.get("files")
 			if isinstance(files, list) and files:
+				files_recorded = False
 				for file in files:
 					if not isinstance(file, dict):
 						continue
-					file_success = file.get("success", True)
 					file_filename = file.get("filename")
-					if not file_success:
+					if not file.get("success", True):
 						# the shared outer entry data is preserved alongside the
 						# per-file data so e.g. the video `downloader` survives
 						self.failures.append(self._legacy_failure(
@@ -373,24 +396,40 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 							file.get("reason_description") or file.get("error"),
 							entry, file,
 						))
+						files_recorded = True
 						continue
-					if not file_filename:
+					if not file_filename or not isinstance(file_filename, str):
 						continue
-					self.items[file_filename] = self._build_item(
-						file_filename, post_ids, url, self._legacy_extra(entry, file)
-					)
-			elif entry.get("filename"):
-				filename = entry["filename"]
-				self.items[filename] = self._build_item(
-					filename, post_ids, url, self._legacy_extra(entry)
-				)
+					# the same file can be listed under more than one URL;
+					# merge so the posts of every URL stay connected to it
+					self.add_item(file_filename, post_ids=post_ids, url=url,
+								  extra=self._legacy_extra(entry, file), merge=True)
+					files_recorded = True
+				if files_recorded or success:
+					continue
+
+			if not success:
+				reason = entry.get("reason")
+				if reason is None and entry.get("retry") is False:
+					# the old video downloader marked URLs that turned out not
+					# to be videos with `retry: False` rather than a reason
+					reason = "not_a_video"
+				self.failures.append(self._legacy_failure(
+					post_ids, url,
+					reason,
+					entry.get("reason_description") or entry.get("error"),
+					entry,
+				))
+			elif entry.get("filename") and isinstance(entry["filename"], str):
+				self.add_item(entry["filename"], post_ids=post_ids, url=url,
+							  extra=self._legacy_extra(entry), merge=True)
 			# else: malformed-but-tolerated; drop
 
 	# Legacy entry keys promoted to first-class v1 fields, or pure structure;
 	# every other key is producer data and is preserved under `extra`.
 	_LEGACY_NON_EXTRA_KEYS = frozenset({
-		"filename", "post_ids", "post_id", "url", "from_dataset", "success",
-		"files", "metadata", "extra",
+		"filename", "post_ids", "post_id", "url", "from_dataset", "source_dataset",
+		"success", "files", "metadata", "extra",
 	})
 	# Additionally promoted on the failure path: failures have no `extra` of
 	# their own, but carry these as first-class fields.
@@ -454,20 +493,51 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 	def add_item(self, filename: str, *, post_ids,
 				 url: Optional[str] = None,
 				 extra: Optional[dict] = None,
-				 replace: bool = False) -> None:
+				 replace: bool = False,
+				 merge: bool = False) -> None:
 		"""
 		Record a successfully produced file.
 
 		:param filename:  the file's name inside the archive. Must be unique
-			within this metadata instance unless `replace=True`.
+			within this metadata instance unless `replace` or `merge` is set.
 		:param post_ids:  list of source post IDs (string-coerced).
 		:param url:  optional originating URL.
 		:param extra:  optional free-form per-file data (e.g. yt-dlp dump).
 		:param replace:  overwrite an existing entry with the same filename.
+		:param merge:  if an entry with the same filename exists, add these
+			post IDs to it instead of overwriting it. Use this when one file
+			can be reached through several URLs (e.g. the same video linked in
+			different ways), so that every post linking to it stays connected
+			to the file. The existing URL is kept, and any other URL that led
+			to the same file is listed in `extra["other_urls"]`. The existing
+			extra data is kept; extra keys the entry does not have yet are
+			added.
 		"""
 		if not filename or not isinstance(filename, str):
 			raise MetadataException("add_item: 'filename' must be a non-empty string.")
-		if not replace and filename in self.items:
+		if replace and merge:
+			raise MetadataException("add_item: use either 'replace' or 'merge', not both.")
+
+		existing = self.items.get(filename)
+		if existing is not None and merge:
+			known_ids = existing.setdefault("post_ids", [])
+			for post_id in self._normalize_post_ids(post_ids):
+				if post_id not in known_ids:
+					known_ids.append(post_id)
+			if extra:
+				existing["extra"] = {**extra, **existing.get("extra", {})}
+			if url is not None:
+				if existing.get("url") is None:
+					existing["url"] = url
+				elif url != existing["url"]:
+					entry_extra = existing.setdefault("extra", {})
+					other_urls = list(entry_extra.get("other_urls", []))
+					if url not in other_urls:
+						other_urls.append(url)
+					entry_extra["other_urls"] = other_urls
+			return
+
+		if existing is not None and not replace:
 			raise MetadataException(f"add_item: filename {filename!r} already present.")
 		self.items[filename] = self._build_item(
 			filename, self._normalize_post_ids(post_ids), url, dict(extra) if extra else {}
@@ -475,7 +545,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 
 	def add_failure(self, *, post_ids, reason: str,
 					reason_description: Optional[str] = None,
-					url: Optional[str] = None) -> None:
+					url: Optional[str] = None,
+					extra: Optional[dict] = None) -> None:
 		"""
 		Record a download attempt that did not produce a file.
 
@@ -483,6 +554,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		:param reason:  structured failure code (e.g. "error", "no_media").
 		:param reason_description:  optional human-readable explanation.
 		:param url:  optional URL that was attempted.
+		:param extra:  optional free-form data about the attempt.
 		"""
 		if not reason or not isinstance(reason, str):
 			raise MetadataException("add_failure: 'reason' must be a non-empty string.")
@@ -494,6 +566,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			failure["url"] = url
 		if reason_description is not None:
 			failure["reason_description"] = reason_description
+		if extra:
+			failure["extra"] = dict(extra)
 		self.failures.append(failure)
 
 	@staticmethod

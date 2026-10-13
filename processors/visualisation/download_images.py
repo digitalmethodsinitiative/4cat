@@ -406,19 +406,22 @@ class ImageDownloader(BasicProcessor):
                         # before ending the loop and wrapping up
                         self.complete = True
 
+            resolved_url, url_extra = self.urls_for_metadata(url)
             if failure:
                 failures.append(url)
                 downloaded_file.unlink(missing_ok=True)
                 metadata.add_failure(
                     post_ids=item_map[url],
                     reason="error",
-                    url=url,
+                    url=resolved_url,
+                    extra=url_extra,
                 )
             else:
                 metadata.add_item(
                     filename=self.filenames[url],
                     post_ids=item_map[url],
-                    url=self.resolve_url(url),
+                    url=resolved_url,
+                    extra=url_extra,
                     replace=True,
                 )
 
@@ -585,6 +588,22 @@ class ImageDownloader(BasicProcessor):
             url = self.url_redirects[url]
 
         return url
+
+    def urls_for_metadata(self, url):
+        """
+        Get the URLs to record in the archive metadata for a download
+
+        The metadata's `url` is where the file was downloaded from, after
+        following any redirects. If the URL as it appeared in the dataset is
+        different, it is listed in `other_urls`, so the file can be found by
+        either.
+
+        :param str url:  URL as it appeared in the dataset
+        :return tuple:  The URL to record, and extra data for the metadata
+        """
+        resolved_url = self.resolve_url(url)
+        extra = {"other_urls": [url]} if resolved_url != url else {}
+        return resolved_url, extra
 
     def get_link_regexes(self):
         """
