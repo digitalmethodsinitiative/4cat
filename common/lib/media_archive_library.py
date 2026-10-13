@@ -131,16 +131,22 @@ class MediaArchiveLibrary:
 				"failures": [(metadata, failure), ...]}}`
 
 		A URL can map to entries from several archives (downloaded more than
-		once) and to several files within one archive (e.g. a playlist).
+		once) and to several files within one archive (e.g. a playlist). A
+		file can also be reached through more than one URL (e.g. a short and
+		a long link to the same video): its `url` and every URL in its
+		`extra["other_urls"]` all lead to it.
 		"""
 		index = {}
 		for metadata in self.metadata_objects:
 			for filename, item in metadata.iter_entries():
-				url = item.get("url")
-				if not url:
-					continue
-				index.setdefault(url, {"items": [], "failures": []})
-				index[url]["items"].append((metadata, filename, item))
+				other_urls = (item.get("extra") or {}).get("other_urls")
+				if not isinstance(other_urls, list):
+					other_urls = []
+				for url in [item.get("url"), *other_urls]:
+					if not url or not isinstance(url, str):
+						continue
+					index.setdefault(url, {"items": [], "failures": []})
+					index[url]["items"].append((metadata, filename, item))
 			for failure in metadata.iter_failures():
 				url = failure.get("url")
 				if not url:
@@ -160,8 +166,9 @@ class MediaArchiveLibrary:
 		Look up a URL across all previous downloader archives.
 
 		Returns a `MediaLibraryHit` — a success hit if any archive
-		downloaded it, otherwise a failure hit carrying every failure
-		`reason` seen — or `None` if the URL was never seen.
+		downloaded it (including as one of a file's other URLs), otherwise a
+		failure hit carrying every failure `reason` seen — or `None` if the
+		URL was never seen.
 		"""
 		bucket = self.url_index.get(url)
 		if not bucket:

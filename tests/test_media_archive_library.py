@@ -173,6 +173,32 @@ def test_items_without_url_are_not_indexed():
 	assert len(lib) == 1
 
 
+def test_find_through_other_url():
+	"""A file reached through a second URL can be found through that URL too."""
+	m = _meta()
+	m.add_item("v.mp4", post_ids=["p1"], url="https://youtube.com/watch?v=abc")
+	m.add_item("v.mp4", post_ids=["p2"], url="https://youtu.be/abc", merge=True)
+	lib = MediaArchiveLibrary([m])
+
+	hit = lib.find("https://youtu.be/abc")
+	assert hit.is_success
+	assert hit.metadata is m
+	assert [fn for fn, _ in hit.entries] == ["v.mp4"]
+	# its own URL still finds it, listed once
+	assert [fn for fn, _ in lib.find("https://youtube.com/watch?v=abc").entries] == ["v.mp4"]
+
+
+def test_other_urls_that_are_not_a_list_are_ignored():
+	"""A hand-edited file may hold something else under `other_urls`."""
+	m = _meta()
+	m.add_item("v.mp4", post_ids=["p1"], url="https://example.com/v",
+			   extra={"other_urls": "https://example.com/w"})
+	lib = MediaArchiveLibrary([m])
+
+	assert lib.find("https://example.com/v").is_success
+	assert lib.find("https://example.com/w") is None
+
+
 def test_len_reports_archive_count():
 	lib = MediaArchiveLibrary([_meta(), _meta(), _meta()])
 	assert len(lib) == 3

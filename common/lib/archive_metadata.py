@@ -78,20 +78,21 @@ class ArchiveMetadataFile:
 			`DEFAULT_FILENAME`.
 
 		:raises FileNotFoundError:  the metadata file is not present.
-		:raises MetadataException:  the dataset is unfinished/empty, or the
-			file is malformed or claims an unsupported schema version.
+		:raises MetadataException:  the dataset is unfinished, or the file is
+			malformed or claims an unsupported schema version.
 		"""
 		filename = filename or cls.DEFAULT_FILENAME
 
-		# for reading, we check the dataset is actually finished and has results
-		results_file = dataset.check_dataset_finished()
-		if results_file is None:
+		# an unfinished dataset may still be writing its metadata. A finished
+		# dataset with no items is still read: an archive in which every
+		# download failed, or whose files were all copied from an earlier
+		# download, still has metadata worth reading. If there is no archive
+		# at all, reading it raises FileNotFoundError below.
+		if not dataset.is_finished():
 			raise MetadataException("Dataset is not finished; metadata may be incomplete.")
-		if results_file == "empty":
-			raise MetadataException("Dataset is empty; no metadata available.")
 
 		# load it
-		raw = cls._load_raw(dataset, Path(results_file), filename)
+		raw = cls._load_raw(dataset, Path(dataset.get_results_path()), filename)
 		# create the class
 		instance = cls(dataset, filename=filename)
 		# and populate
@@ -357,9 +358,14 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					continue
 
 			if not success:
+				reason = entry.get("reason")
+				if reason is None and entry.get("retry") is False:
+					# the old video downloader marked URLs that turned out not
+					# to be videos with `retry: False` rather than a reason
+					reason = "not_a_video"
 				self.failures.append(self._legacy_failure(
 					post_ids, url,
-					entry.get("reason"),
+					reason,
 					entry.get("reason_description") or entry.get("error"),
 					entry,
 				))

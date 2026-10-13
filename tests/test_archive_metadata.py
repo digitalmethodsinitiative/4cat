@@ -19,12 +19,16 @@ CURRENT_SCHEMA_VERSION = MediaArchiveMetadata.SCHEMA_VERSION
 class FakeDataset:
 	"""Just enough surface for MediaArchiveMetadata.read."""
 
-	def __init__(self, key, results_path, results_folder=None):
+	def __init__(self, key, results_path, results_folder=None, finished=True):
 		self.key = key
 		self._results = results_path
 		self._results_folder = results_folder
+		self._finished = finished
 
-	def check_dataset_finished(self):
+	def is_finished(self):
+		return self._finished
+
+	def get_results_path(self):
 		return self._results
 
 	def get_results_folder_path(self):
@@ -201,6 +205,20 @@ def test_legacy_telegram_filename_keyed():
 	assert m.failures[0]["post_ids"] == ["chat-101"]
 	# no URL stored for telegram entries
 	assert "url" not in m.failures[0]
+
+
+def test_legacy_not_a_video_keeps_its_reason():
+	"""The old video downloader marked URLs that were not videos with `retry: False`."""
+	legacy = {
+		"https://example.com/page": {
+			"success": False, "retry": False, "also_indirect": "none",
+			"post_ids": ["p1"], "error": "Not a video",
+		},
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(legacy)
+	assert m.failures[0]["reason"] == "not_a_video"
+	assert m.failures[0]["reason_description"] == "Not a video"
 
 
 def test_legacy_singular_post_id():
@@ -449,15 +467,31 @@ def test_validate_rejects_failure_without_reason():
 		m.validate()
 
 
-def test_read_raises_when_dataset_unfinished():
-	ds = FakeDataset("k", None)
+def test_read_raises_when_dataset_unfinished(tmp_path):
+	ds = FakeDataset("k", tmp_path / "results.zip", finished=False)
 	with pytest.raises(MetadataException, match="not finished"):
 		MediaArchiveMetadata.read(ds)
 
 
-def test_read_raises_when_dataset_empty():
-	ds = FakeDataset("k", "empty")
-	with pytest.raises(MetadataException, match="empty"):
+def test_read_finished_dataset_without_items(tmp_path):
+	"""
+	An archive in which every download failed (or every file was copied from an
+	earlier download) finishes with no items, but its metadata is still read.
+	"""
+	meta = MediaArchiveMetadata.new(processor_type="video-downloader", from_dataset="src")
+	meta.add_failure(post_ids=["1"], reason="not_a_video", url="https://example.com/page")
+	meta.write(tmp_path)
+	archive = tmp_path / "results.zip"
+	with zipfile.ZipFile(archive, "w") as zf:
+		zf.write(tmp_path / ".metadata.json", ".metadata.json")
+
+	loaded = MediaArchiveMetadata.read(FakeDataset("k", archive))
+	assert loaded.failures[0]["reason"] == "not_a_video"
+
+
+def test_read_raises_when_finished_dataset_has_no_archive(tmp_path):
+	ds = FakeDataset("k", tmp_path / "results.zip")
+	with pytest.raises(FileNotFoundError):
 		MediaArchiveMetadata.read(ds)
 
 

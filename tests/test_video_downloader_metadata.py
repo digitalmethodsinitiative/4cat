@@ -6,6 +6,7 @@ The downloader is built with `__new__` and given stand-ins for the few
 attributes it uses, so none of the worker machinery (database, job queue,
 config) has to be started up.
 """
+import zipfile
 from types import SimpleNamespace
 
 from common.lib.archive_metadata import MediaArchiveMetadata
@@ -36,6 +37,7 @@ def make_downloader(parameters=None):
     downloader.dataset = DatasetStub()
     downloader.source_dataset = SimpleNamespace(key="posts")
     downloader.parameters = parameters or {}
+    downloader.files_copied_from_library = {}
     return downloader
 
 
@@ -83,3 +85,114 @@ def test_copied_video_does_not_carry_the_earlier_archives_other_urls():
     assert fields["downloader"] == "yt_dlp"
     # the earlier archive itself is left as it was
     assert earlier.get_entry("abc.mp4")["extra"]["other_urls"] == ["https://youtu.be/abc"]
+
+
+# -- reusing earlier downloads --
+
+def old_not_a_video_archive(also_indirect):
+    """
+    Metadata of a video download made before archive metadata had a schema
+    version, in which a URL was found not to be a video.
+    """
+    previous_run = SimpleNamespace(parameters={"also_indirect": also_indirect})
+    metadata = MediaArchiveMetadata(previous_run)
+    metadata._populate_from_raw({
+        "https://example.com/page": {
+            "success": False, "retry": False, "also_indirect": also_indirect,
+            "post_ids": ["p1"], "error": "Not a video",
+        },
+    })
+    return metadata
+
+
+def test_url_an_old_download_found_not_to_be_a_video_is_skipped(tmp_path):
+    library = MediaArchiveLibrary([old_not_a_video_archive("none")])
+    urls = {"https://example.com/page": {"post_ids": {"p9"}}}
+    downloader = make_downloader({"also_indirect": "none"})
+
+    result = downloader._try_copy_from_library("https://example.com/page", urls, library, tmp_path)
+
+    assert result["skip"] is True
+    assert urls["https://example.com/page"]["reason"] == "not_a_video"
+
+
+def test_url_is_tried_again_when_this_run_allows_yt_dlp_more_urls(tmp_path):
+    library = MediaArchiveLibrary([old_not_a_video_archive("none")])
+    urls = {"https://example.com/page": {"post_ids": {"p9"}}}
+    downloader = make_downloader({"also_indirect": "all"})
+
+    result = downloader._try_copy_from_library("https://example.com/page", urls, library, tmp_path)
+
+    assert result["skip"] is False
+
+
+def earlier_video_archive(tmp_path, key, urls):
+    """
+    An earlier video download whose zip holds one video, `abc.mp4`, that the
+    given URLs all led to.
+    """
+    folder = tmp_path / key
+    folder.mkdir()
+    zip_path = folder / "results.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("abc.mp4", b"video bytes")
+
+    dataset = SimpleNamespace(key=key, parameters={}, get_results_path=lambda: zip_path)
+    metadata = MediaArchiveMetadata(dataset)
+    for i, url in enumerate(urls):
+        metadata.add_item("abc.mp4", post_ids=[f"{key}-{i}"], url=url,
+                          extra={"downloader": "yt_dlp"}, merge=True)
+    return metadata
+
+
+def test_video_reached_through_two_urls_is_copied_once(tmp_path):
+    """
+    An earlier download reached one video through two URLs. When this dataset
+    links to both, the video is found through either URL but copied once.
+    """
+    library = MediaArchiveLibrary([earlier_video_archive(
+        tmp_path, "earlier", ["https://youtube.com/watch?v=abc", "https://youtu.be/abc"])])
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    urls = {
+        "https://youtube.com/watch?v=abc": {"post_ids": {"p1"}},
+        "https://youtu.be/abc": {"post_ids": {"p2"}},
+    }
+    downloader = make_downloader()
+
+    first = downloader._try_copy_from_library("https://youtube.com/watch?v=abc", urls, library, staging)
+    second = downloader._try_copy_from_library("https://youtu.be/abc", urls, library, staging)
+
+    assert (first["copied"], first["count"]) == (True, 1)
+    # found through the file's other URLs, but the video is already there
+    assert (second["copied"], second["count"]) == (True, 0)
+    assert [file.name for file in staging.iterdir()] == ["abc.mp4"]
+
+    # both URLs' posts end up connected to the one file
+    downloader._save_metadata(urls, staging)
+    metadata = downloader.dataset.metadata
+    assert metadata.post_ids_for("abc.mp4") == ["p1", "p2"]
+    assert metadata.get_entry("abc.mp4")["extra"]["other_urls"] == ["https://youtu.be/abc"]
+
+
+def test_same_filename_from_a_different_earlier_download_is_not_copied_over(tmp_path):
+    """
+    Two earlier downloads can each hold a file of the same name, which may be
+    different videos. Copying the second would overwrite the first, so that URL
+    is downloaded again instead.
+    """
+    library = MediaArchiveLibrary([
+        earlier_video_archive(tmp_path, "earlier1", ["https://example.com/one"]),
+        earlier_video_archive(tmp_path, "earlier2", ["https://example.com/two"]),
+    ])
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    urls = {"https://example.com/one": {"post_ids": {"p1"}}, "https://example.com/two": {"post_ids": {"p2"}}}
+    downloader = make_downloader()
+
+    first = downloader._try_copy_from_library("https://example.com/one", urls, library, staging)
+    second = downloader._try_copy_from_library("https://example.com/two", urls, library, staging)
+
+    assert first["copied"] is True
+    assert second["copied"] is False
+    assert "files" not in urls["https://example.com/two"]

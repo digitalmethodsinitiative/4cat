@@ -358,6 +358,9 @@ class VideoDownloaderPlus(BasicProcessor):
         self.downloaded_videos = 0
         self.failed_downloads = 0
         self.copied_videos = 0
+        # filename -> key of the earlier dataset it was copied from, so a video
+        # that several URLs lead to is copied (and counted) only once
+        self.files_copied_from_library = {}
         consecutive_errors = 0
         # not_a_video tracked within direct_results
         self.total_not_a_video = 0
@@ -1065,8 +1068,10 @@ class VideoDownloaderPlus(BasicProcessor):
     def _finish_processing(self, results_path, total_urls):
         """Finish processing and create result archive"""
         self.dataset.update_status("Writing downloaded videos to zip archive")
-        self.write_archive_and_finish(results_path, self.downloaded_videos + self.copied_videos, finish=False)
-        
+        # videos copied from earlier downloads are in the archive too
+        num_videos = self.downloaded_videos + self.copied_videos
+        self.write_archive_and_finish(results_path, num_videos, finish=False)
+
         status_msg = f"Downloaded {self.downloaded_videos} videos"
         if self.copied_videos > 0:
             status_msg += f"; {self.copied_videos} videos copied from previous downloads"
@@ -1079,10 +1084,10 @@ class VideoDownloaderPlus(BasicProcessor):
         
         if self.warning_message:
             self.dataset.update_status(status_msg)
-            self.dataset.finish_with_warning(self.downloaded_videos, f"Incomplete: {self.warning_message}")
+            self.dataset.finish_with_warning(num_videos, f"Incomplete: {self.warning_message}")
         else:
             self.dataset.update_status(status_msg, is_final=True)
-            self.dataset.finish(self.downloaded_videos)
+            self.dataset.finish(num_videos)
 
     def yt_dlp_monitor(self, d):
         """Can be used to gather information from yt-dlp while downloading"""
@@ -1325,11 +1330,15 @@ class VideoDownloaderPlus(BasicProcessor):
         Copy the file(s) of a previously downloaded video into the current
         staging area.
 
+        Several URLs can lead to the same earlier file (e.g. a short and a
+        long link to one video). A file that was already copied for another
+        URL in this run is not copied or counted again.
+
         :param MediaLibraryHit hit:  a successful library lookup; its
             `metadata.dataset` locates the source archive and `entries`
             lists the files to copy.
         :param Path staging_area:  where to extract the files to.
-        :return int:  number of files copied.
+        :return int:  number of files newly copied.
         """
         source_dataset = hit.metadata.dataset
         if source_dataset is None:
@@ -1342,11 +1351,28 @@ class VideoDownloaderPlus(BasicProcessor):
         num_copied = 0
         with zipfile.ZipFile(source_dataset.get_results_path(), "r") as archive_file:
             archive_contents = set(archive_file.namelist())
+
+            # check every file before copying any, so that a URL is never left
+            # with only some of its files copied
+            to_copy = []
             for filename in filenames:
                 if filename not in archive_contents:
                     raise FailedToCopy(f"Previously downloaded video {filename} not found")
+                copied_from = self.files_copied_from_library.get(filename)
+                if copied_from == source_dataset.key:
+                    self.dataset.log(f"Previously downloaded video {filename} was already copied for another URL")
+                    continue
+                if copied_from is not None:
+                    # a file of the same name from a different earlier dataset
+                    # may be a different video; copying it would overwrite the
+                    # one already copied
+                    raise FailedToCopy(f"A video named {filename} was already copied from dataset {copied_from}")
+                to_copy.append(filename)
+
+            for filename in to_copy:
                 self.dataset.log(f"Copying previously downloaded video {filename} to new staging area")
                 archive_file.extract(filename, staging_area)
+                self.files_copied_from_library[filename] = source_dataset.key
                 num_copied += 1
 
         return num_copied
