@@ -349,7 +349,7 @@ class FakeDataset:
         self.num_rows = rows
         self.key = name
         self._finished, self._parent, self._children = finished, parent, list(children)
-        self.error, self.logs = None, []
+        self.error, self.logs, self.statuses = None, [], []
 
     def get_results_path(self):
         return self.path
@@ -375,7 +375,7 @@ class FakeDataset:
         return []
 
     def update_status(self, message, is_final=False):
-        pass
+        self.statuses.append(message)
 
     def update_progress(self, progress):
         pass
@@ -421,6 +421,8 @@ def make_sprite(tmp_path, names, size=32, name="sprite", parameters=None, posts=
 
     archive_path = tmp_path / f"archive-{name}.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
+        for item in items:
+            archive.write(item.file, item.file.name)
         archive.writestr(".metadata.json", json.dumps({
             f"https://example.com/{post['id']}": {"post_ids": [post["id"]], "files": [{"filename": post["file"]}]}
             for post in posts or []
@@ -722,6 +724,9 @@ def test_thumbnails_only_for_posts_at_or_above_threshold(tmp_path):
     with zipfile.ZipFile(dataset.get_results_path()) as archive:
         thumbnails = [m for m in archive.namelist() if m.startswith("thumbnails/")]
     assert sorted(thumbnails) == ["thumbnails/exactly.jpg", "thumbnails/popular.jpg"]
+
+    # progress counts only the files that will get a thumbnail
+    assert any(status.startswith("Extracting thumbnail 1/2 ") for status in dataset.statuses)
 
 
 def test_threshold_that_leaves_nothing_says_so(tmp_path):

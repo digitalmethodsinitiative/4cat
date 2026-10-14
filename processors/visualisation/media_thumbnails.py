@@ -109,14 +109,20 @@ class MediaThumbnails(BasicProcessor):
         """
         size = self.parameters.get("thumbnail_size", 48)
         limit = self.parameters.get("amount", 0)
-        max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
-
-        ffmpeg = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
-        ffprobe = shutil.which("ffprobe".join(ffmpeg.rsplit("ffmpeg", 1))) if ffmpeg else None
 
         min_column = self.parameters.get("min_column", "")
         min_value = self.parameters.get("min_value", 0)
         allowed = self.get_files_above_threshold(min_column, min_value) if min_column else None
+        if allowed is not None and not allowed:
+            self.dataset.finish_with_error(f"No media files come from posts with '{min_column}' of at least "
+                                           f"{min_value:g}, so there is nothing to show.")
+            return
+
+        available = len(allowed) if allowed is not None else self.source_dataset.num_rows
+        max_processed = min(limit, available) if limit else available
+
+        ffmpeg = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
+        ffprobe = shutil.which("ffprobe".join(ffmpeg.rsplit("ffmpeg", 1))) if ffmpeg else None
 
         staging_area = self.dataset.get_staging_area()
         thumbnails = []
@@ -171,11 +177,7 @@ class MediaThumbnails(BasicProcessor):
             thumbnails.append((media_path.name, thumbnail))
 
         if not thumbnails:
-            if below_threshold and not processed:
-                self.dataset.finish_with_error(f"No media files come from posts with '{min_column}' of at least "
-                                               f"{min_value:g}, so there is nothing to show.")
-            else:
-                self.dataset.finish_with_error("None of the media files could be read, so there is nothing to show.")
+            self.dataset.finish_with_error("None of the media files could be read, so there is nothing to show.")
             return
 
         self.dataset.update_status(f"Merging {len(thumbnails):,} thumbnails into a sprite sheet")
@@ -256,9 +258,15 @@ class MediaThumbnails(BasicProcessor):
 
         :param str column:  Column of the original dataset to compare
         :param float threshold:  Lowest value that still gets a thumbnail
-        :return set:  Filenames without extension
+        :return set:  Filenames without extension, only of files that are in
+          the archive
         """
-        post_id_map = read_post_id_map(self.source_dataset.get_results_path(), log=self.dataset.log)
+        archive_path = self.source_dataset.get_results_path()
+        post_id_map = read_post_id_map(archive_path, log=self.dataset.log)
+        if not post_id_map:
+            self.dataset.log("The archive does not say which posts its files came from, so none can be shown")
+            return set()
+
         wanted = {str(post_id) for post_ids in post_id_map.values() for post_id in post_ids}
 
         self.dataset.update_status(f"Reading '{column}' from the original dataset")
@@ -277,8 +285,13 @@ class MediaThumbnails(BasicProcessor):
             except (TypeError, ValueError):
                 pass
 
+        # the metadata also lists files that failed to download; only count
+        # what is actually there, so progress adds up
+        with zipfile.ZipFile(archive_path) as archive:
+            present = {Path(name).stem for name in archive.namelist() if name != ".metadata.json"}
+
         return {stem for stem, post_ids in post_id_map.items()
-                if any(str(post_id) in passing for post_id in post_ids)}
+                if stem in present and any(str(post_id) in passing for post_id in post_ids)}
 
     def make_thumbnail(self, path, size: int, is_video: bool, ffmpeg, ffprobe):
         """
