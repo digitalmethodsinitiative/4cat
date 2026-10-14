@@ -69,6 +69,7 @@ class UniqueImageFilter(BasicProcessor):
         """
         seen_hashes = set()
         hash_map = {}
+        duplicate_of = {}
         hash_type = self.parameters.get("hash-type")
         dupes = 0
         processed = 0
@@ -93,28 +94,44 @@ class UniqueImageFilter(BasicProcessor):
                 hash_map[image_hash] = image.file.name
             else:
                 self.dataset.log(f"{image.file.name} is a duplicate of {hash_map[image_hash]} - skipping")
+                duplicate_of[image.file.name] = hash_map[image_hash]
                 dupes += 1
 
         source_metadata = self.get_media_metadata()
 
         new_metadata = self.dataset.new_media_metadata(
             processor_type=self.type,
-            from_dataset=(source_metadata.from_dataset if source_metadata else self.source_dataset.key),
+            from_dataset=(source_metadata.from_dataset if source_metadata is not None else self.source_dataset.key),
         )
         inverse_hashmap = {v: k for k, v in hash_map.items()}
         if source_metadata is not None:
-            for filename, item in source_metadata.iter_entries():
-                if filename not in inverse_hashmap:
+            # each image that is kept stands in for its duplicates too, so the
+            # posts and URLs of a removed duplicate are added to the kept image
+            # and no post loses its image
+            kept_file = {filename: filename for filename in inverse_hashmap}
+            kept_file.update(duplicate_of)
+
+            # kept images first, so each keeps its own URL; a duplicate's URL
+            # is then listed in the kept image's extra["other_urls"]
+            entries = sorted(source_metadata.iter_entries(), key=lambda entry: entry[0] not in inverse_hashmap)
+            for filename, item in entries:
+                if filename not in kept_file:
                     continue
                 extra = dict(item.get("extra") or {})
-                extra["hash"] = inverse_hashmap[filename]
+                other_urls = extra.pop("other_urls", [])
+                extra["hash"] = inverse_hashmap[kept_file[filename]]
                 extra["hash_type"] = hash_type
                 new_metadata.add_item(
-                    filename,
+                    kept_file[filename],
                     post_ids=item.get("post_ids", []),
                     url=item.get("url"),
                     extra=extra,
+                    merge=True,
                 )
+                # adding these one by one keeps the other URLs of both the
+                # kept image and its duplicates
+                for other_url in other_urls:
+                    new_metadata.add_item(kept_file[filename], post_ids=[], url=other_url, merge=True)
         else:
             for h, filename in hash_map.items():
                 new_metadata.add_item(
