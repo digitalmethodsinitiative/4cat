@@ -10,7 +10,7 @@ from scenedetect import open_video, SceneManager, VideoOpenFailure, FrameTimecod
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, ExecutableSibling
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, MetadataException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
