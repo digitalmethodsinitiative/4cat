@@ -2,9 +2,12 @@
 Assign each embedding to a cluster of similar items.
 """
 import json
+import multiprocessing
 from collections import Counter
+from queue import Empty
 
 import numpy as np
+import psutil
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
@@ -22,6 +25,24 @@ __email__ = "4cat@oilab.eu"
 # Silhouette scores compare every point with every other, so they are
 # computed on a sample of at most this many points
 SILHOUETTE_SAMPLE = 5000
+
+
+def _cluster_in_child(matrix, parameters, messages):
+    """
+    Reduce and cluster in a child process, reporting back through a queue.
+
+    :param matrix:  2D numpy array, one normalised embedding per row
+    :param dict parameters:  Processor parameters
+    :param messages:  Queue for `(kind, value)` tuples: `log` and `status`
+      messages, then `labels` or `error`
+    """
+    try:
+        labels = ClusterEmbeddings.reduce_and_cluster(matrix, parameters,
+                                                      lambda kind, message: messages.put((kind, message)))
+        messages.put(("labels", labels))
+    except Exception as e:
+        messages.put(("error", f"{type(e).__name__}: {e}"))
+        raise
 
 
 class ClusterEmbeddings(BasicProcessor):
@@ -53,6 +74,7 @@ class ClusterEmbeddings(BasicProcessor):
         "[Campello, Ricardo J. G. B., Davoud Moulavi, and Jörg Sander. 2013. 'Density-Based Clustering Based on "
         "Hierarchical Density Estimates.' PAKDD 2013.](https://doi.org/10.1007/978-3-642-37456-2_14)",
         "[How HDBSCAN works](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html)",
+        "[Basic UMAP parameters](https://umap-learn.readthedocs.io/en/latest/parameters.html)",
         "[scikit-learn: k-means](https://scikit-learn.org/stable/modules/clustering.html#k-means)",
         "[scikit-learn: silhouette score](https://scikit-learn.org/stable/modules/clustering.html#silhouette-coefficient)",
     ]
@@ -185,15 +207,15 @@ class ClusterEmbeddings(BasicProcessor):
 
         normalise_in_place(matrix)
 
-        if self.parameters.get("reduce_first", True):
-            matrix = self.reduce(matrix)
-        elif self.parameters.get("algorithm") == "hdbscan":
+        if not self.parameters.get("reduce_first", True) and self.parameters.get("algorithm") == "hdbscan":
             self.dataset.log("Clustering the full vectors with HDBSCAN. This often finds few clusters and much noise; "
                              "reducing with UMAP first usually works better.")
 
-        self.dataset.update_status(f"Clustering {point_count:,} embeddings")
-        clusters = self.renumber_by_size(self.cluster(matrix))
+        labels = self.reduce_and_cluster_in_child(matrix)
         del matrix
+        if labels is None:
+            return
+        clusters = self.renumber_by_size(labels)
 
         sizes = Counter(clusters)
         noise = sizes.pop(-1, 0)
@@ -283,7 +305,85 @@ class ClusterEmbeddings(BasicProcessor):
             return [record.get("id")]
         return record.get("post_ids") or None
 
-    def reduce(self, matrix):
+    def reduce_and_cluster_in_child(self, matrix) -> np.ndarray | None:
+        """
+        Reduce and cluster the embeddings in a separate process.
+
+        UMAP and HDBSCAN run for a long time in compiled code that holds
+        Python's global interpreter lock, which would freeze every other thread
+        in the backend, the API included, until they finish. A child process
+        also gives its memory back to the system when it ends.
+
+        The child is forked, not spawned: spawning re-runs the daemon's main
+        script. Where forking is not possible (Windows), this runs in-process.
+
+        :param matrix:  2D numpy array, one normalised embedding per row
+        :return:  Cluster label per row, or `None` if the dataset was finished
+          with an error
+        """
+        def report(kind, message):
+            (self.dataset.log if kind == "log" else self.dataset.update_status)(message)
+
+        if "fork" not in multiprocessing.get_all_start_methods():
+            return self.reduce_and_cluster(matrix, self.parameters, report)
+
+        context = multiprocessing.get_context("fork")
+        messages = context.Queue()
+        child = context.Process(target=_cluster_in_child, args=(matrix, self.parameters, messages))
+        child.start()
+
+        labels, error = None, None
+        try:
+            while labels is None and error is None:
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while clustering embeddings")
+                if psutil.virtual_memory().percent >= 90:
+                    self.log.warning(f"Memory usage above 90% while clustering; terminating clustering for dataset "
+                                     f"{self.dataset.key}")
+                    error = "Clustering was stopped because memory usage exceeded 90%. Try fewer items."
+                    break
+
+                try:
+                    kind, value = messages.get(timeout=0.5)
+                except Empty:
+                    if not child.is_alive():
+                        error = f"Clustering stopped unexpectedly (exit code {child.exitcode})."
+                    continue
+
+                if kind == "labels":
+                    labels = value
+                elif kind == "error":
+                    error = f"Clustering failed: {value}"
+                else:
+                    report(kind, value)
+        finally:
+            if labels is None and child.is_alive():
+                child.terminate()
+            child.join(timeout=5)
+
+        if error:
+            self.dataset.finish_with_error(error)
+            return None
+        return labels
+
+    @staticmethod
+    def reduce_and_cluster(matrix, parameters: dict, report) -> np.ndarray:
+        """
+        Reduce the embeddings if asked to, and cluster them.
+
+        :param matrix:  2D numpy array, one normalised embedding per row
+        :param dict parameters:  Processor parameters
+        :param report:  `function(kind, message)`, with kind `log` or `status`
+        :return:  Cluster label per row; -1 for HDBSCAN's noise
+        """
+        if parameters.get("reduce_first", True):
+            matrix = ClusterEmbeddings.reduce(matrix, parameters, report)
+
+        report("status", f"Clustering {len(matrix):,} embeddings")
+        return ClusterEmbeddings.cluster(matrix, parameters, report)
+
+    @staticmethod
+    def reduce(matrix, parameters: dict, report):
         """
         Reduce the embeddings with UMAP, only to find clusters in.
 
@@ -292,65 +392,67 @@ class ClusterEmbeddings(BasicProcessor):
         map needs.
 
         :param matrix:  2D numpy array, one normalised embedding per row
+        :param dict parameters:  Processor parameters
+        :param report:  `function(kind, message)`, with kind `log` or `status`
         :return:  2D numpy array with the reduced vectors
         """
         import umap
 
         point_count, dimensions = matrix.shape
-        target = min(self.parameters.get("reduce_dimensions", 5), dimensions - 1, point_count - 2)
-        self.dataset.update_status(f"Reducing {point_count:,} embeddings to {target} dimensions with UMAP before "
-                                   f"clustering; this may take a while")
-        self.dataset.log(f"Reducing to {target} dimensions with UMAP (cosine, n_neighbors=15, min_dist=0.0) before "
-                         f"clustering")
+        target = min(parameters.get("reduce_dimensions", 5), dimensions - 1, point_count - 2)
+        report("status", f"Reducing {point_count:,} embeddings to {target} dimensions with UMAP before clustering; "
+                         f"this may take a while")
+        report("log", f"Reducing to {target} dimensions with UMAP (cosine, n_neighbors=15, min_dist=0.0) before "
+                      f"clustering")
 
         # fixed random_state: the same input should give the same clusters
         return umap.UMAP(n_components=target, n_neighbors=min(15, point_count - 1), min_dist=0.0, metric="cosine",
                          random_state=42).fit_transform(matrix)
 
-    def cluster(self, matrix) -> np.ndarray:
+    @staticmethod
+    def cluster(matrix, parameters: dict, report) -> np.ndarray:
         """
         Run the chosen clustering algorithm.
 
         :param matrix:  2D numpy array, one (normalised or reduced) vector per row
+        :param dict parameters:  Processor parameters
+        :param report:  `function(kind, message)`, with kind `log` or `status`
         :return:  Cluster label per row; -1 for HDBSCAN's noise
         """
         point_count = len(matrix)
 
-        if self.parameters.get("algorithm", "hdbscan") == "kmeans":
+        if parameters.get("algorithm", "hdbscan") == "kmeans":
             from sklearn.cluster import KMeans
 
-            most = min(self.parameters.get("n_clusters", 8), point_count - 1)
-            if not self.parameters.get("auto_clusters"):
-                self.dataset.log(f"Running k-means with {most} clusters")
+            most = min(parameters.get("n_clusters", 8), point_count - 1)
+            if not parameters.get("auto_clusters"):
+                report("log", f"Running k-means with {most} clusters")
                 return KMeans(n_clusters=most, n_init="auto", random_state=42).fit_predict(matrix)
 
             from sklearn.metrics import silhouette_score
 
             best_score, best_labels = None, None
             for count in range(2, most + 1):
-                if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while choosing the number of clusters")
-
-                self.dataset.update_status(f"Trying {count} of up to {most} clusters")
+                report("status", f"Trying {count} of up to {most} clusters")
                 labels = KMeans(n_clusters=count, n_init="auto", random_state=42).fit_predict(matrix)
                 score = silhouette_score(matrix, labels, sample_size=min(point_count, SILHOUETTE_SAMPLE),
                                          random_state=42)
-                self.dataset.log(f"{count} clusters: silhouette score {score:.3f}")
+                report("log", f"{count} clusters: silhouette score {score:.3f}")
                 if best_score is None or score > best_score:
                     best_score, best_labels = score, labels
 
-            self.dataset.log(f"Chose {len(set(best_labels))} clusters (silhouette score {best_score:.3f})")
+            report("log", f"Chose {len(set(best_labels))} clusters (silhouette score {best_score:.3f})")
             return best_labels
 
         from sklearn.cluster import HDBSCAN
 
-        min_cluster_size = min(self.parameters.get("min_cluster_size", 10), point_count)
+        min_cluster_size = min(parameters.get("min_cluster_size", 10), point_count)
         # left unset, min_samples follows min_cluster_size, and finding each
         # item's neighbours then holds items x min_samples distances and
         # indices: over 10 GB for 130,000 items and a cluster size of 5,000
-        min_samples = min(self.parameters.get("min_samples", 10), point_count)
-        self.dataset.log(f"Running HDBSCAN with a minimum cluster size of {min_cluster_size} and {min_samples} "
-                         f"minimum samples")
+        min_samples = min(parameters.get("min_samples", 10), point_count)
+        report("log", f"Running HDBSCAN with a minimum cluster size of {min_cluster_size} and {min_samples} "
+                      f"minimum samples")
         # kd_tree: never fall back to brute force, which holds all distances
         # between all items at once
         return HDBSCAN(min_cluster_size=min_cluster_size, min_samples=min_samples,

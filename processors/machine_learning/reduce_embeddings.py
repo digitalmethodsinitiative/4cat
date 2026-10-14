@@ -34,8 +34,7 @@ class ReduceEmbeddings(BasicProcessor):
     category = "Machine learning"  # category
     title = "Reduce dimensions of embeddings"  # title displayed in UI
     description = ("Reduce embeddings to a small number of dimensions with UMAP, t-SNE or PCA, keeping items with "
-                   "similar meanings close together. Reduce to two dimensions to plot the result as a map. Note that "
-                   "distances in the result may be meaningless (see references).")
+                   "similar meanings close together. Reduce to two dimensions to plot the result as a map.")
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     compatibility = Compatibility(
