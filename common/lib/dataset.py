@@ -585,6 +585,42 @@ class DataSet(FourcatModule):
                     unique_label = f"{annotation_field_items['label']}_{counter}"
                 annotation_labels[annotation_field_id] = unique_label
 
+            def add_annotations(dataset_items):
+                """
+                Get the annotations for a batch of items in one go and add
+                them to each item, under the annotation's label
+                """
+                item_ids = [dataset_item.get("id") for dataset_item in dataset_items]
+
+                # Dict with item ids for fast lookup
+                annotations_dict = collections.defaultdict(dict)
+                annotations = self.get_annotations_for_item(item_ids, before=annotations_before)
+                for item_annotation in annotations:
+                    item_id = item_annotation.item_id
+                    if item_annotation:
+                        annotations_dict[item_id][item_annotation.field_id] = item_annotation.value
+
+                # Process each dataset item
+                for dataset_item in dataset_items:
+                    item_id = dataset_item.get("id")
+                    item_annotations = annotations_dict.get(item_id, {})
+
+                    for annotation_field_id, annotation_field_items in annotation_fields.items():
+                        # Get annotation value
+                        value = item_annotations.get(annotation_field_id, "")
+
+                        # Convert list to string if needed
+                        if isinstance(value, list):
+                            value = ",".join(value)
+                        elif value != "":
+                            value = str(value)  # Ensure string type
+                        else:
+                            value = ""
+
+                        dataset_item[annotation_labels[annotation_field_id]] = value
+
+                return dataset_items
+
         # missing field strategy can be for all fields at once, or per field
         # if it is per field, it is a dictionary with field names and their strategy
         # if it is for all fields, it may be a callback, 'abort', or 'default'
@@ -668,45 +704,21 @@ class DataSet(FourcatModule):
             if get_annotations:
                 dataset_item_cache.append(dataset_item)
 
-                # When we reach the batch limit or the end of the dataset,
-                # get the annotations for cached items and yield the entire thing.
-                if len(dataset_item_cache) >= item_batch_size or i == (self.num_rows - 1):
-
-                    item_ids = [dataset_item.get("id") for dataset_item in dataset_item_cache]
-
-                    # Dict with item ids for fast lookup
-                    annotations_dict = collections.defaultdict(dict)
-                    annotations = self.get_annotations_for_item(item_ids, before=annotations_before)
-                    for item_annotation in annotations:
-                        item_id = item_annotation.item_id
-                        if item_annotation:
-                            annotations_dict[item_id][item_annotation.field_id] = item_annotation.value
-
-                    # Process each dataset item
-                    for dataset_item in dataset_item_cache:
-                        item_id = dataset_item.get("id")
-                        item_annotations = annotations_dict.get(item_id, {})
-
-                        for annotation_field_id, annotation_field_items in annotation_fields.items():
-                            # Get annotation value
-                            value = item_annotations.get(annotation_field_id, "")
-
-                            # Convert list to string if needed
-                            if isinstance(value, list):
-                                value = ",".join(value)
-                            elif value != "":
-                                value = str(value)  # Ensure string type
-                            else:
-                                value = ""
-
-                            dataset_item[annotation_labels[annotation_field_id]] = value
-
-                        yield dataset_item
-
+                # When we reach the batch limit, get the annotations for cached
+                # items and yield the entire thing.
+                if len(dataset_item_cache) >= item_batch_size:
+                    yield from add_annotations(dataset_item_cache)
                     dataset_item_cache = []
 
             else:
                 yield dataset_item
+
+        # Yield the last batch, which is usually not full. This happens after
+        # the loop, so it also works when the last items could not be mapped,
+        # when we stopped early because of too many unmappable items, or when
+        # the dataset has fewer items than its row count says.
+        if get_annotations and dataset_item_cache:
+            yield from add_annotations(dataset_item_cache)
 
 
     def sort_and_iterate_items(

@@ -635,7 +635,7 @@ class VideoWallGenerator(BasicProcessor):
         0.
         """
         probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-show_entries",
-                         "stream=width,height,duration", "-of", "json", str(file_path)]
+                         "stream=width,height,duration:format=duration", "-of", "json", str(file_path)]
 
         probe = self.run_interruptable_process(probe_command)
 
@@ -643,13 +643,15 @@ class VideoWallGenerator(BasicProcessor):
             raise MediaSignatureException(probe.stderr.decode("utf-8", errors="replace"))
 
         try:
-            stream = json.loads(probe.stdout)["streams"][0]
+            probe_output = json.loads(probe.stdout)
+            stream = probe_output["streams"][0]
             dimensions = (int(stream["width"]), int(stream["height"]))
         except (json.JSONDecodeError, KeyError, IndexError, ValueError) as e:
             raise MediaSignatureException(str(e))
 
-        # ffprobe leaves out the duration when it is unknown, e.g. for images
-        length = float(stream.get("duration", 0))
+        # ffprobe leaves out the duration when it is unknown, e.g. for images;
+        # some video formats (e.g. webm) only store it for the whole file
+        length = float(stream.get("duration", probe_output.get("format", {}).get("duration", 0)))
 
         if sort_mode == "random":
             sort_value = random.random()
