@@ -16,7 +16,7 @@ from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.compatibility import Compatibility, is_executable
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -185,11 +185,8 @@ class VideoHasher(BasicProcessor):
         output_dir = self.dataset.get_staging_area()
 
         video_hashes = {}
-        try:
-            video_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            video_metadata = None
-        total_possible_videos = max((min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
+        video_metadata = self.get_media_metadata()
+        total_possible_videos = max((min(self.source_dataset.num_rows, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
         processed_videos = 0
 
         self.dataset.update_status("Creating video hashes")
@@ -199,12 +196,6 @@ class VideoHasher(BasicProcessor):
 
             if max_videos != 0 and processed_videos >= max_videos:
                 break
-
-            if video.file.name == '.metadata.json':
-                continue
-            elif video.file.name == "video_archive":
-                # yt-dlp file
-                continue
 
             try:
                 videohash = VideoHash(path=str(video.file), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)

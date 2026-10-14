@@ -116,11 +116,15 @@ class VideoSceneFrames(BasicProcessor):
         errors = 0
         processed_frames = 0
         num_scenes = self.source_dataset.num_rows
-        for video in video_dataset.iterate_items(self):
-            # Check for 4CAT's metadata JSON and copy it
-            if video.file.name == '.metadata.json':
-                shutil.copy(video.file, staging_area)
 
+        # Copy the videos' metadata, so frames can be traced back to the items
+        # the videos were downloaded for
+        try:
+            self.extract_archived_file_by_name(".metadata.json", video_dataset.get_results_path(), staging_area)
+        except FileNotFoundError:
+            pass
+
+        for video in video_dataset.iterate_items(self):
             if video.file.name not in scenes:
                 continue
 

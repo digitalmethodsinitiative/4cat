@@ -94,10 +94,12 @@ class BaseFilter(BasicProcessor):
 
         # Write the archive if needed and finish the dataset
         if zip_file:
-            # check for metadata file and copy it over if it exists
-            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_dataset.get_results_path())
-            if metadata_file:
-                shutil.copy2(metadata_file, staging_area)
+            # copy the metadata file over, if the archive has one (e.g. an
+            # upload of loose media files does not)
+            try:
+                self.extract_archived_file_by_name(".metadata.json", self.source_dataset.get_results_path(), staging_area)
+            except FileNotFoundError:
+                pass
             self.write_archive_and_finish(staging_area, num_posts)
         else:
             self.dataset.finish(num_posts)

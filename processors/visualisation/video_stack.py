@@ -108,7 +108,7 @@ class VideoStack(BasicProcessor):
         frames from the videos at intervals and create image collages to hashes for comparison of videos.
         """
         # Check processor able to run
-        if self.source_dataset.num_rows < 3:
+        if self.source_dataset.num_rows < 2:
             self.dataset.finish_with_error("Not enough videos to stack (need at least 2)")
             return
 
@@ -152,7 +152,7 @@ class VideoStack(BasicProcessor):
         except ValueError:
             transparency = 0.3
 
-        max_videos = min(amount, self.source_dataset.num_rows - 1)  # minus 1, because .metadata.json
+        max_videos = min(amount, self.source_dataset.num_rows)
         lengths = {}
         videos = []
 
@@ -160,10 +160,6 @@ class VideoStack(BasicProcessor):
         for video in video_dataset.iterate_items(self, immediately_delete=False):
             if self.interrupted:
                 return ProcessorInterruptedException("Interrupted while unpacking videos")
-
-            # skip JSON
-            if video.file.name == '.metadata.json':
-                continue
 
             if len(videos) >= max_videos:
                 break
@@ -189,6 +185,12 @@ class VideoStack(BasicProcessor):
         videos = sorted(videos, key=lambda v: lengths[v.name], reverse=True)
         num_videos = len(videos)
         self.dataset.log(f"Collected {num_videos} videos to stack")
+
+        # the dataset's row count can be higher than the number of videos in
+        # it (e.g. archives from before July 2023 also counted their metadata
+        # file), so check the videos actually found
+        if num_videos < 2:
+            return self.dataset.finish_with_error("Not enough videos to stack (need at least 2)")
 
         # longest video in set may be shorter than requested length
         if video_length:

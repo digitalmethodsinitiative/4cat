@@ -16,6 +16,7 @@ from pathlib import Path
 from natsort import natsorted
 
 from common.lib.annotation import Annotation
+from common.lib.archive_metadata import is_support_file
 from common.lib.job import Job, JobNotFoundException
 
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api, hash_to_md5, convert_to_float
@@ -393,6 +394,7 @@ class DataSet(FourcatModule):
             staging_area=None,
             immediately_delete=True,
             filename_filter=None,
+            include_support_files=False,
             processor=None,
             offset=0,
             *args, **kwargs
@@ -406,6 +408,10 @@ class DataSet(FourcatModule):
 
         Files are temporarily unzipped and deleted after use.
 
+        Support files (metadata, logs, and the like; see `is_support_file()`)
+        are not items of the dataset and are skipped, unless
+        `include_support_files` is set or they are named in `filename_filter`.
+
         :param Path staging_area:  Where to store the files while they're
           being worked with. If omitted, a temporary folder is created and
           marked for deletion after all files have been yielded
@@ -413,10 +419,10 @@ class DataSet(FourcatModule):
           yielding; False keeps files until the staging_area is removed
         :param list filename_filter:  Whitelist of filenames to iterate. If
           empty, do not filter
+        :param bool include_support_files:  Also yield support files
         :param BasicProcessor processor:  A reference to the processor
           iterating the dataset.
-        :param int offset:  Skip this many files before yielding (warning: may
-          skip a metadata file too!)
+        :param int offset:  Skip this many files before yielding
         :return:  An iterator with a dictionary for each file, containing an
           `id`, a `path`, and all attributes of the `ZipInfo` object as keys
         """
@@ -458,6 +464,10 @@ class DataSet(FourcatModule):
             for archived_file in archive_contents:
 
                 if filename_filter and archived_file.filename not in filename_filter:
+                    continue
+
+                # a support file named in filename_filter is still yielded
+                if not include_support_files and not filename_filter and is_support_file(archived_file.filename):
                     continue
 
                 if archived_file.is_dir():
@@ -556,6 +566,10 @@ class DataSet(FourcatModule):
         :param list filename_filter:  Only used when iterating a file archive.
           Whitelist of filenames to iterate, others are skipped. If empty, do
           not filter.
+        :param bool include_support_files:  Only used when iterating a file
+          archive. Defaults to `False`, which skips files that are not items
+          of the dataset, such as metadata and log files. Read metadata with
+          e.g. `read_media_metadata()` instead.
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = 0

@@ -9,7 +9,7 @@ from requests.exceptions import ConnectionError
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
@@ -510,10 +510,7 @@ class AudioToText(BasicProcessor):
         # extension-less filename: the transcription result files share their
         # stem with the input audio (e.g. `foo.wav` -> `foo.json`).
         file_metadata_map = {}
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            source_metadata = None
+        source_metadata = self.get_media_metadata()
         if source_metadata is not None:
             self.dataset.log("Found and loaded audio metadata")
             from_dataset = source_metadata.from_dataset

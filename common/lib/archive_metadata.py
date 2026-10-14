@@ -26,6 +26,32 @@ from typing import Iterator, Optional
 
 from common.lib.exceptions import MetadataException
 
+# Files 4CAT adds to an archive next to its media or other content. They are
+# not items of the dataset: metadata files, the list in which yt-dlp notes
+# which videos it downloaded, and log files (e.g. from ffmpeg)
+SUPPORT_FILENAMES = frozenset({
+	".metadata.json",
+	".token_metadata.json",
+	".model_metadata.json",
+	"video_archive",
+})
+
+
+def is_support_file(filename: str) -> bool:
+	"""
+	Check if a file in an archive is a support file rather than an item
+
+	Iterating through an archive dataset skips these files, unless asked not
+	to. Read a metadata file with its own class instead, e.g. via
+	`DataSet.read_media_metadata()`.
+
+	:param str filename:  File name, can include folders (e.g. a path inside
+	  a zip archive)
+	:return bool:
+	"""
+	name = filename.split("/")[-1]
+	return name in SUPPORT_FILENAMES or name.endswith(".log")
+
 
 class ArchiveMetadataFile:
 	"""
@@ -603,6 +629,65 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 
 	def __contains__(self, filename) -> bool:
 		return filename in self.items
+
+	# -- rows, e.g. for the 'View metadata' processor --
+
+	@classmethod
+	def map_metadata(cls, filename: str, item: dict) -> Iterator[dict]:
+		"""
+		Yield a row for an `items[filename]` entry.
+
+		The processor that made an archive can define its own `map_metadata`,
+		with columns that suit its data; this is used for archives whose
+		processor does not have a custom implementation. Same columns as the 
+		downloaders use, plus the simple values from `extra`.
+		"""
+		row = {
+			"url": item.get("url") or "",
+			"number_of_posts": len(item.get("post_ids", [])),
+			"post_ids": ", ".join(item.get("post_ids", [])),
+			"filename": filename,
+			"download_successful": True,
+		}
+		yield cls._add_simple_values(row, item.get("extra"))
+
+	@classmethod
+	def map_failure_metadata(cls, failure: dict) -> Iterator[dict]:
+		"""
+		Yield a row for a `failures[]` entry; see `map_metadata()`.
+		"""
+		row = {
+			"url": failure.get("url") or "",
+			"number_of_posts": len(failure.get("post_ids", [])),
+			"post_ids": ", ".join(failure.get("post_ids", [])),
+			"filename": "",
+			"download_successful": False,
+			"reason": failure.get("reason", ""),
+			"reason_description": failure.get("reason_description", ""),
+		}
+		yield cls._add_simple_values(row, failure.get("extra"))
+
+	@staticmethod
+	def _add_simple_values(row: dict, extra: Optional[dict]) -> dict:
+		"""
+		Add the values of `extra` that fit in one cell to a row.
+
+		Text, numbers and true/false are added as they are, and lists of
+		those are joined with commas. Nested data, such as a full yt-dlp
+		dump, is left out. A key the row already has keeps its value.
+		"""
+		def is_simple(value):
+			return value is None or isinstance(value, (str, int, float, bool))
+
+		for key, value in (extra or {}).items():
+			if key in row:
+				continue
+			if is_simple(value):
+				row[key] = value
+			elif isinstance(value, list) and all(is_simple(part) for part in value):
+				row[key] = ", ".join(str(part) for part in value if part is not None)
+
+		return row
 
 	# -- output --
 
