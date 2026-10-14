@@ -6,7 +6,7 @@ import csv
 from PIL import UnidentifiedImageError
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, hash_image, stringify_hash
 from common.lib.compatibility import Compatibility
 from processors.metrics.group_hashes import HashGrouper
@@ -110,10 +110,7 @@ class ImageHasher(BasicProcessor):
         group_by = self.parameters.get("group-by", False)
         similarity_pct = float(self.parameters.get("similarity-threshold", 4))
 
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            source_metadata = None
+        source_metadata = self.get_media_metadata()
 
         image_data_by_filename = {}
         if source_metadata is not None:

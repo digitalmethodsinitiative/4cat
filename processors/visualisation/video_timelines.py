@@ -14,7 +14,7 @@ from ural import is_url
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import DataSetNotFoundException, ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import DataSetNotFoundException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
 from common.lib.dataset import DataSet
@@ -67,10 +67,7 @@ class VideoTimelines(BasicProcessor):
         }
 
     def process(self):
-        try:
-            metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            metadata = None
+        metadata = self.get_media_metadata()
         base_height = self.parameters.get("height", 100)
         fontsize = 12
 

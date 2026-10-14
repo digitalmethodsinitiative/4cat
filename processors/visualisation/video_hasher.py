@@ -16,7 +16,7 @@ from videohash.exceptions import FFmpegNotFound, FFmpegFailedToExtractFrames
 from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.compatibility import Compatibility, is_executable
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -185,10 +185,7 @@ class VideoHasher(BasicProcessor):
         output_dir = self.dataset.get_staging_area()
 
         video_hashes = {}
-        try:
-            video_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            video_metadata = None
+        video_metadata = self.get_media_metadata()
         total_possible_videos = max((min(self.source_dataset.num_rows, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
         processed_videos = 0
 

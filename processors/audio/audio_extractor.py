@@ -11,7 +11,7 @@ import oslex
 from backend.lib.processor import BasicProcessor
 from common.lib.archive_metadata import is_support_file
 from common.lib.compatibility import Compatibility, is_executable
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -82,10 +82,7 @@ class AudioExtractor(BasicProcessor):
 
         # Read the source video archive's metadata so each extracted audio
         # file can carry its video's provenance (source posts, URL).
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            source_metadata = None
+        source_metadata = self.get_media_metadata()
 
         # Build our own metadata describing the audio files we produce,
         # rather than passing the (video-keyed) source metadata through.

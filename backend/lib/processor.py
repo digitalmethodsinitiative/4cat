@@ -20,7 +20,7 @@ from common.lib.compatibility import Compatibility
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5, looks_like_email_address
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
-                                   DataSetException, MapItemException, AnnotationException)
+                                   DataSetException, MapItemException, AnnotationException, MetadataException)
 from common.config_manager import ConfigWrapper
 from common.lib.user import User
 
@@ -586,6 +586,31 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                 paths.append(temp_file)
 
         return staging_area
+
+    def get_media_metadata(self, dataset=None):
+        """
+        Read the media metadata of a dataset, if it can be used
+
+        A media archive without a metadata file is normal (e.g. uploaded
+        media), so that is not logged. A metadata file that cannot be read
+        (e.g. it is damaged) is logged in this processor's dataset log, so
+        the researcher can see why the results are not linked to items.
+
+        :param DataSet dataset:  Dataset to read the metadata of. Defaults to
+          the source dataset.
+        :return MediaArchiveMetadata|None:  The metadata, or `None` if there
+          is none that can be used
+        """
+        if dataset is None:
+            dataset = self.source_dataset
+
+        try:
+            return dataset.read_media_metadata()
+        except FileNotFoundError:
+            return None
+        except MetadataException as e:
+            self.dataset.log(f"Could not use the metadata file of dataset {dataset.key}: {e}")
+            return None
 
     def extract_archived_file_by_name(self, filename, archive_path, staging_area=None):
         """

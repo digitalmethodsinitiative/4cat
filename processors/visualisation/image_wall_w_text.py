@@ -16,7 +16,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
@@ -160,9 +160,8 @@ class ImageTextWallGenerator(BasicProcessor):
         if text_dataset.type in ImageTextWallGenerator.combined_dataset:
             # For datasets with both images and text (Stable Diffusion output),
             # the prompt is stored as item.extra.prompt in the archive metadata.
-            try:
-                metadata = text_dataset.read_media_metadata()
-            except (FileNotFoundError, MetadataException):
+            metadata = self.get_media_metadata(text_dataset)
+            if metadata is None:
                 self.dataset.finish_with_error("No metadata file found")
                 return
             for filename, item in metadata.iter_entries():

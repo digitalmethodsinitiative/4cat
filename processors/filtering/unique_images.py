@@ -4,7 +4,7 @@ Filter by unique images
 import shutil
 
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, hash_file
 from common.lib.compatibility import Compatibility
 
@@ -95,10 +95,7 @@ class UniqueImageFilter(BasicProcessor):
                 self.dataset.log(f"{image.file.name} is a duplicate of {hash_map[image_hash]} - skipping")
                 dupes += 1
 
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            source_metadata = None
+        source_metadata = self.get_media_metadata()
 
         new_metadata = self.dataset.new_media_metadata(
             processor_type=self.type,

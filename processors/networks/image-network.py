@@ -11,7 +11,7 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.compatibility import Compatibility
 
@@ -113,9 +113,8 @@ class ImageGrapher(BasicProcessor):
         hash_type = self.parameters.get("deduplicate")
         hashed = 0
 
-        try:
-            metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
+        metadata = self.get_media_metadata()
+        if metadata is None:
             return self.dataset.finish_with_error("No valid metadata found in image archive - this processor can only "
                                                   "be run on sets of images sourced from another 4CAT dataset.")
 

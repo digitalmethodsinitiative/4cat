@@ -10,7 +10,7 @@ from scenedetect import open_video, SceneManager, VideoOpenFailure, FrameTimecod
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -216,10 +216,7 @@ class VideoSceneDetector(BasicProcessor):
 		self.dataset.update_status("Detecting video scenes")
 		skipped = 0
 		processed_videos = 0
-		try:
-			video_metadata = self.source_dataset.read_media_metadata()
-		except (FileNotFoundError, MetadataException):
-			video_metadata = None
+		video_metadata = self.get_media_metadata()
 		collected_scenes = {}
 		for original_video in self.source_dataset.iterate_items(self, immediately_delete=False):
 			if self.interrupted:
