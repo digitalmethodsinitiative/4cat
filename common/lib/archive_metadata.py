@@ -630,6 +630,65 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 	def __contains__(self, filename) -> bool:
 		return filename in self.items
 
+	# -- rows, e.g. for the 'View metadata' processor --
+
+	@classmethod
+	def map_metadata(cls, filename: str, item: dict) -> Iterator[dict]:
+		"""
+		Yield a row for an `items[filename]` entry.
+
+		The processor that made an archive can define its own `map_metadata`,
+		with columns that suit its data; this is used for archives whose
+		processor does not have a custom implementation. Same columns as the 
+		downloaders use, plus the simple values from `extra`.
+		"""
+		row = {
+			"url": item.get("url") or "",
+			"number_of_posts": len(item.get("post_ids", [])),
+			"post_ids": ", ".join(item.get("post_ids", [])),
+			"filename": filename,
+			"download_successful": True,
+		}
+		yield cls._add_simple_values(row, item.get("extra"))
+
+	@classmethod
+	def map_failure_metadata(cls, failure: dict) -> Iterator[dict]:
+		"""
+		Yield a row for a `failures[]` entry; see `map_metadata()`.
+		"""
+		row = {
+			"url": failure.get("url") or "",
+			"number_of_posts": len(failure.get("post_ids", [])),
+			"post_ids": ", ".join(failure.get("post_ids", [])),
+			"filename": "",
+			"download_successful": False,
+			"reason": failure.get("reason", ""),
+			"reason_description": failure.get("reason_description", ""),
+		}
+		yield cls._add_simple_values(row, failure.get("extra"))
+
+	@staticmethod
+	def _add_simple_values(row: dict, extra: Optional[dict]) -> dict:
+		"""
+		Add the values of `extra` that fit in one cell to a row.
+
+		Text, numbers and true/false are added as they are, and lists of
+		those are joined with commas. Nested data, such as a full yt-dlp
+		dump, is left out. A key the row already has keeps its value.
+		"""
+		def is_simple(value):
+			return value is None or isinstance(value, (str, int, float, bool))
+
+		for key, value in (extra or {}).items():
+			if key in row:
+				continue
+			if is_simple(value):
+				row[key] = value
+			elif isinstance(value, list) and all(is_simple(part) for part in value):
+				row[key] = ", ".join(str(part) for part in value if part is not None)
+
+		return row
+
 	# -- output --
 
 	def to_dict(self) -> dict:
