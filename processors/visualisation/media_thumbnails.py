@@ -14,8 +14,9 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import DataSetException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
+from processors.machine_learning.embed_media import read_post_id_map
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -59,7 +60,12 @@ class MediaThumbnails(BasicProcessor):
         :param config ConfigManager|None config:  Configuration reader (context-aware)
         :return dict:   Options for this processor
         """
-        return {
+        try:
+            columns = parent_dataset.top_parent().get_columns() if parent_dataset else []
+        except DataSetException:
+            columns = []
+
+        options = {
             "thumbnail_size": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Thumbnail size in pixels",
@@ -79,6 +85,24 @@ class MediaThumbnails(BasicProcessor):
             },
         }
 
+        if columns:
+            options["min_column"] = {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Only for posts with",
+                "options": {"": "No threshold (all files)", **{column: column for column in columns}},
+                "default": "",
+                "tooltip": "Only media from posts at or above the threshold get a thumbnail.",
+            }
+            options["min_value"] = {
+                "type": UserInput.OPTION_TEXT,
+                "help": "At least",
+                "default": 0,
+                "coerce_type": float,
+                "requires": "min_column",
+            }
+
+        return options
+
     def process(self):
         """
         Make a thumbnail per file and write to sprite sheet.
@@ -90,11 +114,16 @@ class MediaThumbnails(BasicProcessor):
         ffmpeg = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
         ffprobe = shutil.which("ffprobe".join(ffmpeg.rsplit("ffmpeg", 1))) if ffmpeg else None
 
+        min_column = self.parameters.get("min_column", "")
+        min_value = self.parameters.get("min_value", 0)
+        allowed = self.get_files_above_threshold(min_column, min_value) if min_column else None
+
         staging_area = self.dataset.get_staging_area()
         thumbnails = []
         index = {}
         processed = 0
         skipped = 0
+        below_threshold = 0
         needed_ffmpeg = 0
 
         self.dataset.update_status("Extracting thumbnails")
@@ -108,6 +137,10 @@ class MediaThumbnails(BasicProcessor):
             media_path = item.file if hasattr(item, "file") else None
             if not media_path or media_path.name == ".metadata.json":
                 # the archive carries its metadata alongside the media files
+                continue
+
+            if allowed is not None and media_path.stem not in allowed:
+                below_threshold += 1
                 continue
 
             processed += 1
@@ -138,7 +171,11 @@ class MediaThumbnails(BasicProcessor):
             thumbnails.append((media_path.name, thumbnail))
 
         if not thumbnails:
-            self.dataset.finish_with_error("None of the media files could be read, so there is nothing to show.")
+            if below_threshold and not processed:
+                self.dataset.finish_with_error(f"No media files come from posts with '{min_column}' of at least "
+                                               f"{min_value:g}, so there is nothing to show.")
+            else:
+                self.dataset.finish_with_error("None of the media files could be read, so there is nothing to show.")
             return
 
         self.dataset.update_status(f"Merging {len(thumbnails):,} thumbnails into a sprite sheet")
@@ -178,6 +215,8 @@ class MediaThumbnails(BasicProcessor):
             }))
 
         status = f"Extracted {len(thumbnails):,} thumbnails at {size}px into a {columns}x{rows} sprite sheet"
+        if below_threshold:
+            status += f", left out {below_threshold:,} files from posts with '{min_column}' below {min_value:g}"
         if needed_ffmpeg:
             self.dataset.finish_with_warning(
                 len(thumbnails), f"{status}. {needed_ffmpeg:,} videos were skipped because ffmpeg is not available.")
@@ -209,6 +248,37 @@ class MediaThumbnails(BasicProcessor):
             suffix += 1
 
         return candidate
+
+    def get_files_above_threshold(self, column: str, threshold: float) -> set:
+        """
+        Find the media files that come from at least one post whose value in
+        `column` is at or above `threshold`.
+
+        :param str column:  Column of the original dataset to compare
+        :param float threshold:  Lowest value that still gets a thumbnail
+        :return set:  Filenames without extension
+        """
+        post_id_map = read_post_id_map(self.source_dataset.get_results_path(), log=self.dataset.log)
+        wanted = {str(post_id) for post_ids in post_id_map.values() for post_id in post_ids}
+
+        self.dataset.update_status(f"Reading '{column}' from the original dataset")
+        passing = set()
+        for item in self.source_dataset.top_parent().iterate_items(self):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while reading the original dataset")
+
+            post_id = str(item.get("id"))
+            if post_id not in wanted:
+                continue
+
+            try:
+                if float(item.get(column)) >= threshold:
+                    passing.add(post_id)
+            except (TypeError, ValueError):
+                pass
+
+        return {stem for stem, post_ids in post_id_map.items()
+                if any(str(post_id) in passing for post_id in post_ids)}
 
     def make_thumbnail(self, path, size: int, is_video: bool, ffmpeg, ffprobe):
         """
