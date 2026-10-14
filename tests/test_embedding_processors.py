@@ -393,8 +393,16 @@ class FakeDataset:
         self.num_rows, self.error = rows, None
 
 
-def make_sprite(tmp_path, names, size=32, name="sprite"):
-    """Run the real thumbnail processor over a folder of images."""
+def make_sprite(tmp_path, names, size=32, name="sprite", parameters=None, posts=None):
+    """
+    Run the real thumbnail processor over a folder of images.
+
+    `posts` are rows of the original dataset, each with the `file` it
+    downloaded; they end up in the archive's metadata as a downloader would
+    write them.
+    """
+    import json
+    import zipfile
     from PIL import Image
     from processors.visualisation.media_thumbnails import MediaThumbnails
 
@@ -411,11 +419,28 @@ def make_sprite(tmp_path, names, size=32, name="sprite"):
         Image.new("RGB", (100, 60), (i * 40 % 255, 60, 90)).save(path)
         items.append(Item(path))
 
+    archive_path = tmp_path / f"archive-{name}.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(".metadata.json", json.dumps({
+            f"https://example.com/{post['id']}": {"post_ids": [post["id"]], "files": [{"filename": post["file"]}]}
+            for post in posts or []
+        }))
+
+    class Original:
+        def iterate_items(self, processor=None, **kwargs):
+            return iter(posts or [])
+
     class Source:
         num_rows = len(items)
 
         def iterate_items(self, processor=None, **kwargs):
             return iter(items)
+
+        def get_results_path(self):
+            return archive_path
+
+        def top_parent(self):
+            return Original()
 
     class Config:
         def get(self, key, default=None):
@@ -424,7 +449,7 @@ def make_sprite(tmp_path, names, size=32, name="sprite"):
     processor = MediaThumbnails.__new__(MediaThumbnails)
     processor.dataset = FakeDataset(tmp_path, name=name)
     processor.source_dataset, processor.config, processor.interrupted = Source(), Config(), False
-    processor.parameters = {"thumbnail_size": size, "amount": 0}
+    processor.parameters = {"thumbnail_size": size, "amount": 0, **(parameters or {})}
     processor.process()
     return processor.dataset
 
@@ -669,6 +694,42 @@ def test_thumbnail_names_do_not_collide():
 
     assert len(set(taken.values())) == 3
     assert taken["clip.png"].endswith("clip.jpg")
+
+
+def test_thumbnails_only_for_posts_at_or_above_threshold(tmp_path):
+    """
+    Media from posts below the threshold must not end up in the archive at
+    all, since anything in it can be pulled out of a map that embeds it.
+    """
+    import zipfile
+    from processors.visualisation.media_thumbnails import MediaThumbnails
+
+    posts = [
+        {"id": "1", "likes": "5000", "file": "popular.jpg"},
+        {"id": "2", "likes": "1000", "file": "exactly.jpg"},
+        {"id": "3", "likes": "12", "file": "small.jpg"},
+        {"id": "4", "likes": "", "file": "unknown.jpg"},
+        {"id": "5", "likes": "-1", "file": "missing.jpg"},
+    ]
+    names = [post["file"] for post in posts] + ["untraceable.jpg"]
+    dataset = make_sprite(tmp_path, names, name="threshold", posts=posts,
+                          parameters={"min_column": "likes", "min_value": 1000.0})
+
+    assert dataset.error is None and dataset.num_rows == 2
+    sprite = MediaThumbnails.read_sprite(dataset)
+    assert set(sprite["tiles"]) == {"popular.jpg", "exactly.jpg"}
+
+    with zipfile.ZipFile(dataset.get_results_path()) as archive:
+        thumbnails = [m for m in archive.namelist() if m.startswith("thumbnails/")]
+    assert sorted(thumbnails) == ["thumbnails/exactly.jpg", "thumbnails/popular.jpg"]
+
+
+def test_threshold_that_leaves_nothing_says_so(tmp_path):
+    posts = [{"id": "1", "likes": "3", "file": "a.jpg"}]
+    dataset = make_sprite(tmp_path, ["a.jpg"], name="nothing", posts=posts,
+                          parameters={"min_column": "likes", "min_value": 10.0})
+
+    assert "at least 10" in dataset.error
 
 
 # --------------------------------------------------------------------------- #

@@ -47,7 +47,6 @@ def read_embedding_matrix(dataset, limit: int, processor=None, accept=None, keep
     matrix = None
     positions, kept = [], []
 
-    # annotations are not needed here, and fetching them slows reading down
     for position, item in enumerate(dataset.iterate_items(processor, get_annotations=False)):
         if processor is not None and processor.interrupted:
             raise ProcessorInterruptedException("Interrupted while reading embeddings")
