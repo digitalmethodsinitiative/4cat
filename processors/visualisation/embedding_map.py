@@ -962,13 +962,18 @@ HTML_TEMPLATE = """<meta charset="utf-8">
         var drawn = tiles ? thumbScale() : 0;
         var margin = tiles ? drawn : 10, fill = -1;
 
-        for (var i = 0; i < points.length; i++) {
-            if (i === hovered) continue;
-            var xy = project(points[i]);
-            if (xy[0] < -margin || xy[0] > width + margin || xy[1] < -margin || xy[1] > height + margin) continue;
-            if (colour && colour[i] !== fill) { fill = colour[i]; ctx.fillStyle = palette[fill]; }
-            if (tiles) drawTile(i, xy, drawn * sizeOf(i));
-            else { ctx.beginPath(); ctx.arc(xy[0], xy[1], RADIUS * sizeOf(i), 0, 6.2832); ctx.fill(); }
+        // two passes when there are thumbnails: dots first, so thumbnails are
+        // always drawn on top of them
+        for (var pass = tiles ? 0 : 1; pass < 2; pass++) {
+            for (var i = 0; i < points.length; i++) {
+                if (i === hovered) continue;
+                if (tiles && (tiles[i] > -1) !== (pass === 1)) continue;
+                var xy = project(points[i]);
+                if (xy[0] < -margin || xy[0] > width + margin || xy[1] < -margin || xy[1] > height + margin) continue;
+                if (colour && colour[i] !== fill) { fill = colour[i]; ctx.fillStyle = palette[fill]; }
+                if (tiles) drawTile(i, xy, drawn * sizeOf(i));
+                else { ctx.beginPath(); ctx.arc(xy[0], xy[1], RADIUS * sizeOf(i), 0, 6.2832); ctx.fill(); }
+            }
         }
 
         if (hovered > -1) {
