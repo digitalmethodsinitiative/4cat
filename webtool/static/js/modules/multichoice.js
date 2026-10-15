@@ -18,92 +18,70 @@ export const multichoice = {
 
     /**
      * Make multichoice select boxes so
+     *
+     * The options are shown as checkboxes, but the original select stays in
+     * the form, hidden, and remains the field that is submitted: ticking a
+     * checkbox selects the matching option. So the form sends the same values
+     * whether or not this script runs: one per selected option.
      */
     makeMultichoice: function () {
         //more user-friendly select multiple
         $('.multichoice-wrapper').each(function () {
-
             let wrapper = $(this);
-            let select = $(this).find('select');
-            let name = select.attr('name');
-            let input = $('<input type="hidden" name="' + name + '">');
+            let select = wrapper.find('select');
 
-            wrapper.append(input);
+            // do nothing if already expanded
+            if (select.hasClass('multichoice-select')) {
+                return;
+            }
 
             select.find('option').each(function () {
-                let selected = $(this).is(':selected');
-                let checkbox_choice = $('<label><input type="checkbox" name="' + name + ':' + $(this).attr('value') + '"' + (selected ? ' checked="checked"' : '') + '> ' + $(this).text() + '</label>');
-                checkbox_choice.find('input').on('change', function () {
-                    let checked = wrapper.find('input:checked').map(function () {
-                        return $(this).attr('name').split(':')[1];
-                    }).get();
-                    input.val(checked.join(','));
-                });
-                wrapper.append(checkbox_choice);
+                wrapper.append(multichoice.makeCheckbox(select, this));
             });
-            select.remove();
+            select.addClass('multichoice-select').hide();
         });
     },
 
     /**
      * Make multiselect select boxes so
+     *
+     * As with makeMultichoice, the original select stays in the form, hidden,
+     * and is the field that is submitted.
      */
     makeMultiSelect: function () {
         // Multi-select choice menu requires some code.
         $('.multi-select-wrapper').each(function () {
             let wrapper = $(this);
+            let select = wrapper.find('select');
 
             // do nothing if already expanded
-            if (wrapper.find(".multi-select-input").length > 0) {
+            if (select.hasClass('multichoice-select')) {
                 return;
             }
 
-            // get the data we need from the original select and remove it
-            let select = wrapper.find('select');
             let name = select.attr('name');
-            let given_options = {};
+            let selected = $('<div class="multi-select-selected ms-selected-' + name + '" />');
+            let options = $('<div class="multi-select-options ms-options-' + name + '"></div>');
             let num_options = 0;
-            let given_default = [];
+
             select.find('option').each((i, option) => {
                 num_options += 1;
-                option = $(option);
-                given_options[option.attr("value")] = option.text();
-                if (option.is(":selected")) {
-                    given_default.push(option.attr("value"));
-                }
-            });
-            select.remove();
-
-            let selected = $('<div class="multi-select-selected ms-selected-' + name + '" />');
-            let input = $('<input class="multi-select-input" name="' + name + '" hidden />');
-            let options = $('<div class="multi-select-options ms-options-' + name + '"></div>');
-
-            for (let option in given_options) {
-                let selected = given_default.indexOf(option) > -1;
-                let checkbox_choice = $('<label><input type="checkbox" name="' + name + ":" + option + '"' + (selected ? ' checked="checked"' : '') + '> ' + given_options[option] + '</label>');
+                let checkbox_choice = multichoice.makeCheckbox(select, option);
 
                 checkbox_choice.find('input').on('change', () => {
-                    let checked_names = [];
-
-                    // Remove all present labels
-                    let labels = '.multi-select-selected.ms-selected-' + name;
-                    $(labels).empty();
-
-                    // Add labels for all  selected checkmarks
-                    wrapper.find('input:checked').each((i, checked) => {
-                        let checked_name = $(checked).attr('name').split(':')[1];
-                        $(labels).append('<span class="property-badge"><i class="fa fa-fw fa-times"></i> ' + checked_name + '</span>');
-                        checked_names.push(checked_name);
-                    });
-
-                    input.val(checked_names.join(","));
-
+                    // Show a label for each selected option
+                    selected.empty();
+                    for (let selected_option of select[0].selectedOptions) {
+                        let label = $('<span class="property-badge"><i class="fa fa-fw fa-times"></i></span>');
+                        label.attr('data-value', selected_option.value).append(document.createTextNode(' ' + selected_option.value));
+                        selected.append(label);
+                    }
                 });
                 options.append(checkbox_choice);
-            }
+            });
+            select.addClass('multichoice-select').hide();
 
             // prepend in reverse order to not get issues with tooltip button
-            wrapper.prepend(input);
             wrapper.prepend(selected);
             wrapper.prepend(options);
 
@@ -114,6 +92,33 @@ export const multichoice = {
                 wrapper.prepend(search);
             }
         });
+    },
+
+    /**
+     * Make a checkbox that selects or deselects one option of a select
+     *
+     * The checkbox has no name, so it is not submitted itself; the select is.
+     *
+     * @param select  The select (jQuery object) the option belongs to
+     * @param option  The option element
+     * @returns  A label (jQuery object) containing the checkbox
+     */
+    makeCheckbox: function (select, option) {
+        let checkbox = $('<input type="checkbox">').attr('data-value', option.value);
+
+        // resetting the form returns both the select and the checkbox to their
+        // initial state, so these need to match
+        checkbox.prop('defaultChecked', option.defaultSelected).prop('checked', option.selected);
+
+        checkbox.on('change', function () {
+            option.selected = this.checked;
+            // pass the change on as if the select itself was used, so that
+            // e.g. fields that depend on its value are updated
+            select[0].dispatchEvent(new Event('input', {bubbles: true}));
+            select[0].dispatchEvent(new Event('change', {bubbles: true}));
+        });
+
+        return $('<label></label>').append(checkbox, document.createTextNode(' ' + $(option).text()));
     },
 
     filterMultiChoice: function (e) {
@@ -141,8 +146,8 @@ export const multichoice = {
     },
 
     removeMultiChoiceOption: function () {
-        let value = $(this).text().replace(/^\s+|\s+$/g, '');
-        $(this).parent().parent().find('input[name$=":' + value + '"]').prop("checked", false).trigger('change');
+        let value = $(this).attr('data-value');
+        $(this).parent().parent().find('input[type=checkbox]').filter((i, checkbox) => $(checkbox).attr('data-value') === value).prop("checked", false).trigger('change');
         $(this).remove();
     }
 };

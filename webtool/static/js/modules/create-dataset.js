@@ -622,6 +622,9 @@ export const query = {
             $(board_specific).hide();
             $(board_specific + ' input').val(null);
             $(board_specific + ' input').prop('checked', false);
+            // multiple-choice checkboxes stand in for a hidden select, which
+            // is what is submitted, so clear that along with them
+            $(board_specific + ' select.multichoice-select option').prop('selected', false);
             $(board_specific + ' .multi-select-selected').empty();
             $(board_specific).prop('disabled', true);
             $('.form-element[data-board-specific*="' + board + '"]').prop('disabled', false);
