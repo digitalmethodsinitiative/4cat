@@ -46,7 +46,9 @@ export const multichoice = {
      * Make multiselect select boxes so
      *
      * As with makeMultichoice, the original select stays in the form, hidden,
-     * and is the field that is submitted.
+     * and is the field that is submitted. Option labels may contain HTML here,
+     * so this is only for lists of options written in 4CAT's own code, not
+     * for options taken from data such as column names.
      */
     makeMultiSelect: function () {
         // Multi-select choice menu requires some code.
@@ -66,7 +68,7 @@ export const multichoice = {
 
             select.find('option').each((i, option) => {
                 num_options += 1;
-                let checkbox_choice = multichoice.makeCheckbox(select, option);
+                let checkbox_choice = multichoice.makeCheckbox(select, option, true);
 
                 checkbox_choice.find('input').on('change', () => {
                     // Show a label for each selected option
@@ -99,11 +101,17 @@ export const multichoice = {
      *
      * The checkbox has no name, so it is not submitted itself; the select is.
      *
+     * The option's label is shown as plain text, unless allow_html is set.
+     * Only allow that for options whose labels are written in 4CAT's own code
+     * (such as flag icons next to country names): labels taken from data,
+     * such as a dataset's column names, could otherwise run code in the page.
+     *
      * @param select  The select (jQuery object) the option belongs to
      * @param option  The option element
+     * @param allow_html  Whether the label may contain HTML
      * @returns  A label (jQuery object) containing the checkbox
      */
-    makeCheckbox: function (select, option) {
+    makeCheckbox: function (select, option, allow_html=false) {
         let checkbox = $('<input type="checkbox">').attr('data-value', option.value);
 
         // resetting the form returns both the select and the checkbox to their
@@ -118,7 +126,8 @@ export const multichoice = {
             select[0].dispatchEvent(new Event('change', {bubbles: true}));
         });
 
-        return $('<label></label>').append(checkbox, document.createTextNode(' ' + $(option).text()));
+        let text = ' ' + $(option).text();
+        return $('<label></label>').append(checkbox, allow_html ? $.parseHTML(text) : document.createTextNode(text));
     },
 
     filterMultiChoice: function (e) {
