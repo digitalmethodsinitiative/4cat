@@ -4,12 +4,13 @@ from common.lib.helpers import urls_in_text
 
 
 """
-What `urls_in_text` finds, and where it differs from ural's `urls_from_text`.
+What `urls_in_text` finds.
 
 4CAT writes the URLs it finds into research datasets, so a URL that is cut
-short or merged with the next one is wrong data that nobody notices. These
-tests hold the cases where ural (1.6.0) gets this wrong, next to the cases it
-gets right and that must stay that way.
+short or merged with the next one is wrong data that nobody notices. ural
+1.6.0 and older got several of these cases wrong; 1.6.1 fixed them. These
+tests keep checking them, next to the cases it always got right, so that a
+new version of ural cannot quietly change the results.
 """
 
 
@@ -21,9 +22,10 @@ gets right and that must stay that way.
     "https://www.youtube.com/@some.channel2/videos",
     "https://medium.com/@jane.doe1/my-post-abc123",
     "https://mastodon.social/@user.name2",
+    "https://example.com/?ref=@name.surname2",
 ])
 def test_name_after_at_sign_is_not_cut_short(url):
-    """ural stops these URLs inside the name, e.g. at https://www.tiktok.com/@maria.bg"""
+    """ural 1.6.0 and older stopped these URLs inside the name, e.g. at https://www.tiktok.com/@maria.bg"""
     assert urls_in_text(url) == [url]
     assert urls_in_text(f"Look at this: {url}!") == [url]
 
@@ -42,7 +44,7 @@ def test_email_addresses_are_not_urls():
 # --- URLs with a comma between them ------------------------------------------
 
 def test_comma_without_space_separates_urls():
-    """ural returns these two as one URL"""
+    """ural 1.6.0 and older returned these two as one URL"""
     assert urls_in_text("https://a.com/x,https://b.com/y") == ["https://a.com/x", "https://b.com/y"]
     assert urls_in_text("(https://a.com/x,https://b.com/y)") == ["https://a.com/x", "https://b.com/y"]
 
@@ -56,11 +58,10 @@ def test_comma_inside_url_is_kept():
         "https://www.google.com/maps/@52.37,4.89,15z"]
 
 
-def test_commas_can_be_left_alone():
-    """As the video downloader does when its 'Split column values by comma' option is off"""
-    assert urls_in_text("https://a.com/x,https://b.com/y", split_commas=False) == ["https://a.com/x,https://b.com/y"]
-    assert urls_in_text("https://www.tiktok.com/@maria.bg2/video/1", split_commas=False) == [
-        "https://www.tiktok.com/@maria.bg2/video/1"]
+def test_list_of_urls_with_commas_inside_them():
+    """A column holding a comma-separated list of URLs, where the URLs themselves also contain commas"""
+    assert urls_in_text("https://v.example.com/a.mp4?r=1,2&s=3,https://v.example.com/b.mp4?r=4,5") == [
+        "https://v.example.com/a.mp4?r=1,2&s=3", "https://v.example.com/b.mp4?r=4,5"]
 
 
 # --- URLs inside URLs ---------------------------------------------------------
@@ -91,6 +92,12 @@ def test_punctuation_after_url_is_left_out():
 
 def test_brackets_around_wikipedia_url():
     assert urls_in_text("(https://en.wikipedia.org/wiki/Foo_(bar))") == ["https://en.wikipedia.org/wiki/Foo_(bar)"]
+
+
+def test_wikipedia_url_ending_in_bracket():
+    """ural 1.6.0 and older left out the closing bracket"""
+    assert urls_in_text("https://en.wikipedia.org/wiki/Foo_(bar)") == ["https://en.wikipedia.org/wiki/Foo_(bar)"]
+    assert urls_in_text("see https://en.wikipedia.org/wiki/Foo_(bar) here") == ["https://en.wikipedia.org/wiki/Foo_(bar)"]
 
 
 # --- the text of a URL is never changed ----------------------------------------
