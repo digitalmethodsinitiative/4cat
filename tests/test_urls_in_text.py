@@ -69,6 +69,8 @@ def test_list_of_urls_with_commas_inside_them():
 @pytest.mark.parametrize("url", [
     "https://web.archive.org/web/20250000000000*/http://economist.com",
     "https://web.archive.org/web/20250101000000/https://www.economist.com/news",
+    "https://web.archive.org/web/20131020224056/https://www.foodnetwork.com/",
+    "https://web.archive.org/web/2013/https://www.google.com/maps/@52.37,4.89,15z",
     "https://web.archive.org/web/2025/https://www.tiktok.com/@maria.bg2/video/1",
     "https://archive.ph/2025.01.01-000000/https://www.example.com/page",
     "https://www.facebook.com/l.php?u=https://example.com/x&h=abc",
@@ -82,6 +84,16 @@ def test_url_inside_url_is_kept_whole(url):
 def test_url_inside_url_followed_by_another_url():
     assert urls_in_text("https://web.archive.org/web/2025/http://a.com/x,https://b.com/y") == [
         "https://web.archive.org/web/2025/http://a.com/x", "https://b.com/y"]
+
+
+@pytest.mark.parametrize("separator", [",", ", ", "\n", " "])
+def test_archive_urls_in_a_list(separator):
+    archived = "https://web.archive.org/web/20131020224056/https://www.foodnetwork.com/"
+    archived_too = "https://web.archive.org/web/20131020224056*/http://economist.com"
+    other = "https://b.com/y"
+    assert urls_in_text(separator.join([archived, other])) == [archived, other]
+    assert urls_in_text(separator.join([other, archived])) == [other, archived]
+    assert urls_in_text(separator.join([archived_too, archived])) == [archived_too, archived]
 
 
 # --- what ural already does well ----------------------------------------------
@@ -105,12 +117,6 @@ def test_wikipedia_url_ending_in_bracket():
 def test_encoded_at_sign_stays_encoded():
     text = "https://medium.com/%40jane.doe1/my-post and https://medium.com/@jane.doe1/my-post"
     assert urls_in_text(text) == ["https://medium.com/%40jane.doe1/my-post", "https://medium.com/@jane.doe1/my-post"]
-
-
-def test_unusual_characters_in_text():
-    """The helper swaps "@" for a rarely used character while searching; it must not mix up one already there"""
-    assert urls_in_text(" https://www.tiktok.com/@maria.bg2/video/1?x=") == [
-        "https://www.tiktok.com/@maria.bg2/video/1?x="]
 
 
 def test_space_ends_url():

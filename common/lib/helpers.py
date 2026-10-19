@@ -1498,6 +1498,55 @@ def urls_in_text(text):
     return list(dict.fromkeys(ural.urls_from_text(str(text))))
 
 
+def holds_only_urls(text, urls):
+    """
+    Check whether a text consists of nothing but URLs
+
+    That is the case for a single URL or a list of URLs, separated by commas,
+    spaces or new lines, as opposed to ordinary text with URLs in it. Commas,
+    brackets and other punctuation around the URLs (such as a full stop that
+    `urls_in_text` left out of a URL) do not count as text; letters and digits
+    do.
+
+    :param str text:  Text to check
+    :param list urls:  The URLs in the text, as found by `urls_in_text`
+    :return bool:  Whether the text holds only URLs
+    """
+    if not urls:
+        return False
+
+    # longer URLs go first, as a URL may be the start of another one
+    leftover = str(text)
+    for url in sorted(urls, key=len, reverse=True):
+        leftover = leftover.replace(url, "")
+
+    # letters or digits, but not "_", which ural leaves out of the end of URLs
+    return not re.search(r"[^\W_]", leftover)
+
+
+def looks_like_image_url(url):
+    """
+    Check whether a URL looks like it links to an image
+
+    This is a guess based on the URL alone: it has an image file extension
+    after the host name, as in `http://site.com/img.jpg` or
+    `https://preview.redd.it/abc.gif?format=mp4`, or it is an Imgur or Gfycat
+    link, which can be downloaded as an image even without an extension.
+    Many image links have no extension at all (e.g.
+    `https://pbs.twimg.com/media/abc?format=jpg`); those are not recognised.
+
+    :param str url:  URL to check
+    :return bool:  Whether the URL looks like an image link
+    """
+    parsed = urlparse(str(url))
+    after_host = parsed.path + "?" + parsed.query if parsed.query else parsed.path
+    if re.search(r"\.(?:png|jpe?g|gifv?)", after_host, re.IGNORECASE):
+        return True
+
+    host = (parsed.hostname or "").removeprefix("www.")
+    return host in ("imgur.com", "gfycat.com")
+
+
 def folder_size(path='.'):
     """
     Get the size of a folder using os.scandir for efficiency
