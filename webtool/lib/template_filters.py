@@ -12,11 +12,10 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from webtool.lib.helpers import parse_markdown
-from common.lib.helpers import timify, ellipsiate
+from common.lib.helpers import timify, ellipsiate, urls_in_text
 
 from flask import current_app, g
 from flask_login import current_user
-from ural import urls_from_text
 from jinja2.exceptions import TemplateNotFound
 
 @current_app.template_filter('datetime')
@@ -155,7 +154,7 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
     except ValueError:
         return content
 
-    for link in set(ural.urls_from_text(str(content))):
+    for link in urls_in_text(content):
         if ellipsiate > 0:
             link_text = _jinja2_filter_ellipsiate(link, ellipsiate, True, "[&hellip;]")
         else:
@@ -320,7 +319,7 @@ def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
 
     # Add URL links
     if not base_urls[datasource].get("markdown"):
-        for raw_url in urls_from_text(body):
+        for raw_url in urls_in_text(body):
             clean_url = raw_url.split("<")[0]
             safe_url_pattern = lookbehind + re.escape(clean_url)
             replacement = f"<a href='{clean_url}' target='_blank'>{clean_url}</a>"

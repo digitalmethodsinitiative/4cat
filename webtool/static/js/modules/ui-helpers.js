@@ -473,7 +473,10 @@ export const ui_helpers = {
          * @returns {Object|null}            {fieldName: value} or null if the field is not found
          */
         _get_field_value: function(field, form) {
-            const element = form.querySelector("*[name='option-" + field + "']");
+            // a multi-select comes with an empty hidden input of the same name,
+            // which only keeps the field in the submission when nothing is
+            // selected; the select itself holds the value
+            const element = form.querySelector("select[name='option-" + field + "']") || form.querySelector("*[name='option-" + field + "']");
             if(!element) { return null; }
 
             let value;

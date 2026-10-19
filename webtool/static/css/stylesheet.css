@@ -548,6 +548,17 @@ button.tooltip-trigger {
     border-color: var(--gray-dark);
 }
 
+/* in a row of action buttons, a button with a tooltip should look like the
+   buttons next to it, not like a small '?' help button */
+.button-container button.tooltip-trigger {
+    max-height: none;
+    font-size: inherit;
+    top: 0;
+    padding: 0.25em 1em;
+    border-width: 2px;
+    border-color: var(--contrast-dark);
+}
+
 p[role=tooltip] > .tooltip-line {
     display: inline-block;
 }

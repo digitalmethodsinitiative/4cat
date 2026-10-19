@@ -437,7 +437,7 @@ def preview_items(key):
 
                 rows.append(row)
 
-        except NotImplementedError:
+        except (NotImplementedError, FileNotFoundError):
             return error(404)
 
         if not rows and dataset.num_rows > 0:
@@ -576,7 +576,7 @@ def show_result(key):
     can_unexpire = ((g.config.get("expire.allow_optout") and \
                      datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout",
                                                                                                    False)) \
-                   and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
+                   and (g.config.get("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner"))
 
     timestamp_expires = None
     if not dataset.parameters.get("keep"):
@@ -692,6 +692,10 @@ def toggle_private_interactive(key):
     if not success.is_json:
         return success
 
+    if success.json.get("error"):
+        # e.g. the dataset does not exist, or the user may not make datasets public
+        return render_template("error.html", message=success.json["error"])
+
     if success.json["success"]:
         if success.json["is_private"]:
             flash("Dataset has been made private")
@@ -716,7 +720,7 @@ def keep_dataset(key):
                                message="All datasets are scheduled for automatic deletion. This cannot be "
                                        "overridden."), 403
 
-    if not current_user.can_access_dataset(dataset, role="owner"):
+    if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
         return error(403, message="You cannot cancel deletion for this dataset.")
 
     if not dataset.key_parent:

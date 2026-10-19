@@ -14,4 +14,9 @@ jobs:
       - name: checkout-repo
         uses: actions/checkout@v4
       - name: ruff-action
+        # Pinned so that a new ruff release cannot change what this check does
+        # until someone decides it should. Which rules are checked is set in
+        # ruff.toml.
         uses: astral-sh/ruff-action@v3
+        with:
+          version: "0.16.1"

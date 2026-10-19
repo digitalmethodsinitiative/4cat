@@ -1,8 +1,6 @@
 """
 Custom data upload to create bespoke datasets
 """
-import secrets
-import hashlib
 import time
 import csv
 import re
@@ -14,9 +12,10 @@ from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
 from backend.lib.processor import BasicProcessor
+from common.lib.author_info import AuthorInfoReplacer
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException, \
     QueryNeedsExplicitConfirmationException, CsvDialectException
-from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
+from common.lib.helpers import strip_tags, sniff_encoding, UserInput
 
 
 class SearchCustom(BasicProcessor):
@@ -112,10 +111,11 @@ class SearchCustom(BasicProcessor):
                     set(tool_format["columns"]) != set(tool_format["columns"]):
                 raise QueryParametersException("Not all columns are present")
 
-            # hasher for pseudonymisation
-            salt = secrets.token_bytes(16)
-            hasher = hashlib.blake2b(digest_size=24, salt=salt)
-            hash_cache = HashCache(hasher)
+            # hash or remove the author's details, if the upload asked for it.
+            # This is made per dialect, so that a count from an attempt that was
+            # thrown away does not carry over into the one that succeeds
+            mode = self.parameters.get("pseudonymise")
+            author_filter = AuthorInfoReplacer(mode) if mode in AuthorInfoReplacer.MODES else None
 
             # write the resulting dataset
             writer = None
@@ -146,19 +146,17 @@ class SearchCustom(BasicProcessor):
                             timestamp_missing += 1
                             self.dataset.log(f"Item {i} ({item.get('id')}) has no timestamp.")
 
-                        # pseudonymise or anonymise as needed
-                        filtering = self.parameters.get("pseudonymise")
+                        # hash or remove the author's details, if asked for
                         try:
-                            if filtering:
-                                for field, value in item.items():
-                                    if field is None:
-                                        # This would normally be caught when writerow is called
-                                        raise CsvDialectException("Field is None")
-                                    if field.startswith("author"):
-                                        if filtering == "anonymise":
-                                            item[field] = "REDACTED"
-                                        elif filtering == "pseudonymise":
-                                            item[field] = hash_cache.update_cache(value)
+                            if author_filter:
+                                if any(field is None for field in item):
+                                    # a column without a name means this dialect is
+                                    # the wrong one. This would normally be caught
+                                    # when writerow is called, but the replacer
+                                    # needs real names to compare its patterns to
+                                    raise CsvDialectException("Field is None")
+
+                                item = author_filter.filter_row(item)
 
                             writer.writerow(item)
                         except ValueError as e:
@@ -204,6 +202,11 @@ class SearchCustom(BasicProcessor):
             self.dataset.update_status(
                 f"CSV file imported, but {error_message}. See dataset log for details.",
                 is_final=True)
+
+        # an empty dataset has nothing to replace, which says nothing about
+        # whether the field names were right, so do not record that
+        if author_filter and done:
+            self.dataset.author_info_replaced = author_filter.report()
 
         temp_file.unlink()
         self.dataset.delete_parameter("filename")

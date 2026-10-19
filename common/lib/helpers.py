@@ -1074,7 +1074,8 @@ def dict_search_and_update(item, keyword_matches, function):
         if isinstance(d_or_l, dict):
             # Iterate through dictionary
             for key, value in iter(d_or_l.items()):
-                if match_terms == 'True' or any([fnmatch.fnmatch(key, match_term) for match_term in match_terms]):
+                # both sides are lower cased before comparing
+                if match_terms == 'True' or any([fnmatch.fnmatchcase(key.lower(), match_term) for match_term in match_terms]):
                     # Match found; apply function to all items and sub-items
                     if isinstance(value, (list, dict)):
                         # Pass item through again with match_terms = True
@@ -1136,6 +1137,20 @@ def add_notification(db, user, notification, expires=None, allow_dismiss=True):
         "timestamp_expires": expires,
         "allow_dismiss": allow_dismiss
     }, safe=True)
+
+
+def looks_like_email_address(value):
+    """
+    Check if a value looks like an e-mail address
+
+    This is a loose check of the form, e.g. to see if a user name is an
+    e-mail address that 4CAT can send e-mails to. It does not check that the
+    address exists.
+
+    :param str value:  Value to check
+    :return bool:
+    """
+    return bool(value and re.match(r"[^@]+\@.*?\.[a-zA-Z]+", value))
 
 
 def send_email(recipient, message, mail_config):
@@ -1421,10 +1436,11 @@ def split_urls(url_string, allowed_schemes=None):
     Split URL text by \n and commas.
 
     4CAT allows users to input lists by either separating items with a newline or a comma. This function will split URLs
-    and also check for commas within URLs using schemes.
+    and also check for commas and commas followed by a space within URLs using schemes.
 
     Note: some urls may contain scheme (e.g., https://web.archive.org/web/20250000000000*/http://economist.com);
-    this function will work so long as the inner scheme does not follow a comma (e.g., "http://,https://" would fail).
+    this function will work so long as the inner scheme does not follow a comma (e.g., "http://archive.org/,https://something.com" 
+    and "http://archive.org/, https://something.com" will both be split).
     """
     if allowed_schemes is None:
         allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
@@ -1435,13 +1451,15 @@ def split_urls(url_string, allowed_schemes=None):
         parts = line.split(',')
         recombined_url = ""
         for part in parts:
-            if part.startswith(allowed_schemes):  # Other schemes exist
+            # Spaces before a scheme still mean a new URL starts (e.g. "url1, url2"). Other spaces are left
+            # alone, as a URL may contain them if it was not encoded (e.g. "https://example.com/?q=a, b")
+            if part.lstrip().startswith(allowed_schemes):  # Other schemes exist
                 # New URL start detected
                 if recombined_url:
                     # Already have a URL, add to list
                     potential_urls.append(recombined_url)
                 # Start new URL
-                recombined_url = part
+                recombined_url = part.lstrip()
             elif part:
                 if recombined_url:
                     # Add to existing URL
@@ -1456,6 +1474,48 @@ def split_urls(url_string, allowed_schemes=None):
             # Add any remaining URL
             potential_urls.append(recombined_url)
     return potential_urls
+
+
+def urls_in_text(text, split_commas=True, allowed_schemes=None):
+    """
+    Find the URLs in a text, in the order they appear and each only once.
+
+    URLs are found with ural's `urls_from_text`, which leaves out punctuation that follows a URL (such as the full stop
+    at the end of a sentence) and skips e-mail addresses. Two of its mistakes are worked around here:
+
+    - URLs with only a comma between them (`https://a.com/x,https://b.com/y`) come back from ural as one URL. The text
+      is first split with `split_urls`, so that a comma followed by a new URL starts a new one.
+    - A URL with "/@" followed by a name with a dot in it, such as `https://www.tiktok.com/@maria.bg2/video/123`, is
+      cut short by ural (`https://www.tiktok.com/@maria.bg`).
+
+    In ordinary text, a URL with a space in it cannot be told apart from a URL followed by more words. However, if 
+    split_commas=True, split_urls is used to separate URLs by commas and it will split a URL with a comma followed by
+    a space and a new URL (i.e. starting with a new scheme from allowed_schemes) into two URLs. See `split_urls` for details.
+
+    :param str text:  Text to search
+    :param bool split_commas:  Whether a comma directly followed by a new URL separates two URLs. If not, such a comma
+    and the URL after it are kept as part of the URL before it, as ural does.
+    :return list:  The URLs, exactly as they are written in the text
+    """
+    if not text:
+        return []
+
+    pieces = split_urls(str(text), allowed_schemes=allowed_schemes) if split_commas else [str(text)]
+    urls = []
+    for piece in pieces:
+        # ural reads an "@" as the end of a user name, as in https://user:password@example.com, even when the "@" comes
+        # later in the URL. It then takes the name after the "@" for the address of the website, and stops where that
+        # name no longer looks like one. To prevent this, each "@" that follows a "/" is swapped for a character that
+        # does not occur in the text, and swapped back in the URLs that are found.
+        stand_in = ""  # a "private use" character, which has no meaning of its own
+        while stand_in in piece:
+            stand_in = chr(ord(stand_in) + 1)
+
+        for url in ural.urls_from_text(piece.replace("/@", "/" + stand_in)):
+            urls.append(url.replace(stand_in, "@"))
+
+    # the same URL can occur more than once
+    return list(dict.fromkeys(urls))
 
 
 def folder_size(path='.'):

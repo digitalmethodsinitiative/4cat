@@ -26,7 +26,7 @@ from webtool.lib.helpers import error, Pagination, generate_css_colours, setting
 from common.lib.user import User
 from common.lib.dataset import DataSet
 from common.lib.job import Job
-from common.lib.helpers import call_api, send_email, UserInput, get_git_branch, find_extensions
+from common.lib.helpers import call_api, send_email, UserInput, get_git_branch, find_extensions, looks_like_email_address
 from common.lib.exceptions import DataSetException, JobNotFoundException, QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -215,21 +215,22 @@ def delete_job():
     except DataSetException:
         dataset = None
     
+    # Check if the user has permission to manipulate the dataset
+    if dataset and not g.config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
+        return error(403, message="Not allowed to delete this job's dataset")
+
+    # Tell backend to cancel job if running, before deleting anything, so
+    # nothing is left half-deleted if the backend cannot be reached
+    if job.is_claimed:
+        api_response = call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["jobtype"], "level": BasicWorker.INTERRUPT_CANCEL})
+        if api_response["status"] != "success":
+            return error(500,
+                            message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
+
+    # Delete the dataset
     if dataset:
-        # Check if the user has permission to manipulate the dataset
-        if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
-            return error(403, message="Not allowed to delete this job's dataset")
-        
-        # Delete the dataset
         dataset.delete()
 
-    # Tell backend to cancel job if running
-    try:
-        call_api("cancel-job", {"remote_id": job.data["remote_id"], "jobtype": job.data["jobtype"], "level": BasicWorker.INTERRUPT_CANCEL})
-    except ConnectionRefusedError:
-        return error(500,
-                        message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
-    
     # Delete the job
     job.finish(delete=True)
     message =  f"Job {job.data['jobtype']} #{job.data['id']} {'and associated dataset ' if dataset else ''}deleted successfully."
@@ -298,7 +299,7 @@ def add_user():
     force = request.form.get("force", request.args.get("force", None))
     redirect_to_page = False
 
-    if not email or not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", email):
+    if not looks_like_email_address(email):
         response = {**response, **{"message": "Please provide a valid e-mail address."}}
     else:
         username = email
@@ -451,6 +452,34 @@ def delete_user():
     return redirect(url_for("admin.frontpage"))
 
 
+@component.route("/admin/user-reset-link/", methods=["POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_users")
+def create_reset_link():
+    """
+    Create a new password reset link for a user
+
+    The link is shown to the admin instead of being e-mailed, so it can be
+    passed on in some other way, e.g. when the user name is not an e-mail
+    address. The user's current password is not cleared; it keeps working
+    until they set a new one via the link.
+
+    :return:  Redirect to the user's edit page, with the link as a message
+    """
+    username = request.form.get("name")
+    user = User.get_by_name(g.db, username) if username else None
+    if user is None:
+        return error(404, message="User not found")
+
+    if user.is_special:
+        return error(403, message="System users cannot have a password")
+
+    token = user.generate_token(regenerate=True)
+    link = url_for("user.reset_password", _external=True) + "?token=%s" % token
+    flash('New password reset link:<br><a href="%s">%s</a>' % (link, link))
+    return redirect(url_for("admin.manipulate_user", mode="edit", name=user.get_id()))
+
+
 @component.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_users")
@@ -484,6 +513,12 @@ def manipulate_user(mode):
             flash("User name cannot contain whitespace.")
             incomplete.append("name")
 
+        # datasets, settings, API tokens etc are stored under the user name
+        # and would not move along with it, so the name is fixed once created
+        if mode == "edit" and request.form.get("name", user.get_id()) != user.get_id():
+            flash("User names cannot be changed.")
+            incomplete.append("name")
+
         # ensure there is always at least one admin user
         old_tags = user.tags if user else []
         new_tags = [re.sub(r"[^a-z0-9_]", "", t.strip().lower()) for t in request.form.get("tags", "").split(",")]
@@ -496,17 +531,17 @@ def manipulate_user(mode):
 
         if not incomplete:
             user_data = {
-                "name": request.form.get("name"),
                 "is_deactivated": request.form.get("is_deactivated") == "on",
                 "tags": json.dumps(new_tags)
             }
 
             if mode == "edit":
-                g.db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
-                user = User.get_by_name(g.db, user_data["name"])  # ensure updated data
+                g.db.update("users", where={"name": user.get_id()}, data=user_data)
+                user = User.get_by_name(g.db, user.get_id())  # ensure updated data
                 user.with_config(g.config)
 
             else:
+                user_data["name"] = request.form.get("name")
                 try:
                     g.db.insert("users", user_data)
                     user = User.get_by_name(g.db, user_data["name"])
@@ -553,8 +588,9 @@ def manipulate_user(mode):
         else:
             flash("Pleasure ensure all fields contain a valid value.")
 
+    can_email = mode == "edit" and looks_like_email_address(user.get_id())
     return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages(),
-                           mode=mode)
+                           mode=mode, can_email=can_email)
 
 
 @component.route("/admin/user-tags/", methods=["GET", "POST"])
@@ -910,7 +946,7 @@ def get_log(logfile, max_lines=250):
         max_lines = 250
 
     if logfile == "backend":
-        filename = "backend_4cat.log" if not g.config.get("USING_DOCKER") else "backend_4cat.log"
+        filename = "backend_4cat.log"
     elif logfile == "stderr":
         filename = "4cat.stderr"
     elif logfile == "frontend":
@@ -1077,6 +1113,10 @@ def dataset_bulk():
         else:
             action = action[0].split("-")[-1]
 
+            if action == "public" and not g.config.get("privileges.can_make_dataset_public"):
+                flash("You are not allowed to make datasets public.")
+                incomplete.append("action")
+
         where = []
         replacements = []
         forminput = request.form.to_dict()
@@ -1173,11 +1213,14 @@ def dataset_bulk():
                     if action == "delete":
                         dataset.delete()
 
+                    # make sure the dataset is private/public and update children accordingly
                     if action == "public":
                         dataset.is_private = False
+                        dataset.update_children(is_private=False)
 
                     if action == "private":
                         dataset.is_private = True
+                        dataset.update_children(is_private=True)
 
                     if action == "owner":
                         for user_or_tag in bulk_owner:

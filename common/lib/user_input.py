@@ -617,7 +617,7 @@ class UserInput:
                 pass
             try:
                 return int(parse_datetime(choice).timestamp())
-            except (ValueError, TypeError, OverflowError):
+            except (ValueError, TypeError, OverflowError, OSError):
                 # not a number and not a date we can recognise. (previously this
                 # was swallowed by a return inside a finally block and silently
                 # became an open-ended range.)

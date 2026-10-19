@@ -116,6 +116,14 @@ config_definition = {
         "help": "Can view private datasets",
         "tooltip": "Controls whether users can see the datasets made private by their owners."
     },
+    "privileges.can_make_dataset_public": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can make datasets public",
+        "tooltip": "Controls whether users can share their datasets with everyone on this 4CAT server. If this is "
+                   "off, datasets are always created as private and users cannot change that afterwards. Making an "
+                   "already public dataset private is always allowed."
+    },
     "privileges.can_create_api_token": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
@@ -547,8 +555,8 @@ config_definition = {
     "api.youtube.key": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
-        "help": "YouTube API Key",
-        "tooltip": "The developer key from your API console"
+        "help": "YouTube API key",
+        "tooltip": "Can be created on https://developers.google.com/youtube/v3"
     },
     # service manager
     # this is a service that 4CAT can connect to to run e.g. ML models
@@ -690,13 +698,6 @@ config_definition = {
         "default": False,
         "tooltip": "Show main dataset preview directly on dataset pages, instead of behind a 'preview' button"
     },
-    "ui.offer_anonymisation": {
-        "type": UserInput.OPTION_TOGGLE,
-        "help": "Offer anonymisation options",
-        "default": True,
-        "tooltip": "Offer users the option to anonymise their datasets at the time of creation. It is strongly "
-                   "recommended to leave this enabled."
-    },
     "ui.advertise_install": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Advertise local 4CAT",
@@ -729,14 +730,11 @@ config_definition = {
     "ui.offer_hashing": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
-        "help": "Offer pseudonymisation",
-        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
-    },
-    "ui.offer_private": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Offer create as private",
-        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
+        "help": "Offer pseudonymisation and anonymisation",
+        "tooltip": "Adds a control to the 'Create dataset' page where people choose what happens to author details: "
+                   "replace them with a hash, replace them with 'REDACTED', or leave them as they are. It is strongly "
+                   "recommended to leave this enabled. Turning it off does not stop people hiding author details "
+                   "afterwards with the 'Pseudonymise or anonymise' processor."
     },
     "ui.option_email": {
         "type": UserInput.OPTION_CHOICE,
