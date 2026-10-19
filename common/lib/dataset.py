@@ -359,6 +359,16 @@ class DataSet(FourcatModule):
                     if i < offset:
                         continue
 
+                    # csv.DictReader does not fail on a row with more values
+                    # than the file has columns, but puts the extra values
+                    # under the key None. Nothing that reads items expects
+                    # that key, so stop here and say where the file is broken
+                    if None in item:
+                        raise DataSetException(
+                            f"Cannot read dataset {self.key}: line {reader.line_num} of its CSV file has "
+                            f"{len(item[None])} more value(s) than the file has columns"
+                        )
+
                     yield item
 
         elif path.suffix.lower() == ".ndjson":
@@ -575,6 +585,42 @@ class DataSet(FourcatModule):
                     unique_label = f"{annotation_field_items['label']}_{counter}"
                 annotation_labels[annotation_field_id] = unique_label
 
+            def add_annotations(dataset_items):
+                """
+                Get the annotations for a batch of items in one go and add
+                them to each item, under the annotation's label
+                """
+                item_ids = [dataset_item.get("id") for dataset_item in dataset_items]
+
+                # Dict with item ids for fast lookup
+                annotations_dict = collections.defaultdict(dict)
+                annotations = self.get_annotations_for_item(item_ids, before=annotations_before)
+                for item_annotation in annotations:
+                    item_id = item_annotation.item_id
+                    if item_annotation:
+                        annotations_dict[item_id][item_annotation.field_id] = item_annotation.value
+
+                # Process each dataset item
+                for dataset_item in dataset_items:
+                    item_id = dataset_item.get("id")
+                    item_annotations = annotations_dict.get(item_id, {})
+
+                    for annotation_field_id, annotation_field_items in annotation_fields.items():
+                        # Get annotation value
+                        value = item_annotations.get(annotation_field_id, "")
+
+                        # Convert list to string if needed
+                        if isinstance(value, list):
+                            value = ",".join(value)
+                        elif value != "":
+                            value = str(value)  # Ensure string type
+                        else:
+                            value = ""
+
+                        dataset_item[annotation_labels[annotation_field_id]] = value
+
+                return dataset_items
+
         # missing field strategy can be for all fields at once, or per field
         # if it is per field, it is a dictionary with field names and their strategy
         # if it is for all fields, it may be a callback, 'abort', or 'default'
@@ -583,7 +629,11 @@ class DataSet(FourcatModule):
             default_strategy = map_missing
             map_missing = {}
 
-        iterator = self._iterate_items if self.get_extension() != "zip" else self._iterate_archive_contents
+        extension = self.get_extension()
+        if extension is False:
+            raise FileNotFoundError(f"Results file for dataset {self.key} does not exist: {self.get_results_path()}")
+
+        iterator = self._iterate_items if extension != "zip" else self._iterate_archive_contents
 
         # Loop through items
         for i, item in enumerate(iterator(processor=processor, offset=offset, *args, **kwargs)):
@@ -654,45 +704,21 @@ class DataSet(FourcatModule):
             if get_annotations:
                 dataset_item_cache.append(dataset_item)
 
-                # When we reach the batch limit or the end of the dataset,
-                # get the annotations for cached items and yield the entire thing.
-                if len(dataset_item_cache) >= item_batch_size or i == (self.num_rows - 1):
-
-                    item_ids = [dataset_item.get("id") for dataset_item in dataset_item_cache]
-
-                    # Dict with item ids for fast lookup
-                    annotations_dict = collections.defaultdict(dict)
-                    annotations = self.get_annotations_for_item(item_ids, before=annotations_before)
-                    for item_annotation in annotations:
-                        item_id = item_annotation.item_id
-                        if item_annotation:
-                            annotations_dict[item_id][item_annotation.field_id] = item_annotation.value
-
-                    # Process each dataset item
-                    for dataset_item in dataset_item_cache:
-                        item_id = dataset_item.get("id")
-                        item_annotations = annotations_dict.get(item_id, {})
-
-                        for annotation_field_id, annotation_field_items in annotation_fields.items():
-                            # Get annotation value
-                            value = item_annotations.get(annotation_field_id, "")
-
-                            # Convert list to string if needed
-                            if isinstance(value, list):
-                                value = ",".join(value)
-                            elif value != "":
-                                value = str(value)  # Ensure string type
-                            else:
-                                value = ""
-
-                            dataset_item[annotation_labels[annotation_field_id]] = value
-
-                        yield dataset_item
-
+                # When we reach the batch limit, get the annotations for cached
+                # items and yield the entire thing.
+                if len(dataset_item_cache) >= item_batch_size:
+                    yield from add_annotations(dataset_item_cache)
                     dataset_item_cache = []
 
             else:
                 yield dataset_item
+
+        # Yield the last batch, which is usually not full. This happens after
+        # the loop, so it also works when the last items could not be mapped,
+        # when we stopped early because of too many unmappable items, or when
+        # the dataset has fewer items than its row count says.
+        if get_annotations and dataset_item_cache:
+            yield from add_annotations(dataset_item_cache)
 
 
     def sort_and_iterate_items(
@@ -1068,19 +1094,9 @@ class DataSet(FourcatModule):
         because logs can be useful for debugging even after a dataset is deleted. Hanging logs
         are automatically deleted by TempFileCleaner after a certain amount of time.
         """
-        # first, recursively delete children
-        children = self.db.fetchall(
-            "SELECT * FROM datasets WHERE key_parent = %s", (self.key,)
-        )
-        for child in children:
-            try:
-                child = DataSet(key=child["key"], db=self.db, modules=self.modules)
-                child.delete(commit=commit, delete_log=delete_log)
-            except DataSetException:
-                # dataset already deleted - race condition?
-                pass
-
-        # delete any queued jobs for this dataset
+        # first, stop any job for this dataset.
+        # a running processor can still create a follow-up dataset until it is told to stop, 
+        # and a child created after the lookup below would not be deleted
         try:
             job = Job.get_by_remote_ID(self.key, self.db, self.type)
             if job.is_claimed:
@@ -1100,6 +1116,18 @@ class DataSet(FourcatModule):
 
         except JobNotFoundException:
             pass
+
+        # then, recursively delete children
+        children = self.db.fetchall(
+            "SELECT * FROM datasets WHERE key_parent = %s", (self.key,)
+        )
+        for child in children:
+            try:
+                child = DataSet(key=child["key"], db=self.db, modules=self.modules)
+                child.delete(commit=commit, delete_log=delete_log)
+            except DataSetException:
+                # dataset already deleted - race condition?
+                pass
 
         # delete this dataset's own annotations
         self.db.delete("annotations", where={"dataset": self.key}, commit=commit)
@@ -2247,36 +2275,32 @@ class DataSet(FourcatModule):
         compatibility through. This may not be the same reader the dataset was
         instantiated with, e.g. when checking whether some other user should
         be able to run processors on this dataset.
-        :param bool exclude_hidden:  Exclude processors that should be displayed
-        in the UI? If `False`, all processors are returned.
+        :param bool exclude_hidden:  Exclude processors that should not be
+        displayed in the UI? If `False`, all processors are returned.
 
         :return dict:  Available processors, `name => properties` mapping
         """
-        if self.available_processors:
-            # Update to reflect exclude_hidden parameter which may be different from last call
-            # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-            return {
-                processor_type: processor
-                for processor_type, processor in self.available_processors.items()
-                if not exclude_hidden or not processor.is_hidden
-            }
+        # The cache always holds the full list, hidden processors included, so
+        # that every call can apply its own exclude_hidden to it
+        # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
+        if not self.available_processors:
+            processors = self.get_compatible_processors(config=config)
 
-        processors = self.get_compatible_processors(config=config)
+            for analysis in self.get_children(update=True):
+                if analysis.type not in processors:
+                    continue
 
-        for analysis in self.get_children(update=True):
-            if analysis.type not in processors:
-                continue
+                if not processors[analysis.type].get_options(parent_dataset=self, config=config):
+                    # No variable options; this processor has been run so remove
+                    del processors[analysis.type]
 
-            if not processors[analysis.type].get_options(parent_dataset=self, config=config):
-                # No variable options; this processor has been run so remove
-                del processors[analysis.type]
-                continue
+            self.available_processors = processors
 
-            if exclude_hidden and processors[analysis.type].is_hidden:
-                del processors[analysis.type]
-
-        self.available_processors = processors
-        return processors
+        return {
+            processor_type: processor
+            for processor_type, processor in self.available_processors.items()
+            if not exclude_hidden or not processor.is_hidden
+        }
 
     def link_job(self, job):
         """
@@ -2478,7 +2502,7 @@ class DataSet(FourcatModule):
         # Default to text
         return self.parameters.get("media_type", "text")
 
-    def get_media_from_children(self, item_ids=[]) -> dict:
+    def get_media_from_children(self, item_ids=None) -> dict:
         """ Returns a list of media filenames that have been downloaded
             via video or image download child processors
 
@@ -2489,6 +2513,9 @@ class DataSet(FourcatModule):
 
         if not children:
             return {}
+
+        if item_ids is None:
+            item_ids = []
 
         media_map = {}
 
@@ -2600,6 +2627,24 @@ class DataSet(FourcatModule):
         scheme = "https" if self.modules.config.get("flask.https") else "http"
         server = self.modules.config.get("flask.server_name")
         return f"{scheme}://{server}/download/{self.key}/"
+
+    def get_log_url(self):
+        """
+        Gets the 4CAT frontend URL of the dataset's log
+
+        Like `get_result_url()`, this uses the configured server name when
+        called outside the web app (e.g. in the backend).
+
+        :return str:  URL of the dataset log
+        """
+        from flask import has_app_context, url_for
+
+        if has_app_context():
+            return url_for("dataset.view_log", key=self.key, _external=True)
+
+        scheme = "https" if self.modules.config.get("flask.https") else "http"
+        server = self.modules.config.get("flask.server_name")
+        return f"{scheme}://{server}/results/{self.key}/log/"
 
     def warn_unmappable_item(self, item_count, processor=None, error_message=None):
         """

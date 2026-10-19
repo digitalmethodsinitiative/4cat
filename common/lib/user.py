@@ -551,7 +551,11 @@ class User:
                     # dataset already deleted?
                     continue
 
-                if len(dataset.get_owners()) == 1 and also_datasets:
+                # only delete the dataset if this user is its one and only
+                # owner. the user may also be listed as a viewer; then the
+                # dataset belongs to someone else and only the user's access
+                # is removed
+                if also_datasets and dataset.get_owners() == [username]:
                     dataset.delete(commit=False)
                     self.db.delete("jobs", where={"remote_id": dataset.key}, commit=False)
                 else:

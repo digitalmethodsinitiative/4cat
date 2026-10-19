@@ -666,7 +666,7 @@ class MakeWordtree(BasicProcessor):
             x: float = 0,
             y: float = 0,
             height: float = 0,
-            origin: tuple | bool = None,
+            origin: tuple | bool | None = None,
             side: int = 1,
             draw_root: bool = True,
             depth: int = 0

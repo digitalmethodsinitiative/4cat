@@ -474,3 +474,212 @@ processor_packages = {
     assert "Flask~=3.0" not in reqs
     assert "ruff" not in reqs
     assert reqs == sorted(reqs)              # output is sorted
+
+
+# --------------------------------------------------------------------------- #
+# The prompt must not contain a previous answer to the question it is asking
+#
+# Showing the model the auto-generated block gave it a finished, plausible
+# `map_item` for nearly the same Python, and it reproduced that instead of
+# translating. Worst when the Python has not changed, because then the old
+# block really is a correct answer and nothing marks the copy as wrong.
+# --------------------------------------------------------------------------- #
+
+def _module_with_previous_translation():
+    return (
+        "export function capture(response) { return handWrittenHelper(response); }\n"
+        "function handWrittenHelper(r) { return []; }\n\n"
+        + mic.BLOCK_MARKER_START + "\n"
+        "// (regenerated from datasources/douyin/search_douyin.py)\n"
+        "function previouslyDefinedHelper(num) { return num * 10000; }\n\n"
+        "export function map_item(item) {\n"
+        "  return new MappedItem({previously_translated_field: item.whatever});\n"
+        "}\n"
+        + mic.BLOCK_MARKER_END + "\n"
+    )
+
+
+def test_strip_generated_blocks_removes_the_previous_translation():
+    stripped = mic.strip_generated_blocks(_module_with_previous_translation())
+    assert "previouslyDefinedHelper" not in stripped
+    assert "previously_translated_field" not in stripped
+    assert mic.BLOCK_MARKER_START not in stripped
+    # the hand-written half of the module is what the model actually needs
+    assert "export function capture" in stripped
+    assert "handWrittenHelper" in stripped
+    # and something has to stand where the block was, or the module reads as broken
+    assert "belongs here" in stripped
+
+
+def test_strip_generated_blocks_removes_the_generated_imports_too():
+    module = (
+        mic.IMPORTS_MARKER_START + "\n"
+        "import { previouslyImported } from './other.js';\n"
+        + mic.IMPORTS_MARKER_END + "\n"
+        "export function capture(r) { return []; }\n"
+    )
+    stripped = mic.strip_generated_blocks(module)
+    assert "previouslyImported" not in stripped
+    assert "export function capture" in stripped
+
+
+def test_strip_generated_blocks_leaves_an_unsynced_module_alone():
+    module = "export function capture(r) { return []; }\n"
+    assert mic.strip_generated_blocks(module) == module
+
+
+def test_prompt_hides_the_previous_translation_but_keeps_capture():
+    module = _module_with_previous_translation()
+    prompt = mic.build_user_prompt("class X:\n    pass\n", module, "douyin/search_douyin.py")
+    assert "previouslyDefinedHelper" not in prompt
+    assert "previously_translated_field" not in prompt
+    assert "export function capture" in prompt
+    assert "handWrittenHelper" in prompt
+
+
+def test_prompt_does_not_ask_the_model_to_preserve_the_old_block():
+    """The instruction that caused the copying. It asked for completeness but
+    said it in terms of not losing the previous block, which made that block
+    the thing to protect rather than the Python the thing to translate."""
+    prompt = mic.build_user_prompt("class X:\n    pass\n", "export function capture(){}\n", "x/search_x.py")
+    assert "gone unless you emit it again" not in prompt
+    assert "was in the module before" not in prompt
+
+
+def test_prompt_closes_by_naming_the_python_as_the_source_of_truth():
+    """`Python is the source of truth` is stated in the opening section, tens of
+    thousands of characters before the end. The closing position is the one that
+    carries, and it used to hold the instruction that caused the copying."""
+    prompt = mic.build_user_prompt("class X:\n    pass\n", "export function capture(){}\n", "x/search_x.py")
+    closing = prompt[prompt.rindex("# What you are translating"):]
+    assert closing.count("#") == 1, "the precedence statement must be the last section"
+    assert "only source of truth" in closing
+    assert "the Python is right" in closing
+
+
+# --------------------------------------------------------------------------- #
+# Rules added after the twitter and instagram runs of 2026-09-04
+#
+# Each of these pins the specific wording whose absence produced a real bug, so
+# a later tidy-up of the prompt cannot quietly undo the lesson.
+# --------------------------------------------------------------------------- #
+
+def _rule_by_id(rule_id):
+    return next(r for r in rules.RULES if r.id == rule_id)
+
+
+def test_dict_get_examples_show_the_bare_form():
+    """The rule always said `d.get(k)` is `py_get(d, k)`, but both worked
+    examples showed the three-argument form, and that is the form that came
+    back: `py_get(tweet, 'lang', '')` for a Python `tweet.get('lang')`, which
+    writes '' where 4CAT writes null."""
+    rule = _rule_by_id("dict_get")
+    # the two-argument call has to appear as a worked example, not only in prose
+    assert "py_get(tweet, 'lang')" in rule.good
+    assert "py_get(tweet, 'lang', '')" in rule.bad
+    assert "no second argument invented" in rule.verify
+
+
+def test_collection_rule_no_longer_teaches_length_for_any():
+    """`.length` is right for `if some_list:` and wrong for `if any(xs):`. The
+    collection rule taught the first without excluding the second, and
+    `coauthors.length` came back for Python's `any(coauthors)`."""
+    rule = _rule_by_id("empty-collections-are-falsy-in-python-truthy-in-javascript")
+    assert "any(xs)" in rule.prompt_rule
+    assert "NOT the translation" in rule.prompt_rule
+
+
+def test_truthy_test_rule_covers_both_substitutions():
+    rule = _rule_by_id("translate-the-test-not-one-that-looks-like-it")
+    assert "some(Boolean)" in rule.good
+    assert "!= null" in rule.bad
+    assert rule.lint_pattern is None      # flagging `!= null` / `.length` would be noise
+
+
+def test_rounding_rule_flags_a_bare_tofixed():
+    """X's `get_centroid` shipped `.toFixed(6)` for Python's `str(round(x, 6))`,
+    padding every coordinate to `4.850000,52.350000`."""
+    rule = _rule_by_id("str-round-is-not-tofixed")
+    assert rule.lint_pattern is not None
+    issues = mic.lint_translation(
+        _translation("function map_item(i){ return ((i.a + i.b) / 2).toFixed(6); }")
+    )
+    assert any("toFixed" in issue for issue in issues)
+    # the corrected form contains `.toFixed(` too, so the warning has to say so
+    assert any("Number(" in issue for issue in issues)
+
+
+def test_sibling_parser_rule_names_the_functions_that_diverge():
+    rule = _rule_by_id("sibling-parsers-deliberately-differ")
+    assert "parse_graph_item" in rule.prompt_rule
+    assert "parse_itemlist_item" in rule.prompt_rule
+    assert rule.lint_pattern is None
+
+
+def test_the_new_rules_reach_the_prompt_and_the_checklist():
+    prompt = mic.build_user_prompt("class X: pass\n", "export function capture(){}\n", "x/search_x.py")
+    for rule_id in ("translate-the-test-not-one-that-looks-like-it",
+                    "str-round-is-not-tofixed",
+                    "sibling-parsers-deliberately-differ"):
+        rule = _rule_by_id(rule_id)
+        assert rule_id in prompt
+        assert rule.verify in prompt
+
+
+# --------------------------------------------------------------------------- #
+# Rules added after the twitter run of 52e641e7
+#
+# Both defects that survived that round came from a rule being applied past its
+# edge, so these tests pin the boundaries rather than the recommendations.
+# --------------------------------------------------------------------------- #
+
+def test_dict_get_bad_examples_include_the_or_form():
+    """`userResult.is_blue_verified || ''` shipped. `||` discards a stored
+    `false` exactly as `??` discards a stored `null`, so every unverified
+    account was written out as '' instead of false. The or-vs-nullish rule
+    actively recommends `||`, so the two rules meet on this shape and the
+    examples are what settle it."""
+    rule = _rule_by_id("dict_get")
+    assert "is_blue_verified || ''" in rule.bad
+    assert "discards a stored `false`" in rule.prompt_rule
+    assert "`||` or `??`" in rule.verify
+
+
+def test_or_rule_shows_where_it_stops():
+    """Stating the boundary only in prose did not hold: the or-vs-nullish rule
+    already said a `.get` takes neither operator, and `||` was put on one
+    anyway. The counter-example has to be in the `bad` list."""
+    rule = _rule_by_id("python-or-vs-js-falsy-vs-nullish")
+    assert "is_blue_verified" in rule.bad
+    assert "NOT an `or`" in rule.bad
+    assert "neither operator was put on" in rule.verify
+
+
+def test_chain_rule_keeps_each_link_as_python_wrote_it():
+    """X's Python indexes four links then guards the last two; the translation
+    guarded the first four and read `.legacy.screen_name` off the result, which
+    throws whenever a post has no `legacy`."""
+    rule = _rule_by_id("translate-a-get-chain-link-by-link")
+    assert ".legacy.screen_name" in rule.bad          # the shape that shipped
+    assert "local variables" in rule.prompt_rule      # how to keep it readable
+    assert "['result']['core']" in rule.good          # brackets stay brackets
+    # a regex cannot balance the nesting needed to tell this apart from
+    # `py_get(...).map(...)`, so this one is deliberately prompt-only
+    assert rule.lint_pattern is None
+
+
+def test_registry_docstring_records_the_boundary_lesson():
+    """Three rounds running, a record naming a preferred operator produced an
+    over-application in the next batch. Whoever writes the next record should
+    find that written down."""
+    import rules as rules_module
+    doc = rules_module.__doc__
+    assert "say where the rule STOPS" in doc
+    assert "in the examples" in doc.lower()
+
+
+def test_new_chain_rule_reaches_the_prompt_and_the_checklist():
+    prompt = mic.build_user_prompt("class X: pass\n", "export function capture(){}\n", "x/search_x.py")
+    rule = _rule_by_id("translate-a-get-chain-link-by-link")
+    assert "translate-a-get-chain-link-by-link" in prompt
+    assert rule.verify in prompt

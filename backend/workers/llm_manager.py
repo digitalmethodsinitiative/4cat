@@ -110,6 +110,18 @@ class LLMServerManager(BasicWorker):
 			if connection in servers and connection not in listed_connections:
 				kept_enabled.append(model_id)
 
+		# One-time default: only when this instance has never built its model
+		# inventory before (prev_available is empty) do we enable the third-party
+		# models that ship by default, so a fresh install can use them without an
+		# admin ticking every box. On every later run prev_available is non-empty,
+		# so this never fires again - servers or models added afterwards are left
+		# for the admin to enable by hand, and disabled models are never revived.
+		if not prev_available:
+			thirdparty_servers = {server_id for server_id, server_config in servers.items() if server_config.get("type") == "thirdparty"}
+			for model_id, entry in available_models.items():
+				if entry.get("server") in thirdparty_servers and model_id not in kept_enabled:
+					kept_enabled.append(model_id)
+
 		self.config.set("llm.available_models", available_models)
 		self.config.set("llm.enabled_models", kept_enabled)
 
