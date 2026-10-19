@@ -302,6 +302,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                         next_type, self.dataset.key))
 
             elif next_type in available_processors:
+                if self.interrupted == self.INTERRUPT_CANCEL:
+                    # this dataset is being deleted; a follow-up created now
+                    # would be left behind without a parent to attach it to
+                    self.log.info("Not running follow-up processor of type %s for dataset %s, dataset was cancelled" % (
+                        next_type, self.dataset.key))
+                    break
+
                 next_analysis = DataSet(
                     parameters=next_parameters,
                     type=next_type,
