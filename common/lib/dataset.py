@@ -1094,19 +1094,9 @@ class DataSet(FourcatModule):
         because logs can be useful for debugging even after a dataset is deleted. Hanging logs
         are automatically deleted by TempFileCleaner after a certain amount of time.
         """
-        # first, recursively delete children
-        children = self.db.fetchall(
-            "SELECT * FROM datasets WHERE key_parent = %s", (self.key,)
-        )
-        for child in children:
-            try:
-                child = DataSet(key=child["key"], db=self.db, modules=self.modules)
-                child.delete(commit=commit, delete_log=delete_log)
-            except DataSetException:
-                # dataset already deleted - race condition?
-                pass
-
-        # delete any queued jobs for this dataset
+        # first, stop any job for this dataset.
+        # a running processor can still create a follow-up dataset until it is told to stop, 
+        # and a child created after the lookup below would not be deleted
         try:
             job = Job.get_by_remote_ID(self.key, self.db, self.type)
             if job.is_claimed:
@@ -1126,6 +1116,18 @@ class DataSet(FourcatModule):
 
         except JobNotFoundException:
             pass
+
+        # then, recursively delete children
+        children = self.db.fetchall(
+            "SELECT * FROM datasets WHERE key_parent = %s", (self.key,)
+        )
+        for child in children:
+            try:
+                child = DataSet(key=child["key"], db=self.db, modules=self.modules)
+                child.delete(commit=commit, delete_log=delete_log)
+            except DataSetException:
+                # dataset already deleted - race condition?
+                pass
 
         # delete this dataset's own annotations
         self.db.delete("annotations", where={"dataset": self.key}, commit=commit)
