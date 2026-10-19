@@ -96,6 +96,50 @@ def test_archive_urls_in_a_list(separator):
     assert urls_in_text(separator.join([archived_too, archived])) == [archived_too, archived]
 
 
+# --- brackets and Markdown links (worked around for ural 1.6.1) ----------------
+
+@pytest.mark.parametrize("text", [
+    "(see https://a.com/x)",
+    "(see https://a.com/x).",
+    "see https://a.com/x) here",
+    "[see https://a.com/x]",
+    "(https://a.com/x)",
+])
+def test_closing_bracket_after_url_is_left_out(text):
+    """ural 1.6.1 keeps the ")" unless the "(" comes right before the URL"""
+    assert urls_in_text(text) == ["https://a.com/x"]
+
+
+@pytest.mark.parametrize("url", [
+    "https://en.wikipedia.org/wiki/Foo_(bar)",
+    "https://en.wikipedia.org/wiki/Foo_(bar)_(baz)",
+])
+def test_bracket_that_belongs_to_the_url_is_kept(url):
+    assert urls_in_text(url) == [url]
+    assert urls_in_text(f"(see {url})") == [url]
+    assert urls_in_text(f"see {url}.") == [url]
+
+
+@pytest.mark.parametrize("text", [
+    "[https://a.com/x]()",
+    "[https://a.com/x]() and more",
+])
+def test_markdown_link_with_empty_target(text):
+    """ural 1.6.1 crashes on these"""
+    assert urls_in_text(text) == ["https://a.com/x"]
+
+
+@pytest.mark.parametrize("target", ["foo", "/r/sub", "pic.jpg"])
+def test_markdown_link_target_that_is_not_a_url(target):
+    """ural returns the target of a Markdown link even when it is not a URL"""
+    assert urls_in_text(f"[https://a.com/x]({target})") == ["https://a.com/x"]
+
+
+def test_markdown_links():
+    assert urls_in_text("[some text](https://a.com/x)") == ["https://a.com/x"]
+    assert urls_in_text("[https://a.com/x](https://b.com/y)") == ["https://a.com/x", "https://b.com/y"]
+
+
 # --- what ural already does well ----------------------------------------------
 
 def test_punctuation_after_url_is_left_out():
