@@ -116,8 +116,15 @@ LLM_SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
             "description": (
-                "Full source of any helper functions map_item depends on (e.g. a JS "
-                "port of normalize_url_encoding). Empty array if none needed."
+                "Full source of everything map_item depends on that is not already "
+                "a global. One complete declaration per entry. That means every "
+                "helper defined elsewhere in the Python file and used by map_item: "
+                "module-level functions written outside the class, `@staticmethod` "
+                "helpers on it, and class constants such as a media-type value or a "
+                "compiled regex. Functions become `function`s, constants become "
+                "`const`s. Anything map_item calls or reads and you do not put here "
+                "does not exist in the module, and the module will throw. Empty "
+                "array only when map_item needs nothing beyond the globals."
             ),
         },
         "commentary": {
@@ -148,6 +155,11 @@ SYSTEM_PROMPT = (
 # level declarations are global — they must NOT be imported. Anything not on
 # this list must be inlined or added to `helpers_to_add`. Update this list
 # whenever new helpers are added to `js/lib.js`.
+#
+# `wrap_for_map_item` is a `js/lib.js` global too, but is deliberately left off:
+# Zeeschuimer applies it before storing an item, so `map_item` is handed an
+# already-unpacked item and must never call it itself. Listing it here would
+# invite the model to unpack the item a second time.
 AVAILABLE_JS_HELPERS = [
     {
         "name": "MappedItem",
@@ -158,8 +170,42 @@ AVAILABLE_JS_HELPERS = [
     {
         "name": "MissingMappedField",
         "kind": "class",
-        "usage": "new MissingMappedField(value, label)",
-        "note": "Represents a field that may legitimately be missing. Always instantiate with `new`.",
+        "usage": "new MissingMappedField(fallbackValue)",
+        "note": (
+            "Marks a field the source told us nothing about. Takes ONE argument, "
+            "the value processors fall back on — so pick one that cannot pass "
+            "for a real value: -1 for a count rather than 0. Always instantiate "
+            "with `new`."
+        ),
+    },
+    {
+        "name": "py_get",
+        "kind": "function",
+        "usage": "py_get(obj, key, fallback)",
+        "note": (
+            "Port of Python's `dict.get(key, default)`: it returns the fallback "
+            "ONLY when the key is absent, and returns whatever the source sent "
+            "otherwise — including `null`, `0`, `false` and `''`. Use it for every "
+            "`.get(k, default)` in the Python. Do not write `obj[key] ?? fallback` "
+            "instead: that also replaces a key the source did send as null, which "
+            "Python keeps. The fallback defaults to `null`, so `py_get(obj, key)` "
+            "is the exact translation of `obj.get(key)`, where bare `obj[key]` "
+            "would give `undefined` and lose the field from the output."
+        ),
+    },
+    {
+        "name": "value_or_missing",
+        "kind": "function",
+        "usage": "value_or_missing(obj, key, fallback)",
+        "note": (
+            "Port of 4CAT's `value_or_missing` — `py_get` with a "
+            "`MissingMappedField` for its fallback, so an absent key becomes a "
+            "missing field while everything the source did send is kept as it is. "
+            "Translate a Python `value_or_missing(...)` call as this one for one. "
+            "A datasource that treats an absent key AND a null as equally missing "
+            "(Instagram does) needs the third form instead: "
+            "`obj[key] ?? new MissingMappedField(fallback)`."
+        ),
     },
     {
         "name": "normalize_url_encoding",
@@ -176,8 +222,22 @@ AVAILABLE_JS_HELPERS = [
     {
         "name": "formatUtcTimestamp",
         "kind": "function",
-        "usage": "formatUtcTimestamp(timestamp)",
-        "note": "Formats a UTC timestamp as a readable string.",
+        "usage": "formatUtcTimestamp(unixSeconds)",
+        "note": (
+            "Formats a UTC timestamp the way Python's "
+            "`strftime('%Y-%m-%d %H:%M:%S')` does. Takes SECONDS, not "
+            "milliseconds — divide a millisecond value by 1000 first."
+        ),
+    },
+    {
+        "name": "traverse_data",
+        "kind": "function",
+        "usage": "traverse_data(obj, (value, key) => ...)",
+        "note": (
+            "Walks a nested object and yields whatever the callback returns for "
+            "each value it visits. Mostly used by `capture()`; `map_item` rarely "
+            "needs it, but it is there if the Python walks nested data."
+        ),
     },
     {
         "name": "MapItemException",
@@ -272,6 +332,81 @@ def discover_bootstrap_files(repo_root: Path, zeeschuimer_root: Path) -> list[Pa
     return found
 
 
+# What `map_item` is handed. Zeeschuimer stores a captured object inside a
+# record with some notes about where it came from, then unpacks that record
+# before calling `map_item`; 4CAT's importer builds the same shape (see
+# `wrap_for_map_item` in Zeeschuimer's `js/lib.js` and `common/lib/helpers.py`
+# in 4CAT). Nothing else in the prompt says where `__import_meta` comes from,
+# so the model has to be told, along with the unit trap in its timestamps.
+ITEM_SHAPE_BLOCK = (
+    "# What `item` is\n"
+    "`item` is not quite what `capture()` returned. Zeeschuimer stores each "
+    "captured object together with some notes about where it came from, and "
+    "unpacks that record before handing it to `map_item`: the captured object's "
+    "own fields sit at the top level, and everything else is gathered under a "
+    "single `__import_meta` key. 4CAT builds exactly the same shape when it "
+    "imports the data, which is why one `map_item` can serve both.\n\n"
+    "So `item['__import_meta']` is always there, and holds:\n"
+    "- `source_platform` — which Zeeschuimer module captured this\n"
+    "- `source_platform_url` — the site the capture came from\n"
+    "- `source_url` — the page the user was on\n"
+    "- `item_id`, `nav_index` — Zeeschuimer's own bookkeeping\n"
+    "- `timestamp_collected`, `last_updated` — IN MILLISECONDS, which is why the "
+    "Python divides them by 1000\n"
+    "- `user_agent`\n\n"
+    "Two things follow from that. The unpacking has already happened, so never "
+    "call `wrap_for_map_item` yourself. And a time taken from `__import_meta` is "
+    "in milliseconds while a time taken from the captured data is usually in "
+    "seconds — keep whichever conversion the Python does for each one, and "
+    "remember `formatUtcTimestamp` wants seconds.\n\n"
+)
+
+# The module is shown to the model so it can see `capture()`, which decides the
+# shape of the item `map_item` receives, and so the translation matches the
+# module's style. What it must NOT show is the auto-generated block, because
+# that is a previous answer to the very question being asked: a complete,
+# plausible `map_item` for nearly the same Python. Given one, a model will
+# reproduce it rather than translate the Python again, and the copy looks
+# right — most so when the Python has not changed, since then the old block
+# genuinely is a correct answer and nothing signals that copying is wrong.
+#
+# The generated block is 34-58% of these modules, so leaving it out also makes
+# the prompt about a fifth shorter.
+_GENERATED_BLOCK_PLACEHOLDER = (
+    "// === the auto-generated map_item block belongs here ===\n"
+    "// Left out of this prompt on purpose. It holds the previous translation,\n"
+    "// which your answer replaces in full. Translate the Python above; do not\n"
+    "// try to reconstruct what used to be here.\n"
+    "// === end ==="
+)
+
+
+def strip_generated_blocks(module_source: str) -> str:
+    """
+    Replace the auto-generated marker blocks in a module with a placeholder.
+
+    Used on the module before it goes into the prompt. Everything hand-written
+    stays — in the modules synced today that is `capture()` and its helpers,
+    all of which sit above the markers.
+
+    :param str module_source:  The Zeeschuimer module as it is on disk
+    :return str:  The same module with the generated blocks replaced
+    """
+    stripped = re.sub(
+        re.escape(BLOCK_MARKER_START) + r".*?" + re.escape(BLOCK_MARKER_END),
+        lambda _match: _GENERATED_BLOCK_PLACEHOLDER,
+        module_source,
+        flags=re.DOTALL,
+    )
+    # The imports block is generated too, and equally a previous answer.
+    return re.sub(
+        re.escape(IMPORTS_MARKER_START) + r".*?" + re.escape(IMPORTS_MARKER_END) + r"\n?",
+        "",
+        stripped,
+        flags=re.DOTALL,
+    )
+
+
 def build_user_prompt(python_source: str, existing_module_source: str, python_rel: str) -> str:
     helpers_block = _format_available_helpers()
     past_errors_block = _format_past_errors(RULES)
@@ -282,11 +417,14 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "class is the source of truth — your JavaScript translation must produce an "
         "object with the same field names and equivalent values.\n\n"
         f"```python\n{python_source}\n```\n\n"
+        f"{ITEM_SHAPE_BLOCK}"
         "# Existing Zeeschuimer module\n"
         "This module's `capture()` function returns the raw items that will be "
         "passed to `map_item(item)` as `item`. Use it to understand the input shape "
-        "and to match the existing code style (ES modules, `export` keyword, etc.).\n\n"
-        f"```javascript\n{existing_module_source}\n```\n\n"
+        "and to match the existing code style (ES modules, `export` keyword, etc.). "
+        "The auto-generated block has been left out of this listing: it holds "
+        "the previous translation, which your answer replaces in full.\n\n"
+        f"```javascript\n{strip_generated_blocks(existing_module_source)}\n```\n\n"
         "# Available Zeeschuimer JS helpers (globals)\n"
         "Zeeschuimer loads `js/lib.js` as a plain `<script>`, NOT as an ES "
         "module. Its top-level declarations are global — available everywhere "
@@ -314,7 +452,20 @@ def build_user_prompt(python_source: str, existing_module_source: str, python_re
         "Use `export function map_item(item) { ... }` to match this module's ES-module style. "
         "Return raw JavaScript source — do NOT wrap fields in markdown code fences. "
         "The `imports_to_add` field is normally an empty array (the helpers above are global, not imported). "
-        "The `helpers_to_add` field should contain full helper-function source (each entry one complete function)."
+        "The `helpers_to_add` field must contain a complete declaration for everything "
+        "`map_item` uses that is not on the globals list above — one entry each, and "
+        "including every module-level function, `@staticmethod` and class constant that "
+        "the Python file defines and `map_item` uses.\n\n"
+        # Last thing the model reads, and so the one that carries most weight.
+        # The same point is made in the opening section, tens of thousands of
+        # characters earlier; this is where it has to hold.
+        "# What you are translating\n"
+        "Translate the Python `map_item` above. That file is the only source of "
+        "truth for which fields exist and what goes in them. The JavaScript module "
+        "is context: read `capture()` for the shape of `item`, and follow the "
+        "module's style. Where the two disagree, the Python is right and the "
+        "JavaScript is out of date — that is usually why this translation was "
+        "asked for."
     )
 
 

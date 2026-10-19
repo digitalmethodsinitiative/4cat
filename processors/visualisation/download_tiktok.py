@@ -33,7 +33,7 @@ class TikTokImageDownloader(BasicProcessor):
     media_type = "image"
 
     # Allow processor on TikTok datasets
-    compatibility = Compatibility(types={"tiktok-search", "tiktok-urls-search"}, preferred_followups=ImageDownloader.followups)
+    compatibility = Compatibility(type_prefixes={"tiktok-"}, top_dataset_only=True, preferred_followups=ImageDownloader.followups)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):

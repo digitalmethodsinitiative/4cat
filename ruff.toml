@@ -1,0 +1,28 @@
+# Which ruff rules 4CAT checks, and why the list is short.
+#
+# .github/workflows/ruff.yml pins the ruff version too, so that the same code
+# gives the same answer for everyone.
+#
+# New rules worth reviewing under ruff 0.16.1:
+#
+#   ASYNC    blocking calls such as time.sleep or open inside an async function
+#   W605     a backslash in a string that Python does not read as an escape
+
+# The oldest Python that 4CAT supports
+target-version = "py311"
+
+[lint]
+select = [
+    "E4", "E7", "E9", "F", "PLE", "B006", "B012", "B025", "RUF013", "RUF034", "PLW0127",
+
+    # whole groups 4CAT already passes, so they cannot creep back in
+    "EXE",  # shebang lines that do not match whether a file is executable
+    "NPY",  # numpy features that have been removed or renamed
+    "TID",  # imports written relative to the current file instead of from the top
+    "YTT",  # version checks that break on Python 3.10 and later
+]
+
+[lint.per-file-ignores]
+# Migration scripts are a frozen record of what each upgrade did and are not
+# edited once released, so they cannot be brought in line with new rules.
+"helper-scripts/migrate/**" = ["ALL"]

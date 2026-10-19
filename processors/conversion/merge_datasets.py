@@ -209,6 +209,7 @@ class DatasetMerger(BasicProcessor):
 
                 except NotImplementedError:
                     self.dataset.finish_with_error(f"Datasets comprising {dataset.get_extension()} files cannot be merged. You can only merge NDJSON or CSV datasets.")
+                    return
 
         # log any raised warnings to dataset log
         num_warnings = sum([sum(w.values()) for w in warnings.values()])
