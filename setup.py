@@ -41,7 +41,7 @@ core_packages = {
 	"requests_futures",
 	"ruff",
 	"svgwrite~=1.4.0",
-	"ural~=1.6.1",
+	"ural~=1.6.2",
 	"Werkzeug"
 }
 

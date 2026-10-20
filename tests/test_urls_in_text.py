@@ -96,7 +96,7 @@ def test_archive_urls_in_a_list(separator):
     assert urls_in_text(separator.join([archived_too, archived])) == [archived_too, archived]
 
 
-# --- brackets and Markdown links (worked around for ural 1.6.1) ----------------
+# --- brackets and Markdown links -------------------------------------------------
 
 @pytest.mark.parametrize("text", [
     "(see https://a.com/x)",
@@ -106,7 +106,17 @@ def test_archive_urls_in_a_list(separator):
     "(https://a.com/x)",
 ])
 def test_closing_bracket_after_url_is_left_out(text):
-    """ural 1.6.1 keeps the ")" unless the "(" comes right before the URL"""
+    """ural 1.6.1 kept the ")" unless the "(" came right before the URL; 1.6.2 fixed that"""
+    assert urls_in_text(text) == ["https://a.com/x"]
+
+
+@pytest.mark.parametrize("text", [
+    "((see https://a.com/x))",
+    "(see (also https://a.com/x))",
+    "see https://a.com/x]) here",
+])
+def test_more_than_one_closing_bracket_after_url_is_left_out(text):
+    """ural 1.6.2 leaves out only one closing bracket; urls_in_text leaves out the rest"""
     assert urls_in_text(text) == ["https://a.com/x"]
 
 
@@ -117,6 +127,7 @@ def test_closing_bracket_after_url_is_left_out(text):
 def test_bracket_that_belongs_to_the_url_is_kept(url):
     assert urls_in_text(url) == [url]
     assert urls_in_text(f"(see {url})") == [url]
+    assert urls_in_text(f"(see (also {url}))") == [url]
     assert urls_in_text(f"see {url}.") == [url]
 
 
@@ -125,13 +136,13 @@ def test_bracket_that_belongs_to_the_url_is_kept(url):
     "[https://a.com/x]() and more",
 ])
 def test_markdown_link_with_empty_target(text):
-    """ural 1.6.1 crashes on these"""
+    """ural 1.6.1 crashed on these; 1.6.2 fixed that"""
     assert urls_in_text(text) == ["https://a.com/x"]
 
 
 @pytest.mark.parametrize("target", ["foo", "/r/sub", "pic.jpg"])
 def test_markdown_link_target_that_is_not_a_url(target):
-    """ural returns the target of a Markdown link even when it is not a URL"""
+    """ural (as of 1.6.2) returns the target of a Markdown link even when it is not a URL"""
     assert urls_in_text(f"[https://a.com/x]({target})") == ["https://a.com/x"]
 
 

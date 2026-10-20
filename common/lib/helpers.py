@@ -1488,8 +1488,8 @@ def urls_in_text(text):
     In ordinary text, a URL with a space in it cannot be told apart from a URL followed by more words, so a space
     always ends a URL.
 
-    Three things ural 1.6.1 gets wrong are worked around here; they were reported to ural, and each step below can
-    go once ural handles it (the tests in tests/test_urls_in_text.py will show when that is the case).
+    Two things ural (as of 1.6.2) does not handle are taken care of here. Each step below can go once ural handles it;
+    the tests in tests/test_urls_in_text.py will show when that is the case.
 
     :param str text:  Text to search
     :return list:  The URLs, exactly as they are written in the text
@@ -1497,20 +1497,17 @@ def urls_in_text(text):
     if not text:
         return []
 
-    # ural crashes on a Markdown link with an empty target, such as "[https://a.com/x]()". An empty target holds no
-    # URL, so it is left out of the text before searching
-    text = str(text).replace("]()", "] ")
-
     urls = []
-    for url in ural.urls_from_text(text):
+    for url in ural.urls_from_text(str(text)):
         # ural also returns the target of a Markdown link when that is not a URL, such as "foo" in
         # "[https://a.com/x](foo)". Every URL it finds otherwise has "//" in it
         if "//" not in url:
             continue
 
-        # ural keeps a closing bracket after a URL unless the URL directly follows an opening one, so
-        # "(see https://a.com/x)" gives "https://a.com/x)". A closing bracket at the end that has no opening bracket
-        # in the URL is left out; one that does, as in https://en.wikipedia.org/wiki/Foo_(bar), stays
+        # ural leaves out one closing bracket after a URL that has no matching opening bracket, as in
+        # "(see https://a.com/x)", but not two, as in "(see (also https://a.com/x))", nor a "]" that follows a ")".
+        # All closing brackets at the end that have no opening bracket in the URL are left out; those that do, as in
+        # https://en.wikipedia.org/wiki/Foo_(bar), stay
         for opening, closing in (("(", ")"), ("[", "]")):
             while url.endswith(closing) and url.count(closing) > url.count(opening):
                 url = url[:-1]
