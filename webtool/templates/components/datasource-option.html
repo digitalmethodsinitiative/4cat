@@ -103,6 +103,11 @@
             {% endif %}
         {% elif settings.type == "multi" %}
             <div class="multichoice-wrapper">
+                {# a browser submits nothing at all for a select with nothing selected, which
+                   would be indistinguishable from the field never having been shown. this
+                   empty value keeps the field in the submission either way; it is discarded
+                   while parsing #}
+                <input name="option-{{ option }}" type="hidden" value="">
                 <select name="option-{{ option }}" id="forminput-{{ option }}" multiple="multiple">
             {% for choice in settings.options %}
                     <option value="{{ choice }}"{% if choice in settings.default %} selected="selected"{% endif %}>{{ settings.options[choice] }}</option>
@@ -117,6 +122,8 @@
             </div>
         {% elif settings.type == "multi_select" %}
             <div class="multi-select-wrapper">
+                {# see above: keeps the field present when nothing is selected #}
+                <input name="option-{{ option }}" type="hidden" value="">
                 <select name="option-{{ option }}" id="forminput-{{ option }}" multiple="multiple">
                 {% for choice in settings.options %}
                     <option value="{{ choice }}"{% if choice in settings.default %} selected="selected"{% endif %}>{{ settings.options[choice] }}</option>

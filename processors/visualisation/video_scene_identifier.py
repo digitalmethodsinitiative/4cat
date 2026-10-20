@@ -134,7 +134,7 @@ class VideoSceneDetector(BasicProcessor):
 				"coerce_type": float,
 				"default": 27.0,
 				"min": 0,
-				"max": 5,
+				"max": 255,
 				"requires": "detector_type==content_detector"
 			},
 			"ad_adaptive_threshold": {
@@ -193,13 +193,14 @@ class VideoSceneDetector(BasicProcessor):
 			"save_annotations": {
 				"type": UserInput.OPTION_ANNOTATION,
 				"label": "scene data",
-				"hidden_in_explorer": True,
+				"hide_in_explorer": True,
 				"tooltip": "Add amount of scenes per video to top dataset",
 				"default": False
 			}
 		}
 		# only offer ffmpeg option if we actually have ffmpeg and ffprobe
-		if not ExecutableSibling("ffmpeg", "ffprobe")(config.get("video-downloader.ffmpeg_path")):
+		if not ExecutableSibling("ffmpeg", "ffprobe")(config.get("video-down" \
+		"loader.ffmpeg_path")):
 			del options["detector_type"]["options"]["ffmpeg_select"]
 			# fall back to the first remaining choice; the keys are the stored
 			# values, the dictionary values are display labels

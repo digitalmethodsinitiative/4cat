@@ -390,18 +390,21 @@ class Search4Chan(SearchWithScope):
                 "min": 0,
                 "max": 100,
                 "default": 15,
-                "tooltip": "At least this many % of posts in the thread must match the query"
+                "tooltip": "At least this many % of posts in the thread must match the query",
+                "requires": "search_scope==dense-threads"
             },
             "scope_length": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Min. dense thread length",
                 "min": 30,
                 "default": 30,
-                "tooltip": "A thread must at least be this many posts long to qualify as a 'dense thread'"
+                "tooltip": "A thread must at least be this many posts long to qualify as a 'dense thread'",
+                "requires": "search_scope==dense-threads"
             },
             "valid_ids": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Post IDs (comma-separated)"
+                "help": "Post IDs (comma-separated)",
+                "requires": "search_scope==match-ids"
             }
         }
 
@@ -870,12 +873,17 @@ class Search4Chan(SearchWithScope):
             query["max_date"] = before
 
         del query["daterange"]
-        if query.get("search_scope") not in ("dense-threads",):
-            del query["scope_density"]
-            del query["scope_length"]
 
-        if query.get("search_scope") not in ("match-ids",) and "valid_ids" in query.keys():
-            del query["valid_ids"]
+        # the scope fields are declared with a "requires" on the matching
+        # search scope, so on the web path they are already left out of the
+        # parsed input when their scope is not selected; this also covers
+        # callers that skip that parsing and pass them along anyway
+        if query.get("search_scope") not in ("dense-threads",):
+            query.pop("scope_density", None)
+            query.pop("scope_length", None)
+
+        if query.get("search_scope") not in ("match-ids",):
+            query.pop("valid_ids", None)
 
         return query
 
