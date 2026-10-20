@@ -1476,46 +1476,95 @@ def split_urls(url_string, allowed_schemes=None):
     return potential_urls
 
 
-def urls_in_text(text, split_commas=True, allowed_schemes=None):
+def urls_in_text(text):
     """
     Find the URLs in a text, in the order they appear and each only once.
 
     URLs are found with ural's `urls_from_text`, which leaves out punctuation that follows a URL (such as the full stop
-    at the end of a sentence) and skips e-mail addresses. Two of its mistakes are worked around here:
+    at the end of a sentence) and skips e-mail addresses. A list of URLs separated by commas, with or without a space
+    after each comma, gives each URL separately: a comma directly followed by "http://" or "https://" starts a new
+    URL, while other commas, such as those in `https://www.google.com/maps/@52.37,4.89,15z`, stay part of the URL.
 
-    - URLs with only a comma between them (`https://a.com/x,https://b.com/y`) come back from ural as one URL. The text
-      is first split with `split_urls`, so that a comma followed by a new URL starts a new one.
-    - A URL with "/@" followed by a name with a dot in it, such as `https://www.tiktok.com/@maria.bg2/video/123`, is
-      cut short by ural (`https://www.tiktok.com/@maria.bg`).
+    In ordinary text, a URL with a space in it cannot be told apart from a URL followed by more words, so a space
+    always ends a URL.
 
-    In ordinary text, a URL with a space in it cannot be told apart from a URL followed by more words. However, if 
-    split_commas=True, split_urls is used to separate URLs by commas and it will split a URL with a comma followed by
-    a space and a new URL (i.e. starting with a new scheme from allowed_schemes) into two URLs. See `split_urls` for details.
+    Two things ural (as of 1.6.2) does not handle are taken care of here. Each step below can go once ural handles it;
+    the tests in tests/test_urls_in_text.py will show when that is the case.
 
     :param str text:  Text to search
-    :param bool split_commas:  Whether a comma directly followed by a new URL separates two URLs. If not, such a comma
-    and the URL after it are kept as part of the URL before it, as ural does.
     :return list:  The URLs, exactly as they are written in the text
     """
     if not text:
         return []
 
-    pieces = split_urls(str(text), allowed_schemes=allowed_schemes) if split_commas else [str(text)]
     urls = []
-    for piece in pieces:
-        # ural reads an "@" as the end of a user name, as in https://user:password@example.com, even when the "@" comes
-        # later in the URL. It then takes the name after the "@" for the address of the website, and stops where that
-        # name no longer looks like one. To prevent this, each "@" that follows a "/" is swapped for a character that
-        # does not occur in the text, and swapped back in the URLs that are found.
-        stand_in = ""  # a "private use" character, which has no meaning of its own
-        while stand_in in piece:
-            stand_in = chr(ord(stand_in) + 1)
+    for url in ural.urls_from_text(str(text)):
+        # ural also returns the target of a Markdown link when that is not a URL, such as "foo" in
+        # "[https://a.com/x](foo)". Every URL it finds otherwise has "//" in it
+        if "//" not in url:
+            continue
 
-        for url in ural.urls_from_text(piece.replace("/@", "/" + stand_in)):
-            urls.append(url.replace(stand_in, "@"))
+        # ural leaves out one closing bracket after a URL that has no matching opening bracket, as in
+        # "(see https://a.com/x)", but not two, as in "(see (also https://a.com/x))", nor a "]" that follows a ")".
+        # All closing brackets at the end that have no opening bracket in the URL are left out; those that do, as in
+        # https://en.wikipedia.org/wiki/Foo_(bar), stay
+        for opening, closing in (("(", ")"), ("[", "]")):
+            while url.endswith(closing) and url.count(closing) > url.count(opening):
+                url = url[:-1]
+
+        urls.append(url)
 
     # the same URL can occur more than once
     return list(dict.fromkeys(urls))
+
+
+def holds_only_urls(text, urls):
+    """
+    Check whether a text consists of nothing but URLs
+
+    That is the case for a single URL or a list of URLs, separated by commas,
+    spaces or new lines, as opposed to ordinary text with URLs in it. Commas,
+    brackets and other punctuation around the URLs (such as a full stop that
+    `urls_in_text` left out of a URL) do not count as text; letters and digits
+    do.
+
+    :param str text:  Text to check
+    :param list urls:  The URLs in the text, as found by `urls_in_text`
+    :return bool:  Whether the text holds only URLs
+    """
+    if not urls:
+        return False
+
+    # longer URLs go first, as a URL may be the start of another one
+    leftover = str(text)
+    for url in sorted(urls, key=len, reverse=True):
+        leftover = leftover.replace(url, "")
+
+    # letters or digits, but not "_", which ural leaves out of the end of URLs
+    return not re.search(r"[^\W_]", leftover)
+
+
+def looks_like_image_url(url):
+    """
+    Check whether a URL looks like it links to an image
+
+    This is a guess based on the URL alone: it has an image file extension
+    after the host name, as in `http://site.com/img.jpg` or
+    `https://preview.redd.it/abc.gif?format=mp4`, or it is an Imgur or Gfycat
+    link, which can be downloaded as an image even without an extension.
+    Many image links have no extension at all (e.g.
+    `https://pbs.twimg.com/media/abc?format=jpg`); those are not recognised.
+
+    :param str url:  URL to check
+    :return bool:  Whether the URL looks like an image link
+    """
+    parsed = urlparse(str(url))
+    after_host = parsed.path + "?" + parsed.query if parsed.query else parsed.path
+    if re.search(r"\.(?:png|jpe?g|gifv?)", after_host, re.IGNORECASE):
+        return True
+
+    host = (parsed.hostname or "").removeprefix("www.")
+    return host in ("imgur.com", "gfycat.com")
 
 
 def folder_size(path='.'):

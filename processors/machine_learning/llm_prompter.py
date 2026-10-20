@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException, MetadataException
-from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
+from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict, urls_in_text
 from common.lib.llm.adapter import LLMAdapter
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
@@ -753,7 +753,7 @@ class LLMPrompter(BasicProcessor):
                         else:
                             item_values[column_to_use] = item_value
 
-                    # Get media URL values; split links on comma.
+                    # Get media URL values; a column can hold one URL or a list of them.
                     media_urls = []
                     for media_column in media_columns:
                         media_url = item.get(media_column, [])
@@ -761,7 +761,7 @@ class LLMPrompter(BasicProcessor):
                             if isinstance(media_url, list):
                                 media_urls += media_url
                             else:
-                                media_urls += [url.strip() for url in media_url.split(",")]
+                                media_urls += urls_in_text(media_url)
 
                     # Skip with empty items
                     empty_items = True if not any(v for v in item_values.values()) and columns_to_use else False
