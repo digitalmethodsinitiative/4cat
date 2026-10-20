@@ -212,7 +212,7 @@ class SearchTumblr(Search):
 		"""
 
 		# ready our parameters
-		parameters = self.dataset.get_parameters()
+		parameters = self.parameters
 		queries = re.split(",|\n", parameters.get("query", ""))
 		get_notes = parameters.get("get_notes", False)
 		get_reblogs = parameters.get("get_reblogs", False)
@@ -931,6 +931,7 @@ class SearchTumblr(Search):
 
 		return self.client
 
+	@staticmethod
 	def validate_query(query, request, config):
 		"""
 		Validate custom data input
@@ -964,9 +965,15 @@ class SearchTumblr(Search):
 		items = ", ".join([item.strip() for item in items if item])
 
 		# the dates need to make sense as a range to search within
-		query["min_date"], query["max_date"] = query.get("daterange")
-		if any(query.get("daterange")) and not all(query.get("daterange")):
+		after, before = query.get("daterange")
+		if any((after, before)) and not all((after, before)):
 			raise QueryParametersException("When providing a date range, set both an upper and lower limit.")
+
+		# only store date bounds that were actually set
+		if after:
+			query["min_date"] = after
+		if before:
+			query["max_date"] = before
 
 		del query["daterange"]
 

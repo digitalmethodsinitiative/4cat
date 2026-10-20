@@ -201,6 +201,8 @@ class VideoSceneDetector(BasicProcessor):
 		# only offer ffmpeg option if we actually have ffmpeg and ffprobe
 		if not ExecutableSibling("ffmpeg", "ffprobe")(config.get("video-downloader.ffmpeg_path")):
 			del options["detector_type"]["options"]["ffmpeg_select"]
+			# fall back to the first remaining choice; the keys are the stored
+			# values, the dictionary values are display labels
 			options["detector_type"]["default"] = list(options["detector_type"]["options"].keys())[0]
 
 		return options
