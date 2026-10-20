@@ -103,7 +103,6 @@ class TikTokVideoDownloader(ProcessorPreset):
                 "parameters": {
                     "amount": amount,
                     "columns": ["video_url"],
-                    "split-comma": False,
                     "also_indirect": "all", # enabled YT-DLP
                     "_ytdlp_fallback_column": "tiktok_url" # YT-DLP uses TikTok post URL
                 }
