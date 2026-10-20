@@ -8,6 +8,7 @@ assumes that ffprobe is also present in the same location.
 """
 import shutil
 import oslex
+import json
 
 from packaging import version
 
@@ -164,20 +165,23 @@ class VideoStack(BasicProcessor):
             if len(videos) >= max_videos:
                 break
 
-            video_path = oslex.quote(str(video.file))
-
             # determine length if needed
-            length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of",
-                              "default=noprint_wrappers=1:nokey=1", video_path]
-            length = self.run_interruptable_process(length_command)
+            length_command = [ffprobe_path, "-v", "error", "-show_entries", "format=duration", "-of", "json",
+                              str(video.file)]
+            probe = self.run_interruptable_process(length_command)
 
-            length_output = length.stdout.decode("utf-8")
-            length_error = length.stderr.decode("utf-8")
-            if length_error:
-                return self.dataset.finish_with_error("Cannot determine length of video {video.name}. Cannot stack "
-                                                      "videos without knowing the video lengths.")
-            else:
-                lengths[video.file.name] = float(length_output)
+            probe_error = probe.stderr.decode("utf-8", errors="replace")
+            if not probe_error:
+                try:
+                    # ffprobe leaves out the duration when it is unknown
+                    lengths[video.file.name] = float(json.loads(probe.stdout)["format"]["duration"])
+                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                    probe_error = f"no duration found ({e})"
+
+            if probe_error:
+                self.dataset.log(f"ffprobe could not read {video.file.name}: {probe_error}")
+                return self.dataset.finish_with_error(f"Cannot determine length of video {video.file.name}. Cannot "
+                                                      "stack videos without knowing the video lengths.")
 
             videos.append(video.file)
 
@@ -200,9 +204,8 @@ class VideoStack(BasicProcessor):
         # loop again, this time to construct the ffmpeg command
         last_index = num_videos - 1
         for video in videos:
-            video_path = oslex.quote(str(video))
             # video to stack
-            command += ["-i", video_path]
+            command += ["-i", str(video)]
             if index > 0:
                 # 'bottom' video doesn't need transparency since there's nothing below it
                 transparency_filter.append(

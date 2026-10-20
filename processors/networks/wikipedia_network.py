@@ -11,6 +11,7 @@ import networkx as nx
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import urls_in_text
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
@@ -38,11 +39,10 @@ class WikiURLCoLinker(BasicProcessor):
 		* or " in the query
 		"""
 
-		# we use these to extract URLs and host names if needed
-		link_regex = re.compile(r"https?://en.wikipedia\.org/wiki/[^\s.]+")
+		# links to English Wikipedia articles are the ones we are after
+		wikipedia_link = re.compile(r"https?://en\.wikipedia\.org/wiki/.")
 		# wiki_page = re.compile(r"[\[\[[^\]]+\]\]")
 		category_regex = re.compile(r"\[\[Category:[^\]]+\]\]")
-		trailing_comma = re.compile(r",$")
 
 		links = {}
 		all_categories = {}
@@ -61,14 +61,12 @@ class WikiURLCoLinker(BasicProcessor):
 			if not post["body"]:
 				continue
 
-			wiki_links = link_regex.findall(post["body"])
+			wiki_links = [link for link in urls_in_text(post["body"]) if wikipedia_link.match(link)]
 
 			# if the result has an explicit url per post, take that into
 			# account as well
-			if "url" in post and post["url"] and link_regex.match(post["url"]):
-				wiki_links.append(link_regex.findall(post["url"]))
-
-			wiki_links = [trailing_comma.sub("", link) for link in wiki_links]
+			if "url" in post and post["url"]:
+				wiki_links += [link for link in urls_in_text(post["url"]) if wikipedia_link.match(link)]
 
 			# Encode the URLs, e.g. replace commas with '%2c', so it makes a nice gdf file
 			wiki_links = [link.replace(",", "%2c").replace("'", "").replace('"',"").replace("\\_","_") for link in wiki_links]

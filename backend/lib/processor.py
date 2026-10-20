@@ -155,7 +155,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                         # this means there is no dataset that is *not* a preset anywhere
                         # above this dataset. This should never occur, but if it does, we
                         # cannot continue
-                        self.log.error(f"Processor preset {self.type} for dataset {self.dataset.key} cannot find non-preset parent dataset")
+                        self.log.error("Processor preset %s for dataset %s cannot find non-preset parent dataset" % (
+                            self.type, self.dataset.key))
                         self.job.finish()
                         return
 
@@ -183,6 +184,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         processor_name = self.title if hasattr(self, "title") else self.type
         self.dataset.clear_log()
         self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
+
+        # remember the datasets above this one now, while they still exist, so
+        # they can be reported later if they are deleted while this runs
+        self.dataset.get_genealogy()
 
         # start log file; update dataset status_type to processing
         self.dataset.update_status("Processing data", status_type=StatusType.PROCESSING)
@@ -297,6 +302,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                         next_type, self.dataset.key))
 
             elif next_type in available_processors:
+                if self.interrupted == self.INTERRUPT_CANCEL:
+                    # this dataset is being deleted; a follow-up created now
+                    # would be left behind without a parent to attach it to
+                    self.log.info("Not running follow-up processor of type %s for dataset %s, dataset was cancelled" % (
+                        next_type, self.dataset.key))
+                    break
+
                 next_analysis = DataSet(
                     parameters=next_parameters,
                     type=next_type,
@@ -385,8 +397,19 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
             except DataSetException:
                 # dataset with key to attach to doesn't exist...
-                self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist, may have "
-                                 "been deleted in the meantime)" % (self.dataset.key, self.parameters["attach_to"]))
+                try:
+                    # check if this running dataset still exists
+                    DataSet(key=self.dataset.key, db=self.db, modules=self.modules)
+                except DataSetException:
+                    # this dataset was deleted in process, we do not need to attach it to anything
+                    pass
+                else:
+                    # this dataset still exists, so it was left behind
+                    # without the dataset it was supposed to be attached to
+                    chain = " -> ".join(dataset.key for dataset in self.dataset.get_genealogy())
+                    self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist, but %s "
+                                     "does; chain when processing started: %s)" % (
+                        self.dataset.key, self.parameters["attach_to"], self.dataset.key, chain))
 
         # Validate map_item against the freshly finished dataset and emit a
         # single rolled-up admin alert if anything is unmappable. Fires once
