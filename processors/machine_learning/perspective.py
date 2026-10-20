@@ -72,7 +72,8 @@ class Perspective(BasicProcessor):
 				"default": "",
 				"help": "Google API key",
 				"tooltip": "Can be created on console.cloud.google.com",
-				"sensitive": True
+				"sensitive": True,
+				"mandatory": True
 			}
 
 		return options

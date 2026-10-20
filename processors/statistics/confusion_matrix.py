@@ -34,6 +34,7 @@ class ConfusionMatrix(BasicProcessor):
         options = {
             "columns": {
                 "type": UserInput.OPTION_TEXT,
+                "mandatory": True,
                 "help": "Column to use for true and predicted values",
                 "inline": True,
                 "default": "",

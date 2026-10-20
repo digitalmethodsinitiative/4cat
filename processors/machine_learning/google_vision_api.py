@@ -59,11 +59,14 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             "amount": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Images to process (0 = all)",
+                "coerce_type": int,
+                "min": 0,
                 "default": 0
             },
             "api_key": {
                 "type": UserInput.OPTION_TEXT,
                 "sensitive": True,
+                "mandatory": True,
                 "help": "API Key",
                 "tooltip": "The API Key for the Google API account you want to query with. You can generate and find this"
                         "key on console.cloud.google.com. You also need to enable billing and Vision API."

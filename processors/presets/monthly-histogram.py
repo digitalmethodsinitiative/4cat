@@ -22,8 +22,8 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None):
 		count_options = CountPosts.get_options(parent_dataset=parent_dataset, config=config)
-		if "all" in count_options["timeframe"]:
-			# Cannot graph overall counts (or rather it would be a single bar)
+		# Cannot graph overall counts (or rather it would be a single bar)
+		if "all" in count_options["timeframe"]["options"]:
 			count_options["timeframe"]["options"].pop("all")
 		return count_options
 

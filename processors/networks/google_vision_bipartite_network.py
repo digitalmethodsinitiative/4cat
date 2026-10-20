@@ -44,6 +44,9 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
             "min_confidence": {
                 "type": UserInput.OPTION_TEXT,
                 "default": 0.5,
+                "coerce_type": float,
+                "min": 0,
+                "max": 1,
                 "help": "Min confidence",
                 "tooltip": "Value between 0 and 1; confidence required before the annotation is included. Note that the" \
                         "confidence is not known for all annotation types (these will be included with confidence '-1'" \

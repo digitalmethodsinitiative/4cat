@@ -9,7 +9,7 @@ from requests.exceptions import ConnectionError
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.dmi_service_manager import DmiServiceManager, DmiServiceManagerException, DsmOutOfMemory
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 
@@ -255,10 +255,32 @@ class AudioToText(BasicProcessor):
                 "help": "OpenAI API key",
                 "tooltip": "Can be created on platform.openapi.com",
                 "requires": "model_host==openai",
-                "sensitive": True
+                "sensitive": True,
+                "mandatory": True
             }
 
         return options
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Ask for confirmation before audio is sent to OpenAI
+
+        Sending audio to OpenAI shares data with a third party and is likely to
+        cost money, so ask the user to confirm that first. That the API key is
+        actually filled in is handled by the option's `mandatory` setting.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        if query.get("model_host") == "openai" and not query.get("frontend-confirm"):
+            raise QueryNeedsExplicitConfirmationException(
+                "Your audio files will be sent to OpenAI for processing. This shares your data with a third "
+                "party and is likely to incur costs. Do you want to continue?")
+
+        return query
 
     def process(self):
         """
@@ -318,7 +340,9 @@ class AudioToText(BasicProcessor):
                     return
 
         else:
-            # Check for API key if using OpenAI models
+            # the key is also checked when the job is queued, but jobs started
+            # by presets and `next` steps skip that check, and a site-wide key
+            # can be removed between queueing and running
             api_key = self.parameters.get("api_key")
             if not api_key:
                 api_key = self.config.get("api.openai.api_key")

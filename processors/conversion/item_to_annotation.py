@@ -34,6 +34,7 @@ class ItemToAnnotation(BasicProcessor):
             "columns": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "body",
+                "mandatory": True,
                 "help": "Columns to convert",
             }
         }
@@ -44,6 +45,9 @@ class ItemToAnnotation(BasicProcessor):
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["inline"] = True
             options["columns"]["options"] = {v: v for v in columns}
+            # a list of columns this parent actually has: the plain "body"
+            # default above is neither a list nor necessarily a real column
+            options["columns"]["default"] = ["body"] if "body" in columns else []
 
         return options
 

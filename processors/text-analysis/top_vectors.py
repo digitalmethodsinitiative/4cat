@@ -43,6 +43,8 @@ class VectorRanker(BasicProcessor):
 			"top": {
 				"type": UserInput.OPTION_TEXT,
 				"default": 25,
+				"coerce_type": int,
+				"min": 1,
 				"help": "Cut-off for top list"
 			},
 			"top-style": {

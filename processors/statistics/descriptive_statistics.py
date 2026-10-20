@@ -33,6 +33,7 @@ class DescriptiveStatistics(BasicProcessor):
         options = {
             "columns": {
                 "type": UserInput.OPTION_MULTI,
+                "mandatory": True,
                 "help": "Columns to analyze",
                 "options": {},
                 "default": [],

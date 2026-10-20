@@ -103,6 +103,7 @@ class CategorizeImagesCLIP(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "help": "Categories (comma seperated list)",
                 "default": "",
+                "mandatory": True,
                 "tooltip": "The CLIP model will estimate the probability an image belongs to every category, adding up to 100% across categories. It is quite robust and can accept proper nouns, some celebrities, as well as understand syntax such as \"animal\" vs \"not animal\""
             },
         }

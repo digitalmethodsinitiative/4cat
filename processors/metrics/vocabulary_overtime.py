@@ -5,6 +5,7 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
@@ -79,6 +80,24 @@ class OvertimeAnalysis(BasicProcessor):
                 "help": "Custom vocabulary (separate with commas)"
             }
         }
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Check that there are words to count
+
+        Either vocabulary or vocabulary-custom must be provided, otherwise the processor will not know what to count.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param ConfigManager|None config:  Configuration reader (context-aware)
+        :return dict:  Safe query parameters
+        """
+        if not query.get("vocabulary") and not query.get("vocabulary-custom", "").strip():
+            raise QueryParametersException(
+                "Choose at least one vocabulary, or provide your own words to count.")
+
+        return query
 
     def process(self):
         """

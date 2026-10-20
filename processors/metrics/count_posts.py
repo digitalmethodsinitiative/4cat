@@ -62,10 +62,12 @@ class CountPosts(BasicProcessor):
             options["column"]["inline"] = True
             options["column"]["tooltip"] = "Choose one. If multiple are selected, the first will be used."
             options["column"]["options"] = {v: v for v in columns if "time" in v or "date" in v or "created" in v}
+            # a list: this is a multi-select, so its default is a set of
+            # selected options, not a single one
             options["column"]["default"] = (
-                "timestamp"
+                ["timestamp"]
                 if "timestamp" in columns
-                else sorted(columns, key=lambda k: "time" in k).pop()
+                else [sorted(columns, key=lambda k: "time" in k).pop()]
             )
 
         return options
