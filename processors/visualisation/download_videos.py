@@ -212,13 +212,6 @@ class VideoDownloaderPlus(BasicProcessor):
                 "min": 1,
                 "tooltip": "Max of 100 MB set by 4CAT administrators",
             },
-            "split-comma": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Split column values by comma",
-                "default": True,
-                "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-                        "separately"
-            }
         }
 
         # Update the amount max and help from config
@@ -1251,7 +1244,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
     def identify_video_urls_in_string(self, text):
         """Search string of text for URLs that may contain video links"""
-        return urls_in_text(text, split_commas=self.parameters.get("split-comma", True))
+        return urls_in_text(text)
 
     def copy_previous_video(self, previous_vid_metadata, staging_area, previous_downloaders):
         """Copy existing video to new staging area"""

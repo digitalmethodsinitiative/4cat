@@ -5,12 +5,11 @@ import requests
 import urllib3
 import shutil
 import json
-import re
 
 from PIL import Image, UnidentifiedImageError
 from requests.structures import CaseInsensitiveDict
 
-from common.lib.helpers import UserInput, url_to_filename
+from common.lib.helpers import UserInput, url_to_filename, urls_in_text, holds_only_urls, looks_like_image_url
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.exceptions import ProcessorInterruptedException, FourcatException
@@ -101,14 +100,8 @@ class ImageDownloader(BasicProcessor):
                 "help": "Column to get image links from",
                 "default": "image_url",
                 "inline": True,
-                "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
-            },
-            "split-comma": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Split column values by comma?",
-                "default": True,
-                "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-                "separately",
+                "tooltip": "If the column contains only URLs (one, or a list separated by commas), use those URLs; "
+                "else, try to find image URLs in the column's content",
             },
         }
 
@@ -156,7 +149,6 @@ class ImageDownloader(BasicProcessor):
 
         # Get the source file data path
         amount = self.parameters.get("amount", 100)
-        split_comma = self.parameters.get("split-comma", False)
 
         if amount == 0:
             amount = self.config.get("image-downloader.max", 1000)
@@ -204,19 +196,7 @@ class ImageDownloader(BasicProcessor):
                 if not value:
                     continue
 
-                # remove all whitespace from beginning and end (needed for single URL check)
-                values = [str(value).strip()]
-                if split_comma:
-                    values = values[0].split(",")
-
-                for value in values:
-                    if re.match(r"https?://(\S+)$", value):
-                        # single URL
-                        item_urls.add(value)
-                    else:
-                        # search for URLs in string
-                        for regex in self.get_link_regexes():
-                            item_urls |= set(regex.findall(value))
+                item_urls |= self.find_image_urls(str(value))
 
             item_urls = self.preprocess_urls(item_urls)
             for item_url in item_urls:
@@ -584,28 +564,29 @@ class ImageDownloader(BasicProcessor):
 
         return url
 
-    def get_link_regexes(self):
+    @staticmethod
+    def find_image_urls(value):
         """
-        Get regexes to extract relevant links from text
+        Find the URLs to download images from in a column value
 
-        :return list:  List of compiled regular expressions
+        If the value holds nothing but URLs (one, or a list), all of them are
+        used: the column is then meant to hold image links, even if they do not
+        look like one, as many image hosts leave out the file extension.
+        Otherwise the value is ordinary text, and only the URLs in it that look
+        like image links are used.
+
+        :param str value:  Column value
+        :return set:  Image URLs
         """
-        return [
-            # for image URL extraction, we use the following heuristic:
-            # Makes sure that it gets "http://site.com/img.jpg", but also
-            # more complicated ones like
-            # https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
-            re.compile(
-                r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*",
-                re.IGNORECASE,
-            ),
-            # Imgur and gfycat links that do not end in an extension are also accepted.
-            # These can later be downloaded by adding an extension.
-            re.compile(
-                r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[,']*",
-                re.IGNORECASE,
-            ),
-        ]
+        urls = urls_in_text(value)
+
+        if holds_only_urls(value, urls):
+            # a single URL or a list of URLs: the column is meant to hold image
+            # links, so use them all, even those without an image extension
+            return set(urls)
+
+        # text with links in it: only use the links that look like images
+        return {url for url in urls if looks_like_image_url(url)}
 
     def get_valid_file_extension(self, file):
         """

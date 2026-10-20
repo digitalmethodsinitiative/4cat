@@ -10,7 +10,7 @@ from itertools import islice, chain
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import QueryParametersException
-from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
+from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor, urls_in_text
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -366,12 +366,11 @@ class AttributeRanker(BasicProcessor):
         :param str look_for:  What type of value to look for
         :return list:  Found values
         """
-        link_regex = re.compile(r"https?://[^\s\]()]+")
         www_regex = re.compile(r"^www\.")
         values = []
 
         if look_for in ("urls", "hostnames", "level2-hostnames"):
-            links = link_regex.findall(value)
+            links = urls_in_text(value)
 
             if look_for in ("hostnames", "level2-hostnames"):
                 for urlbits in links:
