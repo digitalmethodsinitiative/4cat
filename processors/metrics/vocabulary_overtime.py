@@ -5,7 +5,7 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.helpers import UserInput, get_interval_descriptor
+from common.lib.helpers import UserInput, get_interval_descriptor, compile_term_regex
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -77,6 +77,20 @@ class OvertimeAnalysis(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "Custom vocabulary (separate with commas)"
+            },
+            "match": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "word",
+                "options": {
+                    "word": "Whole words only",
+                    "start": "At the start of words",
+                    "anywhere": "Anywhere, also inside words",
+                },
+                "help": "Match words",
+                "tooltip": "'At the start of words' also counts words that continue after the word you are looking "
+                           "for. Use this for Korean, where particles are part of the word: '학교' then also counts "
+                           "'학교에서' and '학교가'. 'Anywhere' also counts the word inside other words, such as "
+                           "'고등학교'. Use this for languages written without spaces, such as Chinese."
             }
         }
 
@@ -121,8 +135,9 @@ class OvertimeAnalysis(BasicProcessor):
         for vocabulary_id in vocabularies:
             if not vocabularies[vocabulary_id]:
                 continue
-            vocabulary_regexes[vocabulary_id] = re.compile(
-                r"\b(" + "|".join([re.escape(term) for term in vocabularies[vocabulary_id] if term]) + r")\b")
+            vocabulary_regexes[vocabulary_id] = compile_term_regex(
+                [re.escape(term) for term in vocabularies[vocabulary_id] if term],
+                match=self.parameters.get("match", "word"))
 
         # if the results are partitioned, then it is useful to have a way to
         # compare the frequencies to the overall activity in the graph. This

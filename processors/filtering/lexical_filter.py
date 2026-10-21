@@ -5,7 +5,7 @@ import re
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.compatibility import Compatibility
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, compile_term_regex
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -52,6 +52,20 @@ class LexicalFilter(BaseFilter):
                 "default": False,
                 "help": "Interpret custom word list as a regular expression",
                 "tooltip": "Regular expressions are parsed with Python"
+            },
+            "match": {
+                "type": UserInput.OPTION_CHOICE,
+                "default": "word",
+                "options": {
+                    "word": "Whole words only",
+                    "start": "At the start of words",
+                    "anywhere": "Anywhere, also inside words",
+                },
+                "help": "Match words",
+                "tooltip": "'At the start of words' also finds words that continue after the word you are looking "
+                           "for. Use this for Korean, where particles are part of the word: '학교' then also finds "
+                           "'학교에서' and '학교가'. 'Anywhere' also finds the word inside other words, such as "
+                           "'고등학교'. Use this for languages written without spaces, such as Chinese."
             },
             "exclude": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -105,13 +119,8 @@ class LexicalFilter(BaseFilter):
                 phrases = [term for term in lexicons[lexicon_id] if term]
 
             try:
-                if not case_sensitive:
-                    lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b",
-                        flags=re.IGNORECASE)
-                else:
-                    lexicon_regexes[lexicon_id] = re.compile(
-                        r"\b(" + "|".join(phrases) + r")\b")
+                lexicon_regexes[lexicon_id] = compile_term_regex(phrases, match=self.parameters.get("match", "word"),
+                                                                 flags=0 if case_sensitive else re.IGNORECASE)
             except re.error:
                 self.dataset.finish_with_error("Invalid regular expression, cannot use as filter")
                 return

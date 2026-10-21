@@ -1567,6 +1567,37 @@ def looks_like_image_url(url):
     return host in ("imgur.com", "gfycat.com")
 
 
+def compile_term_regex(terms, match="word", flags=0):
+    """
+    Compile a regular expression that finds any of the given terms in a text
+
+    Where a term can be found depends on `match`:
+
+    - "word": only as a whole word, so "cat" is found in "a cat" but not in
+      "cats".
+    - "start": at the start of a word. Korean writes particles and endings as
+      part of the word, so "학교" (school) is found in "학교에서" and "학교가",
+      but not in "고등학교" (high school).
+    - "anywhere": also inside words, so "학교" is found in "고등학교" too. Use
+      this for languages that are written without spaces, such as Chinese.
+
+    :param list terms:  Terms to find, as regular expressions. Escape them with
+    `re.escape` first to find them as they are written.
+    :param str match:  "word", "start" or "anywhere"
+    :param int flags:  Flags to compile the expression with, e.g.
+    `re.IGNORECASE`
+    :return re.Pattern:  Compiled expression
+    """
+    pattern = "(" + "|".join(terms) + ")"
+    if match == "start":
+        # unlike \b, this also works for terms that start with e.g. '#'
+        pattern = r"(?<!\w)" + pattern
+    elif match != "anywhere":
+        pattern = r"\b" + pattern + r"\b"
+
+    return re.compile(pattern, flags=flags)
+
+
 def folder_size(path='.'):
     """
     Get the size of a folder using os.scandir for efficiency

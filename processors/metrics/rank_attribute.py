@@ -348,7 +348,8 @@ class AttributeRanker(BasicProcessor):
             return values
 
         elif look_for == "hashtags":
-            hashtags = list(re.findall(r"#([a-zA-Z0-9_]+)", value))
+            # \w also matches letters outside the Latin alphabet, e.g. #서울
+            hashtags = list(re.findall(r"#(\w+)", value))
             return hashtags
 
         elif look_for == "emoji":
