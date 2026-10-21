@@ -24,12 +24,16 @@ class AccentFoldingFilter(BasicProcessor):
     type = "accent-folder"  # job type ID
     category = "Filtering"  # category
     title = "Convert accented and non-Latin characters"  # title displayed in UI
-    description = ("Replaces or transliterates non-Latin characters with the closest ASCII equivalent, converting e.g. "
-                   "'á' to 'a', 'ç' to 'c', etc. This creates a new dataset.")
+    description = ("Makes words that are written with and without accents count as the same word, e.g. 'canción' and "
+                   "'cancion'. It can also rewrite all text in Latin letters. This creates a new dataset.")
     extension = "csv"  # extension of result file, used internally and in UI
 
     # Allow on top-level CSV datasets
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv"})
+
+    # scripts from which accents are removed. The Unicode names of their
+    # letters contain these words, e.g. 'GREEK SMALL LETTER ALPHA'
+    FOLDED_SCRIPTS = {"LATIN", "GREEK", "ARABIC", "HEBREW"}
 
     def process(self):
         """
@@ -104,13 +108,15 @@ class AccentFoldingFilter(BasicProcessor):
                 "help": "What to replace?",
                 "type": UserInput.OPTION_CHOICE,
                 "options": {
-                    "fold": "Fold only accented latin characters",
-                    "transliterate": "Transliterate non-ASCII characters"
+                    "fold": "Remove accents from Latin, Greek, Arabic and Hebrew letters",
+                    "transliterate": "Rewrite all text in Latin letters (ASCII)"
                 },
                 "default": "fold",
-                "tooltip": "Transliteration will ensure that only pure ASCII characters are left, but makes larger changes"
-                        " to the text (i.e. 北亰 is replaced with 'Bei Jing'). Folding will only replace accented "
-                        "characters with their closest un-accented ASCII equivalent, e.g. á -> a."
+                "tooltip": "On social media, people often leave out accents. Removing them makes 'canción' and "
+                           "'cancion' the same word. Text in other scripts, such as Korean, Chinese or Japanese, "
+                           "does not change. Rewriting in Latin letters changes all text, e.g. '北亰' becomes "
+                           "'Bei Jing' and '한국어' becomes 'hangugeo'. This loses information and is rarely useful "
+                           "for analysis."
             },
             "case-fold": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -136,12 +142,32 @@ class AccentFoldingFilter(BasicProcessor):
     @staticmethod
     def case_fold(text, errors=None):
         """
-        Case-folding function for processing text
+        Remove accents from Latin, Greek, Arabic and Hebrew letters
+
+        Each character is split into its letter and its marks ('é' into 'e'
+        and an accent). The marks on letters in these four scripts are left
+        out, because people often leave them out when they write, e.g. on
+        social media. Marks in other scripts are kept. There they are part of
+        the letter, and leaving them out changes the word, e.g. Japanese 'が'
+        becomes 'か' and Russian 'й' becomes 'и'.
 
         Thanks to https://stackoverflow.com/a/518232.
 
-        :param text:  Text to case-fold
+        :param text:  Text to fold
         :param errors:  Dummy parameter for compatibility with unidecode
-        :return:  Case-folded text
+        :return:  Folded text
         """
-        return ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+        kept = []
+        letter = None
+        for c in unicodedata.normalize('NFD', text):
+            if unicodedata.category(c) != 'Mn':
+                letter = c
+            elif letter and AccentFoldingFilter.FOLDED_SCRIPTS & set(unicodedata.name(letter, "").split()):
+                continue
+
+            kept.append(c)
+
+        # put back together what was split but kept, e.g. Hangul syllables,
+        # else the text looks the same but no longer matches searches or
+        # word lists
+        return unicodedata.normalize('NFC', ''.join(kept))
