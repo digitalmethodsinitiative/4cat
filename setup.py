@@ -57,6 +57,7 @@ processor_packages = {
 	"google_api_python_client",  # perspective, youtube_metadata
 	"jieba",  # word-trees, tokenise
 	"jsonschema",  # llm_prompter
+	"kiwipiepy~=0.24.0",  # tokenise (0.24 and newer are Apache-2.0, older versions LGPL)
 	"lxml",  # download_images_4chan, wikipedia_network, url_titles
 	"nltk~=3.9.3",  # similar-words, word-trees, collocations, split_sentences, tokenise
 	"networkx>=3.0",  # networks/*

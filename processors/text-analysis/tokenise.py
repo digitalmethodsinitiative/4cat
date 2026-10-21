@@ -2,6 +2,7 @@
 Tokenize post bodies
 """
 import ahocorasick
+import unicodedata
 import razdel
 import string
 import jieba
@@ -10,12 +11,15 @@ import re
 import os
 
 import nltk
+from kiwipiepy import Kiwi
+from kiwipiepy.utils import Stopwords
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
+from common.lib.exceptions import QueryNeedsExplicitConfirmationException
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 
@@ -23,6 +27,25 @@ __author__ = ["Stijn Peeters", "Sal Hagen"]
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
 __maintainer__ = ["Stijn Peeters", "Sal Hagen"]
 __email__ = "4cat@oilab.eu"
+
+# Kiwi part-of-speech tags (Sejong tag set) per word class that can be kept
+# when tokenising Korean text. Tokens with any other tag (particles, endings,
+# suffixes, pronouns, symbols, etc.) are only kept with the "other" choice.
+KIWI_WORD_CLASSES = {
+    "nouns": {"NNG", "NNP"},
+    "verbs": {"VV"},
+    "adjectives": {"VA"},
+    "adverbs": {"MAG"},
+    "foreign": {"SL", "SH"},
+    "social": {"W_HASHTAG", "W_MENTION", "W_EMOJI"},
+}
+
+# The tokeniser for each language if the tokeniser option is left at
+# 'Recommended'. Other languages use TweetTokenizer.
+RECOMMENDED_TOKENIZERS = {
+    "chinese": "jieba-cut",
+    "korean": "kiwi",
+}
 
 
 class Tokenise(BasicProcessor):
@@ -42,6 +65,9 @@ class Tokenise(BasicProcessor):
     references = [
         "[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
         "[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
+        "[Kiwi Korean morphological analyser](https://github.com/bab2min/kiwipiepy)",
+        "[Part-of-speech tags used by Kiwi](https://github.com/bab2min/kiwipiepy#%ED%92%88%EC%82%AC-%ED%83%9C%EA%B7%B8)",
+        "[Words in Kiwi's Korean stop word list](https://github.com/bab2min/kiwipiepy/blob/v0.24.1/kiwipiepy/corpus/stopwords.txt)",
         "[Words in stopwords-iso word list](https://github.com/stopwords-iso/stopwords-iso/blob/master/stopwords-iso.json)",
         "[Words in Google Books word list](https://github.com/hackerb9/gwordlist)",
         "[Words in cracklib word list](https://github.com/cracklib/cracklib/tree/master/words)",
@@ -85,7 +111,8 @@ class Tokenise(BasicProcessor):
             "language": {
                 "type": UserInput.OPTION_CHOICE,
                 "options": {
-                    **{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+                    **{language: language[0].upper() + language[1:] for language in
+                       sorted([*SnowballStemmer.languages, "chinese", "korean"])},
                     "other": "Other (stemming, lemmatizing and sentence splitting will most likely not produce "
                              "accurate results)"
                 },
@@ -96,17 +123,40 @@ class Tokenise(BasicProcessor):
             },
             "tokenizer_type": {
                 "type": UserInput.OPTION_CHOICE,
-                "default": "twitter",
+                "default": "recommended",
                 "options": {
+                    "recommended": "Recommended (Kiwi for Korean, jieba for Chinese, otherwise TweetTokenizer)",
                     "twitter": "nltk TweetTokenizer (use general language setting, optimised for social media)",
                     "regular": "nltk word_tokenize (use general language setting)",
                     "razdel": "razdel (for Russian text)",
                     "jieba-cut": "jieba (for Chinese text; accurate mode)",
                     "jieba-cut-all": "jieba (for Chinese text; full mode)",
                     "jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+                    "kiwi": "Kiwi (for Korean text; splits words into morphemes)",
                 },
                 "help": "Tokeniser",
-                "tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
+                "tooltip": "TweetTokenizer works for social media text in languages that put spaces between words. "
+                           "Korean and Chinese need their own tokeniser. Korean writes particles as part of the "
+                           "word, and Chinese has no spaces between words."
+            },
+            "kiwi_word_classes": {
+                "type": UserInput.OPTION_MULTI_SELECT,
+                "default": ["nouns", "verbs", "adjectives", "foreign", "social"],
+                "options": {
+                    "nouns": "Nouns (NNG, NNP)",
+                    "verbs": "Verbs (VV)",
+                    "adjectives": "Adjectives (VA)",
+                    "adverbs": "Adverbs (MAG)",
+                    "foreign": "Words in Latin script or Hanja (SL, SH)",
+                    "social": "Hashtags, mentions and emoji (W_HASHTAG, W_MENTION, W_EMOJI)",
+                    "other": "Everything else (particles, endings, suffixes, pronouns, symbols, etc.)",
+                },
+                "help": "Korean word classes to keep",
+                "tooltip": "Kiwi splits words into parts and tags their word class. Verbs and adjectives carry much "
+                           "of the meaning in informal posts. They are kept in their dictionary form: '먹었는데' "
+                           "becomes '먹다'. Adverbs are left out by default because the most common ones are words "
+                           "like '안' (not) and '너무' (too). Add them for sentiment analysis, where negation matters.",
+                "requires": "language==korean"
             },
             "grouping-per": {
                 "type": UserInput.OPTION_CHOICE,
@@ -125,7 +175,7 @@ class Tokenise(BasicProcessor):
                 "help": "Stem tokens (with SnowballStemmer)",
                 "tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes "
                            "'bicycl', etc.",
-                "requires": "language!=other"
+                "requires": "language!=other && language!=korean && language!=chinese"
             },
             "lemmatise": {
                 "type": UserInput.OPTION_TOGGLE,
@@ -152,7 +202,17 @@ class Tokenise(BasicProcessor):
                 },
                 "help": "Tokens to exclude",
                 "tooltip": "See the references for information on the word lists' provenance. It is highly recommended "
-                           "to exclude stop words. Choosing more word lists increases processing time."
+                           "to exclude stop words. Choosing more word lists increases processing time.",
+                "requires": "language!=korean"
+            },
+            "kiwi_stopwords": {
+                "type": UserInput.OPTION_TOGGLE,
+                "default": True,
+                "help": "Remove Korean stop words",
+                "tooltip": "Removes the 100 most frequent Korean words in Kiwi's stop word list, e.g. '하다' (to do) "
+                           "and '것' (thing), but also '사람' (person). Review the list in the references. To keep a "
+                           "word, add it to 'Always allow these tokens'.",
+                "requires": "language==korean"
             },
             "accept_words": {
                 "type": UserInput.OPTION_TEXT,
@@ -246,21 +306,46 @@ class Tokenise(BasicProcessor):
         with open(self.config.get("PATH_ROOT").joinpath("common/assets/stopwords-iso.json"), encoding="utf-8") as infile:
             stopwords_iso = json.load(infile)
 
-        # Twitter tokenizer if indicated
         language = self.parameters.get("language", "english")
-        if self.parameters.get("tokenizer_type") == "jieba-cut":
+        tokenizer_type = self.parameters.get("tokenizer_type")
+        if tokenizer_type == "recommended":
+            tokenizer_type = RECOMMENDED_TOKENIZERS.get(language, "twitter")
+        self.dataset.log(f"Tokenising with tokeniser '{tokenizer_type}' for language '{language}'")
+
+        # words to keep even if they are in a stop word list
+        accept_words = set()
+        if self.parameters.get("accept_words"):
+            accept_words = {str(word).strip() for word in self.parameters["accept_words"].split(",")}
+
+        # Kiwi is used to tokenise Korean text and to split it into sentences.
+        # Loading its model takes about a second, so do it once per job.
+        kiwi = None
+        if tokenizer_type == "kiwi" or language == "korean":
+            self.dataset.update_status("Loading Kiwi model")
+            kiwi = Kiwi()
+
+        # Twitter tokenizer if indicated
+        if tokenizer_type == "kiwi":
+            word_classes = self.parameters.get("kiwi_word_classes")
+            if not word_classes:
+                self.dataset.finish_with_error("Choose at least one Korean word class to keep.")
+                return
+            kiwi_stopwords = Stopwords() if self.parameters.get("kiwi_stopwords") else None
+            tokenizer = self.get_kiwi_tokenizer(kiwi, word_classes, kiwi_stopwords, accept_words)
+            tokenizer_args = {}
+        elif tokenizer_type == "jieba-cut":
             tokenizer = jieba.cut
             tokenizer_args = {"cut_all": False}
-        elif self.parameters.get("tokenizer_type") == "jieba-cut-all":
+        elif tokenizer_type == "jieba-cut-all":
             tokenizer = jieba.cut
             tokenizer_args = {"cut_all": True}
-        elif self.parameters.get("tokenizer_type") == "jieba-search":
+        elif tokenizer_type == "jieba-search":
             tokenizer = jieba.cut_for_search
             tokenizer_args = {}
-        elif self.parameters.get("tokenizer_type") == "razdel":
+        elif tokenizer_type == "razdel":
             tokenizer = razdel.tokenize
             tokenizer_args = {}
-        elif self.parameters.get("tokenizer_type") == "twitter":
+        elif tokenizer_type == "twitter":
             tokenizer = TweetTokenizer(preserve_case=False).tokenize
             tokenizer_args = {}
         else:
@@ -268,12 +353,21 @@ class Tokenise(BasicProcessor):
             tokenizer_args = {"language": language} if language != "other" else {}
 
         # load word filters - words to exclude from tokenisation
+        wordlists = self.parameters.get("filter", [])
+        if language == "korean":
+            # the 'Remove Korean stop words' option replaces the word lists.
+            # Kiwi applies its own list, which needs Kiwi's word classes, so
+            # the other tokenisers use the stopwords-iso list instead
+            use_iso_list = self.parameters.get("kiwi_stopwords") and tokenizer_type != "kiwi"
+            wordlists = ["stopwords-iso-ko"] if use_iso_list else []
+
         word_filter = set()
-        for wordlist in self.parameters.get("filter", []):
+        for wordlist in wordlists:
             if wordlist == "copy-language" and language != "other":
                 # use stopwords-iso list for chosen language
                 copy_language = {
                     "arabic": "ar",
+                    "chinese": "zh",
                     "danish": "dk",
                     "dutch": "nl",
                     "english": "en",
@@ -302,11 +396,7 @@ class Tokenise(BasicProcessor):
 
         # Extend or limit the word filter with optionally added words
         # Remove accepted words from filter
-        if self.parameters.get("accept_words"):
-            accept_words = [str(word).strip() for word in self.parameters["accept_words"].split(",")]
-            for accept_word in accept_words:
-                if accept_word in word_filter:
-                    word_filter.remove(accept_word)
+        word_filter -= accept_words
 
         # Add rejected words to filter
         if self.parameters.get("reject_words"):
@@ -325,7 +415,7 @@ class Tokenise(BasicProcessor):
         # initialise pre-processors if needed
         stemmer = None
         lemmatizer = None
-        if self.parameters.get("language") != "other":
+        if language in SnowballStemmer.languages:
             if self.parameters.get("stem"):
                 stemmer = SnowballStemmer(language)
 
@@ -349,10 +439,10 @@ class Tokenise(BasicProcessor):
         output_file_handle = None
 
         # Get sentence tokenizer
-        sentence_method, sentence_error = self.get_sentence_method(language=language, grouping=grouping, dataset=self.dataset)
+        sentence_method, sentence_error = self.get_sentence_method(language=language, grouping=grouping, dataset=self.dataset, kiwi=kiwi)
 
         # Collect metadata
-        metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'language':language, 'intervals':set()}}
+        metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'language':language, 'tokenizer':tokenizer_type, 'intervals':set()}}
         processed = 0
         annotations = []
 
@@ -408,7 +498,13 @@ class Tokenise(BasicProcessor):
                     self.dataset.finish_with_error("Column %s contains non text values and cannot be tokenized")
                     return
 
-                value = [Tokenise.normalise_segment(v) for v in sentence_method(item[column], language) if
+                # text can store e.g. Hangul syllables or accented letters
+                # either composed or decomposed into parts. Kiwi and the
+                # stop word lists only recognise the composed form
+                if column_value:
+                    column_value = unicodedata.normalize("NFC", column_value)
+
+                value = [Tokenise.normalise_segment(v) for v in sentence_method(column_value, language) if
                          v is not None]
                 if value:
                     groupings.extend(value)
@@ -433,7 +529,8 @@ class Tokenise(BasicProcessor):
                     token = Tokenise.normalise_segment(token)
 
                     token = token.lower()
-                    token = numbers.sub("", symbol.sub("", token))
+                    # jieba returns the spaces between words as tokens too
+                    token = numbers.sub("", symbol.sub("", token)).strip()
 
                     # skip empty and filtered tokens
                     if not token or token in automaton:
@@ -522,12 +619,13 @@ class Tokenise(BasicProcessor):
         self.write_archive_and_finish(staging_area, warning=warning)
 
     @staticmethod
-    def get_sentence_method(language, grouping, dataset=None):
+    def get_sentence_method(language, grouping, dataset=None, kiwi=None):
         """
         Choose the right sentence tokenizer for the language
 
         :param str language:  Language to choose tokenizer for
         :param str grouping:  Grouping method to choose tokenizer for (sentence or item)
+        :param Kiwi kiwi:  Kiwi instance, used to split Korean text
         :return function, error:  Tokenizer function, error bool if language not supported
         """
 
@@ -535,12 +633,28 @@ class Tokenise(BasicProcessor):
         def dummy_function(x, *args, **kwargs):
             return [x]
 
+        # razdel and Kiwi only take the text, not the language
+        def razdel_function(text, *args, **kwargs):
+            return razdel.sentenize(text) if text else []
+
+        def kiwi_function(text, *args, **kwargs):
+            return [sentence.text for sentence in kiwi.split_into_sents(text)] if text else []
+
+        # nltk cannot split Chinese, so split after the punctuation that ends
+        # a sentence, and keep that punctuation with its sentence
+        def chinese_function(text, *args, **kwargs):
+            return [sentence for sentence in re.split(r"(?<=[。！？!?])", text) if sentence.strip()] if text else []
+
         # if told so, first split the item into separate sentences
         if grouping == "sentence":
-            if language == "Russian":
+            if language == "russian":
                 # for russian we use a special purpose splitter with better
                 # performance
-                return razdel.sentenize, False
+                return razdel_function, False
+            elif language == "korean" and kiwi:
+                return kiwi_function, False
+            elif language == "chinese":
+                return chinese_function, False
             elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab'))]:
                 if dataset:
                     dataset.update_status(f"Language {language} not available for sentence tokenizer; grouping by items instead.")
@@ -549,6 +663,97 @@ class Tokenise(BasicProcessor):
                 return sent_tokenize, False
         else:
             return dummy_function, False
+
+    @staticmethod
+    def get_kiwi_tokenizer(kiwi, word_classes, stopwords=None, accept_words=None):
+        """
+        Make a function that tokenises Korean text with Kiwi
+
+        Kiwi splits text into morphemes and tags each with its part of
+        speech. Only morphemes in the chosen word classes are kept. Verbs and
+        adjectives are returned in their dictionary form ('먹' becomes '먹다').
+
+        :param Kiwi kiwi:  Kiwi instance to tokenise with
+        :param list word_classes:  Keys of `KIWI_WORD_CLASSES` to keep, and/or
+        "other" to keep morphemes that are in none of those classes
+        :param Stopwords stopwords:  Kiwi stop word list. Its words are left
+        out, unless they are in `accept_words`.
+        :param set accept_words:  Words to keep even if they are in the stop
+        word list
+        :return function:  Function that takes a string and returns a list of
+        tokens
+        """
+        keep_tags = set().union(*[KIWI_WORD_CLASSES[word_class] for word_class in word_classes if
+                                  word_class in KIWI_WORD_CLASSES])
+        known_tags = set().union(*KIWI_WORD_CLASSES.values())
+        keep_other = "other" in word_classes
+
+        # Kiwi's list has (morpheme, tag) pairs, plus tags of which all
+        # morphemes are stop words, e.g. punctuation
+        stop_pairs = stopwords.stopwords if stopwords else set()
+        stop_tags = stopwords.stoptags if stopwords else set()
+        accept_words = accept_words or set()
+
+        def tokenize(text):
+            tokens = []
+            # normalize_coda splits off a ㅋ or ㅎ that was typed as the last
+            # consonant of the syllable before it, as in '먹었엌ㅋㅋ'
+            for token in kiwi.tokenize(text, normalize_coda=True):
+                # irregular verbs and adjectives have tags such as 'VV-I'
+                tag = token.tag.split("-")[0]
+                if tag not in keep_tags and not (keep_other and tag not in known_tags):
+                    continue
+
+                is_stopword = (token.form, tag) in stop_pairs or tag in stop_tags
+                if is_stopword and token.lemma not in accept_words and token.form not in accept_words:
+                    continue
+
+                tokens.append(token.lemma)
+
+            return tokens
+
+        return tokenize
+
+    @staticmethod
+    def validate_query(query, request, config):
+        """
+        Ask the user to confirm a tokeniser that does not fit the language
+
+        Kiwi and jieba only work for Korean and Chinese, and the other
+        tokenisers give poor results for these languages.
+
+        :param dict query:  Processor options, as parsed from the form
+        :param request:  Flask request
+        :param config:  Configuration reader
+        :return dict:  The same options
+        """
+        if query.get("frontend-confirm"):
+            return query
+
+        language = query.get("language") or ""
+        tokenizer = query.get("tokenizer_type") or ""
+        if tokenizer == "recommended":
+            return query
+
+        if language == "korean" and tokenizer != "kiwi":
+            raise QueryNeedsExplicitConfirmationException(
+                "Kiwi is the recommended tokeniser for Korean. Other tokenisers keep particles attached to words, "
+                "so e.g. '학교에서' and '학교가' count as different words. Continue anyway?")
+
+        if language == "chinese" and not tokenizer.startswith("jieba"):
+            raise QueryNeedsExplicitConfirmationException(
+                "jieba is the recommended tokeniser for Chinese. Other tokenisers split text at spaces, and Chinese "
+                "has no spaces between words. Continue anyway?")
+
+        if tokenizer == "kiwi" and language not in ("korean", "other"):
+            raise QueryNeedsExplicitConfirmationException(
+                f"Kiwi only works for Korean text, but the language is {language.title()}. Continue anyway?")
+
+        if tokenizer.startswith("jieba") and language not in ("chinese", "other"):
+            raise QueryNeedsExplicitConfirmationException(
+                f"jieba only works for Chinese text, but the language is {language.title()}. Continue anyway?")
+
+        return query
 
     @staticmethod
     def normalise_segment(segment):
