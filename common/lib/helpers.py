@@ -24,7 +24,7 @@ import io
 from pathlib import Path
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, unquote, urlparse, urlunparse
 from dateutil import parser as dateutil_parser
 from calendar import monthrange
 from packaging import version
@@ -1274,55 +1274,96 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
 
     return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
 
-def normalize_url_encoding(url):
+# Characters that readable_url percent-encodes. First, those a URL
+# cannot contain as they are: control characters, the space, and
+# " < > ^ ` { | }. The backslash is left alone, because browsers read it as "/"
+# in the path of a web address. Second, characters that would be invisible or
+# look like a space, including those that change the direction of the text
+# around them, which RFC 3987 (sections 2.2 and 4.1) asks to keep encoded. They
+# are listed one by one rather than looked up in Python's Unicode tables, so
+# that the JavaScript copy of the function in Zeeschuimer gives exactly the
+# same result.
+URL_ENCODED_CHARACTERS = re.compile(
+    r'[\x00-\x20"<>^`{|}\x7f'
+    r'\u0080-\u00a0\u00ad\u034f\u0600-\u0605\u061c\u06dd\u070f\u08e2\u115f\u1160\u1680\u17b4\u17b5\u180b-\u180f'
+    r'\u2000-\u200b\u200e\u200f\u2028-\u202f\u205f-\u206f\u2800\u3000\u3164\ue000-\uf8ff\ufdd0-\ufdef\ufeff\uffa0'
+    r'\ufff0-\uffff]'
+)
+
+
+def readable_url(url):
     """
-    Normalize URL encoding for display and linking
+    Make a URL readable without changing where it leads
 
-    Takes a URL that may or may not already be percent-encoded and returns
-    a properly encoded version suitable for both display and use as a link.
-    Only query parameters and fragments are encoded; the scheme, domain, and
-    path remain human-readable.
+    Datasources give URLs that may be percent-encoded, not encoded, or partly
+    encoded. This shows encoded text as the characters themselves, where that
+    does not change the URL.
+    
+    Idea: lossless data (result should refer to exact same resource), readable
+    (for our users), clickable (for our UI), stable (if a URL gets mapped and 
+    saved, running the function on it again should not change it), doesn't throw
+    errors (safe for our mappers), and explainable.
+    
+    For the explainable, I followed the conversion from URI to IRI in RFC 3987, 
+    section 3.2 that browsers use to show URLs in their address bar.
 
-    Examples:
-        - "https://example.com/search?q=hello world" → "https://example.com/search?q=hello%20world"
-        - "https%3A//example.com/search%3Fq%3Dhello" → "https://example.com/search?q=hello"
-        - "https://example.com/search?q=hello%20world" → "https://example.com/search?q=hello%20world"
+    Zeeschuimer has a JavaScript copy of this function (`readable_url`
+    in js/lib.js), which should give exactly the same result.
 
-    :param str url: URL to normalize (may be encoded or not)
-    :return str: Properly encoded URL, or empty string if invalid
+    Where this differs from RFC 3987, section 3.2, and why:
+
+    - Encoded ASCII always stays encoded to prevent breaking links that carry 
+      a signature over their exact text.
+    - If a run of escapes has any invalid UTF-8 in it, the whole run stays
+      encoded; the RFC decodes the valid parts. This keeps text in other
+      encodings (e.g. Chinese in GBK) from showing as the wrong characters,
+      and it is what JavaScript's decodeURIComponent does.
+    - Use a fixed list of characters to keep encoded (see above), so that 
+      the JavaScript copy gives the same result. RFC has a more general rule.
+    - The RFC expects a URL that is already encoded. Ours may not be, so
+      characters a URL cannot contain (such as spaces) are encoded,
+      whitespace around the URL and tabs and line breaks in it are removed,
+      and a "%" that does not start an escape is left as it is.
+    - 4CAT must deal with external and uploaded data; some URLs have been
+      saved with the whole URL encoded, like "https%3A%2F%2Fsite.com%2F" instead
+      of "https://site.com/". Decode them first (more than once if they were 
+      encoded more than once), because otherwise they can be neither read nor opened.
+
+    See URL_ENCODED_CHARACTERS for the characters that are always percent-encoded, 
+    even if they are valid UTF-8 above.
+
+    :param str url:  URL to make readable
+    :return str:  The URL, decoded where that is safe; an empty string if `url` is empty
     """
-    from urllib.parse import unquote, urlencode, parse_qs
-
     if not url:
         return ""
 
-    try:
-        # Unquote the entire URL first to normalize
-        decoded_url = unquote(url)
-        # Parse the URL into components
-        parsed = urlparse(decoded_url)
+    url = str(url)
 
-        # Re-encode the query string properly
-        if parsed.query:
-            query_params = parse_qs(parsed.query, keep_blank_values=True)
-            # Flatten single-value lists and encode
-            encoded_query = urlencode({k: v[0] if len(v) == 1 else v for k, v in query_params.items()})
-            # Reconstruct URL with encoded query
-            result = urlunparse((
-                parsed.scheme,
-                parsed.netloc,
-                parsed.path,
-                parsed.params,
-                encoded_query,
-                parsed.fragment
-            ))
-        else:
-            result = decoded_url
+    # Some external URLs have been saved with the whole URL encoded: "https%3A%2F%2Fsite.com"
+    # instead of "https://site.com", sometimes more than once. Undo that first,
+    # one layer at a time. This only decodes plain characters such as : / ? = %;
+    # the rest is decoded further down. A working URL never starts with
+    # "https%3A", so other URLs are not affected.
+    while re.match(r"[\x00-\x20]*https?%(25)*3A", url, re.IGNORECASE):
+        url = re.sub(r"%[0-7][0-9A-Fa-f]", lambda match: unquote(match.group()), url)
 
-        return result
-    except (ValueError, AttributeError):
-        # If URL parsing fails, return the original URL
-        return url
+    # like a browser does with a pasted URL, ignore spaces and control
+    # characters around it, and tabs and line breaks inside it
+    url = re.sub(r"^[\x00-\x20]+|[\x00-\x20]+$", "", url)
+    url = re.sub(r"[\t\n\r]", "", url)
+
+    # decode each run of escapes for bytes outside ASCII, if it is valid UTF-8
+    def decode(match):
+        try:
+            return unquote(match.group(), errors="strict")
+        except UnicodeDecodeError:
+            return match.group()
+
+    url = re.sub(r"(?:%[89A-Fa-f][0-9A-Fa-f])+", decode, url)
+
+    # encode what a URL cannot contain as it is, and what would be invisible
+    return URL_ENCODED_CHARACTERS.sub(lambda match: quote(match.group(), safe=""), url)
 
 def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """

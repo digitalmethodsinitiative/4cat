@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from backend.lib.search import Search
 from common.lib.exceptions import MapItemException
 from common.lib.item_mapping import MappedItem, MissingMappedField, value_or_missing
-from common.lib.helpers import normalize_url_encoding, strip_tags
+from common.lib.helpers import readable_url, strip_tags
 
 
 class SearchWeiboComments(Search):
@@ -64,7 +64,7 @@ class SearchWeiboComments(Search):
         reply_to = comment.get("reply_comment") or {}
 
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(comment.get("__import_meta", {}).get("source_platform_url", "")),
+            "collected_from_url": readable_url(comment.get("__import_meta", {}).get("source_platform_url", "")),
             "id": comment["idstr"],
             "thread_id": post["id"] if post["id"] is not None else MissingMappedField(""),
             "post_id": post["id"] if post["id"] is not None else MissingMappedField(""),

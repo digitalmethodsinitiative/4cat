@@ -644,7 +644,7 @@ RULES: list[TranslationError] = [
         prompt_rule=(
             "`js/lib.js` is loaded as a plain `<script>`, NOT an ES module. Its "
             "declarations (`MappedItem`, `MissingMappedField`, `MapItemException`, "
-            "`strip_tags`, `normalize_url_encoding`, `formatUtcTimestamp`) are GLOBALS. "
+            "`strip_tags`, `readable_url`, `formatUtcTimestamp`) are GLOBALS. "
             "Never write `import { ... } from '../js/lib.js'` — that import fails at "
             "runtime."
         ),
