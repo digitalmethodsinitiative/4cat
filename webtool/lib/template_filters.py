@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from webtool.lib.helpers import parse_markdown
-from common.lib.helpers import timify, ellipsiate, urls_in_text
+from common.lib.helpers import timify, ellipsiate, urls_in_text, readable_url
 
 from flask import current_app, g
 from flask_login import current_user
@@ -144,7 +144,9 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
     """
     Add HTML links to text
 
-    Replaces URLs with a clickable link
+    Replaces URLs with a clickable link. The link text shows the URL in
+    readable form (see `readable_url`); the link itself leads to the URL
+    exactly as it was written.
 
     :param str content:  Text to parse
     :return str:  Parsed text
@@ -155,10 +157,9 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
         return content
 
     for link in urls_in_text(content):
+        link_text = readable_url(link)
         if ellipsiate > 0:
-            link_text = _jinja2_filter_ellipsiate(link, ellipsiate, True, "[&hellip;]")
-        else:
-            link_text = link
+            link_text = _jinja2_filter_ellipsiate(link_text, ellipsiate, True, "[&hellip;]")
         content = content.replace(link, f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
 
     return content
