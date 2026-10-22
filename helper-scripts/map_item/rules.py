@@ -328,6 +328,36 @@ RULES: list[TranslationError] = [
         # prompt and checklist guidance only.
         lint_pattern=None,
     ),
+    TranslationError(
+        id="-null-is-a-mistranslated-get",
+        prompt_rule=(
+            "Never write `|| null`. 4CAT's map_items do not use `or None`, so "
+            "`|| null` in a translation is always a `.get(k)` that was given an "
+            "operator, and it writes null where the platform sent an empty string, "
+            "a zero or a false. A `.get(k)` is `py_get(d, k)`, with no operator at "
+            "all. The rule stops at `null`: a Python `x or ''` is an `or`, and "
+            "stays `x || ''`."
+        ),
+        bad=(
+            "fields['mid'] || null          // weibo_comments; Python: fields.get('mid').\n"
+            "                               // The `or` rule's `||`, put on a .get: an\n"
+            "                               // empty mid became null instead of ''"
+        ),
+        good=(
+            "py_get(fields, 'mid')          // Python: fields.get('mid')\n"
+            "py_get(post, 'title') || ''    // Python: post.get('title') or '' - an `or`, so `||`"
+        ),
+        verify="The function contains no `|| null`.",
+        # Unlike `??`, this can be linted: no 4CAT datasource writes `or None`,
+        # so a match is the mistake in `bad` rather than a correct translation.
+        lint_pattern=re.compile(r"\|\|\s*null\b"),
+        lint_message=(
+            "`|| null` found. No 4CAT map_item writes `or None`, so this is almost "
+            "certainly a translated `.get(k)`, which is `py_get(d, k)`: `||` turns "
+            "an empty string, a zero or a false that the platform sent into null. "
+            "If the Python really does say `or None`, ignore this warning."
+        ),
+    ),
 
     TranslationError(
         id="translate-a-get-chain-link-by-link",
@@ -473,7 +503,7 @@ RULES: list[TranslationError] = [
     TranslationError(
         id="translate-the-test-not-one-that-looks-like-it",
         prompt_rule=(
-            "Write the test the Python wrote, not one that looks near enough. Two "
+            "Write the test the Python wrote, not one that looks near enough. Three "
             "substitutions have gone wrong. First, Python `if x:` is a truthiness "
             "test, and for a plain value JavaScript's `if (x)` is the same test: "
             "`0`, `''`, `null` and `undefined` are false on both sides. "
@@ -484,20 +514,28 @@ RULES: list[TranslationError] = [
             "Second, Python `any(xs)` asks whether any ELEMENT is truthy, which is "
             "`xs.some(Boolean)` \u2014 NOT `xs.length`. A list of empty strings has a "
             "length but nothing truthy in it, so `xs.length` joins them into `','` "
-            "where Python returns `''`. For a truthy test on a list or object "
-            "itself, the rule above applies instead."
+            "where Python returns `''`. Third, a truthiness test is not a type "
+            "test. Weibo's `long_text.get('content')` came back as "
+            "`typeof longText.content === 'string'`, which accepts an empty string "
+            "where Python falls back to `text_raw`. A Python `isinstance(x, str)` "
+            "is a type test, and stays `typeof x === 'string'`. For a truthy test "
+            "on a list or object itself, the rule above applies instead."
         ),
         bad=(
             "node.location.lat != null ? `${lat},${lng}` : ''   // Python: if ....get('lat')\n"
-            "coauthors.length ? coauthors.join(',') : ''        // Python: if any(coauthors)"
+            "coauthors.length ? coauthors.join(',') : ''        // Python: if any(coauthors)\n"
+            "typeof longText.content === 'string'               // Python: and long_text.get('content')"
         ),
         good=(
             "node.location.lat ? `${lat},${lng}` : ''\n"
-            "coauthors.some(Boolean) ? coauthors.join(',') : ''"
+            "coauthors.some(Boolean) ? coauthors.join(',') : ''\n"
+            "longText.content\n"
+            "typeof raw === 'string'                            // Python: isinstance(raw, str), a type test"
         ),
         verify=(
             "Every Python truthiness test is a plain truthy test in JavaScript "
-            "rather than a null check, and every `any(xs)` is `xs.some(Boolean)`."
+            "rather than a null check or a type check, and every `any(xs)` is "
+            "`xs.some(Boolean)`."
         ),
         # Linting this means flagging `!= null` and `.length`, both of which are
         # right far more often than they are wrong here. Prompt and checklist only.
