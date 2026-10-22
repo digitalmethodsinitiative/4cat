@@ -10,7 +10,7 @@ import zipfile
 
 import pytest
 
-from common.lib.archive_metadata import MediaArchiveMetadata
+from common.lib.archive_metadata import MediaArchiveMetadata, is_support_file
 from common.lib.exceptions import MetadataException
 
 CURRENT_SCHEMA_VERSION = MediaArchiveMetadata.SCHEMA_VERSION
@@ -597,3 +597,20 @@ def test_v1_read_normalizes_integer_post_ids():
 	m._populate_from_raw(raw)
 	assert m.get_entry("a.jpg")["post_ids"] == ["1", "2"]
 	assert m.failures[0]["post_ids"] == ["3"]
+
+
+@pytest.mark.parametrize("filename, expected", [
+	(".metadata.json", True),
+	(".token_metadata.json", True),
+	(".model_metadata.json", True),
+	("video_archive", True),
+	("video_1/ffmpeg_error.log", True),
+	("frames/.metadata.json", True),
+	("image.jpg", False),
+	("video.mp4", False),
+	("results.json", False),
+	(".DS_Store", False),
+])
+def test_is_support_file(filename, expected):
+	"""Metadata, yt-dlp's video list and logs are support files; media is not."""
+	assert is_support_file(filename) is expected

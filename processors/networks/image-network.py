@@ -11,7 +11,7 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.compatibility import Compatibility
 
@@ -111,12 +111,10 @@ class ImageGrapher(BasicProcessor):
     def process(self):
         column = self.parameters.get("column")
         hash_type = self.parameters.get("deduplicate")
-        filename_filter = [".metadata.json"] if hash_type == "none" else []
         hashed = 0
 
-        try:
-            metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
+        metadata = self.get_media_metadata()
+        if metadata is None:
             return self.dataset.finish_with_error("No valid metadata found in image archive - this processor can only "
                                                   "be run on sets of images sourced from another 4CAT dataset.")
 
@@ -129,14 +127,15 @@ class ImageGrapher(BasicProcessor):
         seen_hashes = set()
         id_file_map = {}
 
-        for image in self.source_dataset.iterate_items(filename_filter=filename_filter):
-            if image.file.name == ".metadata.json":
-                continue
+        # without deduplication, images are told apart by file name, so the
+        # images themselves do not need to be read
+        images = self.source_dataset.iterate_items() if hash_type != "none" else []
+        for image in images:
             try:
                 hashed += 1
                 if hashed % 100 == 0:
-                    self.dataset.update_status(f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows-1:,} item(s)")
-                self.dataset.update_progress(hashed / (self.source_dataset.num_rows-1) * 0.5)
+                    self.dataset.update_status(f"Generated identity hashes for {hashed:,} of {self.source_dataset.num_rows:,} item(s)")
+                self.dataset.update_progress(hashed / self.source_dataset.num_rows * 0.5)
                 file_hash = hash_file(image.file, hash_type)
                 file_hash_map[image.file.name] = file_hash
                 if file_hash not in hash_file_map:

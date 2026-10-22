@@ -9,7 +9,6 @@ from urllib.parse import unquote
 from werkzeug.utils import secure_filename
 
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
-from common.lib.exceptions import MetadataException
 from common.lib.helpers import UserInput, ellipsiate, urls_in_text
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
@@ -263,9 +262,8 @@ class PixPlotGenerator(BasicProcessor):
 
         """
         # Get image data
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
+        source_metadata = self.get_media_metadata()
+        if source_metadata is None:
             return False
 
         top_dataset = self.dataset.top_parent()

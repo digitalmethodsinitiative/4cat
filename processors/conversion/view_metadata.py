@@ -1,11 +1,13 @@
 """
 View .metadata.json
 
-Designed to work with any processor that has a 'map_metadata' method
+Uses the 'map_metadata' method of the processor that made the archive, if it
+has one, and otherwise shows the metadata as it is stored
 """
 import csv
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import MediaArchiveMetadata
 from common.lib.compatibility import Compatibility
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, MetadataException, ProcessorInterruptedException
@@ -78,9 +80,9 @@ class ViewMetadata(BasicProcessor):
 	def process(self):
 		"""
 		Read .metadata.json from the parent archive and reformat as CSV using the
-		parent producer's `map_metadata` / `map_failure_metadata` hooks, adding
-		the data of the dataset the media was downloaded from where that dataset
-		can still be found.
+		parent producer's `map_metadata` / `map_failure_metadata` hooks (or the
+		default ones of `MediaArchiveMetadata`), adding the data of the dataset
+		the media was downloaded from where that dataset can still be found.
 		"""
 		self.dataset.update_status("Collecting .metadata.json file")
 		try:
@@ -93,12 +95,12 @@ class ViewMetadata(BasicProcessor):
 			return
 
 		producer = self.source_dataset.get_own_processor()
-		if producer is None or not hasattr(producer, "map_metadata"):
-			if producer is not None:
-				self.log.warning(f"Metadata formatter processor cannot run on {producer.type}; map_metadata method not implemented")
-			self.dataset.finish_with_error("Cannot reformat metadata for this dataset")
-			return
-		self.dataset.log(f"Collecting metadata created by {producer.type}")
+		if producer is not None and hasattr(producer, "map_metadata"):
+			self.dataset.log(f"Collecting metadata created by {producer.type}")
+		else:
+			# e.g. an archive of unique images, whose processor does not say how
+			# to show its metadata
+			self.dataset.log("Collecting metadata as it is stored in the archive")
 
 		# read the metadata file into rows, and note which items they refer to
 		media_rows, wanted_ids = self.collect_media_rows(metadata, producer)
@@ -117,17 +119,21 @@ class ViewMetadata(BasicProcessor):
 		Turn the metadata file into rows
 
 		The processor that made the archive decides what the rows look like, via
-		its `map_metadata` and `map_failure_metadata` methods. Their columns are
+		its `map_metadata` and `map_failure_metadata` methods. Where it has none,
+		the default ones of `MediaArchiveMetadata` are used. Their columns are
 		prefixed here so that they cannot collide with those of the dataset the
 		media came from.
 
 		:param MediaArchiveMetadata metadata:  The archive's metadata
-		:param producer:  Processor class that made the archive
+		:param producer:  Processor class that made the archive, or `None` if
+		  it is not known
 		:return tuple:  A list of (row, item IDs) tuples, and the set of all
 		  item IDs those rows refer to
 		"""
 		media_rows = []
 		wanted_ids = set()
+		map_item = getattr(producer, "map_metadata", MediaArchiveMetadata.map_metadata)
+		map_failure = getattr(producer, "map_failure_metadata", MediaArchiveMetadata.map_failure_metadata)
 
 		def add(rows, entry):
 			# a download that produced no file still records the items it was
@@ -143,10 +149,9 @@ class ViewMetadata(BasicProcessor):
 		for filename, item in metadata.iter_entries():
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while reading metadata file")
-			add(producer.map_metadata(filename, item), item)
+			add(map_item(filename, item), item)
 
-		map_failure = getattr(producer, "map_failure_metadata", None)
-		if self.parameters.get("include_failed", False) and map_failure is not None:
+		if self.parameters.get("include_failed", False):
 			for failure in metadata.iter_failures():
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while reading metadata file")
