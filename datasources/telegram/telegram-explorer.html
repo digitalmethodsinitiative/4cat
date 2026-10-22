@@ -97,8 +97,7 @@
                         {% endif %}
                     </div>
 				{% endif %}
-                {% set body = item.body.replace("#", "\#") %}
-				{{ body | markdown | social_mediafy(datasource="telegram") | safe }}
+				{{ item.body | social_mediafy(datasource="telegram", line_breaks=True) | safe }}
 			</div>
 
 			{% if item.reactions %}

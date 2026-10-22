@@ -115,7 +115,7 @@ set all_known_fields = {
 	{% if fields.get("tags") %}
 		<div class="tags">
         Tags:
-			{{ fields.tags.split(",")|join(", ") | safe }}
+			{{ fields.tags.split(",")|join(", ") }}
 		</div>
 	{% endif %}
 
