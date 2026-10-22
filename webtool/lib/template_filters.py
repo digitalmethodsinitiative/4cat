@@ -1,6 +1,7 @@
 import datetime
 
 import json
+import markdown2
 import ural
 import uuid
 import math
@@ -12,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from webtool.lib.helpers import parse_markdown
-from common.lib.helpers import timify, ellipsiate, urls_in_text, link_urls_in_text
+from common.lib.helpers import timify, ellipsiate, link_urls_in_text, link_urls_in_html
 
 from flask import current_app, g
 from flask_login import current_user
@@ -268,14 +269,24 @@ def _jinja2_filter_chan_image(tim, ext, board):
         return f"https://desu-usergeneratedcontent.xyz/{board}/image/{tim[:4]}/{tim[4:6]}/{tim}{ext}"
 
 @current_app.template_filter("social_mediafy")
-def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
+def _jinja2_filter_social_mediafy(body, datasource="", markdown=False, line_breaks=False) -> str:
     """
-    Adds links to a text body with hashtags, @-mentions, and URLs.
-    A data source must be given to generate the correct URLs.
-    """
+    Turn the URLs, hashtags and @-mentions in a post's text into links, as safe HTML
 
-    if not datasource or not body:
-        return body
+    Hashtags and @-mentions link to the platform the post comes from, so the
+    data source must be given for those. Everything in the text is escaped,
+    so HTML in a post is shown as it is written instead of being used.
+
+    :param body:  Text of a post
+    :param str datasource:  Data source the post comes from
+    :param bool markdown:  The text is Markdown, as Tumblr's is. It is turned
+    into HTML with the HTML in it escaped, and links that could run code
+    (such as javascript:) made to lead nowhere.
+    :param bool line_breaks:  Show line breaks in plain text as `<br>`
+    :return str:  HTML
+    """
+    if not body:
+        return ""
 
     # Base URLs after which tags and @-mentions follow, per platform
     base_urls = {
@@ -288,7 +299,7 @@ def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
             "hashtag": "https://instagram.com/explore/tags/",
             "mention": "https://instagram.com/",
         },
-        "tumblr": {"mention": "https://tumblr.com/", "markdown": True},
+        "tumblr": {"mention": "https://tumblr.com/"},
         "linkedin": {
             "hashtag": "https://linkedin.com/feed/hashtag/?keywords=",
             "mention": "https://linkedin.com/in/",
@@ -300,45 +311,22 @@ def _jinja2_filter_social_mediafy(body: str, datasource="") -> str:
         },
     }
 
-    datasource = datasource.replace("-search", "").replace("-import", "")
+    datasource = (datasource or "").replace("-search", "").replace("-import", "")
+    platform = base_urls.get(datasource, {})
 
-    if datasource not in base_urls:
-        return body
+    # a hashtag or @-mention starts after a space or punctuation, not within
+    # a word or e-mail address
+    other_links = {}
+    if "hashtag" in platform:
+        other_links[r"(?<!\w)#\w+"] = lambda tag: platform["hashtag"] + tag[1:]
+    if "mention" in platform:
+        mention_pattern = r"(?<!\w)@[\w.-]+" if datasource == "bsky" else r"(?<!\w)@[\w-]+"
+        other_links[mention_pattern] = lambda mention: platform["mention"] + mention[1:]
 
-    lookbehind = r'(?<!["\'>])'
+    if markdown:
+        return link_urls_in_html(markdown2.markdown(str(body), safe_mode="escape"), other_links, new_tab=True)
 
-    # Add URL links
-    if not base_urls[datasource].get("markdown"):
-        for raw_url in urls_in_text(body):
-            clean_url = raw_url.split("<")[0]
-            safe_url_pattern = lookbehind + re.escape(clean_url)
-            replacement = f"<a href='{clean_url}' target='_blank'>{clean_url}</a>"
-
-            body = re.sub(safe_url_pattern, replacement, body)
-
-    # Add hashtag links
-    if "hashtag" in base_urls[datasource]:
-        tags = re.findall(r"#[\w0-9]+", body)
-        tags = sorted(tags, key=len, reverse=True)
-        for tag in tags:
-            tag_pattern = lookbehind + f"({tag})"
-            replacement = f"<a href='{base_urls[datasource]['hashtag']}{tag[1:]}' target='_blank'>{tag}</a>"
-            body = re.sub(tag_pattern, replacement, body)
-
-    # Add @-mention links
-    if "mention" in base_urls[datasource]:
-        if datasource == "bsky":
-            mentions = re.findall(r"@[\w0-9-.]+", body)
-        else:
-            mentions = re.findall(r"@[\w0-9-]+", body)
-
-        mentions = sorted(mentions, key=len, reverse=True)
-        for mention in mentions:
-            mention_pattern = lookbehind + f"({mention})"
-            replacement = f"<a href='{base_urls[datasource]['mention']}{mention[1:]}' target='_blank'>{mention}</a>"
-            body = re.sub(mention_pattern, replacement, body)
-
-    return body
+    return link_urls_in_text(body, line_breaks=line_breaks, other_links=other_links, new_tab=True)
 
 
 @current_app.template_filter('string_counter')
