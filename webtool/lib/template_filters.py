@@ -16,21 +16,24 @@ from webtool.lib.helpers import parse_markdown
 from common.lib.helpers import timify, ellipsiate, link_urls_in_text, link_urls_in_html
 
 from flask import current_app, g
+from markupsafe import escape
 from flask_login import current_user
 from jinja2.exceptions import TemplateNotFound
 
 @current_app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
+    # templates mark the result as safe HTML, so a value that is not a date
+    # is escaped before it is returned as it is
     if isinstance(date, str):
         try:
             date = int(date)
         except ValueError:
-            return date
+            return escape(date)
 
     try:
         date = datetime.datetime.utcfromtimestamp(date)
-    except (ValueError, OverflowError):
-        return date
+    except (ValueError, OverflowError, TypeError):
+        return escape(date)
 
     format = "%d %b %Y" if not fmt else fmt
     formatted = date.strftime(format)
