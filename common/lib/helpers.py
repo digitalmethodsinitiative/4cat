@@ -9,6 +9,7 @@ import datetime
 import smtplib
 import fnmatch
 import socket
+import html
 import oslex
 import copy
 import time
@@ -1557,6 +1558,56 @@ def urls_in_text(text):
 
     # the same URL can occur more than once
     return list(dict.fromkeys(urls))
+
+
+def link_urls_in_text(text, max_length=0, line_breaks=False):
+    """
+    Turn the URLs in a text into links, as safe HTML
+
+    The text is taken as plain text: all of it is escaped, so HTML in it is
+    shown as it is written instead of being used. Each web address (http://
+    or https://) that `urls_in_text` finds becomes a link to the URL exactly
+    as it is written, with the URL in readable form (see `readable_url`) as
+    the link text. Other kinds of URLs, such as javascript://, stay text.
+
+    The text is gone through once, from start to end, and where two of the
+    URLs start at the same place, the longer one becomes the link. That way,
+    a URL that is the start of another one (https://x.com/someone and
+    https://x.com/someone/status/123) does not break the other one's link.
+
+    :param text:  Text to add links to; anything else is turned into text first
+    :param int max_length:  Shorten link texts that are longer than this,
+    keeping their start and end; 0 to never shorten them
+    :param bool line_breaks:  Show the line breaks in the text as `<br>`
+    :return str:  HTML
+    """
+    text = str(text)
+
+    urls = [url for url in urls_in_text(text) if re.match(r"https?://", url, re.IGNORECASE)]
+    if not urls:
+        result = html.escape(text)
+        return result.replace("\n", "<br>\n") if line_breaks else result
+
+    # with the longest URLs first, the longest one wins where several start at the same place
+    url_pattern = re.compile("|".join(re.escape(url) for url in sorted(urls, key=len, reverse=True)))
+
+    parts = []
+    position = 0
+    for match in url_pattern.finditer(text):
+        url = match.group()
+        link_text = readable_url(url)
+        if max_length:
+            link_text = ellipsiate(link_text, max_length, inside=True, ellipsis_str="[…]")
+
+        parts.append(html.escape(text[position:match.start()]))
+        parts.append(f'<a href="{html.escape(url)}" rel="external">{html.escape(link_text)}</a>')
+        position = match.end()
+
+    parts.append(html.escape(text[position:]))
+    result = "".join(parts)
+
+    # URLs never contain line breaks, so these are all in the text between them
+    return result.replace("\n", "<br>\n") if line_breaks else result
 
 
 def holds_only_urls(text, urls):

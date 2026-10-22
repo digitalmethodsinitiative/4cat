@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from webtool.lib.helpers import parse_markdown
-from common.lib.helpers import timify, ellipsiate, urls_in_text, readable_url
+from common.lib.helpers import timify, ellipsiate, urls_in_text, link_urls_in_text
 
 from flask import current_app, g
 from flask_login import current_user
@@ -142,27 +142,16 @@ def _jinja2_add_colours(data):
 @current_app.template_filter("add_ahref")
 def _jinja2_filter_add_ahref(content, ellipsiate=0):
     """
-    Add HTML links to text
+    Turn the URLs in a text into links, as safe HTML
 
-    Replaces URLs with a clickable link. The link text shows the URL in
-    readable form (see `readable_url`); the link itself leads to the URL
-    exactly as it was written.
+    See `link_urls_in_text`. The text is escaped here, so use this on plain
+    text rather than on HTML. Line breaks are shown as `<br>`.
 
-    :param str content:  Text to parse
-    :return str:  Parsed text
+    :param content:  Text to add links to
+    :param int ellipsiate:  Shorten link texts that are longer than this; 0 to never shorten them
+    :return str:  HTML
     """
-    try:
-        content = str(content)
-    except ValueError:
-        return content
-
-    for link in urls_in_text(content):
-        link_text = readable_url(link)
-        if ellipsiate > 0:
-            link_text = _jinja2_filter_ellipsiate(link_text, ellipsiate, True, "[&hellip;]")
-        content = content.replace(link, f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
-
-    return content
+    return link_urls_in_text(content, max_length=ellipsiate, line_breaks=True)
 
 
 @current_app.template_filter("add_base_url")
