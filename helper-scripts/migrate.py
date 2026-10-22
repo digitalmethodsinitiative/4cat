@@ -149,6 +149,65 @@ def install_extensions(logger, no_pip=True):
 					logger.info(result.stderr.decode("utf-8")) if result.stderr else None
 
 
+def install_dependencies(logger, upgrade=True):
+	"""
+	Install 4CAT's Python dependencies with pip
+
+	The requirements of installed extensions are included, because setup.py
+	adds them to 4CAT's own.
+
+	:param bool upgrade:  Also upgrade packages that are already installed to
+	the newest version allowed. If `False`, only missing packages are installed.
+	:return bool:  `True` if pip ran
+	"""
+	if args.no_pip:
+		print("- Skipping dependencie update with pip")
+		return False
+
+	try:
+		from common.config_manager import CoreConfigManager
+		config = CoreConfigManager()
+	except ImportError:
+		config = None
+
+	if config and config.get("USING_DOCKER"):
+		logger.info("- Running in Docker environment, checking for and installing any needed compilers...")
+		# Pip needs some compilers to successfully update
+		needed_packages = ["g++", "gcc"]
+		try:
+			apt_get = subprocess.run(["apt-get", "install", "-y"] + needed_packages, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+			logger.info("\n".join(["  " + line for line in apt_get.stdout.decode("utf-8").split("\n")]))
+		except subprocess.CalledProcessError as e:
+			logger.info("\n".join(["  " + line for line in e.output.decode("utf-8").split("\n")]))
+			logger.info(f"\n Error while installing {needed_packages}: {e}")
+
+	def log_pip_output(logger, output):
+		for line in output.decode("utf-8").split("\n"):
+			if line.startswith("Requirement already satisfied:"):
+				# eliminate some noise in the output
+				continue
+			logger.info("  " + line)
+
+	pip_command = [interpreter, "-m", "pip", "install", "-r", "requirements.txt"]
+	if upgrade:
+		logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
+		pip_command += ["--upgrade", "--upgrade-strategy", "eager"]
+	else:
+		logger.info("- Running pip to install missing dependencies")
+
+	logger.info("  (this could take a moment)...")
+	try:
+		pip = subprocess.run(pip_command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
+		log_pip_output(logger, pip.stdout)
+	except subprocess.CalledProcessError as e:
+		log_pip_output(logger, e.output)
+		logger.info(f"\n Error running pip: {e}")
+		exit(1)
+	logger.info("  ...done")
+
+	return True
+
+
 def finish(args, logger, no_pip=True):
 	"""
 	Finish migration
@@ -182,7 +241,7 @@ cli.add_argument("--yes", "-y", default=False, action="store_true", help="Answer
 cli.add_argument("--release", "-l", default=False, action="store_true", help="Pull and check out the latest 4CAT release from Github before migrating")
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
-cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
+cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not check out new code or run scripts to upgrade between minor versions; only install missing dependencies (unless --no-pip is set) and run extension install scripts. Use e.g. after installing an extension. Cannot be combined with --release or --branch.")
 cli.add_argument("--no-pip", "-p", default=False, action="store_true", help="Do not update dependencies with pip.")
 cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
@@ -219,10 +278,16 @@ logger.info("------------------------------------------")
 logger.info("Interactive:             " + ("yes" if not args.yes else "no"))
 logger.info("Pull latest release:     " + ("yes" if args.release else "no"))
 logger.info("Pull branch:             " + (args.branch if args.branch else "no"))
+logger.info("Run migration scripts:   " + ("no" if args.no_migrate else "yes"))
 logger.info("Restart after migration: " + ("yes" if args.restart else "no"))
 logger.info("Repository URL:          " + args.repository)
 logger.info(".current-version path:   " + args.current_version)
 logger.info(f"Current Datetime:        {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+if args.no_migrate and (args.release or args.branch):
+	# new code may need its migration scripts to run before 4CAT can start
+	logger.info("\n--no-migrate cannot be combined with --release or --branch.")
+	exit(1)
 
 # ---------------------------------------------
 #    Ensure existence of current version file
@@ -270,6 +335,14 @@ else:
 		logger.info(result.stderr.decode("utf-8"))
 		exit(1)
 	logger.info("  ...done")
+
+# ---------------------------------------------
+#     Only install dependencies, if asked to
+# ---------------------------------------------
+if args.no_migrate:
+	logger.info("- Not checking out new code or running migration scripts")
+	pip_ran = install_dependencies(logger, upgrade=False)
+	finish(args, logger, no_pip=pip_ran)
 
 # ---------------------------------------------
 #     Determine current and target versions
@@ -412,51 +485,9 @@ else:
 		logger.info("  - %s" % file.name)
 
 # ---------------------------------------------
-#                    Install any needed packages
+#        Install and upgrade dependencies
 # ---------------------------------------------
-
-try:
-	from common.config_manager import CoreConfigManager
-	config = CoreConfigManager()
-except ImportError:
-	config = None
-
-if config and config.get("USING_DOCKER"):
-	logger.info("- Running in Docker environment, checking for and installing any needed compilers...")
-	# Pip needs some compilers to successfully update
-	needed_packages = ["g++", "gcc"]
-	try:
-		apt_get = subprocess.run(["apt-get", "install", "-y"] + needed_packages, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
-		logger.info("\n".join(["  " + line for line in apt_get.stdout.decode("utf-8").split("\n")]))
-	except subprocess.CalledProcessError as e:
-		logger.info("\n".join(["  " + line for line in e.output.decode("utf-8").split("\n")]))
-		logger.info(f"\n Error while installing {needed_packages}: {e}")
-
-# ---------------------------------------------
-#                    Run pip
-# ---------------------------------------------
-if args.no_pip:
-	print("- Skipping dependencie update with pip")
-else:
-	def log_pip_output(logger, output):
-		for line in output.decode("utf-8").split("\n"):
-			if line.startswith("Requirement already satisfied:"):
-				# eliminate some noise in the output
-				continue
-			logger.info("  " + line)
-
-	logger.info("- Running pip to install new dependencies and upgrade existing dependencies")
-	logger.info("  (this could take a moment)...")
-	try:
-		pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt", "--upgrade", "--upgrade-strategy", "eager"],
-									stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
-		log_pip_output(logger, pip.stdout)
-		pip_ran = True
-	except subprocess.CalledProcessError as e:
-		log_pip_output(logger, e.output)
-		logger.info(f"\n Error running pip: {e}")
-		exit(1)
-	logger.info("  ...done")
+pip_ran = install_dependencies(logger, upgrade=True)
 
 # ---------------------------------------------
 #       Run individual migration scripts
