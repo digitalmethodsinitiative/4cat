@@ -79,6 +79,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                     # migrate to latest release
                     command += " --release"
 
+            elif self.job.data["remote_id"] == "extension":
+                # an extension was just installed - install its dependencies
+                # and restart, but keep 4CAT itself at its current version
+                command = sys.executable + " helper-scripts/migrate.py --yes --restart --no-migrate"
+
             else:
                 command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
 
@@ -153,9 +158,10 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             else:
                 api_host += self.config.get("flask.server_name")
 
-            if self.job.data["remote_id"].startswith("upgrade") and self.config.get("USING_DOCKER"):
+            remote_id = self.job.data["remote_id"]
+            if (remote_id.startswith("upgrade") or remote_id == "extension") and self.config.get("USING_DOCKER"):
                 # when using Docker, the front-end needs to update separately
-                log_stream_restart.write("Telling front-end Docker container to upgrade...\n")
+                log_stream_restart.write("Telling front-end Docker container to update...\n")
                 log_stream_restart.close()  # close, because front-end will be writing to it
                 upgrade_ok = False
                 upgrade_timeout = False

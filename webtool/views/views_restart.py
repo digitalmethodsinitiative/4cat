@@ -138,23 +138,32 @@ def upgrade_frontend():
 
     restart_log_file = g.config.get("PATH_LOGS").joinpath("restart.log")
     frontend_version_file = g.config.get("PATH_CONFIG").joinpath(".current-version-frontend")
-    if not frontend_version_file.exists():
-        return jsonify({"status": "error", "message": "No version file found"})
+
+    # there should be one and only one job of this type, with the parameters of
+    # our upgrade. it determines if we update to the latest release, to a
+    # branch, or only install the dependencies of a newly installed extension
+    upgrade_job = g.queue.get_job("restart-4cat", restrict_claimable=False)
+    installing_extension = upgrade_job and upgrade_job.data["remote_id"] == "extension"
+
+    if installing_extension:
+        # the code stays the same, so there is no version to keep track of
+        command = sys.executable + " -m helper-scripts.migrate.py --component frontend --yes --no-migrate"
+    else:
+        if not frontend_version_file.exists():
+            return jsonify({"status": "error", "message": "No version file found"})
+
+        command = sys.executable + " -m helper-scripts.migrate.py --component frontend --repository %s --yes --current-version %s" % (
+            oslex.quote(g.config.get("4cat.github_url")), oslex.quote(str(frontend_version_file)))
+        command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {oslex.quote(upgrade_job.details['branch'])}"
 
     log_stream = restart_log_file.open("a")
 
-    log_stream.write("Updating code for front-end Docker container\n")
+    if installing_extension:
+        log_stream.write("Installing extension dependencies for front-end Docker container\n")
+    else:
+        log_stream.write("Updating code for front-end Docker container\n")
     log_stream.flush()
     upgrade_ok = False
-
-    command = sys.executable + " -m helper-scripts.migrate.py --component frontend --repository %s --yes --current-version %s" % (
-        oslex.quote(g.config.get("4cat.github_url")), oslex.quote(str(frontend_version_file)))
-
-    # there should be one and only one job of this type, with the parameters of
-    # our upgrade. it determines if we update to the latest release or to a
-    # branch
-    upgrade_job = g.queue.get_job("restart-4cat", restrict_claimable=False)
-    command += " --release" if not upgrade_job or not upgrade_job.details.get("branch") else f" --branch {oslex.quote(upgrade_job.details['branch'])}"
 
     try:
         response = subprocess.run(oslex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
@@ -170,7 +179,7 @@ def upgrade_frontend():
 
     finally:
         log_stream.close()
-        frontend_version_file.unlink()
+        frontend_version_file.unlink(missing_ok=True)
 
     return jsonify({"status": "OK" if upgrade_ok else "error", "message": ""})
 

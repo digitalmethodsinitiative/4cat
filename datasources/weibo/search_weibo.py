@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from backend.lib.search import Search
 from common.lib.exceptions import MapItemException
 from common.lib.item_mapping import MappedItem, MissingMappedField, value_or_missing
-from common.lib.helpers import normalize_url_encoding, strip_tags
+from common.lib.helpers import readable_url, strip_tags
 
 
 class SearchWeibo(Search):
@@ -66,7 +66,7 @@ class SearchWeibo(Search):
         reposted_user = reposted.get("user") if reposted is not None else None
 
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),
+            "collected_from_url": readable_url(post.get("__import_meta", {}).get("source_platform_url", "")),
             "id": post["idstr"],
             "thread_id": post["idstr"],
             "url": f"https://weibo.com/{user['idstr']}/{post['mblogid']}",

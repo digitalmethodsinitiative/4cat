@@ -10,7 +10,7 @@ import re
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField, value_or_missing
 from common.lib.exceptions import MapItemException
-from common.lib.helpers import normalize_url_encoding
+from common.lib.helpers import readable_url
 
 
 class SearchInstagram(Search):
@@ -234,7 +234,7 @@ class SearchInstagram(Search):
         
         mapped_item = {
             # Post and caption
-            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(node.get("__import_meta", {}).get("source_platform_url")),  # Zeeschuimer metadata
             "collected_from_view": node.get("_zs_instagram_view", ""),
             "partial_item": partial_item,
             "id": node["code"],
@@ -355,7 +355,7 @@ class SearchInstagram(Search):
         mapped_item = {
             # Post data
             "id": node["shortcode"],
-            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(node.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "collected_from_view": SearchInstagram.get_value_or_missing(node, "_zs_instagram_view", ""),
             "partial_item": SearchInstagram.get_value_or_missing(node, "_zs_partial", ""),
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
@@ -541,7 +541,7 @@ class SearchInstagram(Search):
 
         mapped_item = {
             # Post and caption
-            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(node.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "collected_from_view": node.get("_zs_instagram_view", ""),
             "partial_item": node.get("_zs_partial", ""),
             "id": code,
