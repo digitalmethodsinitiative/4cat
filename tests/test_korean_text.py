@@ -343,6 +343,8 @@ def test_accent_folding_keeps_hangul_composed():
     ("हिन्दी किताब", "हिन्दी किताब"),
     ("ёлка йогурт", "ёлка йогурт"),
     ("✌️", "✌️"),
+    # symbols whose names have 'LATIN' in them are not letters
+    ("🅿️ Ⓜ️ ✝️", "🅿️ Ⓜ️ ✝️"),
     ("café がっこう", "cafe がっこう"),
 ])
 def test_accent_folding_only_changes_some_scripts(text, expected):
@@ -352,3 +354,14 @@ def test_accent_folding_only_changes_some_scripts(text, expected):
 def test_hashtags_in_any_script():
     assert AttributeRanker.extract(None, "#서울 #kpop스타 #café #BTS!", "hashtags") == [
         "서울", "kpop스타", "café", "BTS"]
+
+
+@pytest.mark.parametrize("text, hashtags", [
+    # vowel signs and the virama are marks, not letters
+    ("#हिन्दी दिवस", ["हिन्दी"]),
+    ("#น่ารัก", ["น่ารัก"]),
+    (unicodedata.normalize("NFD", "#café"), [unicodedata.normalize("NFD", "café")]),
+    ("#BTS_ARMY #1위 #😂 ##tag", ["BTS_ARMY", "1위", "tag"]),
+])
+def test_hashtags_keep_marks(text, hashtags):
+    assert AttributeRanker.extract(None, text, "hashtags") == hashtags

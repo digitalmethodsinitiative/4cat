@@ -1492,6 +1492,11 @@ def urls_in_text(text):
     Two things ural (as of 1.6.2) does not handle are taken care of here. Each step below can go once ural handles it;
     the tests in tests/test_urls_in_text.py will show when that is the case.
 
+    Note: Chinese and Japanese text puts no space after a URL, and ural does not end a URL at their punctuation. In
+    "看https://a.com。很好", the URL found is "https://a.com。很好". Links in such text need another way to split them
+    from the text around them. Until then, the Chinese sentence splitter in the tokeniser does not use this function,
+    and it also splits inside links, e.g. after the "?" in "https://a.com/?id=1".
+
     :param str text:  Text to search
     :return list:  The URLs, exactly as they are written in the text
     """
