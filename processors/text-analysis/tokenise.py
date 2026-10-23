@@ -11,15 +11,13 @@ import re
 import os
 
 import nltk
-from kiwipiepy import Kiwi
-from kiwipiepy.utils import Stopwords
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 from razdel.substring import Substring
 
 from common.lib.helpers import UserInput, get_interval_descriptor
-from common.lib.exceptions import QueryNeedsExplicitConfirmationException
+from common.lib.exceptions import QueryNeedsExplicitConfirmationException, QueryParametersException
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 
@@ -45,6 +43,29 @@ KIWI_WORD_CLASSES = {
 RECOMMENDED_TOKENIZERS = {
     "chinese": "jieba-cut",
     "korean": "kiwi",
+}
+
+# The stopwords-iso list for each language, used for the 'Stop words for
+# language chosen above' option
+STOPWORDS_ISO_CODES = {
+    "arabic": "ar",
+    "chinese": "zh",
+    "danish": "da",
+    "dutch": "nl",
+    "english": "en",
+    "finnish": "fi",
+    "french": "fr",
+    "german": "de",
+    "hungarian": "hu",
+    "italian": "it",
+    "norwegian": "no",
+    # 'porter' is the Porter stemmer, which is for English
+    "porter": "en",
+    "portuguese": "pt",
+    "romanian": "ro",
+    "russian": "ru",
+    "spanish": "es",
+    "swedish": "sv",
 }
 
 
@@ -321,11 +342,24 @@ class Tokenise(BasicProcessor):
         # Loading its model takes about a second, so do it once per job.
         kiwi = None
         if tokenizer_type == "kiwi" or language == "korean":
+            # imported here, so that the other tokenisers still work on a
+            # server where kiwipiepy is not installed
+            try:
+                from kiwipiepy import Kiwi
+            except ImportError:
+                self.dataset.finish_with_error("Could not load Kiwi, the Korean tokeniser. The kiwipiepy package is "
+                                               "not installed on this 4CAT server. Ask the 4CAT administrator to "
+                                               "install it.")
+                return
+
             self.dataset.update_status("Loading Kiwi model")
             kiwi = Kiwi()
 
         # Twitter tokenizer if indicated
+        tokenizer_warning = None  # shown when the dataset finishes
         if tokenizer_type == "kiwi":
+            from kiwipiepy.utils import Stopwords
+
             word_classes = self.parameters.get("kiwi_word_classes")
             if not word_classes:
                 self.dataset.finish_with_error("Choose at least one Korean word class to keep.")
@@ -350,7 +384,16 @@ class Tokenise(BasicProcessor):
             tokenizer_args = {}
         else:
             tokenizer = word_tokenize
-            tokenizer_args = {"language": language} if language != "other" else {}
+            tokenizer_args = {}
+            if language in self.get_punkt_languages():
+                tokenizer_args["language"] = language
+            elif language != "other":
+                # validate_query refuses this, but e.g. presets do not pass
+                # through it. Without a language, word_tokenize uses the
+                # English model, as for 'other'
+                tokenizer_warning = (f"nltk word_tokenize cannot split {language.title()} text into sentences, so "
+                                     f"it used the English model. Use the 'Recommended' tokeniser for better "
+                                     f"results.")
 
         # load word filters - words to exclude from tokenisation
         wordlists = self.parameters.get("filter", [])
@@ -365,25 +408,7 @@ class Tokenise(BasicProcessor):
         for wordlist in wordlists:
             if wordlist == "copy-language" and language != "other":
                 # use stopwords-iso list for chosen language
-                copy_language = {
-                    "arabic": "ar",
-                    "chinese": "zh",
-                    "danish": "dk",
-                    "dutch": "nl",
-                    "english": "en",
-                    "finnish": "fi",
-                    "french": "fr",
-                    "german": "de",
-                    "hungarian": "hu",
-                    "italian": "it",
-                    "norwegian": "no",
-                    "porter": "pt",
-                    "portugese": "pt",
-                    "romanian": "ro",
-                    "russian": "ru",
-                    "spanish": "es",
-                    "swedish": "sv",
-                }.get(language, "en")
+                copy_language = STOPWORDS_ISO_CODES.get(language, "en")
                 wordlist = f"stopwords-iso-{copy_language}"
 
             if wordlist.startswith("stopwords-iso"):
@@ -611,9 +636,10 @@ class Tokenise(BasicProcessor):
         with staging_area.joinpath(".token_metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
-        warning = None
+        finish_warnings = [tokenizer_warning] if tokenizer_warning else []
         if sentence_error:
-            warning = f"Finished tokenizing; Unable to group by sentence ({language} not supported), instead grouped by item."
+            finish_warnings.append(f"Unable to group by sentence ({language} not supported), instead grouped by item.")
+        warning = ("Finished tokenizing; " + " ".join(finish_warnings)) if finish_warnings else None
 
         # create zip of archive and delete temporary files and folder
         self.write_archive_and_finish(staging_area, warning=warning)
@@ -655,7 +681,7 @@ class Tokenise(BasicProcessor):
                 return kiwi_function, False
             elif language == "chinese":
                 return chinese_function, False
-            elif language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab'))]:
+            elif language not in Tokenise.get_punkt_languages():
                 if dataset:
                     dataset.update_status(f"Language {language} not available for sentence tokenizer; grouping by items instead.")
                 return dummy_function, True
@@ -663,6 +689,15 @@ class Tokenise(BasicProcessor):
                 return sent_tokenize, False
         else:
             return dummy_function, False
+
+    @staticmethod
+    def get_punkt_languages():
+        """
+        Get the languages that NLTK can split into sentences
+
+        :return list:  Language names, e.g. 'english'
+        """
+        return [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt_tab'))]
 
     @staticmethod
     def get_kiwi_tokenizer(kiwi, word_classes, stopwords=None, accept_words=None):
@@ -717,21 +752,32 @@ class Tokenise(BasicProcessor):
     @staticmethod
     def validate_query(query, request, config):
         """
-        Ask the user to confirm a tokeniser that does not fit the language
+        Check that the tokeniser fits the language
 
-        Kiwi and jieba only work for Korean and Chinese, and the other
-        tokenisers give poor results for these languages.
+        nltk word_tokenize cannot work for a language that NLTK cannot split
+        into sentences, so that is refused. Kiwi and jieba only work for
+        Korean and Chinese, and the other tokenisers give poor results for
+        these languages, so the user must confirm those.
 
         :param dict query:  Processor options, as parsed from the form
         :param request:  Flask request
         :param config:  Configuration reader
         :return dict:  The same options
         """
+        language = query.get("language") or ""
+        tokenizer = query.get("tokenizer_type") or ""
+
+        # checked tokenizer compatibilities
+        if tokenizer == "regular" and language not in ("", "other") and \
+                language not in Tokenise.get_punkt_languages():
+            raise QueryParametersException(
+                f"nltk word_tokenize does not work for {language.title()}. It first splits the text into "
+                f"sentences, and NLTK cannot split {language.title()} text into sentences. Choose 'Recommended' or "
+                f"another tokeniser.")
+
         if query.get("frontend-confirm"):
             return query
 
-        language = query.get("language") or ""
-        tokenizer = query.get("tokenizer_type") or ""
         if tokenizer == "recommended":
             return query
 

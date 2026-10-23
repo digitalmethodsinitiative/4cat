@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import re
 import unicodedata
 from pathlib import Path
@@ -8,7 +9,7 @@ import pytest
 from kiwipiepy import Kiwi
 from kiwipiepy.utils import Stopwords
 
-from common.lib.exceptions import QueryNeedsExplicitConfirmationException
+from common.lib.exceptions import QueryNeedsExplicitConfirmationException, QueryParametersException
 from common.lib.helpers import compile_term_regex
 from processors.filtering.accent_fold import AccentFoldingFilter
 from processors.metrics.rank_attribute import AttributeRanker
@@ -37,6 +38,34 @@ SENTENCE = "학교에서 친구들이랑 떡볶이 먹었는데 진짜 맛있었
 @pytest.fixture(scope="module")
 def kiwi():
     return Kiwi()
+
+
+def run_tokenise(tmp_path, texts, **parameters):
+    """
+    Run the tokeniser on some texts, as the backend would
+
+    :return tuple:  The token lists, and the warning the dataset finished with
+    """
+    root = Path(__file__).parent.parent
+    config = MagicMock()
+    config.get.return_value = root
+    defaults = {option: settings.get("default") for option, settings in Tokenise.get_options(config=config).items()}
+
+    processor = Tokenise.__new__(Tokenise)
+    processor.config = config
+    processor.parameters = {**defaults, "columns": ["body"], **parameters}
+    processor.dataset = MagicMock()
+    processor.dataset.get_staging_area.return_value = tmp_path
+    processor.source_dataset = MagicMock(annotation_fields=None, num_rows=len(texts))
+    processor.source_dataset.iterate_items.return_value = [{"id": str(i), "body": text} for i, text in enumerate(texts)]
+    processor.write_archive_and_finish = MagicMock()
+
+    processor.process()
+
+    assert not processor.dataset.finish_with_error.called
+    # one file per interval, and the default interval is 'all'
+    tokens = json.loads(tmp_path.joinpath("all.json").read_text(encoding="utf-8"))
+    return tokens, processor.write_archive_and_finish.call_args.kwargs.get("warning")
 
 
 # --- finding words in text ---------------------------------------------------
@@ -136,7 +165,7 @@ def test_russian_sentences():
     ("korean", "kiwi", False),
     ("korean", "twitter", True),
     ("chinese", "jieba-cut", False),
-    ("chinese", "regular", True),
+    ("chinese", "twitter", True),
     ("english", "kiwi", True),
     ("english", "jieba-search", True),
     ("other", "jieba-cut", False),
@@ -151,6 +180,49 @@ def test_tokeniser_that_does_not_fit_the_language(language, tokenizer, asks):
         assert Tokenise.validate_query({**query, "frontend-confirm": True}, None, None)
     else:
         assert Tokenise.validate_query(query, None, None) == query
+
+
+@pytest.mark.parametrize("language, refused", [
+    ("korean", True),
+    ("chinese", True),
+    ("arabic", True),
+    ("english", False),
+    ("danish", False),
+    ("other", False),
+])
+def test_word_tokenize_needs_a_sentence_model(language, refused):
+    """word_tokenize first splits the text into sentences, which NLTK cannot do for every language"""
+    query = {"language": language, "tokenizer_type": "regular"}
+    if refused:
+        with pytest.raises(QueryParametersException):
+            Tokenise.validate_query(query, None, None)
+        # confirming a warning does not let it through
+        with pytest.raises(QueryParametersException):
+            Tokenise.validate_query({**query, "frontend-confirm": True}, None, None)
+    else:
+        assert Tokenise.validate_query(query, None, None) == query
+
+
+def test_word_tokenize_without_sentence_model_warns(tmp_path):
+    """presets do not pass through validate_query, so the tokeniser itself must cope"""
+    tokens, warning = run_tokenise(tmp_path, ["학교에서 공부했다. 친구가 왔다."], language="korean",
+                                   tokenizer_type="regular", kiwi_stopwords=False)
+    assert tokens == [["학교에서", "공부했다", "친구가", "왔다"]]
+    assert "English model" in warning
+
+
+def test_stop_words_for_every_language():
+    """'Stop words for language chosen above' finds a stopwords-iso list for each language"""
+    root = Path(__file__).parent.parent
+    config = MagicMock()
+    config.get.return_value = root
+    languages = Tokenise.get_options(config=config)["language"]["options"]
+    with root.joinpath("common/assets/stopwords-iso.json").open(encoding="utf-8") as infile:
+        stopwords_iso = json.load(infile)
+
+    # Korean has its own stop word option, and 'other' has no list
+    for language in set(languages) - {"korean", "other"}:
+        assert _tokenise.STOPWORDS_ISO_CODES.get(language) in stopwords_iso, language
 
 
 # --- other processors ----------------------------------------------------------
