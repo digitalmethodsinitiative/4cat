@@ -12,7 +12,9 @@ from kiwipiepy.utils import Stopwords
 from common.lib.exceptions import QueryNeedsExplicitConfirmationException, QueryParametersException
 from common.lib.helpers import compile_term_regex
 from processors.filtering.accent_fold import AccentFoldingFilter
+from processors.filtering.lexical_filter import LexicalFilter
 from processors.metrics.rank_attribute import AttributeRanker
+from processors.metrics.vocabulary_overtime import OvertimeAnalysis
 
 
 """
@@ -40,24 +42,44 @@ def kiwi():
     return Kiwi()
 
 
+class DatasetItem(dict):
+    """An item as `DataSet.iterate_items` gives it"""
+    @property
+    def original(self):
+        return self
+
+
+def make_processor(processor_type, texts, **parameters):
+    """
+    Make a processor that runs on items with the given texts as their body
+
+    The rest of 4CAT is mocked. Options that are not in `parameters` get their
+    default value, as in the backend.
+
+    :return BasicProcessor:  Processor, ready to run
+    """
+    config = MagicMock()
+    config.get.return_value = Path(__file__).parent.parent
+    options = processor_type.get_options(config=config)
+
+    processor = processor_type.__new__(processor_type)
+    processor.config = config
+    processor.parameters = {**{option: settings.get("default") for option, settings in options.items()}, **parameters}
+    processor.dataset = MagicMock()
+    processor.source_dataset = MagicMock(annotation_fields=None, num_rows=len(texts))
+    processor.source_dataset.iterate_items.return_value = [
+        DatasetItem(id=str(i), body=text) for i, text in enumerate(texts)]
+    return processor
+
+
 def run_tokenise(tmp_path, texts, **parameters):
     """
     Run the tokeniser on some texts, as the backend would
 
     :return tuple:  The token lists, and the warning the dataset finished with
     """
-    root = Path(__file__).parent.parent
-    config = MagicMock()
-    config.get.return_value = root
-    defaults = {option: settings.get("default") for option, settings in Tokenise.get_options(config=config).items()}
-
-    processor = Tokenise.__new__(Tokenise)
-    processor.config = config
-    processor.parameters = {**defaults, "columns": ["body"], **parameters}
-    processor.dataset = MagicMock()
+    processor = make_processor(Tokenise, texts, columns=["body"], **parameters)
     processor.dataset.get_staging_area.return_value = tmp_path
-    processor.source_dataset = MagicMock(annotation_fields=None, num_rows=len(texts))
-    processor.source_dataset.iterate_items.return_value = [{"id": str(i), "body": text} for i, text in enumerate(texts)]
     processor.write_archive_and_finish = MagicMock()
 
     processor.process()
@@ -97,6 +119,46 @@ def test_chinese_needs_anywhere():
 def test_start_of_word_works_for_hashtags():
     """with \\b, a term that starts with '#' is only found after a letter or digit"""
     assert compile_term_regex([re.escape("#서울")], match="start").search("오늘 #서울에서")
+
+
+COMPOSED = "학교에서 공부했다"
+DECOMPOSED = unicodedata.normalize("NFD", COMPOSED)  # the same text, with each syllable split into letters
+
+
+@pytest.mark.parametrize("term, text", [
+    ("학교", COMPOSED),
+    ("학교", DECOMPOSED),
+    (unicodedata.normalize("NFD", "학교"), COMPOSED),
+])
+def test_lexical_filter_finds_composed_and_decomposed_hangul(term, text):
+    processor = make_processor(LexicalFilter, [text, "집에 있다"], **{"lexicon-custom": term, "match": "start"})
+    assert [item["id"] for item in processor.filter_items()] == ["0"]
+
+
+@pytest.mark.parametrize("term, text", [
+    # the text used to be lowercased, but the terms were not
+    ("Trump", "TRUMP visited Seoul"),
+    ("학교", DECOMPOSED),
+])
+def test_overtime_counts_find_terms(term, text):
+    processor = make_processor(OvertimeAnalysis, [text, "집에 있다"],
+                               **{"vocabulary-custom": term, "match": "start", "timeframe": "all"})
+    processor.write_csv_items_and_finish = MagicMock()
+    processor.process()
+    assert processor.write_csv_items_and_finish.call_args.args[0] == [{"date": "all", "item": "value", "value": 1}]
+
+
+def test_overtime_counts_everything_for_comparison():
+    """'Match everything' counts every item, also those without text"""
+    processor = make_processor(OvertimeAnalysis, [COMPOSED, "집에 있다", ""],
+                               **{"vocabulary-custom": "학교", "match": "start", "partition": True,
+                                  "vocabulary": ["wildcard"], "timeframe": "all"})
+    processor.write_csv_items_and_finish = MagicMock()
+    processor.process()
+    assert processor.write_csv_items_and_finish.call_args.args[0] == [
+        {"date": "all", "item": "user-defined", "value": 1},
+        {"date": "all", "item": "everything", "value": 3},
+    ]
 
 
 # --- tokenising with Kiwi ----------------------------------------------------

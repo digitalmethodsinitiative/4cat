@@ -5,7 +5,7 @@ import re
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.compatibility import Compatibility
-from common.lib.helpers import UserInput, compile_term_regex
+from common.lib.helpers import UserInput, TermMatcher, get_term_match_option
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -53,20 +53,7 @@ class LexicalFilter(BaseFilter):
                 "help": "Interpret custom word list as a regular expression",
                 "tooltip": "Regular expressions are parsed with Python"
             },
-            "match": {
-                "type": UserInput.OPTION_CHOICE,
-                "default": "word",
-                "options": {
-                    "word": "Whole words only",
-                    "start": "At the start of words",
-                    "anywhere": "Anywhere, also inside words",
-                },
-                "help": "Match words",
-                "tooltip": "'At the start of words' also finds words that continue after the word you are looking "
-                           "for. Use this for Korean, where particles are part of the word: '학교' then also finds "
-                           "'학교에서' and '학교가'. 'Anywhere' also finds the word inside other words, such as "
-                           "'고등학교'. Use this for languages written without spaces, such as Chinese."
-            },
+            "match": get_term_match_option(),
             "exclude": {
                 "type": UserInput.OPTION_TOGGLE,
                 "default": False,
@@ -108,7 +95,7 @@ class LexicalFilter(BaseFilter):
         lexicons[custom_id] |= custom_lexicon
 
         # compile into regex for quick matching
-        lexicon_regexes = {}
+        lexicon_matchers = {}
         for lexicon_id in lexicons:
             if not lexicons[lexicon_id]:
                 continue
@@ -119,8 +106,8 @@ class LexicalFilter(BaseFilter):
                 phrases = [term for term in lexicons[lexicon_id] if term]
 
             try:
-                lexicon_regexes[lexicon_id] = compile_term_regex(phrases, match=self.parameters.get("match", "word"),
-                                                                 flags=0 if case_sensitive else re.IGNORECASE)
+                lexicon_matchers[lexicon_id] = TermMatcher(phrases, match=self.parameters.get("match", "word"),
+                                                           flags=0 if case_sensitive else re.IGNORECASE)
             except re.error:
                 self.dataset.finish_with_error("Invalid regular expression, cannot use as filter")
                 return
@@ -143,15 +130,14 @@ class LexicalFilter(BaseFilter):
             # check separately
             matching_lexicons = set()
             for lexicon_id in lexicons:
-                if lexicon_id not in lexicon_regexes:
+                if lexicon_id not in lexicon_matchers:
                     continue
-
-                lexicon_regex = lexicon_regexes[lexicon_id]
 
                 # check if we match
-                if not lexicon_regex.findall(mapped_item["body"]) and not exclude:
+                found = lexicon_matchers[lexicon_id].found_in(mapped_item["body"])
+                if not found and not exclude:
                     continue
-                elif lexicon_regex.findall(mapped_item["body"]) and exclude:
+                elif found and exclude:
                     continue
 
                 matching_lexicons.add(lexicon_id)

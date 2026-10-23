@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import unicodedata
 import subprocess
 import imagehash
 import hashlib
@@ -1581,6 +1582,9 @@ def compile_term_regex(terms, match="word", flags=0):
     - "anywhere": also inside words, so "학교" is found in "고등학교" too. Use
       this for languages that are written without spaces, such as Chinese.
 
+    The terms are composed (NFC). To search texts, use `TermMatcher`, which
+    composes each text too.
+
     :param list terms:  Terms to find, as regular expressions. Escape them with
     `re.escape` first to find them as they are written.
     :param str match:  "word", "start" or "anywhere"
@@ -1588,7 +1592,7 @@ def compile_term_regex(terms, match="word", flags=0):
     `re.IGNORECASE`
     :return re.Pattern:  Compiled expression
     """
-    pattern = "(" + "|".join(terms) + ")"
+    pattern = "(" + "|".join([unicodedata.normalize("NFC", term) for term in terms]) + ")"
     if match == "start":
         # unlike \b, this also works for terms that start with e.g. '#'
         pattern = r"(?<!\w)" + pattern
@@ -1596,6 +1600,58 @@ def compile_term_regex(terms, match="word", flags=0):
         pattern = r"\b" + pattern + r"\b"
 
     return re.compile(pattern, flags=flags)
+
+
+class TermMatcher:
+    """
+    Find any of the given terms in texts
+
+    Text can store e.g. Hangul syllables or accented letters either composed
+    or split into parts, which look the same but do not match each other. The
+    matcher composes (NFC) both the terms and each text it searches, so both
+    forms match.
+
+    It only says whether a term was found. A composed text can be shorter
+    than the original, so positions in it would not fit the original text.
+    """
+    def __init__(self, terms, match="word", flags=0):
+        """
+        :param list terms:  Terms to find, as for `compile_term_regex`
+        :param str match:  "word", "start" or "anywhere", as for
+        `compile_term_regex`
+        :param int flags:  Flags to compile the expression with, e.g.
+        `re.IGNORECASE`
+        """
+        self.regex = compile_term_regex(terms, match=match, flags=flags)
+
+    def found_in(self, text):
+        """
+        :param str text:  Text to search
+        :return bool:  Whether any of the terms is in the text
+        """
+        return bool(self.regex.search(unicodedata.normalize("NFC", text)))
+
+
+def get_term_match_option():
+    """
+    Get the processor option that sets where `TermMatcher` finds terms
+
+    :return dict:  Option definition, for a processor's `get_options()`
+    """
+    return {
+        "type": UserInput.OPTION_CHOICE,
+        "default": "word",
+        "options": {
+            "word": "Whole words only",
+            "start": "At the start of words",
+            "anywhere": "Anywhere, also inside words",
+        },
+        "help": "Match words",
+        "tooltip": "'At the start of words' also finds words that continue after the word you are looking for. Use "
+                   "this for Korean, where particles are part of the word: '학교' then also finds '학교에서' and "
+                   "'학교가'. 'Anywhere' also finds the word inside other words, such as '고등학교'. Use this for "
+                   "languages written without spaces, such as Chinese."
+    }
 
 
 def folder_size(path='.'):

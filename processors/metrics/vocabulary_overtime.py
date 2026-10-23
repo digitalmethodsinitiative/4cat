@@ -5,7 +5,7 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.helpers import UserInput, get_interval_descriptor, compile_term_regex
+from common.lib.helpers import UserInput, get_interval_descriptor, TermMatcher, get_term_match_option
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -78,20 +78,7 @@ class OvertimeAnalysis(BasicProcessor):
                 "default": "",
                 "help": "Custom vocabulary (separate with commas)"
             },
-            "match": {
-                "type": UserInput.OPTION_CHOICE,
-                "default": "word",
-                "options": {
-                    "word": "Whole words only",
-                    "start": "At the start of words",
-                    "anywhere": "Anywhere, also inside words",
-                },
-                "help": "Match words",
-                "tooltip": "'At the start of words' also counts words that continue after the word you are looking "
-                           "for. Use this for Korean, where particles are part of the word: '학교' then also counts "
-                           "'학교에서' and '학교가'. 'Anywhere' also counts the word inside other words, such as "
-                           "'고등학교'. Use this for languages written without spaces, such as Chinese."
-            }
+            "match": get_term_match_option()
         }
 
     def process(self):
@@ -131,13 +118,13 @@ class OvertimeAnalysis(BasicProcessor):
             vocabularies[custom_id] |= custom_vocabulary
 
         # compile into regex for quick matching
-        vocabulary_regexes = {}
+        vocabulary_matchers = {}
         for vocabulary_id in vocabularies:
             if not vocabularies[vocabulary_id]:
                 continue
-            vocabulary_regexes[vocabulary_id] = compile_term_regex(
+            vocabulary_matchers[vocabulary_id] = TermMatcher(
                 [re.escape(term) for term in vocabularies[vocabulary_id] if term],
-                match=self.parameters.get("match", "word"))
+                match=self.parameters.get("match", "word"), flags=re.IGNORECASE)
 
         # if the results are partitioned, then it is useful to have a way to
         # compare the frequencies to the overall activity in the graph. This
@@ -145,7 +132,7 @@ class OvertimeAnalysis(BasicProcessor):
         # data.
         if partition and "wildcard" in self.parameters.get("vocabulary", []):
             vocabularies["everything"] = set()
-            vocabulary_regexes["everything"] = re.compile(r".*")
+            vocabulary_matchers["everything"] = TermMatcher([".*"], match="anywhere")
 
         # now for the real deal
         self.dataset.update_status("Reading source file")
@@ -165,13 +152,11 @@ class OvertimeAnalysis(BasicProcessor):
             # vocabulary, but else we'll have different ones we can
             # check separately
             for vocabulary_id in vocabularies:
-                if vocabulary_id not in vocabulary_regexes:
+                if vocabulary_id not in vocabulary_matchers:
                     continue
 
-                vocabulary_regex = vocabulary_regexes[vocabulary_id]
-
                 # check if we match
-                if not vocabulary_regex.findall(post["body"].lower()):
+                if not vocabulary_matchers[vocabulary_id].found_in(post["body"]):
                     continue
 
                 # determine what interval to save the frequency for
