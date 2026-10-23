@@ -158,11 +158,14 @@ class AccentFoldingFilter(BasicProcessor):
         :return:  Folded text
         """
         kept = []
-        letter = None
+        base = None
         for c in unicodedata.normalize('NFD', text):
             if unicodedata.category(c) != 'Mn':
-                letter = c
-            elif letter and AccentFoldingFilter.FOLDED_SCRIPTS & set(unicodedata.name(letter, "").split()):
+                base = c
+            # only marks on letters, so that e.g. an emoji such as '🅿️' keeps
+            # its variation selector, even though its name has 'LATIN' in it
+            elif base and unicodedata.category(base).startswith("L") and \
+                    AccentFoldingFilter.FOLDED_SCRIPTS & set(unicodedata.name(base, "").split()):
                 continue
 
             kept.append(c)
