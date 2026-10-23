@@ -1,6 +1,7 @@
 """
 Generate ranking per post attribute
 """
+import unicodedata
 import emoji
 import re
 
@@ -348,8 +349,20 @@ class AttributeRanker(BasicProcessor):
             return values
 
         elif look_for == "hashtags":
-            # \w also matches letters outside the Latin alphabet, e.g. #서울
-            hashtags = list(re.findall(r"#(\w+)", value))
+            # a hashtag is letters, digits and underscores in any script, as
+            # with \w, plus the marks that some scripts add to letters, such
+            # as the vowel signs in '#हिन्दी'. \w stops at those marks
+            hashtags = []
+            for candidate in re.findall(r"#([^\s#]+)", value):
+                length = 0
+                for character in candidate:
+                    if character != "_" and unicodedata.category(character)[0] not in "LNM":
+                        break
+                    length += 1
+
+                if length:
+                    hashtags.append(candidate[:length])
+
             return hashtags
 
         elif look_for == "emoji":
