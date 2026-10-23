@@ -217,17 +217,22 @@ def test_kiwi_keeps_hashtags_and_mentions(tmp_path):
     assert tokens == [["새롭다", "정책", "#주말", "@jimin", "😂"]]
 
 
-@pytest.mark.parametrize("language, tokenizer, shown", [
-    ("korean", "recommended", True),
-    ("other", "kiwi", True),
-    ("english", "twitter", False),
+@pytest.mark.parametrize("language, tokenizer, word_classes, stopwords", [
+    ("korean", "recommended", True, True),
+    ("korean", "kiwi", True, True),
+    # the word classes only apply where Kiwi runs, the stop words to Korean with any tokeniser
+    ("korean", "twitter", False, True),
+    ("korean", "jieba-cut", False, True),
+    ("other", "kiwi", False, True),
+    ("english", "recommended", False, False),
+    ("english", "twitter", False, False),
 ])
-def test_kiwi_options_shown_when_kiwi_can_run(language, tokenizer, shown):
+def test_kiwi_options_shown_when_they_apply(language, tokenizer, word_classes, stopwords):
     """an option whose 'requires' is not met is left out, even if the form sends it"""
     form = {"language": language, "tokenizer_type": tokenizer, "kiwi_word_classes": "nouns", "kiwi_stopwords": "on"}
     parsed = UserInput.parse_all(Tokenise.get_options(config=mock_config()), form)
-    assert ("kiwi_word_classes" in parsed) is shown
-    assert ("kiwi_stopwords" in parsed) is shown
+    assert ("kiwi_word_classes" in parsed) is word_classes
+    assert ("kiwi_stopwords" in parsed) is stopwords
 
 
 def test_korean_without_kiwi_when_not_needed(tmp_path, monkeypatch):

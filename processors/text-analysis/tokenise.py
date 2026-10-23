@@ -177,7 +177,11 @@ class Tokenise(BasicProcessor):
                            "of the meaning in informal posts. They are kept in their dictionary form: '먹었는데' "
                            "becomes '먹다'. Adverbs are left out by default because the most common ones are words "
                            "like '안' (not) and '너무' (too). Add them for sentiment analysis, where negation matters.",
-                "requires": "language==korean || tokenizer_type==kiwi"
+                # only shown for Korean with Kiwi or 'Recommended', where Kiwi
+                # runs. 'requires' cannot mix AND and OR, so this lists the
+                # other tokenisers. Kiwi with another language uses the default
+                "requires": ["language==korean", "tokenizer_type!=twitter", "tokenizer_type!=regular",
+                             "tokenizer_type!=razdel", "tokenizer_type!^=jieba"]
             },
             "grouping-per": {
                 "type": UserInput.OPTION_CHOICE,
