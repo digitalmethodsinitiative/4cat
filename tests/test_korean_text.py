@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import re
+import sys
 import unicodedata
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -10,7 +11,7 @@ from kiwipiepy import Kiwi
 from kiwipiepy.utils import Stopwords
 
 from common.lib.exceptions import QueryNeedsExplicitConfirmationException, QueryParametersException
-from common.lib.helpers import compile_term_regex
+from common.lib.helpers import UserInput, compile_term_regex
 from processors.filtering.accent_fold import AccentFoldingFilter
 from processors.filtering.lexical_filter import LexicalFilter
 from processors.metrics.rank_attribute import AttributeRanker
@@ -49,6 +50,12 @@ class DatasetItem(dict):
         return self
 
 
+def mock_config():
+    config = MagicMock()
+    config.get.return_value = Path(__file__).parent.parent
+    return config
+
+
 def make_processor(processor_type, texts, **parameters):
     """
     Make a processor that runs on items with the given texts as their body
@@ -58,8 +65,7 @@ def make_processor(processor_type, texts, **parameters):
 
     :return BasicProcessor:  Processor, ready to run
     """
-    config = MagicMock()
-    config.get.return_value = Path(__file__).parent.parent
+    config = mock_config()
     options = processor_type.get_options(config=config)
 
     processor = processor_type.__new__(processor_type)
@@ -197,6 +203,38 @@ def test_kiwi_stopwords_can_be_allowed(kiwi):
     assert Tokenise.get_kiwi_tokenizer(kiwi, ["nouns", "verbs"], Stopwords())(text) == ["떡볶이", "먹다", "영화"]
     assert Tokenise.get_kiwi_tokenizer(kiwi, ["nouns", "verbs"], Stopwords(), {"사람", "보다"})(text) == [
         "사람", "떡볶이", "먹다", "영화", "보다"]
+
+
+def test_kiwi_joins_adjective_roots(kiwi):
+    """Kiwi splits '깨끗한' into a root (XR) and a suffix (XSA). A noun with that suffix stays a noun"""
+    assert Tokenise.get_kiwi_tokenizer(kiwi, ["nouns", "adjectives"])("깨끗한 방에서 행복한 하루") == [
+        "깨끗하다", "방", "행복", "하루"]
+
+
+def test_kiwi_keeps_hashtags_and_mentions(tmp_path):
+    """the tokeniser removes punctuation from tokens, but not the '#' and '@' that Kiwi tagged"""
+    tokens, _ = run_tokenise(tmp_path, ["새로운 정책 #주말 @jimin 😂"], language="korean")
+    assert tokens == [["새롭다", "정책", "#주말", "@jimin", "😂"]]
+
+
+@pytest.mark.parametrize("language, tokenizer, shown", [
+    ("korean", "recommended", True),
+    ("other", "kiwi", True),
+    ("english", "twitter", False),
+])
+def test_kiwi_options_shown_when_kiwi_can_run(language, tokenizer, shown):
+    """an option whose 'requires' is not met is left out, even if the form sends it"""
+    form = {"language": language, "tokenizer_type": tokenizer, "kiwi_word_classes": "nouns", "kiwi_stopwords": "on"}
+    parsed = UserInput.parse_all(Tokenise.get_options(config=mock_config()), form)
+    assert ("kiwi_word_classes" in parsed) is shown
+    assert ("kiwi_stopwords" in parsed) is shown
+
+
+def test_korean_without_kiwi_when_not_needed(tmp_path, monkeypatch):
+    """another tokeniser only needs Kiwi to split Korean text into sentences"""
+    monkeypatch.setitem(sys.modules, "kiwipiepy", None)
+    tokens, _ = run_tokenise(tmp_path, ["학교에서 공부했다"], language="korean", tokenizer_type="twitter")
+    assert tokens == [["학교에서", "공부했다"]]
 
 
 def test_korean_sentences(kiwi):

@@ -166,7 +166,7 @@ class Tokenise(BasicProcessor):
                 "options": {
                     "nouns": "Nouns (NNG, NNP)",
                     "verbs": "Verbs (VV)",
-                    "adjectives": "Adjectives (VA)",
+                    "adjectives": "Adjectives (VA, XR + XSA)",
                     "adverbs": "Adverbs (MAG)",
                     "foreign": "Words in Latin script or Hanja (SL, SH)",
                     "social": "Hashtags, mentions and emoji (W_HASHTAG, W_MENTION, W_EMOJI)",
@@ -177,7 +177,7 @@ class Tokenise(BasicProcessor):
                            "of the meaning in informal posts. They are kept in their dictionary form: '먹었는데' "
                            "becomes '먹다'. Adverbs are left out by default because the most common ones are words "
                            "like '안' (not) and '너무' (too). Add them for sentiment analysis, where negation matters.",
-                "requires": "language==korean"
+                "requires": "language==korean || tokenizer_type==kiwi"
             },
             "grouping-per": {
                 "type": UserInput.OPTION_CHOICE,
@@ -230,10 +230,11 @@ class Tokenise(BasicProcessor):
                 "type": UserInput.OPTION_TOGGLE,
                 "default": True,
                 "help": "Remove Korean stop words",
-                "tooltip": "Removes the 100 most frequent Korean words in Kiwi's stop word list, e.g. '하다' (to do) "
-                           "and '것' (thing), but also '사람' (person). Review the list in the references. To keep a "
-                           "word, add it to 'Always allow these tokens'.",
-                "requires": "language==korean"
+                "tooltip": "With Kiwi, this removes the 100 words in Kiwi's stop word list, e.g. '하다' (to do) and "
+                           "'것' (thing), but also '사람' (person). Other tokenisers use the stopwords-iso list for "
+                           "Korean (679 entries) instead. Both lists are in the references. To keep a word, add it to "
+                           "'Always allow these tokens'.",
+                "requires": "language==korean || tokenizer_type==kiwi"
             },
             "accept_words": {
                 "type": UserInput.OPTION_TEXT,
@@ -338,10 +339,12 @@ class Tokenise(BasicProcessor):
         if self.parameters.get("accept_words"):
             accept_words = {str(word).strip() for word in self.parameters["accept_words"].split(",")}
 
+        grouping = "item" if self.parameters.get("grouping-per", "") == "item" else "sentence"
+
         # Kiwi is used to tokenise Korean text and to split it into sentences.
         # Loading its model takes about a second, so do it once per job.
         kiwi = None
-        if tokenizer_type == "kiwi" or language == "korean":
+        if tokenizer_type == "kiwi" or (language == "korean" and grouping == "sentence"):
             # imported here, so that the other tokenisers still work on a
             # server where kiwipiepy is not installed
             try:
@@ -456,7 +459,6 @@ class Tokenise(BasicProcessor):
         # process items
         self.dataset.update_status("Processing items")
         docs_per = self.parameters.get("docs_per")
-        grouping = "item" if self.parameters.get("grouping-per", "") == "item" else "sentence"
 
         # this is how we'll keep track of the subsets of tokens
         output_files = {}
@@ -554,8 +556,13 @@ class Tokenise(BasicProcessor):
                     token = Tokenise.normalise_segment(token)
 
                     token = token.lower()
-                    # jieba returns the spaces between words as tokens too
-                    token = numbers.sub("", symbol.sub("", token)).strip()
+                    # Kiwi tags hashtags and mentions, and only keeps them if
+                    # asked to. Keep their '#' or '@', to tell them apart from
+                    # other words
+                    is_social = tokenizer_type == "kiwi" and len(token) > 1 and token[0] in "#@"
+                    if not is_social:
+                        # jieba returns the spaces between words as tokens too
+                        token = numbers.sub("", symbol.sub("", token)).strip()
 
                     # skip empty and filtered tokens
                     if not token or token in automaton:
@@ -706,7 +713,9 @@ class Tokenise(BasicProcessor):
 
         Kiwi splits text into morphemes and tags each with its part of
         speech. Only morphemes in the chosen word classes are kept. Verbs and
-        adjectives are returned in their dictionary form ('먹' becomes '먹다').
+        adjectives are returned in their dictionary form ('먹' becomes '먹다'),
+        also adjectives that Kiwi splits into a root and a suffix ('깨끗' and
+        '하' become '깨끗하다').
 
         :param Kiwi kiwi:  Kiwi instance to tokenise with
         :param list word_classes:  Keys of `KIWI_WORD_CLASSES` to keep, and/or
@@ -733,17 +742,30 @@ class Tokenise(BasicProcessor):
             tokens = []
             # normalize_coda splits off a ㅋ or ㅎ that was typed as the last
             # consonant of the syllable before it, as in '먹었엌ㅋㅋ'
-            for token in kiwi.tokenize(text, normalize_coda=True):
+            morphemes = kiwi.tokenize(text, normalize_coda=True)
+            for i, token in enumerate(morphemes):
                 # irregular verbs and adjectives have tags such as 'VV-I'
                 tag = token.tag.split("-")[0]
+                form = token.form
+                lemma = token.lemma
+
+                # many adjectives are a root and a suffix: '깨끗한' is '깨끗'
+                # (XR) and '하' (XSA). Keep them as one adjective, '깨끗하다'
+                if tag == "XR" and i + 1 < len(morphemes) and morphemes[i + 1].tag.startswith("XSA"):
+                    tag = "VA"
+                    form += morphemes[i + 1].form
+                    lemma = form + "다"
+                elif tag == "XSA" and i > 0 and morphemes[i - 1].tag == "XR":
+                    continue
+
                 if tag not in keep_tags and not (keep_other and tag not in known_tags):
                     continue
 
-                is_stopword = (token.form, tag) in stop_pairs or tag in stop_tags
-                if is_stopword and token.lemma not in accept_words and token.form not in accept_words:
+                is_stopword = (form, tag) in stop_pairs or tag in stop_tags
+                if is_stopword and lemma not in accept_words and form not in accept_words:
                     continue
 
-                tokens.append(token.lemma)
+                tokens.append(lemma)
 
             return tokens
 
