@@ -104,20 +104,50 @@ def test_media_types_unknown_stays_empty(client):
 # --------------------------------------------------------------------------- #
 # OllamaClient.embed
 
-def test_embed_refuses_media(client):
+def test_media_becomes_objects_in_the_input_list(client):
     """
-    Ollama's /api/embed has no image parameter and discards one silently, so a
-    media request must fail loudly here rather than come back as a text-only
-    vector that looks valid.
+    /api/embed takes either a plain string or an object with any of `text`,
+    `image` and `audio` - that object is how one vector comes to represent a
+    frame together with its soundtrack.
     """
-    with pytest.raises(LLMServerException, match="multimodal"):
-        client.embed("mxbai-embed-large:latest", ["some text"], media=["<base64>"])
+    entries = client.build_input(["a tone"], [[
+        {"type": "image", "data": "IMG"},
+        {"type": "audio", "data": "AUD"},
+    ]])
+
+    assert entries == [{"text": "a tone", "image": "IMG", "audio": "AUD"}]
 
 
-def test_embed_refuses_media_before_reaching_the_server(client):
-    """The guard must not depend on the server being up, or on there being text."""
-    with pytest.raises(LLMServerException):
-        client.embed("mxbai-embed-large:latest", [], media=["<base64>"])
+def test_plain_text_stays_a_plain_string(client):
+    assert client.build_input(["one", "two"], None) == ["one", "two"]
+
+
+def test_a_single_descriptor_need_not_be_wrapped_in_a_list(client):
+    entries = client.build_input([""], [{"type": "image", "data": "IMG"}])
+    assert entries == [{"image": "IMG"}]
+
+
+def test_video_is_refused_with_an_actionable_message(client):
+    """
+    The endpoint rejects video containers outright. Saying so here, naming the
+    way round it, beats relaying "input.video not supported" from the server.
+    """
+    with pytest.raises(LLMServerException, match="frame and the audio track"):
+        client.build_input([""], [{"type": "video", "data": "MP4"}])
+
+
+def test_several_images_in_one_entry_are_refused(client):
+    """
+    `image` is a single value, so frames cannot be fused into one vector this
+    way - better to say that than to silently drop all but one.
+    """
+    with pytest.raises(LLMServerException, match="one image per item"):
+        client.build_input([""], [[{"type": "image", "data": "A"}, {"type": "image", "data": "B"}]])
+
+
+def test_media_length_must_match_inputs(client):
+    with pytest.raises(LLMServerException, match="each input needs its own entry"):
+        client.embed("m", ["a", "b"], media=[{"type": "image", "data": "A"}])
 
 
 def test_embed_short_circuits_on_empty_input(client):
@@ -310,10 +340,14 @@ def test_media_embed_without_text_sends_no_system_turn(openai_client, monkeypatc
     assert [message["role"] for message in sent["body"]["messages"]] == ["user", "assistant"]
 
 
-def test_ollama_accepts_the_instruction_flag_and_still_refuses_media(client):
-    """The media processor passes the flag to whichever client it has."""
-    with pytest.raises(LLMServerException, match="multimodal"):
-        client.embed("mxbai-embed-large:latest", ["x"], media=["<base64>"], text_as_instruction=True)
+def test_ollama_has_no_separate_instruction_channel(client):
+    """
+    The media processor passes the flag to whichever client it has. Ollama has
+    no system role on this endpoint, so the text simply accompanies the media
+    either way - the flag must not change the payload or raise.
+    """
+    media = [{"type": "image", "data": "IMG"}]
+    assert client.build_input(["describe"], media) == [{"text": "describe", "image": "IMG"}]
 
 
 def test_media_embed_rejects_a_length_mismatch(openai_client):
@@ -432,3 +466,16 @@ def test_the_error_names_the_model_and_connection_type():
         client.embed("text-embedding-3-small", ["hello"])
     except LLMServerException as e:
         assert "text-embedding-3-small" in str(e) and "thirdparty" in str(e)
+
+
+def test_audio_capability_maps_to_an_audio_media_type(client):
+    """
+    Ollama reports `audio` for models with an audio encoder. Dropping it made
+    the settings page under-report what a model like embeddinggemma-2 takes.
+    """
+    assert client.parse_supported_media_types(
+        make_meta(["embedding", "vision", "audio"])) == ["text", "image", "audio"]
+
+
+def test_audio_only_model_still_consumes_text(client):
+    assert client.parse_supported_media_types(make_meta(["embedding", "audio"])) == ["text", "audio"]

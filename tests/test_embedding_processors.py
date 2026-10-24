@@ -61,9 +61,9 @@ def test_subclasses_are_concrete_and_typed(processor):
 def test_shared_options_wrap_the_media_specific_ones(processor):
     keys = list(processor.get_options(config=None).keys())
     assert keys[:3] == ["model_info", "model", "instruction"]
-    assert keys[-2:] == ["amount", "save_annotations"]
+    assert keys[-3:] == ["amount", "dimensions", "save_annotations"]
     # everything between the two is contributed by the subclass
-    assert set(keys[3:-2]) == set(processor.get_media_options().keys())
+    assert set(keys[3:-3]) == set(processor.get_media_options().keys())
 
 
 @pytest.mark.parametrize("processor", SUBCLASSES)
@@ -1268,7 +1268,7 @@ class ScriptedClient:
         self.script, self.attempts = list(script), attempts
         self.file, self.tries = 0, 0
 
-    def embed(self, model_id, inputs, media=None, text_as_instruction=False):
+    def embed(self, model_id, inputs, media=None, text_as_instruction=False, dimensions=None):
         from common.lib.exceptions import LLMServerException
         succeeds = self.script[self.file]
         if succeeds:
@@ -1725,3 +1725,144 @@ def test_use_clusters_is_only_offered_for_clustered_embeddings(tmp_path):
     plain = FakeDataset(tmp_path, name="emb", dataset_type="text-embeddings")
     options = EmbeddingStreams.get_options(parent_dataset=plain, config=None)
     assert "use_clusters" not in options and "clusters" not in options
+
+
+# --------------------------------------------------------------------------- #
+# Ollama cannot take a video container, so a video becomes a frame plus audio
+
+def video_processor(**parameters):
+    from processors.machine_learning.embed_videos import EmbedVideos
+
+    processor = EmbedVideos.__new__(EmbedVideos)
+    processor.parameters = parameters
+    return processor
+
+
+@pytest.mark.parametrize("model,single_frame", [
+    ("ollama://localhost:11434/embeddinggemma-2:latest", True),
+    ("openai-like://gpu:8000/Qwen/Qwen3-VL-Embedding-8B", False),
+    ("thirdparty:///text-embedding-3-small", False),
+    ("", False),
+])
+def test_single_frame_mode_follows_the_server(model, single_frame):
+    """
+    Keyed on the same model prefix the options' `requires` clauses use, so what
+    the form offered and what the processor does cannot drift apart.
+    """
+    assert video_processor(model=model).single_frame_mode() is single_frame
+
+
+def test_frame_options_are_offered_only_for_ollama():
+    from processors.machine_learning.embed_videos import EmbedVideos
+
+    options = EmbedVideos.get_options(config=None)
+    for key in ("ollama_info", "frame_position", "include_audio"):
+        assert options[key]["requires"] == "model^=ollama", key
+
+    # the container settings are meaningless when only one frame is sent
+    for key in ("max_duration", "fps", "crf"):
+        assert options[key]["requires"] == "model!^=ollama", key
+
+    # and the audio length only matters when audio is included at all
+    assert options["audio_seconds"]["requires"] == "include_audio==true"
+
+
+def test_the_single_frame_limitation_is_stated_plainly():
+    """Someone reading the form should not have to infer it from the options."""
+    from processors.machine_learning.embed_videos import EmbedVideos
+
+    notice = EmbedVideos.get_options(config=None)["ollama_info"]["help"]
+    assert "one frame" in notice.lower()
+    assert "over time" in notice.lower()
+
+
+# --------------------------------------------------------------------------- #
+# Matryoshka truncation
+
+@pytest.mark.parametrize("processor_name", ["embed_text", "embed_videos", "embed_images", "embed_audio"])
+def test_every_embedder_offers_truncation(processor_name):
+    import importlib
+
+    module = importlib.import_module(f"processors.machine_learning.{processor_name}")
+    processor = next(c for c in vars(module).values()
+                     if isinstance(c, type) and getattr(c, "type", None)
+                     and c.__module__ == module.__name__)
+
+    option = processor.get_options(config=None)["dimensions"]
+    assert option["default"] == "", "the full vector must be the default"
+    assert option["type"] == "choice", "a free field invites sizes the model was not trained for"
+    assert list(option["options"])[0] == ""
+
+
+def test_truncation_reads_back_as_an_int_or_none():
+    from processors.machine_learning.embed_videos import EmbedVideos
+
+    assert video_processor(dimensions="256").embedding_dimensions() == 256
+    assert video_processor(dimensions="").embedding_dimensions() is None
+    assert EmbedVideos.__new__(EmbedVideos).__class__ is EmbedVideos
+    assert video_processor().embedding_dimensions() is None
+
+
+# --------------------------------------------------------------------------- #
+# audio embeddings reach the thumbnails of the videos they came from
+
+def test_stem_matching_links_audio_to_its_video_tile():
+    """
+    Extracting audio keeps the name but changes the extension, so `clip.wav`
+    has to find the tile made from `clip.mp4` or the map loses its pictures.
+    """
+    from processors.visualisation.embedding_map import EmbeddingMap
+
+    sheet = {"clip0.mp4": 0, "clip1.mp4": 1}
+    tiles, sources = EmbeddingMap.match_tiles(sheet, ["clip1.wav", "clip0.wav", "gone.wav"])
+
+    assert tiles == [1, 0, -1]
+    # links open the video the frame came from, not the audio pulled out of it
+    assert sources == ["clip1.mp4", "clip0.mp4", ""]
+
+
+def test_exact_filenames_still_win_over_stems():
+    from processors.visualisation.embedding_map import EmbeddingMap
+
+    sheet = {"a.jpg": 0, "a.png": 1}
+    tiles, sources = EmbeddingMap.match_tiles(sheet, ["a.png"])
+    assert (tiles, sources) == ([1], ["a.png"])
+
+
+def test_audio_embeddings_count_as_media_embeddings():
+    from processors.visualisation.embedding_map import MEDIA_EMBEDDINGS
+
+    assert "audio-embeddings" in MEDIA_EMBEDDINGS
+
+
+def test_sprites_are_found_above_the_immediate_parent(tmp_path):
+    """
+    Audio embeddings hang off the audio, which hangs off the videos. The sheet
+    is a child of the videos, two levels up - `ancestry()` deliberately stops
+    at the embeddings, so a separate walk is needed.
+    """
+    from processors.visualisation.embedding_map import EmbeddingMap
+
+    sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 40}, rows=3)
+    videos = FakeDataset(tmp_path, name="videos", dataset_type="video-downloader")
+    audio = FakeDataset(tmp_path, name="audio", dataset_type="audio-extractor", parent=videos)
+    embeddings = FakeDataset(tmp_path, name="emb", dataset_type="audio-embeddings", parent=audio)
+    videos._children = [sprite, audio]
+    audio._children = [embeddings]
+
+    assert list(EmbeddingMap.find_sprite_datasets(embeddings)) == ["sprite1"]
+
+
+def test_the_nearest_ancestor_with_sheets_wins(tmp_path):
+    """Looking further up would offer media these items did not come from."""
+    from processors.visualisation.embedding_map import EmbeddingMap
+
+    far = FakeDataset(tmp_path, name="far-sprite", parameters={"thumbnail_size": 99}, rows=1)
+    grandparent = FakeDataset(tmp_path, name="gp", dataset_type="video-downloader")
+    near = FakeDataset(tmp_path, name="near-sprite", parameters={"thumbnail_size": 40}, rows=3)
+    parent = FakeDataset(tmp_path, name="p", dataset_type="audio-extractor", parent=grandparent)
+    embeddings = FakeDataset(tmp_path, name="emb", dataset_type="audio-embeddings", parent=parent)
+    grandparent._children = [far, parent]
+    parent._children = [near, embeddings]
+
+    assert list(EmbeddingMap.find_sprite_datasets(embeddings)) == ["near-sprite"]
