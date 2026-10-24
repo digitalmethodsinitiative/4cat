@@ -77,7 +77,7 @@ class OpenAICompatibleClient(LLMServerClient):
         return super().list_models()
 
     def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300,
-              text_as_instruction: bool = False) -> list[list[float]]:
+              text_as_instruction: bool = False, dimensions: int | None = None) -> list[list[float]]:
         """
         Embed via the server's OpenAI-compatible `/v1/embeddings` endpoint.
 
@@ -118,12 +118,17 @@ class OpenAICompatibleClient(LLMServerClient):
                 f"(use an empty string as the text if there is none)")
 
         if not media:
-            return self._post_embeddings({"model": model_id, "input": list(inputs)}, timeout, len(inputs))
+            payload = {"model": model_id, "input": list(inputs)}
+            if dimensions:
+                payload["dimensions"] = dimensions
+            return self._post_embeddings(payload, timeout, len(inputs))
 
         vectors = []
         for text, item_media in zip(inputs, media):
             messages = []
-            user_content = [self._media_content_part(item_media)]
+            # several parts in one message is the natural shape here: unlike
+            # Ollama, this API fuses a whole content array into a single vector
+            user_content = [self._media_content_part(part) for part in self.as_descriptors(item_media)]
 
             # an instruction steers the embedding; any other text is embedded along with the media
             if text and text_as_instruction:
@@ -140,6 +145,8 @@ class OpenAICompatibleClient(LLMServerClient):
                 "continue_final_message": True,
                 "add_special_tokens": True,
             }
+            if dimensions:
+                payload["dimensions"] = dimensions
             vectors += self._post_embeddings(payload, timeout, 1)
 
         return vectors
