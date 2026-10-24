@@ -155,11 +155,10 @@ class EmbedMedia(BasicProcessor):
             "instruction": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "[optional] Prompt",
-                "default": f"Represent the {cls.media_label}.",
-                "tooltip": f"An instruction sent to the model as a system prompt with each {cls.media_label}. It is "
-                           f"not embedded itself: instruction-aware models like Qwen3-VL-Embedding use it to steer "
-                           f"what the embedding captures, so tailoring it to your research question can improve "
-                           f"results. Leave empty to use the model's own default.",
+                "default": f"",
+                "tooltip": f"Requires an instruction-aware embedding model. This is a small system prompt sent with "
+                           f"each {cls.media_label}. The text is not embedded itself but used by instruction-aware "
+                           f"models like Qwen3-VL-Embedding to steer the embedding. Leave empty for model's own default.",
             },
         }
 
