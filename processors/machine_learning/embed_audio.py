@@ -55,17 +55,17 @@ class EmbedAudio(EmbedMedia):
         return {
             "window_info": {
                 "type": UserInput.OPTION_INFO,
-                "help": "Audio embedding models often only accept a short stretch of audio (often around 80 seconds). "
+                "help": "Audio embedding models usually only accept a short stretch of audio (often around 80 seconds). "
                         "Longer recordings are cut down to the window below.",
             },
             "window_position": {
                 "type": UserInput.OPTION_TEXT,
-                "help": "Audio start (% into the track)",
+                "help": "Audio start %",
                 "default": 0,
                 "min": 0,
                 "max": 100,
                 "coerce_type": int,
-                "tooltip": "Where the window begins.",
+                "tooltip": "The percentage point of where the audio starts.",
             },
             "window_seconds": {
                 "type": UserInput.OPTION_TEXT,
