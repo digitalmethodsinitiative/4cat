@@ -155,7 +155,7 @@ class EmbedMedia(BasicProcessor):
             "instruction": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "[optional] Prompt",
-                "default": f"",
+                "default": "",
                 "tooltip": f"Requires an instruction-aware embedding model. This is a small system prompt sent with "
                            f"each {cls.media_label}. The text is not embedded itself but used by instruction-aware "
                            f"models like Qwen3-VL-Embedding to steer the embedding. Leave empty for model's own default.",
