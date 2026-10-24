@@ -22,7 +22,7 @@ __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
 # Datasets whose items are media files, and so can be shown as thumbnails
-MEDIA_EMBEDDINGS = ("image-embeddings", "video-embeddings")
+MEDIA_EMBEDDINGS = ("image-embeddings", "video-embeddings", "audio-embeddings")
 
 # Datasets the embeddings themselves were made in, as opposed to later steps
 # (clustering, reduction) that carry them along
@@ -158,6 +158,23 @@ class EmbeddingMap(BasicProcessor):
             }
 
         return options
+
+    @staticmethod
+    def sources_of(dataset):
+        """
+        Yield the datasets an embedding set was derived from, nearest first.
+
+        :param dataset:  The embeddings dataset
+        :return:  Generator of ancestors, nearest first
+        """
+        try:
+            for _ in range(MAX_ANCESTRY):
+                dataset = dataset.get_parent() if dataset else None
+                if not dataset:
+                    return
+                yield dataset
+        except DataSetException:
+            return
 
     @staticmethod
     def ancestry(dataset):
@@ -625,7 +642,7 @@ class EmbeddingMap(BasicProcessor):
         """
         return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    def media_link_base(self) -> str | None:
+    def media_link_base(self, sprite_dataset=None) -> str | None:
         """
         URL prefix that serves one file out of the media archive.
 
@@ -643,7 +660,12 @@ class EmbeddingMap(BasicProcessor):
         # the archive is the parent of the embeddings, which are the parent of
         # the reduced embeddings this map is made from
         embeddings = self.get_embeddings_dataset(self.source_dataset)
-        archive = embeddings.get_parent() if embeddings else None
+        # follow the sheet when there is one: its tiles name files in the
+        # archive it was made from, which for audio embeddings is the videos
+        # rather than the audio pulled out of them
+        archive = sprite_dataset.get_parent() if sprite_dataset else None
+        if not archive:
+            archive = embeddings.get_parent() if embeddings else None
         if not archive:
             return None
 
@@ -660,11 +682,6 @@ class EmbeddingMap(BasicProcessor):
         """
         Find sprite sheets made from the same media as these embeddings.
 
-        Thumbnails belong to the media, not to any one embedding run, so they
-        are extracted as a sibling of the embeddings - a child of the archive
-        both were derived from. One extraction then serves every map, including
-        maps of embeddings made later with a different model.
-
         :param parent_dataset:  The reduced embeddings the map would run on
         :return dict:  `{dataset key: label}`, empty when there are none.
         """
@@ -672,17 +689,20 @@ class EmbeddingMap(BasicProcessor):
         if not embeddings or embeddings.type not in MEDIA_EMBEDDINGS:
             return {}
 
-        archive = embeddings.get_parent()
-        if not archive:
-            return {}
-
         sprites = {}
-        for sibling in archive.get_children():
-            if sibling.type != MediaThumbnails.type or not sibling.is_finished():
-                continue
+        for archive in cls.sources_of(embeddings):
+            for sibling in archive.get_children():
+                if sibling.type != MediaThumbnails.type or not sibling.is_finished():
+                    continue
 
-            size = sibling.parameters.get("thumbnail_size", "?")
-            sprites[sibling.key] = f"{size}px, {sibling.num_rows:,} thumbnails"
+                size = sibling.parameters.get("thumbnail_size", "?")
+                sprites[sibling.key] = f"{size}px, {sibling.num_rows:,} thumbnails"
+
+            if sprites:
+                # the nearest ancestor that has any wins: a sheet made from the
+                # videos is what an audio embedding should show, and looking
+                # further up would only find media these items did not come from
+                break
 
         return sprites
 
@@ -766,8 +786,7 @@ class EmbeddingMap(BasicProcessor):
             self.dataset.log("Not drawing thumbnails: the sprite sheet could not be read.")
             return None
 
-        lookup = sprite["tiles"]
-        tiles = [lookup.get(filename, -1) for filename in filenames]
+        tiles, sources = self.match_tiles(sprite["tiles"], filenames)
         matched = sum(1 for tile in tiles if tile > -1)
         if not matched:
             self.dataset.log("Not drawing thumbnails: the sprite sheet has no tiles for these items.")
@@ -780,11 +799,40 @@ class EmbeddingMap(BasicProcessor):
             "tile": sprite["tile"],
             "cols": sprite["cols"],
             "tiles": tiles,
-            # only link files the sheet actually covers, so a click never opens
-            # something the map is not showing
-            "files": [name if tile > -1 else "" for name, tile in zip(filenames, tiles)],
-            "base": self.media_link_base() or "",
+            # the names the *sheet* knows, so a click opens the video a frame
+            # was taken from rather than the audio extracted out of it. Only
+            # files the sheet covers get one, so a click never opens something
+            # the map is not showing.
+            "files": sources,
+            "base": self.media_link_base(sprite_dataset) or "",
         }
+
+    @staticmethod
+    def match_tiles(lookup: dict, filenames: list) -> tuple:
+        """
+        Line a sheet's tiles up with the items being plotted.
+
+        :param dict lookup:  The sheet's `{filename: tile index}`
+        :param list filenames:  Item filename per point, in point order
+        :return tuple:  `(tile index per point, sheet filename per point)`,
+          with -1 and "" where there is no tile.
+        """
+        by_stem = {}
+        for name, tile in lookup.items():
+            by_stem.setdefault(name.rsplit(".", 1)[0], (name, tile))
+
+        tiles, sources = [], []
+        for filename in filenames:
+            if filename in lookup:
+                tiles.append(lookup[filename])
+                sources.append(filename)
+                continue
+
+            name, tile = by_stem.get(filename.rsplit(".", 1)[0], ("", -1))
+            tiles.append(tile)
+            sources.append(name)
+
+        return tiles, sources
 
     @staticmethod
     def encode_payload(data: dict, atlas: dict | None = None) -> str:
