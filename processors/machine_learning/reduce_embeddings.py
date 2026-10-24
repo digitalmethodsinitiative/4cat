@@ -38,7 +38,7 @@ class ReduceEmbeddings(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     compatibility = Compatibility(
-        types={"text-embeddings", "video-embeddings", "image-embeddings", "cluster-embeddings"},
+        types={"text-embeddings", "video-embeddings", "image-embeddings", "audio-embeddings", "cluster-embeddings"},
         preferred_followups=["embedding-map", "embedding-map-3d"],
     )
 

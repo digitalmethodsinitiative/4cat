@@ -60,7 +60,7 @@ class ClusterEmbeddings(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     compatibility = Compatibility(
-        types={"text-embeddings", "video-embeddings", "image-embeddings"},
+        types={"text-embeddings", "video-embeddings", "image-embeddings", "audio-embeddings"},
         preferred_followups=["reduce-embeddings"],
     )
 
