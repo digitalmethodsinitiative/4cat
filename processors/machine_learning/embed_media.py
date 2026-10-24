@@ -175,6 +175,21 @@ class EmbedMedia(BasicProcessor):
                        f"this is slow for large datasets.",
         }
         
+        options["dimensions"] = {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Embedding size",
+            "options": {
+                "": "Full (model default)",
+                "768": "768",
+                "512": "512",
+                "256": "256",
+                "128": "128",
+            },
+            "default": "",
+            "tooltip": "Increases efficiency but only works well for models trained with Matryoshka representation "
+                       "learning, which keep most of their accuracy when truncated.",
+        }
+
         options["save_annotations"] = {
             "type": UserInput.OPTION_ANNOTATION,
             "label": cls.annotation_label,
@@ -241,6 +256,19 @@ class EmbedMedia(BasicProcessor):
         :return tuple:  `(media descriptor, original size, sent size)`
         """
         pass
+
+    def embedding_dimensions(self) -> int | None:
+        """
+        The vector size the user asked for, if they asked for one.
+
+        The option is a dropdown, so the value arrives as a string; an empty
+        one means "whatever the model produces".
+
+        :return int|None:  Dimensions to truncate to, or `None` for the full
+          vector.
+        """
+        chosen = self.parameters.get("dimensions")
+        return int(chosen) if chosen else None
 
     def resolve_model(self):
         """
@@ -387,6 +415,7 @@ class EmbedMedia(BasicProcessor):
                 while retries < max_retries:
                     try:
                         vector = client.embed(model["local_id"], [instruction], media=[payload],
+                                              dimensions=self.embedding_dimensions(),
                                               text_as_instruction=True)[0]
                         break  # success!
                     except LLMServerException as e:

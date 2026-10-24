@@ -118,6 +118,20 @@ class GenerateTextEmbeddings(BasicProcessor):
                 "tooltip": "How many items to send to the server at once. Higher is faster but uses more memory on the "
                            "server; lower this if requests time out.",
             },
+            "dimensions": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Embedding size",
+                "options": {
+                "": "Full (model default)",
+                "768": "768",
+                "512": "512",
+                "256": "256",
+                "128": "128",
+            },
+                "default": "",
+                "tooltip": "Increases efficiency but only works well for models trained with Matryoshka representation "
+                       "learning, which keep most of their accuracy when truncated.",
+            },
             "save_annotations": {
                 "type": UserInput.OPTION_ANNOTATION,
                 # must match the label the annotations are written under, below:
@@ -297,7 +311,9 @@ class GenerateTextEmbeddings(BasicProcessor):
         if not batch:
             return 0
 
-        vectors = client.embed(model["local_id"], [text for _, text in batch])
+        chosen = self.parameters.get("dimensions")
+        vectors = client.embed(model["local_id"], [text for _, text in batch],
+                               dimensions=int(chosen) if chosen else None)
 
         time_created = int(time.time())
         for (item_id, text), vector in zip(batch, vectors):
