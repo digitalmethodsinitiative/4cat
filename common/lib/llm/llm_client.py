@@ -174,8 +174,21 @@ class LLMServerClient:
 
         return ["embed"] if "embed" in model_id.lower() else ["generate"]
 
+    @staticmethod
+    def as_descriptors(item_media) -> list:
+        """
+        Normalise one item's media to a list of descriptors.
+
+        :param item_media:  A descriptor, a list of them, or None
+        :return list:  Descriptors, possibly empty
+        """
+        if not item_media:
+            return []
+
+        return list(item_media) if isinstance(item_media, (list, tuple)) else [item_media]
+
     def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300,
-              text_as_instruction: bool = False) -> list[list[float]]:
+              text_as_instruction: bool = False, dimensions: int | None = None) -> list[list[float]]:
         """
         Embed one or more inputs, returning one vector per input.
 
@@ -198,7 +211,11 @@ class LLMServerClient:
           or, in place of `data`, a `"url"` the server can fetch itself. Each
           client translates this to whatever its own API expects.
         :param int timeout:  Request timeout in seconds.
+        :param int dimensions:  Truncate each vector to this many dimensions,
+          for models trained with Matryoshka representation learning. `None`
+          keeps the model's full output.
         :param bool text_as_instruction:  With media, treat `inputs[i]` as an
+
           instruction that steers the embedding rather than as text to embed
           along with the media. Clients without such a distinction ignore it.
         :returns list[list[float]]:  One vector per input, in input order.
