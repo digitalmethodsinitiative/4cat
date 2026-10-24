@@ -47,6 +47,7 @@ class OllamaClient(LLMServerClient):
         **Primary path**: reads `meta["capabilities"]`:
         - `"completion"` → `"text"`
         - `"vision"`     → `"image"`
+        - `"audio"`      → `"audio"`
         - `"embedding"`  → `"text"` (an embedder still consumes text)
 
         **Fallback path** (used when capabilities are absent or only yield `"text"`):
@@ -68,6 +69,7 @@ class OllamaClient(LLMServerClient):
             "completion": "text",
             "embedding": "text",
             "vision": "image",
+            "audio": "audio",
         }
         for cap in capabilities:
             mapped = _cap_map.get(cap)
@@ -129,41 +131,50 @@ class OllamaClient(LLMServerClient):
         return tasks if tasks else ["generate"]
 
     def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300,
-              text_as_instruction: bool = False) -> list[list[float]]:
+              text_as_instruction: bool = False, dimensions: int | None = None) -> list[list[float]]:
         """
         Embed inputs via Ollama's `/api/embed` endpoint.
 
-        The endpoint accepts a list and returns one vector per item, so a caller
-        that batches its inputs gets one round-trip per batch rather than per
-        item. NOTE: Ollama currently only supports text embeddings.
+        The endpoint takes a list and returns one vector per entry, so a caller
+        that batches its inputs gets one round-trip per batch rather than one
+        per item.
 
-        todo: revise later, since Ollama notes that OpenAI-like embedding endpoints are coming soon,
-         https://ollama.com/blog/embedding-models
+        An entry is either a plain string, or an object carrying any of `text`,
+        `image` and `audio`. Two limits:
+
+        * video is not yet supported (can be approximated with video frame + audio).
+        * `image` and `audio` are single values, so one entry holds at most one
+          of each. Several frames cannot be fused into one vector this way.
 
         :param str model_id:  Ollama model name.
-        :param list inputs:  Strings to embed.
-        :param list media:  Not supported; passing any raises.
+        :param list inputs:  Text per item. With media, `inputs[i]` accompanies
+          `media[i]` and may be an empty string.
+        :param list media:  Optional media per item, a descriptor or a list of
+          them, see `LLMServerClient.as_descriptors`.
         :param int timeout:  Request timeout in seconds.
-        :param bool text_as_instruction:  Ignored; only relevant with media,
-          which Ollama does not support.
+        :param bool text_as_instruction:  Unused here since Ollama has no 'system prompt'
+          you can add to the embedding as e.g. Qwen3 embedding does.
+        :param int dimensions:  Truncate vectors to this many dimensions.
         :returns list[list[float]]:  One vector per input, in input order.
-        :raises LLMServerException:  If media is passed, if the server errors,
-          or if it returns a number of vectors that does not match the number of
-          inputs (which would silently misalign vectors with their items).
+        :raises LLMServerException
         """
-        if media:
-            raise LLMServerException(
-                "Ollama does not support non-text inputs yet. Use a "
-                "server and model that supports multimodal embeddings, like vLLM.")
-
-        if not inputs:
+        if not inputs and not media:
             return []
+
+        if media and len(media) != len(inputs):
+            raise LLMServerException(
+                f"Got media for {len(media)} items but {len(inputs)} inputs; each input needs its own entry "
+                f"(use an empty string as the text if there is none)")
+
+        payload = {"model": model_id, "input": self.build_input(inputs, media)}
+        if dimensions:
+            payload["dimensions"] = dimensions
 
         try:
             response = self._session.post(
                 f"{self.base_url}/api/embed",
                 headers=self._headers,
-                json={"model": model_id, "input": inputs},
+                json=payload,
                 timeout=timeout,
             )
         except requests.RequestException as e:
@@ -188,6 +199,47 @@ class OllamaClient(LLMServerClient):
                 f"vectors back to items")
 
         return embeddings
+
+    def build_input(self, inputs: list, media: list | None) -> list:
+        """
+        Build the `input` list, as plain strings or as media objects.
+
+        :param list inputs:  Text per item
+        :param list media:  Media per item, or None
+        :return list:  Entries for the request body
+        :raises LLMServerException:  For media this endpoint cannot accept
+        """
+        if not media:
+            return list(inputs)
+
+        entries = []
+        for text, item_media in zip(inputs, media):
+            entry = {}
+            if text:
+                entry["text"] = text
+
+            for descriptor in self.as_descriptors(item_media):
+                kind = descriptor.get("type")
+                if kind == "video":
+                    raise LLMServerException(
+                        "Ollama's /embed endpoint does not (yet) accept video. Send a frame and the audio track "
+                        "instead or use an OpenAI-like API server that takes video.")
+
+                if kind not in ("image", "audio"):
+                    raise LLMServerException(f"Ollama cannot embed media of type '{kind}'")
+
+                if kind in entry:
+                    raise LLMServerException(
+                        f"Ollama accepts one {kind} per item, and this item has several.")
+
+                entry[kind] = descriptor.get("data")
+
+            if not entry:
+                raise LLMServerException("An item has neither text nor usable media to embed")
+
+            entries.append(entry)
+
+        return entries
 
     def format_display_name(self, meta: dict) -> str:
         """
