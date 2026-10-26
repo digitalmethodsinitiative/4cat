@@ -95,6 +95,7 @@ class InternalAPI(BasicWorker):
 				continue
 
 			self.api_response(client, address)
+			client.close()
 
 		if client:
 			client.close()
