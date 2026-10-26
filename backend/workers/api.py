@@ -195,17 +195,7 @@ class InternalAPI(BasicWorker):
 			self.manager.request_interrupt(job=job, interrupt_level=level)
 			return "OK"
 
-		elif request == "workers":
-			# return the number of workers, sorted by type
-			workers = {}
-			for jobtype in self.manager.worker_pool:
-				workers[jobtype] = len(self.manager.worker_pool[jobtype])
-
-			workers["total"] = sum([workers[workertype] for workertype in workers])
-
-			return workers
-
-		if request == "jobs":
+		elif request == "jobs":
 			# return queued jobs, sorted by type
 			jobs = self.db.fetchall("SELECT * FROM jobs")
 			if jobs is None:
