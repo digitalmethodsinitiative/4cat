@@ -1,44 +1,149 @@
-body {
+/* Colours and fonts as on douyin.com's post pages */
+
+.explorer-content {
 	background-color: #161823;
-	color: #b8b9bc;
+	padding: 30px 0 10px 0;
 }
 
-.items header span.item_id {
-	display: none;
+.items .item {
+	font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+	font-size: 15px;
+	color: rgba(255, 255, 255, 0.9);
+	background-color: #252632;
+	list-style-type: none;
+	box-sizing: border-box;
+	width: 580px;
+	max-width: calc(100% - 32px);
+	margin: 0 auto 20px auto;
+	padding: 16px 20px;
+	border-radius: 12px;
 }
 
-.items li.item {
-	border-radius: 10px;
-	padding: 20px;
-	max-width: 200px;
-	color: #b8b9bc;
-	background-color: #292b35;
-	border-bottom: 1px grey;
+.items .item a {
+	color: rgba(255, 255, 255, 0.9);
+	text-decoration: none;
 }
 
+.items .item a:hover {
+	text-decoration: underline;
+}
 
-.items li.item .preview {
+/* author, date and link to the post */
+.items .item header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 12px;
+}
+
+.items .item header .author {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-weight: 500;
+}
+
+.items .item header .avatar {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+.items .item header .datetime {
+	color: rgba(255, 255, 255, 0.34);
+	font-size: 13px;
+}
+
+.items .item header .external-url {
+	margin-left: auto;
+	color: rgba(255, 255, 255, 0.6);
+}
+
+.items .item header .external-url.deactivated {
+	opacity: 0.4;
+}
+
+/* post text, with links in Douyin's medium weight */
+.items .item .body {
+	font-size: 16px;
+	line-height: 1.6;
+	word-wrap: break-word;
+}
+
+.items .item .body a {
+	font-weight: 500;
+}
+
+.items .item .music {
+	margin-top: 8px;
+	font-size: 13px;
+	color: rgba(255, 255, 255, 0.6);
+}
+
+/* videos, images and cover image */
+.items .item .item-media {
+	margin-top: 12px;
+}
+
+.items .item .item-media .media-image,
+.items .item .item-media .media-video {
 	display: block;
-	margin: 0 auto;
-	max-width: 300px;
+	max-width: 100%;
+	max-height: 480px;
+	border-radius: 8px;
 }
 
-
-.items .item header .author_picture {
-	float: left;
-	margin-right: 15px;
+.items .item .item-media .media-container + .media-container {
+	margin-top: 8px;
 }
 
-.items .item header .author_picture img {
-	border-radius: 100px;
-	width: 50px;
+/* the note for media that was not downloaded */
+.items .item .media-placeholder {
+	margin-top: 0;
 }
 
-.items .item header .author_picture:after {
-	display: none;
+.items .item .media-placeholder-note {
+	color: rgba(255, 255, 255, 0.6);
+	opacity: 1;
 }
 
+.items .item .media-placeholder-note a {
+	color: rgba(255, 255, 255, 0.9);
+	font-weight: 500;
+}
+
+.items .item .media-placeholder:not(.with-cover) .media-placeholder-note {
+	background-color: #161823;
+}
+
+/* likes, comments, saves and shares, as in the row under a Douyin post */
+.items .item .metrics {
+	display: flex;
+	gap: 24px;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid rgba(255, 255, 255, 0.06);
+	font-weight: 500;
+}
+
+.items .item .metrics i {
+	margin-right: 4px;
+}
+
+/* annotations */
 .items .item .item-annotations {
-	background-color: black;
-	color: white;
+	margin-top: 14px;
+	background-color: #161823;
+	border-radius: 8px;
+	color: rgba(255, 255, 255, 0.9);
+}
+
+.items .item .item-annotation {
+	border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.items .item .item-annotation .annotation-label,
+.items .item .item-annotation a.from-dataset-link {
+	color: rgba(255, 255, 255, 0.6);
 }

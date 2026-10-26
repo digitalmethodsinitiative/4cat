@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from webtool.lib.helpers import parse_markdown
-from common.lib.helpers import timify, ellipsiate, is_web_url, link_urls_in_text, link_urls_in_html
+from common.lib.helpers import timify, ellipsiate, is_web_url, split_urls, link_urls_in_text, link_urls_in_html
 
 from flask import current_app, g
 from markupsafe import escape
@@ -172,6 +172,17 @@ def _jinja2_filter_web_url(url):
     """
     url = str(url).strip()
     return url if is_web_url(url) else "#"
+
+
+@current_app.template_filter("split_urls")
+def _jinja2_filter_split_urls(urls):
+    """
+    Split a list of URLs separated by commas or line breaks; see `split_urls`
+
+    :param str urls:  URLs
+    :return list:  The separate URLs
+    """
+    return split_urls(str(urls))
 
 
 @current_app.template_filter("add_base_url")
