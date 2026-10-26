@@ -3,7 +3,7 @@
 	<div class="author-row {% if reblog %}reblog{% endif %}">
 	{% if not pseudonymised %}
 		<!-- Possible external link, if not pseudonymised -->
-		<a href="{{ item['item_url'] | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+		<a href="{{ item.get('post_url') | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 		<!-- PFP -->
 		{% if item["author_avatar_url"] %}
 		<div class="author-avatar {% if reblog %}reblog{% endif %}">
@@ -62,7 +62,7 @@
 		<div class="author-row">
 		{% if not pseudonymised %}
 			<!-- Possible external link, if not pseudonymised -->
-			<a href="{{ item['item_url'] | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+			<a href="{{ item.get('post_url') | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 			<!-- PFP -->
 			{% if item["author_avatar_url"] %}
 			<div class="author-avatar">
