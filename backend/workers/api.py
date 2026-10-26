@@ -2,8 +2,11 @@ import traceback
 import socket
 import time
 import json
+import sys
+import re
 
 from backend.lib.worker import BasicWorker
+from common.lib.helpers import get_software_commit
 from common.lib.job import Job
 from common.lib.exceptions import JobNotFoundException
 
@@ -245,6 +248,9 @@ class InternalAPI(BasicWorker):
 			running = []
 			queue = {}
 
+			# get relevant frame stacks
+			frames = sys._current_frames()
+
 			for job in open_jobs:
 				# find the worker for this job, if it exists
 				queue_key = job["queue_id"]
@@ -281,6 +287,24 @@ class InternalAPI(BasicWorker):
 					# resolution is left to the frontend (which treats remote_id as
 					# a dataset key only for processor jobtypes); the API just
 					# reports job state.
+
+					# include the worker stack location, which shows where exactly
+					# the worker is currently executing code
+					stack = []
+					if frames.get(worker.ident):
+						stack = []
+						frame = frames[worker.ident]
+						while frame:
+							# each frame has a reference to the parent frame (if there is one)
+							# traverse this stack to construct the actual call stack
+							stack.append({
+								"path": re.sub(f"^{re.escape(str(self.config.get('PATH_ROOT')))}", "", frame.f_code.co_filename),
+								"line": frame.f_lineno,
+								"function": frame.f_code.co_name
+							})
+							frame = frame.f_back
+						stack = stack[:-2]
+
 					running.append({
 						"type": jobtype,
 						"queue_id": queue_key,
@@ -292,6 +316,10 @@ class InternalAPI(BasicWorker):
 						"is_recurring": (int(job["interval"]) > 0),
 						"is_parked": is_parked,
 						"is_maybe_crashed": is_claimed and not bool(worker),
+						"code": {
+							"origin": get_software_commit(worker),
+							"location": stack
+						},
 						"timestamp_queued": job["timestamp"],
 						"timestamp_claimed": timestamp_claimed,
 						"timestamp_lastclaimed": job["timestamp_lastclaimed"],
