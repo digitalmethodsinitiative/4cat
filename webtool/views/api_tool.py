@@ -16,7 +16,8 @@ from flask_login import login_required, current_user
 from webtool.lib.helpers import error, setting_required, parse_markdown
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
-	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException
+	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException, \
+	DataSetNotFoundException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.lib.dataset import DataSet
@@ -552,6 +553,10 @@ def check_dataset():
 	"""
 	Check dataset status
 
+	Works for any dataset, including top-level datasets. For a child dataset
+	shown in its parent's list of results, `/api/check-processors/` also
+	returns the HTML for that entry.
+
 	Requires authentication by logging in or providing a valid access token.
 
 	:request-param str key:  ID of the dataset for which to return the status
@@ -756,24 +761,29 @@ def nuke_dataset(key=None, reason=None):
 	for child in children:
 		try:
 			job = Job.get_by_remote_ID(child.key, database=g.db, jobtype=child.type)
-			call_api("cancel-job", {"remote_id": child.key, "jobtype": child.type, "level": BasicWorker.INTERRUPT_CANCEL})
-			job.finish()
-			child.delete()
 		except JobNotFoundException:
-			pass
-		except ConnectionRefusedError:
-			return error(500,
-						 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
+			continue
+
+		# only a claimed job has a worker running that needs to be stopped
+		if job.is_claimed:
+			api_response = call_api("cancel-job", {"remote_id": child.key, "jobtype": child.type, "level": BasicWorker.INTERRUPT_CANCEL})
+			if api_response["status"] != "success":
+				return error(500,
+							 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
+
+		job.finish()
+		child.delete()
 
 	# now cancel and delete the job for this one (if it exists)
 	try:
 		job = Job.get_by_remote_ID(dataset.key, database=g.db, jobtype=dataset.type)
-		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+		if job.is_claimed:
+			api_response = call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+			if api_response["status"] != "success":
+				return error(500,
+							 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 	except JobNotFoundException:
 		pass
-	except ConnectionRefusedError:
-		return error(500,
-					 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
 	# wait for the dataset to actually be cancelled
 	time.sleep(2)
@@ -1321,7 +1331,18 @@ def queue_processor(key=None, processor=None):
 @current_app.openapi.endpoint("tool")
 def check_processor():
 	"""
-	Check processor status
+	Check the status of child datasets
+
+	This is only for datasets that are the child of another dataset. The
+	returned HTML shows each dataset as an entry in its parent's list of
+	results on a result page, so it needs the dataset's parent. To check the
+	status of a top-level dataset, use `/api/check-query/`.
+
+	Keys that cannot be shown this way are left out of the result: top-level
+	datasets, datasets whose parent no longer exists, datasets that do not
+	exist (any more), and datasets the user cannot access. The one top-level
+	dataset that is included is the copy a filter makes of its result; it is
+	shown in the place of the filter dataset it was copied from.
 
 	:request-param str subqueries:  A JSON-encoded list of dataset keys to get
 	                                the status of
@@ -1372,23 +1393,37 @@ def check_processor():
 		else:
 			genealogy = dataset.get_genealogy()
 
+		if len(genealogy) < 2:
+			# get_genealogy() stops at a parent that no longer exists. Without
+			# its parent, the dataset cannot be shown as a child, just like a
+			# top-level dataset above
+			g.log.warning(f"Parent of dataset {dataset.key} not found; cannot render child view. Skipping...")
+			continue
+
 		parent = genealogy[-2]
 		top_parent = genealogy[0]
 
-		children.append({
-			"key": dataset.key,
-			"finished": dataset.is_finished(),
-			"progress": round(dataset.get_progress() * 100),
-			"html": render_template("components/result-child.html", child=dataset, dataset=parent,
-                                    query=dataset.get_genealogy()[0], parent_key=top_parent.key,
-                                    processors=g.modules.processors),
-			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
-			"url": url_for("dataset.get_result", dataset_key=dataset.key, query_file=dataset.result_file),
-			"annotation_fields": {
-				field_id: {"label": field_data.get("label", "")}
-				for field_id, field_data in (top_parent.annotation_fields or {}).items()
-			}
-		})
+		try:
+			children.append({
+				"key": dataset.key,
+				"finished": dataset.is_finished(),
+				"progress": round(dataset.get_progress() * 100),
+				"html": render_template("components/result-child.html", child=dataset, dataset=parent,
+                                        query=dataset.get_genealogy()[0], parent_key=top_parent.key,
+                                        processors=g.modules.processors),
+				"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
+				"url": url_for("dataset.get_result", dataset_key=dataset.key, query_file=dataset.result_file),
+				"annotation_fields": {
+					field_id: {"label": field_data.get("label", "")}
+					for field_id, field_data in (top_parent.annotation_fields or {}).items()
+				}
+			})
+		except DataSetNotFoundException:
+			# The dataset was deleted while it was being rendered, e.g. by a
+			# delete request sent from the same page while it was still
+			# checking this dataset. Skip it, as if it had been gone from the
+			# start
+			pass
 
 	return jsonify(children)
 

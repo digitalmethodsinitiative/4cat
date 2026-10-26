@@ -6,7 +6,7 @@ import csv
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from backend.lib.proxied_requests import FailedProxiedRequest
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, urls_in_text
 from common.lib.exceptions import ProcessorInterruptedException
 
 import warnings
@@ -114,7 +114,7 @@ class URLFetcher(BasicProcessor):
         for item in self.source_dataset.iterate_items(self):
             # combine column contents that we need to extract URLs from
             source_text = " ".join([str(item[column]) for column in columns])
-            urls = ural.urls_from_text(source_text)
+            urls = urls_in_text(source_text)
 
             for url in urls:
                 if url not in all_urls:

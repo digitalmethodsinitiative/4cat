@@ -9,6 +9,7 @@ import datetime
 import smtplib
 import fnmatch
 import socket
+import html
 import oslex
 import copy
 import time
@@ -24,7 +25,7 @@ import io
 from pathlib import Path
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, unquote, urlparse, urlunparse
 from dateutil import parser as dateutil_parser
 from calendar import monthrange
 from packaging import version
@@ -1139,6 +1140,20 @@ def add_notification(db, user, notification, expires=None, allow_dismiss=True):
     }, safe=True)
 
 
+def looks_like_email_address(value):
+    """
+    Check if a value looks like an e-mail address
+
+    This is a loose check of the form, e.g. to see if a user name is an
+    e-mail address that 4CAT can send e-mails to. It does not check that the
+    address exists.
+
+    :param str value:  Value to check
+    :return bool:
+    """
+    return bool(value and re.match(r"[^@]+\@.*?\.[a-zA-Z]+", value))
+
+
 def send_email(recipient, message, mail_config):
     """
     Send an e-mail using the configured SMTP settings
@@ -1260,55 +1275,96 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
 
     return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
 
-def normalize_url_encoding(url):
+# Characters that readable_url percent-encodes. First, those a URL
+# cannot contain as they are: control characters, the space, and
+# " < > ^ ` { | }. The backslash is left alone, because browsers read it as "/"
+# in the path of a web address. Second, characters that would be invisible or
+# look like a space, including those that change the direction of the text
+# around them, which RFC 3987 (sections 2.2 and 4.1) asks to keep encoded. They
+# are listed one by one rather than looked up in Python's Unicode tables, so
+# that the JavaScript copy of the function in Zeeschuimer gives exactly the
+# same result.
+URL_ENCODED_CHARACTERS = re.compile(
+    r'[\x00-\x20"<>^`{|}\x7f'
+    r'\u0080-\u00a0\u00ad\u034f\u0600-\u0605\u061c\u06dd\u070f\u08e2\u115f\u1160\u1680\u17b4\u17b5\u180b-\u180f'
+    r'\u2000-\u200b\u200e\u200f\u2028-\u202f\u205f-\u206f\u2800\u3000\u3164\ue000-\uf8ff\ufdd0-\ufdef\ufeff\uffa0'
+    r'\ufff0-\uffff]'
+)
+
+
+def readable_url(url):
     """
-    Normalize URL encoding for display and linking
+    Make a URL readable without changing where it leads
 
-    Takes a URL that may or may not already be percent-encoded and returns
-    a properly encoded version suitable for both display and use as a link.
-    Only query parameters and fragments are encoded; the scheme, domain, and
-    path remain human-readable.
+    Datasources give URLs that may be percent-encoded, not encoded, or partly
+    encoded. This shows encoded text as the characters themselves, where that
+    does not change the URL.
+    
+    Idea: lossless data (result should refer to exact same resource), readable
+    (for our users), clickable (for our UI), stable (if a URL gets mapped and 
+    saved, running the function on it again should not change it), doesn't throw
+    errors (safe for our mappers), and explainable.
+    
+    For the explainable, I followed the conversion from URI to IRI in RFC 3987, 
+    section 3.2 that browsers use to show URLs in their address bar.
 
-    Examples:
-        - "https://example.com/search?q=hello world" → "https://example.com/search?q=hello%20world"
-        - "https%3A//example.com/search%3Fq%3Dhello" → "https://example.com/search?q=hello"
-        - "https://example.com/search?q=hello%20world" → "https://example.com/search?q=hello%20world"
+    Zeeschuimer has a JavaScript copy of this function (`readable_url`
+    in js/lib.js), which should give exactly the same result.
 
-    :param str url: URL to normalize (may be encoded or not)
-    :return str: Properly encoded URL, or empty string if invalid
+    Where this differs from RFC 3987, section 3.2, and why:
+
+    - Encoded ASCII always stays encoded to prevent breaking links that carry 
+      a signature over their exact text.
+    - If a run of escapes has any invalid UTF-8 in it, the whole run stays
+      encoded; the RFC decodes the valid parts. This keeps text in other
+      encodings (e.g. Chinese in GBK) from showing as the wrong characters,
+      and it is what JavaScript's decodeURIComponent does.
+    - Use a fixed list of characters to keep encoded (see above), so that 
+      the JavaScript copy gives the same result. RFC has a more general rule.
+    - The RFC expects a URL that is already encoded. Ours may not be, so
+      characters a URL cannot contain (such as spaces) are encoded,
+      whitespace around the URL and tabs and line breaks in it are removed,
+      and a "%" that does not start an escape is left as it is.
+    - 4CAT must deal with external and uploaded data; some URLs have been
+      saved with the whole URL encoded, like "https%3A%2F%2Fsite.com%2F" instead
+      of "https://site.com/". Decode them first (more than once if they were 
+      encoded more than once), because otherwise they can be neither read nor opened.
+
+    See URL_ENCODED_CHARACTERS for the characters that are always percent-encoded, 
+    even if they are valid UTF-8 above.
+
+    :param str url:  URL to make readable
+    :return str:  The URL, decoded where that is safe; an empty string if `url` is empty
     """
-    from urllib.parse import unquote, urlencode, parse_qs
-
     if not url:
         return ""
 
-    try:
-        # Unquote the entire URL first to normalize
-        decoded_url = unquote(url)
-        # Parse the URL into components
-        parsed = urlparse(decoded_url)
+    url = str(url)
 
-        # Re-encode the query string properly
-        if parsed.query:
-            query_params = parse_qs(parsed.query, keep_blank_values=True)
-            # Flatten single-value lists and encode
-            encoded_query = urlencode({k: v[0] if len(v) == 1 else v for k, v in query_params.items()})
-            # Reconstruct URL with encoded query
-            result = urlunparse((
-                parsed.scheme,
-                parsed.netloc,
-                parsed.path,
-                parsed.params,
-                encoded_query,
-                parsed.fragment
-            ))
-        else:
-            result = decoded_url
+    # Some external URLs have been saved with the whole URL encoded: "https%3A%2F%2Fsite.com"
+    # instead of "https://site.com", sometimes more than once. Undo that first,
+    # one layer at a time. This only decodes plain characters such as : / ? = %;
+    # the rest is decoded further down. A working URL never starts with
+    # "https%3A", so other URLs are not affected.
+    while re.match(r"[\x00-\x20]*https?%(25)*3A", url, re.IGNORECASE):
+        url = re.sub(r"%[0-7][0-9A-Fa-f]", lambda match: unquote(match.group()), url)
 
-        return result
-    except (ValueError, AttributeError):
-        # If URL parsing fails, return the original URL
-        return url
+    # like a browser does with a pasted URL, ignore spaces and control
+    # characters around it, and tabs and line breaks inside it
+    url = re.sub(r"^[\x00-\x20]+|[\x00-\x20]+$", "", url)
+    url = re.sub(r"[\t\n\r]", "", url)
+
+    # decode each run of escapes for bytes outside ASCII, if it is valid UTF-8
+    def decode(match):
+        try:
+            return unquote(match.group(), errors="strict")
+        except UnicodeDecodeError:
+            return match.group()
+
+    url = re.sub(r"(?:%[89A-Fa-f][0-9A-Fa-f])+", decode, url)
+
+    # encode what a URL cannot contain as it is, and what would be invisible
+    return URL_ENCODED_CHARACTERS.sub(lambda match: quote(match.group(), safe=""), url)
 
 def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """
@@ -1422,10 +1478,11 @@ def split_urls(url_string, allowed_schemes=None):
     Split URL text by \n and commas.
 
     4CAT allows users to input lists by either separating items with a newline or a comma. This function will split URLs
-    and also check for commas within URLs using schemes.
+    and also check for commas and commas followed by a space within URLs using schemes.
 
     Note: some urls may contain scheme (e.g., https://web.archive.org/web/20250000000000*/http://economist.com);
-    this function will work so long as the inner scheme does not follow a comma (e.g., "http://,https://" would fail).
+    this function will work so long as the inner scheme does not follow a comma (e.g., "http://archive.org/,https://something.com" 
+    and "http://archive.org/, https://something.com" will both be split).
     """
     if allowed_schemes is None:
         allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
@@ -1436,13 +1493,15 @@ def split_urls(url_string, allowed_schemes=None):
         parts = line.split(',')
         recombined_url = ""
         for part in parts:
-            if part.startswith(allowed_schemes):  # Other schemes exist
+            # Spaces before a scheme still mean a new URL starts (e.g. "url1, url2"). Other spaces are left
+            # alone, as a URL may contain them if it was not encoded (e.g. "https://example.com/?q=a, b")
+            if part.lstrip().startswith(allowed_schemes):  # Other schemes exist
                 # New URL start detected
                 if recombined_url:
                     # Already have a URL, add to list
                     potential_urls.append(recombined_url)
                 # Start new URL
-                recombined_url = part
+                recombined_url = part.lstrip()
             elif part:
                 if recombined_url:
                     # Add to existing URL
@@ -1457,6 +1516,213 @@ def split_urls(url_string, allowed_schemes=None):
             # Add any remaining URL
             potential_urls.append(recombined_url)
     return potential_urls
+
+
+def urls_in_text(text):
+    """
+    Find the URLs in a text, in the order they appear and each only once.
+
+    URLs are found with ural's `urls_from_text`, which leaves out punctuation that follows a URL (such as the full stop
+    at the end of a sentence) and skips e-mail addresses. A list of URLs separated by commas, with or without a space
+    after each comma, gives each URL separately: a comma directly followed by "http://" or "https://" starts a new
+    URL, while other commas, such as those in `https://www.google.com/maps/@52.37,4.89,15z`, stay part of the URL.
+
+    In ordinary text, a URL with a space in it cannot be told apart from a URL followed by more words, so a space
+    always ends a URL.
+
+    Two things ural (as of 1.6.2) does not handle are taken care of here. Each step below can go once ural handles it;
+    the tests in tests/test_urls_in_text.py will show when that is the case.
+
+    :param str text:  Text to search
+    :return list:  The URLs, exactly as they are written in the text
+    """
+    if not text:
+        return []
+
+    urls = []
+    for url in ural.urls_from_text(str(text)):
+        # ural also returns the target of a Markdown link when that is not a URL, such as "foo" in
+        # "[https://a.com/x](foo)". Every URL it finds otherwise has "//" in it
+        if "//" not in url:
+            continue
+
+        # ural leaves out one closing bracket after a URL that has no matching opening bracket, as in
+        # "(see https://a.com/x)", but not two, as in "(see (also https://a.com/x))", nor a "]" that follows a ")".
+        # All closing brackets at the end that have no opening bracket in the URL are left out; those that do, as in
+        # https://en.wikipedia.org/wiki/Foo_(bar), stay
+        for opening, closing in (("(", ")"), ("[", "]")):
+            while url.endswith(closing) and url.count(closing) > url.count(opening):
+                url = url[:-1]
+
+        urls.append(url)
+
+    # the same URL can occur more than once
+    return list(dict.fromkeys(urls))
+
+
+def is_web_url(url):
+    """
+    Check whether a URL is a web address, starting with http:// or https://
+
+    Only web addresses are safe to link to: a link to a URL such as
+    javascript:alert(1) runs code when it is clicked.
+
+    :param url:  URL to check; anything else is turned into text first
+    :return bool:  Whether the URL is a web address
+    """
+    return bool(re.match(r"https?://", str(url), re.IGNORECASE))
+
+
+def link_urls_in_text(text, max_length=0, line_breaks=False, other_links=None, new_tab=False):
+    """
+    Turn the URLs in a text into links, as safe HTML
+
+    The text is taken as plain text: all of it is escaped, so HTML in it is
+    shown as it is written instead of being used. Each web address (http://
+    or https://) that `urls_in_text` finds becomes a link to the URL exactly
+    as it is written, with the URL in readable form (see `readable_url`) as
+    the link text. Other kinds of URLs, such as javascript://, stay text.
+
+    Other things can become links too, such as hashtags and @-mentions: for
+    each kind, `other_links` gives a regular expression that finds them and
+    a function that gives the URL for what was found.
+
+    The text is gone through once, from start to end, and where two of the
+    URLs start at the same place, the longer one becomes the link. That way,
+    a URL that is the start of another one (https://x.com/someone and
+    https://x.com/someone/status/123) does not break the other one's link,
+    and a # or @ in a URL does not become a link of its own.
+
+    :param text:  Text to add links to; anything else is turned into text first
+    :param int max_length:  Shorten URLs in link texts that are longer than
+    this, keeping their start and end; 0 to never shorten them
+    :param bool line_breaks:  Show the line breaks in the text as `<br>`
+    :param dict other_links:  Other things to turn into links, as
+    `{regular expression: function}`, e.g. `{r"(?<!\\w)#\\w+": lambda tag:
+    "https://x.com/hashtag/" + tag[1:]}`
+    :param bool new_tab:  Make the links open in a new tab
+    :return str:  HTML
+    """
+    text = str(text)
+    target = ' target="_blank"' if new_tab else ""
+
+    # one pattern for everything that becomes a link, with each kind in a
+    # group of its own; None marks the group for URLs
+    patterns = []
+    url_for = []
+    urls = [url for url in urls_in_text(text) if is_web_url(url)]
+    if urls:
+        # with the longest URLs first, the longest one wins where several start at the same place
+        patterns.append("|".join(re.escape(url) for url in sorted(urls, key=len, reverse=True)))
+        url_for.append(None)
+
+    for pattern, make_url in (other_links or {}).items():
+        patterns.append(pattern)
+        url_for.append(make_url)
+
+    parts = []
+    position = 0
+    if patterns:
+        link_pattern = re.compile("|".join(f"(?P<kind{index}>{pattern})" for index, pattern in enumerate(patterns)))
+        for match in link_pattern.finditer(text):
+            found = match.group()
+            kind = next(index for index in range(len(patterns)) if match.group(f"kind{index}") is not None)
+            if url_for[kind] is None:
+                url = found
+                link_text = readable_url(found)
+                if max_length:
+                    link_text = ellipsiate(link_text, max_length, inside=True, ellipsis_str="[…]")
+            else:
+                url = url_for[kind](found)
+                link_text = found
+
+            parts.append(html.escape(text[position:match.start()]))
+            parts.append(f'<a href="{html.escape(url)}" rel="external"{target}>{html.escape(link_text)}</a>')
+            position = match.end()
+
+    parts.append(html.escape(text[position:]))
+    result = "".join(parts)
+
+    # links never contain line breaks, so these are all in the text between them
+    return result.replace("\n", "<br>\n") if line_breaks else result
+
+
+def link_urls_in_html(html_text, other_links=None, new_tab=False):
+    """
+    Turn the URLs in the text of safe HTML into links
+
+    Works like `link_urls_in_text`, for HTML that is safe already, such as
+    Markdown turned into HTML with the HTML in it escaped. Only the text
+    between the tags changes, and not the text of links it already has.
+
+    :param str html_text:  Safe HTML
+    :param dict other_links:  Other things to turn into links, as for `link_urls_in_text`
+    :param bool new_tab:  Make the new links open in a new tab
+    :return str:  HTML
+    """
+    # every odd part is a tag, every even part the text between tags
+    parts = re.split(r"(<[^>]*>)", str(html_text))
+    in_link = False
+    for index, part in enumerate(parts):
+        if index % 2:
+            if re.match(r"<a[\s>]", part, re.IGNORECASE):
+                in_link = True
+            elif re.match(r"</a\s*>", part, re.IGNORECASE):
+                in_link = False
+        elif part and not in_link:
+            # the text is escaped already; link_urls_in_text escapes it again
+            parts[index] = link_urls_in_text(html.unescape(part), other_links=other_links, new_tab=new_tab)
+
+    return "".join(parts)
+
+
+def holds_only_urls(text, urls):
+    """
+    Check whether a text consists of nothing but URLs
+
+    That is the case for a single URL or a list of URLs, separated by commas,
+    spaces or new lines, as opposed to ordinary text with URLs in it. Commas,
+    brackets and other punctuation around the URLs (such as a full stop that
+    `urls_in_text` left out of a URL) do not count as text; letters and digits
+    do.
+
+    :param str text:  Text to check
+    :param list urls:  The URLs in the text, as found by `urls_in_text`
+    :return bool:  Whether the text holds only URLs
+    """
+    if not urls:
+        return False
+
+    # longer URLs go first, as a URL may be the start of another one
+    leftover = str(text)
+    for url in sorted(urls, key=len, reverse=True):
+        leftover = leftover.replace(url, "")
+
+    # letters or digits, but not "_", which ural leaves out of the end of URLs
+    return not re.search(r"[^\W_]", leftover)
+
+
+def looks_like_image_url(url):
+    """
+    Check whether a URL looks like it links to an image
+
+    This is a guess based on the URL alone: it has an image file extension
+    after the host name, as in `http://site.com/img.jpg` or
+    `https://preview.redd.it/abc.gif?format=mp4`, or it is an Imgur or Gfycat
+    link, which can be downloaded as an image even without an extension.
+    Many image links have no extension at all (e.g.
+    `https://pbs.twimg.com/media/abc?format=jpg`); those are not recognised.
+
+    :param str url:  URL to check
+    :return bool:  Whether the URL looks like an image link
+    """
+    parsed = urlparse(str(url))
+    after_host = parsed.path + "?" + parsed.query if parsed.query else parsed.path
+    if re.search(r"\.(?:png|jpe?g|gifv?)", after_host, re.IGNORECASE):
+        return True
+
+    host = (parsed.hostname or "").removeprefix("www.")
+    return host in ("imgur.com", "gfycat.com")
 
 
 def folder_size(path='.'):

@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 
 import requests
 import yt_dlp
-from ural import urls_from_text
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
@@ -23,7 +22,7 @@ from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.compatibility import Compatibility
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
-from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
+from common.lib.helpers import UserInput, sets_to_lists, url_to_filename, split_urls, urls_in_text
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -208,13 +207,6 @@ class VideoDownloaderPlus(BasicProcessor):
                 "min": 1,
                 "tooltip": "Max of 100 MB set by 4CAT administrators",
             },
-            "split-comma": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Split column values by comma",
-                "default": True,
-                "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-                        "separately"
-            }
         }
 
         # Update the amount max and help from config
@@ -326,7 +318,11 @@ class VideoDownloaderPlus(BasicProcessor):
             self.dataset.finish_with_error(str(e))
             return
 
-        self.dataset.update_status('Collected %i urls.' % len(urls))
+        if _preexisting_fallback_queue:
+            num_fallback = len(_preexisting_fallback_queue)
+            self.dataset.update_status(f"Collected {len(urls)} urls, plus {num_fallback} post {'URL' if num_fallback == 1 else 'URLs'} to try with yt-dlp only.")
+        else:
+            self.dataset.update_status('Collected %i urls.' % len(urls))
 
         vid_lib = DatasetVideoLibrary(self.dataset, modules=self.modules)
 
@@ -363,8 +359,9 @@ class VideoDownloaderPlus(BasicProcessor):
         self.skipped_urls = 0
         self.processed_urls = 0
         last_domains = []
-        total_urls = len(urls)
-        self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
+        # count the URLs that are only tried with yt-dlp too; they are added to `urls` further down
+        total_urls = len(set(urls) | set(_preexisting_fallback_queue))
+        self.total_possible_videos = min(total_urls, amount) if amount != 0 else total_urls
         self.yt_dlp_archive_map = {}
 
         # Process URLs in three tiers:
@@ -773,6 +770,7 @@ class VideoDownloaderPlus(BasicProcessor):
             
         except VideoStreamUnavailable as e:
             if self._should_use_yt_dlp(url, also_indirect):
+                self.dataset.log(f"{e}; trying again with yt-dlp")
                 result["fallback_to_ytdlp"] = True
             else:
                 self.dataset.log(f"NotVideoLinkError: {str(e)}")
@@ -872,10 +870,12 @@ class VideoDownloaderPlus(BasicProcessor):
                 self.downloaded_videos += num_files
                 self._update_download_status()
             else:
+                # the reason, if yt-dlp gave one, is logged where it happened; this makes each failure explicit
+                self.dataset.log(f"Could not download {url} with yt-dlp")
                 results["failed"] += 1
                 if ytdlp_result.get("should_stop"):
                     break
-                    
+
         return results
 
     def _download_single_ytdlp(self, url, ydl_opts, urls_dict):
@@ -1196,10 +1196,15 @@ class VideoDownloaderPlus(BasicProcessor):
                 video_links = self.identify_video_urls_in_string(value)
                 return set(video_links), bool(video_links)
 
-            # Fallback URLs should be *known* single (post) URL columns, but may be blank
+            # Fallback URLs should be *known* single (post) URL columns, but may be blank. Use the URL as it is:
+            # searching the value for URLs, as for the other columns, can cut a URL short (e.g. at a dot in a
+            # TikTok username, so that only the profile URL is left)
             _fallback_value = post.get(_fallback_column, None)
-            _fallback_url_links, has_fallback_links = _parse_and_collect_video_urls(_fallback_value)
-            fallback_url = _fallback_url_links.pop() if _fallback_url_links else None
+            _fallback_url_links = [
+                link for link in split_urls(str(_fallback_value)) if link.startswith(("http://", "https://"))
+            ] if _fallback_value else []
+            has_fallback_links = bool(_fallback_url_links)
+            fallback_url = _fallback_url_links[0] if _fallback_url_links else None
 
             for column in columns:
                 value = post.get(column)
@@ -1234,16 +1239,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
     def identify_video_urls_in_string(self, text):
         """Search string of text for URLs that may contain video links"""
-        split_comma = self.parameters.get("split-comma", True)
-        if split_comma:
-            texts = text.split(",")
-        else:
-            texts = [text]
-
-        urls = set()
-        for string in texts:
-            urls |= set([url for url in urls_from_text(string)])
-        return list(urls)
+        return urls_in_text(text)
 
     def copy_previous_video(self, previous_vid_metadata, staging_area, previous_downloaders):
         """Copy existing video to new staging area"""

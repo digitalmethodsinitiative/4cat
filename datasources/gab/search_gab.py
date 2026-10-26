@@ -5,7 +5,7 @@ import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.lib.helpers import normalize_url_encoding
+from common.lib.helpers import readable_url
 
 
 class SearchGab(Search):
@@ -73,7 +73,7 @@ class SearchGab(Search):
         post_time = datetime.datetime.strptime(post.get("ca", post.get("created_at")), "%Y-%m-%dT%H:%M:%S.%fZ")
         mapped_item = {
             "collected_at": timestamp_collected,
-            "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url", "")),
+            "collected_from_url": readable_url(metadata.get("source_platform_url", "")),
             "id": post_id,
             "created_at": post_time.strftime("%Y-%m-%d %H:%M:%S"),
             "body": post.get("c") if "c" in post else post["content"],

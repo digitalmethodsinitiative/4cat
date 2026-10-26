@@ -36,7 +36,7 @@ set all_known_fields = {
 {% if fields.get("url") and pseudonymised %}
 	<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
 {% elif fields.get("url") and not pseudonymised %}
-	<a href="{{ fields.url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+	<a href="{{ fields.url | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 {% endif %}
 
 
@@ -115,7 +115,7 @@ set all_known_fields = {
 	{% if fields.get("tags") %}
 		<div class="tags">
         Tags:
-			{{ fields.tags.split(",")|join(", ") | safe }}
+			{{ fields.tags.split(",")|join(", ") }}
 		</div>
 	{% endif %}
 

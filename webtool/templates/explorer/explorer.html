@@ -19,7 +19,7 @@ let annotation_fields = {{ annotation_fields | tojson | safe }}
 
 // We're getting the dataset column names to make sure that
 // new annotation fields cannot overwrite these.
-let original_columns = {{ dataset.get_columns() | safe }}
+let original_columns = {{ dataset.get_columns() | tojson }}
 for (const a in annotation_fields) {
 	let annotation_label = annotation_fields[a]["label"]
 	if (original_columns.includes(annotation_label)) {

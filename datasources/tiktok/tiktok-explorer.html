@@ -76,7 +76,7 @@
 			{% if item.get("tiktok_url") and pseudonymised %}
 			<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
 			{% elif item.get("tiktok_url") and not pseudonymised %}
-			<a href="{{ item['tiktok_url'] }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+			<a href="{{ item['tiktok_url'] | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 			{% endif %}
 		</div>
 	</div>

@@ -10,7 +10,6 @@ import copy
 import abc
 import csv
 import os
-import re
 import time
 
 from pathlib import PurePath, Path
@@ -19,7 +18,7 @@ from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet, StatusType
 from common.lib.compatibility import Compatibility
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5
+from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5, looks_like_email_address
 from common.lib.exceptions import (WorkerInterruptedException, ProcessorInterruptedException, ProcessorException,
                                    DataSetException, MapItemException, AnnotationException)
 from common.config_manager import ConfigWrapper
@@ -156,7 +155,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                         # this means there is no dataset that is *not* a preset anywhere
                         # above this dataset. This should never occur, but if it does, we
                         # cannot continue
-                        self.log.error(f"Processor preset {self.type} for dataset {self.dataset.key} cannot find non-preset parent dataset")
+                        self.log.error("Processor preset %s for dataset %s cannot find non-preset parent dataset" % (
+                            self.type, self.dataset.key))
                         self.job.finish()
                         return
 
@@ -184,6 +184,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         processor_name = self.title if hasattr(self, "title") else self.type
         self.dataset.clear_log()
         self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
+
+        # remember the datasets above this one now, while they still exist, so
+        # they can be reported later if they are deleted while this runs
+        self.dataset.get_genealogy()
 
         # start log file; update dataset status_type to processing
         self.dataset.update_status("Processing data", status_type=StatusType.PROCESSING)
@@ -298,6 +302,13 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                         next_type, self.dataset.key))
 
             elif next_type in available_processors:
+                if self.interrupted == self.INTERRUPT_CANCEL:
+                    # this dataset is being deleted; a follow-up created now
+                    # would be left behind without a parent to attach it to
+                    self.log.info("Not running follow-up processor of type %s for dataset %s, dataset was cancelled" % (
+                        next_type, self.dataset.key))
+                    break
+
                 next_analysis = DataSet(
                     parameters=next_parameters,
                     type=next_type,
@@ -372,12 +383,33 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
                     # already finished, could happen (though it shouldn't)
                     pass
 
-                surrogate.update_status(self.dataset.get_status())
+                # status updates of the steps are copied to the preset, so it usually has this status already;
+                # setting it again would only repeat the line in the preset's log
+                if surrogate.get_status() != self.dataset.get_status():
+                    surrogate.update_status(self.dataset.get_status())
+
+                # the steps of a preset are hidden, and their logs have more details than the preset's own
+                surrogate.log("Each step of this preset has its own log, with more details (e.g. why individual items failed):")
+                for step in surrogate.get_all_children():
+                    step_processor = step.get_producer_processor()
+                    step_name = step_processor.title if step_processor else step.type
+                    surrogate.log(f"  {step_name}: {step.get_log_url()}")
 
             except DataSetException:
                 # dataset with key to attach to doesn't exist...
-                self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist, may have "
-                                 "been deleted in the meantime)" % (self.dataset.key, self.parameters["attach_to"]))
+                try:
+                    # check if this running dataset still exists
+                    DataSet(key=self.dataset.key, db=self.db, modules=self.modules)
+                except DataSetException:
+                    # this dataset was deleted in process, we do not need to attach it to anything
+                    pass
+                else:
+                    # this dataset still exists, so it was left behind
+                    # without the dataset it was supposed to be attached to
+                    chain = " -> ".join(dataset.key for dataset in self.dataset.get_genealogy())
+                    self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist, but %s "
+                                     "does; chain when processing started: %s)" % (
+                        self.dataset.key, self.parameters["attach_to"], self.dataset.key, chain))
 
         # Validate map_item against the freshly finished dataset and emit a
         # single rolled-up admin alert if anything is unmappable. Fires once
@@ -390,17 +422,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
         if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
             owner = self.dataset.get_parameters().get("email-complete", False)
             # Check that username is email address
-            if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
-                from email.mime.multipart import MIMEMultipart
-                from email.mime.text import MIMEText
-                from smtplib import SMTPException
-                import socket
-                import html2text
-
-        if self.config.get('mail.server') and self.dataset.get_parameters().get("email-complete", False):
-            owner = self.dataset.get_parameters().get("email-complete", False)
-            # Check that username is email address
-            if re.match(r"[^@]+\@.*?\.[a-zA-Z]+", owner):
+            if looks_like_email_address(owner):
                 from email.mime.multipart import MIMEMultipart
                 from email.mime.text import MIMEText
                 from smtplib import SMTPException

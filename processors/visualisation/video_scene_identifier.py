@@ -2,7 +2,6 @@
 Detect scenes in videos
 """
 import shutil
-import oslex
 import json
 import os
 import re
@@ -10,7 +9,7 @@ import re
 from scenedetect import open_video, SceneManager, VideoOpenFailure, FrameTimecode
 
 from backend.lib.processor import BasicProcessor
-from common.lib.compatibility import Compatibility
+from common.lib.compatibility import Compatibility, ExecutableSibling
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 
@@ -199,11 +198,10 @@ class VideoSceneDetector(BasicProcessor):
 				"default": False
 			}
 		}
-		# only offer ffmpeg option if we actually have ffmpeg
-		ffmpeg_path = config.get("video-downloader.ffmpeg_path")
-		if not ffmpeg_path or not os.path.exists(shutil.which(ffmpeg_path)):
+		# only offer ffmpeg option if we actually have ffmpeg and ffprobe
+		if not ExecutableSibling("ffmpeg", "ffprobe")(config.get("video-downloader.ffmpeg_path")):
 			del options["detector_type"]["options"]["ffmpeg_select"]
-			options["detector_type"]["default"] = list(options["detector_type"]["options"].values())[0]
+			options["detector_type"]["default"] = list(options["detector_type"]["options"].keys())[0]
 
 		return options
 
@@ -326,23 +324,40 @@ class VideoSceneDetector(BasicProcessor):
 		ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
 		# first get some video metadata
-		probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-show_entries",
-		                 "stream=avg_frame_rate,duration,nb_frames", "-of", "csv=p=0",
-						 oslex.quote(str(original_video.file))]
+		# -count_packets makes ffprobe count the packets in the video stream
+		# (one per frame), for videos that do not store their frame count;
+		# this only reads the file, which is quick compared to the detection
+		probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries",
+						 "stream=avg_frame_rate,duration,nb_frames,nb_read_packets:format=duration", "-of", "json",
+						 str(original_video.file)]
 
 		probe = self.run_interruptable_process(probe_command)
-		if probe.stderr.decode("utf-8"):
-			raise SceneDetectionException("Could not read video metadata with ffprobe. The video may be unreadable.")
+		if probe.stderr:
+			raise SceneDetectionException("Could not read video metadata with ffprobe. The video may be unreadable. "
+										  f"({probe.stderr.decode('utf-8', errors='replace').strip()})")
 
-		probe_output = probe.stdout.decode("utf-8")
-		fps, duration, total_frames = probe_output.split(",")
-		fps = float(fps.split("/")[0]) / float(fps.split("/")[1])
-		duration = float(duration)
-		total_frames = int(total_frames)
-		length_timecode = FrameTimecode(duration, fps).get_timecode()
+		try:
+			probe_output = json.loads(probe.stdout)
+			stream = probe_output["streams"][0]
+		except (json.JSONDecodeError, KeyError, IndexError):
+			raise SceneDetectionException("ffprobe found no video stream in the file.")
+
+		# ffprobe leaves out values it does not know. Some formats (e.g. webm)
+		# only store the duration of the whole file and no frame count
+		duration = stream.get("duration", probe_output.get("format", {}).get("duration"))
+		total_frames = stream.get("nb_frames", stream.get("nb_read_packets"))
+		try:
+			fps_numerator, fps_denominator = stream["avg_frame_rate"].split("/")
+			fps = float(fps_numerator) / float(fps_denominator)
+			duration = float(duration)
+			total_frames = int(total_frames)
+			length_timecode = FrameTimecode(duration, fps).get_timecode()
+		except (KeyError, TypeError, ValueError, ZeroDivisionError):
+			raise SceneDetectionException(f"Could not read the frame rate ({stream.get('avg_frame_rate')}), duration "
+										  f"({duration}) or frame count ({total_frames}) of the video.")
 
 		command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
-		command.extend(["-i", oslex.quote(str(original_video.file))])
+		command.extend(["-i", str(original_video.file)])
 		# select all frames with a diff to the previous frame of > 0
 		# make sure to always select at least first and last frames
 		# frames are 0-indexed, so the last frame is total_frames-1

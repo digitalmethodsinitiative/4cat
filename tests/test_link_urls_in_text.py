@@ -1,0 +1,261 @@
+import html
+import random
+import re
+from html.parser import HTMLParser
+
+import pytest
+
+import markdown2
+
+from common.lib.helpers import is_web_url, link_urls_in_html, link_urls_in_text, urls_in_text
+
+
+"""
+How `link_urls_in_text` turns the URLs in a text into links.
+
+It makes the links in the CSV preview and in the image descriptions of
+PixPlot, so the text comes from datasets and can contain anything. These tests
+check that each URL links to exactly itself, that nothing in the text can act
+as HTML, and the cases the earlier code got wrong: a URL that is the start of
+another one, and URLs at the end of a line or next to quotation marks.
+"""
+
+
+def link(url, text=None):
+    """The HTML for one link, as `link_urls_in_text` writes it"""
+    return f'<a href="{html.escape(url)}" rel="external">{html.escape(text or url)}</a>'
+
+
+# --- a URL that is the start of another one ------------------------------------
+
+@pytest.mark.parametrize("text, expected", [
+    ("Profile https://x.com/someone and the post https://x.com/someone/status/123",
+     "Profile " + link("https://x.com/someone") + " and the post " + link("https://x.com/someone/status/123")),
+    ("The post https://x.com/someone/status/123 by https://x.com/someone",
+     "The post " + link("https://x.com/someone/status/123") + " by " + link("https://x.com/someone")),
+    ("https://en.wikipedia.org/wiki/Amsterdam,https://en.wikipedia.org/wiki/Amsterdam_Centraal",
+     link("https://en.wikipedia.org/wiki/Amsterdam") + "," + link("https://en.wikipedia.org/wiki/Amsterdam_Centraal")),
+    # an archived page has the URL of the original in it
+    ("https://web.archive.org/web/2020/https://bbc.co.uk/news and https://bbc.co.uk/news",
+     link("https://web.archive.org/web/2020/https://bbc.co.uk/news") + " and " + link("https://bbc.co.uk/news")),
+])
+def test_url_that_starts_another_url(text, expected):
+    assert link_urls_in_text(text) == expected
+
+
+def test_same_url_twice():
+    assert link_urls_in_text("https://a.com/x and https://a.com/x") == link("https://a.com/x") + " and " + link("https://a.com/x")
+
+
+# --- what is next to a URL is not part of it ------------------------------------
+
+def test_url_at_end_of_line():
+    """The earlier code turned line breaks into <br> first, and linked to https://example.com/end%3Cbr"""
+    assert link_urls_in_text("line one https://example.com/end\nline two", line_breaks=True) == \
+        "line one " + link("https://example.com/end") + "<br>\nline two"
+
+
+def test_line_breaks_kept_as_they_are_by_default():
+    assert link_urls_in_text("https://example.com/end\nline two") == link("https://example.com/end") + "\nline two"
+
+
+def test_url_between_quotation_marks_and_angle_brackets():
+    assert link_urls_in_text('He said "https://example.com/x" and <https://example.com/y>') == \
+        "He said &quot;" + link("https://example.com/x") + "&quot; and &lt;" + link("https://example.com/y") + "&gt;"
+
+
+def test_url_in_brackets():
+    assert link_urls_in_text("(see https://en.wikipedia.org/wiki/Foo_(bar)) and https://example.com/x.") == \
+        "(see " + link("https://en.wikipedia.org/wiki/Foo_(bar)") + ") and " + link("https://example.com/x") + "."
+
+
+# --- the text can not act as HTML -----------------------------------------------
+
+def test_html_in_the_text_is_shown_as_text():
+    assert link_urls_in_text("<img src=x onerror=alert(1)> https://example.com/ok") == \
+        "&lt;img src=x onerror=alert(1)&gt; " + link("https://example.com/ok")
+
+
+@pytest.mark.parametrize("text", [
+    "javascript://example.com/%0Aalert(1)",
+    "JAVASCRIPT://x.com/",
+    "ftp://example.com/file",
+])
+def test_only_web_addresses_become_links(text):
+    assert link_urls_in_text(text) == text
+
+
+@pytest.mark.parametrize("url, expected", [
+    ("https://example.com/x", True),
+    ("HTTP://EXAMPLE.COM/", True),
+    ("javascript:alert(1)", False),
+    ("JavaScript:alert(1)", False),
+    (" javascript:alert(1)", False),
+    ("data:text/html,<script>alert(1)</script>", False),
+    ("//example.com/x", False),
+    ("", False),
+    (None, False),
+])
+def test_is_web_url(url, expected):
+    assert is_web_url(url) == expected
+
+
+def test_link_leads_to_the_url_exactly_as_written():
+    """Characters that mean something in HTML are escaped in the link, so the browser reads the URL back unchanged"""
+    result = link_urls_in_text("https://en.wikipedia.org/wiki/O'Brien and https://example.com/?a=1&b=2")
+    assert result == link("https://en.wikipedia.org/wiki/O'Brien") + " and " + link("https://example.com/?a=1&b=2")
+    assert 'href="https://en.wikipedia.org/wiki/O&#x27;Brien"' in result
+    assert 'href="https://example.com/?a=1&amp;b=2"' in result
+
+
+# --- the link text ----------------------------------------------------------------
+
+def test_link_text_is_readable():
+    assert link_urls_in_text("https://en.wikipedia.org/wiki/Tonin%C3%A1") == \
+        link("https://en.wikipedia.org/wiki/Tonin%C3%A1", "https://en.wikipedia.org/wiki/Toniná")
+
+
+def test_long_link_text_is_shortened():
+    url = "https://www.example.com/a/very/long/path/to/some/page.html"
+    result = link_urls_in_text(url, max_length=30)
+    assert result.startswith(f'<a href="{url}" rel="external">https://www.example.com/')
+    assert "[…]" in result
+    assert result.endswith("some/page.html</a>")
+
+
+def test_short_link_text_is_not_shortened():
+    assert link_urls_in_text("https://example.com/x", max_length=30) == link("https://example.com/x")
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("HTTPS://EXAMPLE.COM/Up", link("HTTPS://EXAMPLE.COM/Up")),
+    ("no links here", "no links here"),
+    ("", ""),
+    (12345, "12345"),
+])
+def test_other_input(text, expected):
+    assert link_urls_in_text(text) == expected
+
+
+# --- random texts ------------------------------------------------------------------
+
+def _random_texts(count):
+    """Random texts with URLs, HTML and line breaks in them, some URLs the start of others"""
+    pieces = ["https://x.com/someone", "https://x.com/someone/status/123", "https://en.wikipedia.org/wiki/O'Brien",
+              "https://example.com/?a=1&b=2", "https://en.wikipedia.org/wiki/Tonin%C3%A1", "javascript://x.com/",
+              "<b>", "</a>", '"', "'", "&", "&amp;", "\n", " ", ",", "(", ")", ".", "<script>alert(1)</script>",
+              "%", "50% off", "美食", "#tag"]
+    generator = random.Random(7)
+    return ["".join(generator.choice(pieces) for _ in range(generator.randint(1, 10))) for _ in range(count)]
+
+
+@pytest.mark.parametrize("text", _random_texts(500))
+def test_random_text_gives_safe_html(text):
+    result = link_urls_in_text(text, max_length=30, line_breaks=True)
+
+    # apart from the links and line breaks it adds, there is no HTML in the result
+    tags = re.compile(r'<a href="[^"<>]*" rel="external">|</a>|<br>')
+    assert "<" not in tags.sub("", result) and ">" not in tags.sub("", result)
+    assert result.count("<a ") == result.count("</a>")
+
+    # each link leads to a URL that is in the text
+    found = urls_in_text(text)
+    for href in re.findall(r'<a href="([^"]*)"', result):
+        assert html.unescape(href) in found
+
+
+# --- hashtags and @-mentions, as in the Explorer -----------------------------------------
+
+HASHTAGS_AND_MENTIONS = {
+    r"(?<!\w)#\w+": lambda tag: "https://x.com/hashtag/" + tag[1:],
+    r"(?<!\w)@[\w-]+": lambda mention: "https://x.com/" + mention[1:],
+}
+
+
+def test_hashtags_and_mentions_become_links():
+    assert link_urls_in_text("#tag by @someone", other_links=HASHTAGS_AND_MENTIONS) == \
+        link("https://x.com/hashtag/tag", "#tag") + " by " + link("https://x.com/someone", "@someone")
+
+
+def test_hashtag_or_mention_in_a_url_is_part_of_the_url():
+    text = "https://www.tiktok.com/@someone/video/1?q=%23tag#comments"
+    assert link_urls_in_text(text, other_links=HASHTAGS_AND_MENTIONS) == link(text)
+
+
+def test_no_mentions_in_e_mail_addresses_or_words():
+    text = "mail me@example.com, issue#12, C#"
+    assert link_urls_in_text(text, other_links=HASHTAGS_AND_MENTIONS) == html.escape(text)
+
+
+def test_hashtags_with_html_around_them():
+    assert link_urls_in_text("<b>#tag</b>", other_links=HASHTAGS_AND_MENTIONS) == \
+        "&lt;b&gt;" + link("https://x.com/hashtag/tag", "#tag") + "&lt;/b&gt;"
+
+
+def test_links_open_in_a_new_tab():
+    assert link_urls_in_text("https://example.com/x", new_tab=True) == \
+        '<a href="https://example.com/x" rel="external" target="_blank">https://example.com/x</a>'
+
+
+def test_link_with_a_quotation_mark_stays_one_attribute():
+    """The Explorer used to write href='...', so a ' in a URL could add attributes to the link"""
+    text = "https://example.com/x'onmouseover='alert(1) and https://example.com/y\"onclick=\"alert(2)"
+    tags = []
+    parser = HTMLParser()
+    parser.handle_starttag = lambda tag, attributes: tags.append(dict(attributes))
+    parser.feed(link_urls_in_text(text, new_tab=True))
+
+    assert len(tags) == 2
+    for attributes in tags:
+        assert list(attributes) == ["href", "rel", "target"]
+        assert attributes["href"] in urls_in_text(text)
+
+
+# --- links in HTML that is safe already ----------------------------------------------------
+
+def tumblr_markdown(text):
+    """Markdown turned into safe HTML with links, as `social_mediafy` does for Tumblr posts in the Explorer"""
+    return link_urls_in_html(markdown2.markdown(text, safe_mode="escape", extras=["code-friendly"]), HASHTAGS_AND_MENTIONS)
+
+
+def test_mentions_in_safe_markdown():
+    result = tumblr_markdown("**Hi** @someone, see [the post](https://example.com/post) <img src=x onerror=alert(1)>")
+    assert "<strong>Hi</strong> " + link("https://x.com/someone", "@someone") in result
+    assert '<a href="https://example.com/post">the post</a>' in result
+    assert "&lt;img src=x onerror=alert(1)&gt;" in result
+    assert "<img" not in result
+
+
+@pytest.mark.parametrize("markdown", [
+    # markdown2 2.4.2 let these through as HTML that runs
+    "<x <img src=x onerror=alert(1)//>",
+    "nice post <b <img src=x onerror=alert(2)//> thanks @someone",
+    "![a\nhttps://e.example/x/onerror=alert(1)//)](>onload  \nzz)",
+])
+def test_html_in_markdown_can_not_run(markdown):
+    attributes = []
+    parser = HTMLParser()
+    parser.handle_starttag = lambda tag, tag_attributes: attributes.extend(name for name, value in tag_attributes)
+    parser.feed(tumblr_markdown(markdown))
+    assert set(attributes) <= {"href", "src", "alt", "title", "rel", "target"}
+
+
+def test_plus_in_link_address_is_kept():
+    assert '<a href="https://example.com/C++/a+b">C++ docs</a>' in tumblr_markdown("[C++ docs](https://example.com/C++/a+b)")
+
+
+def test_url_with_underscores_stays_whole():
+    result = tumblr_markdown("see https://en.wikipedia.org/wiki/Hello_World_Program and *this*")
+    assert link("https://en.wikipedia.org/wiki/Hello_World_Program") in result
+    assert "<em>this</em>" in result
+
+
+def test_existing_links_and_tags_are_left_alone():
+    safe_html = '<p><a href="https://example.com/@someone">see @someone</a> and @other</p>'
+    assert link_urls_in_html(safe_html, HASHTAGS_AND_MENTIONS) == \
+        '<p><a href="https://example.com/@someone">see @someone</a> and ' + link("https://x.com/other", "@other") + "</p>"
+
+
+def test_text_in_html_stays_escaped():
+    assert link_urls_in_html("<p>a &lt;b&gt; &amp; https://example.com/?a=1&amp;b=2</p>") == \
+        "<p>a &lt;b&gt; &amp; " + link("https://example.com/?a=1&b=2") + "</p>"

@@ -63,13 +63,15 @@ class ExtensionManipulator(BasicWorker):
         if task == "install":
             success = self.install_extension(extension_reference)
             if success:
-                # Add job to restart 4CAT; include upgrade to ensure migrate.py runs which will install any extension updates and new python packages
+                # Add job to restart 4CAT; the restart runs migrate.py, which
+                # installs the extension's Python packages and runs its install
+                # script, without upgrading 4CAT itself
                 lock_file = self.config.get("PATH_CONFIG").joinpath("restart.lock")
                 if lock_file.exists():
                     # restart already in progress
-                    self.extension_log.info("4CAT restart already in progress. Upgrade will be applied on next restart.")
+                    self.extension_log.info("4CAT restart already in progress. Extension will be loaded on next restart.")
                 else:
-                    self.extension_log.info("Adding job to restart 4CAT and apply extension upgrade.")
+                    self.extension_log.info("Adding job to restart 4CAT and finish installing the extension.")
                      # ensure lockfile exists - will be written to later by worker
                     lock_file.touch()
                     # this log file is used to keep track of the progress, and will also
@@ -77,11 +79,11 @@ class ExtensionManipulator(BasicWorker):
                     restart_log_file = self.config.get("PATH_LOGS").joinpath("restart.log")
                     with restart_log_file.open("w") as outfile:
                         outfile.write(
-                            f"Upgrade initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
-                        outfile.write("Telling 4CAT to upgrade via job queue...\n")
-                    
+                            f"Extension installation initiated at server timestamp {datetime.datetime.now().strftime('%c')}\n")
+                        outfile.write("Telling 4CAT to install extension dependencies and restart via job queue...\n")
+
                     # add job to restart 4CAT
-                    self.queue.add_job(worker_or_type="restart-4cat", details={}, remote_id="upgrade")
+                    self.queue.add_job(worker_or_type="restart-4cat", details={}, remote_id="extension")
                 
         elif task == "uninstall":
             self.uninstall_extension(extension_reference)

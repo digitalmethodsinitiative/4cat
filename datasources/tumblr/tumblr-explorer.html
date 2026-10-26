@@ -3,11 +3,11 @@
 	<div class="author-row {% if reblog %}reblog{% endif %}">
 	{% if not pseudonymised %}
 		<!-- Possible external link, if not pseudonymised -->
-		<a href="{{ item['item_url'] }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+		<a href="{{ item['item_url'] | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 		<!-- PFP -->
 		{% if item["author_avatar_url"] %}
 		<div class="author-avatar {% if reblog %}reblog{% endif %}">
-			<a href="{{ item.get('author_url') }}" target="_blank">
+			<a href="{{ item.get('author_url') | web_url }}" target="_blank">
 				<img src="{{ item.get('author_avatar_url') }}">
 			</a>
 		</div>
@@ -16,7 +16,7 @@
 		{% if reblog %}
 			<span class="reblog-icon"><i class="fa-solid fa-repeat"></i></span>
 		{% endif %}
-		<span class="author"><a href="{{ item.get('author_url') }}">{{ item.get("author") }}</a></span>
+		<span class="author"><a href="{{ item.get('author_url') | web_url }}">{{ item.get("author") }}</a></span>
 		{% if reblog %}<span class="reblog-notice"> reblogged </span><a href="https://tumblr.com/{{ item.parent_item_author }}"><span class="author">{{ item.parent_item_author }}</span></a>{% endif %}
 		
 	{% else %}
@@ -62,17 +62,17 @@
 		<div class="author-row">
 		{% if not pseudonymised %}
 			<!-- Possible external link, if not pseudonymised -->
-			<a href="{{ item['item_url'] }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+			<a href="{{ item['item_url'] | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 			<!-- PFP -->
 			{% if item["author_avatar_url"] %}
 			<div class="author-avatar">
-				<a href="{{ item.get('author_url') }}" target="_blank">
+				<a href="{{ item.get('author_url') | web_url }}" target="_blank">
 					<img src="{{ item.get('author_avatar_url') }}">
 				</a>
 			</div>
 			{% endif %}
 			<!-- AUTHOR -->
-			<span class="author"><a href="{{ item.get('author_url') }}">{{ item.get("author") }}</a></span>
+			<span class="author"><a href="{{ item.get('author_url') | web_url }}">{{ item.get("author") }}</a></span>
 			
 		{% else %}
 			<span title="Pseudonymous author" class="author pseudonymous">
@@ -92,7 +92,7 @@
 	{% for block in content_order %}
 		{% if block == "text" %}
 		<!-- TEXT -->
-			<div class="body">{{ item.get("body_markdown").split("\n")[block_counts.text] | markdown | social_mediafy(datasource='tumblr') | safe }}</div>
+			<div class="body">{{ item.get("body_markdown").split("\n")[block_counts.text] | social_mediafy(datasource='tumblr', markdown=True) | safe }}</div>
 			{% set block_counts.text = block_counts.text + 1 %}
 		{% elif block == "image" %}
 		<!-- IMAGE -->
@@ -103,7 +103,7 @@
 		{% elif block == "video" %}
 		<!-- VIDEO -->
 			<div class="media-container video">
-				<a href="{{ item.video_urls.split(',')[block_counts.video] }}" target='blank'>
+				<a href="{{ item.video_urls.split(',')[block_counts.video] | web_url }}" target='blank'>
 					<img src="{{ item.video_thumb_urls.split(',')[block_counts.video] }}">
 					<div class="play-button"><i class="fa-solid fa-play"></i></div>
 				</a>
@@ -120,7 +120,7 @@
 			{% set url = item.link_urls.split(",")[block_counts.link] %}
 			{% set link_title = item.link_titles.split(",")[block_counts.link] %}
 			{% set link_description = item.link_descriptions.split(",")[block_counts.link] %}
-			<a class="embedded-link" href="{{ url }}" target="_blank">
+			<a class="embedded-link" href="{{ url | web_url }}" target="_blank">
 			<div class="embedded-link-box">
 				{{ link_title }}
 				<div class="link-description">{{ link_description }} <i class="fas fa-external-link-alt"></i></div>
@@ -147,7 +147,7 @@
 				<div class="body-ask">
 				<div class="author-ask"><strong>{% if not pseudonymised %}{{ item["author_ask"] }}{% else %}<i lass="fa fa-user-secret tooltip-trigger"></i>{% endif %}</strong> asked:</div>
 			{% endif %}
-					<p>{{ item.get("body_ask").split("\n")[block_counts.ask] | markdown | social_mediafy(datasource='tumblr') | safe }}</p>
+					<p>{{ item.get("body_ask").split("\n")[block_counts.ask] | social_mediafy(datasource='tumblr', markdown=True) | safe }}</p>
 			{% if end_ask_block %}
 				</div>
 			</div>

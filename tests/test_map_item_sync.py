@@ -683,3 +683,53 @@ def test_new_chain_rule_reaches_the_prompt_and_the_checklist():
     rule = _rule_by_id("translate-a-get-chain-link-by-link")
     assert "translate-a-get-chain-link-by-link" in prompt
     assert rule.verify in prompt
+
+
+# --------------------------------------------------------------------------- #
+# Rules added after the Weibo and RedNote review of 2026-10-22
+#
+# Both defects broke a rule that was already in the prompt, so these pin the
+# shapes that shipped and give the first of them a lint.
+# --------------------------------------------------------------------------- #
+
+def test_or_null_lint_flags_the_weibo_comments_shape():
+    """weibo_comments shipped `fields['mid'] || null` for Python's
+    `fields.get('mid')`, so an empty mid became null where 4CAT keeps ''. No 4CAT
+    map_item writes `or None`, which is what makes `|| null` safe to lint."""
+    rule = _rule_by_id("-null-is-a-mistranslated-get")
+    issues = mic.lint_translation(
+        _translation("export function map_item(i){ return new MappedItem({id: i['mid'] || null}); }")
+    )
+    assert any(rule.lint_message in issue for issue in issues)
+    # the right translations of a .get, and an `or ''`, stay quiet
+    for value in ("py_get(i, 'mid')", "py_get(i, 'title') || ''", "i['mid'] ?? null"):
+        issues = mic.lint_translation(
+            _translation(f"export function map_item(i){{ return new MappedItem({{id: {value}}}); }}")
+        )
+        assert issues == [], value
+
+
+def test_or_null_rule_shows_where_it_stops():
+    rule = _rule_by_id("-null-is-a-mistranslated-get")
+    assert "fields['mid'] || null" in rule.bad
+    assert "py_get(fields, 'mid')" in rule.good
+    assert "|| ''" in rule.good      # an `or ''` is still `||`
+
+
+def test_truthy_test_rule_covers_the_type_test_substitution():
+    """weibo shipped `typeof longText.content === 'string'` for Python's
+    `long_text.get('content')`, which lets an empty string through where Python
+    falls back to `text_raw`. The same function's `isinstance(text_raw, str)` is
+    a real type test, so the example has to show that one staying."""
+    rule = _rule_by_id("translate-the-test-not-one-that-looks-like-it")
+    assert "typeof longText.content === 'string'" in rule.bad
+    assert "isinstance(raw, str)" in rule.good
+    assert "Three substitutions" in rule.prompt_rule
+    assert "type check" in rule.verify
+
+
+def test_or_null_rule_reaches_the_prompt_and_the_checklist():
+    prompt = mic.build_user_prompt("class X: pass\n", "export function capture(){}\n", "x/search_x.py")
+    rule = _rule_by_id("-null-is-a-mistranslated-get")
+    assert "-null-is-a-mistranslated-get" in prompt
+    assert rule.verify in prompt

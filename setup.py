@@ -25,7 +25,7 @@ core_packages = {
 	"langchain_openai",
 	"langchain_mistralai",
 	"langchain_deepseek",
-	"markdown2==2.4.2",
+	"markdown2==2.5.5",
 	"natsort",
 	"oslex",
 	"packaging",
@@ -41,7 +41,7 @@ core_packages = {
 	"requests_futures",
 	"ruff",
 	"svgwrite~=1.4.0",
-	"ural~=1.3",
+	"ural~=1.6.2",
 	"Werkzeug"
 }
 

@@ -4,7 +4,7 @@
   height: 11px;
   position: relative;
   top: 1px;
-  background: url('../img/flags/country-flags.png') no-repeat;
+  background: url('../img/flags/flags.8.png') no-repeat;
 }
 
 
@@ -273,7 +273,7 @@
 	height:11px;
 	position:relative;
 	top:1px;
-	background:url('../img/flags/troll-flags.png') no-repeat
+	background:url('../img/flags/flags.png') no-repeat
 }
 
 .flag[class*="flag-t_ac"]{background-position:0 0}
