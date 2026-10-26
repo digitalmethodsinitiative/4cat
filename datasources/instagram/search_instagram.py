@@ -48,6 +48,20 @@ class SearchInstagram(Search):
         return ",".join(SearchInstagram.HASHTAG_REGEX.findall(caption))
 
     @staticmethod
+    def extract_timestamp(post_id) -> int:
+        """
+        Instagram post ID embeds timestamp of publication!
+
+        See https://slang.cx/instagram-id
+        :param post_id: Numerical post ID (i.e. not the string)
+        :retur int: timestamp
+        """
+        post_id = int(post_id)
+        instagram_epoch = 1314220021
+        embedded_timestamp = (post_id >> (64 - 41)) / 1000
+        return round(instagram_epoch + embedded_timestamp)
+
+    @staticmethod
     def get_author(node):
         """
         Collect the details of the account that posted an item
@@ -209,6 +223,11 @@ class SearchInstagram(Search):
         unix_at = MissingMappedField(0)
         # 2026-2-24 node["caption"]["text"] 
         caption = MissingMappedField("") if "caption" not in node else "" if not node.get("caption") else node["caption"]["text"]
+
+        # we have no direct timestamp, but we can extract it from the post ID if available
+        if "pk" in node:
+            unix_at = SearchInstagram.extract_timestamp(node["pk"])
+            collected_at = datetime.datetime.fromtimestamp(unix_at).strftime("%Y-%m-%d %H:%M:%S"),
         
 
         author = SearchInstagram.get_author(node)
@@ -536,8 +555,9 @@ class SearchInstagram(Search):
             unix_at = node["taken_at"]
         else:
             # grid and thumbnail views leave the post date out
-            collected_at = MissingMappedField(0)
-            unix_at = MissingMappedField(0)
+            # but we can get it from the post ID!
+            unix_at = SearchInstagram.extract_timestamp(node["pk"])
+            collected_at = datetime.datetime.fromtimestamp(unix_at).strftime("%Y-%m-%d %H:%M:%S")
 
         mapped_item = {
             # Post and caption
