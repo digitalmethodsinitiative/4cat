@@ -7,6 +7,7 @@ from yt_dlp import DownloadError
 from backend.lib.proxied_requests import FailedProxiedRequest
 from processors.visualisation import download_videos
 from processors.visualisation.download_videos import LiveVideoException, VideoDownloaderPlus
+from processors.visualisation.download_weibo_videos import WeiboVideoDownloader
 
 
 """
@@ -160,16 +161,18 @@ SETTINGS_ERROR = {"success": False, "site_error": False}
 DOWNLOADED = {"success": True, "site_error": False}
 
 
-def download_with_ytdlp(outcomes, tmp_path):
+def download_with_ytdlp(outcomes, tmp_path, in_preset=False):
     """
     Run the yt-dlp download step
 
     :param list outcomes:  What downloading each link with yt-dlp results in
+    :param bool in_preset:  Whether the downloader runs as part of a preset, e.g. for TikTok or Weibo
     :return tuple:  The downloader and the step's results
     """
     urls = [f"https://www.youtube.com/watch?v={number}" for number in range(len(outcomes))]
     urls_dict = {url: {"success": False, "retry": True} for url in urls}
     downloader = make_downloader([])
+    downloader.is_running_in_preset = in_preset
     downloader._download_single_ytdlp = MagicMock(side_effect=outcomes)
     results = downloader._process_ytdlp_downloads(
         urls, urls_dict, {}, tmp_path, amount=0, also_indirect="all", consecutive_errors=0
@@ -182,6 +185,15 @@ def test_yt_dlp_errors_stop_after_five(tmp_path):
 
     assert results["processed"] == 5
     assert "non-direct" in downloader.warning_message
+
+
+def test_presets_do_not_suggest_changing_the_non_direct_setting(tmp_path):
+    # the TikTok and Weibo presets turn yt-dlp on themselves; users cannot change that
+    downloader, results = download_with_ytdlp([SITE_ERROR] * 5, tmp_path, in_preset=True)
+
+    assert results["processed"] == 5
+    assert "non-direct" not in downloader.warning_message
+    assert "working links" in downloader.warning_message
 
 
 def test_yt_dlp_errors_caused_by_settings_do_not_stop(tmp_path):
@@ -225,3 +237,81 @@ def test_which_yt_dlp_errors_count(error, is_site_error, monkeypatch):
 
     assert not result["success"]
     assert result["site_error"] == is_site_error
+
+
+# --- which links are collected -----------------------------------------------------
+
+class FakeSource:
+    """A dataset to download videos for, giving its mapped items"""
+    def __init__(self, items):
+        self.items = items
+        self.num_rows = len(items)
+
+    def iterate_items(self, processor=None, **kwargs):
+        yield from self.items
+
+
+VIDEO_POST = {
+    "id": "1",
+    "video_url": "https://f.video.weibocdn.com/o0/WTuS30b8lx08BKpeRPu001041200QWY50E010.mp4?label=mp4_720p&Expires=1792590895",
+    "url": "https://weibo.com/1886903325/RnIE07YSu",
+}
+TEXT_POST = {"id": "2", "video_url": "", "url": "https://weibo.com/2172061270/RnnJA9tPy"}
+
+
+def collect_links(items, parameters):
+    """
+    Collect the links the downloader would try
+
+    :return tuple:  Video links, and post URLs that only yt-dlp is asked about
+    """
+    downloader = make_downloader([])
+    downloader.source_dataset = FakeSource(items)
+    downloader.parameters = parameters
+    return downloader.collect_video_urls()
+
+
+def test_posts_without_video_link_go_to_yt_dlp_by_default():
+    """As for TikTok, where every post that is left at this point has a video"""
+    urls, fallback_only = collect_links([VIDEO_POST, TEXT_POST], {"columns": ["video_url"], "_ytdlp_fallback_column": "url"})
+
+    assert len(urls) == 1
+    assert list(fallback_only) == [TEXT_POST["url"]]
+
+
+def test_weibo_posts_without_video_are_left_out():
+    weibo = WeiboVideoDownloader.__new__(WeiboVideoDownloader)
+    weibo.parameters = {"amount": 100, "max_video_size": 100}
+    parameters = weibo.get_processor_pipeline()[0]["parameters"]
+
+    urls, fallback_only = collect_links([VIDEO_POST, TEXT_POST], parameters)
+
+    # the video link is tried first; if it no longer works, yt-dlp gets the post's page
+    assert [link_info["_ytdlp_fallback_url"] for link_info in urls.values()] == [VIDEO_POST["url"]]
+    assert not fallback_only
+
+
+# --- which downloader is offered ---------------------------------------------------
+
+class FakeDataset:
+    """Just enough of a dataset to check which processors are offered for it"""
+    def __init__(self, type):
+        self.type = type
+
+    def is_top_dataset(self):
+        return True
+
+    def is_from_collector(self):
+        return True
+
+    def get_extension(self):
+        return "ndjson"
+
+
+def test_weibo_datasets_get_the_weibo_downloader():
+    weibo = FakeDataset("weibo-search")
+
+    assert WeiboVideoDownloader.is_compatible_with(weibo, config=MagicMock())
+    assert not VideoDownloaderPlus.is_compatible_with(weibo, config=MagicMock())
+    # other data sources still get the general one
+    assert VideoDownloaderPlus.is_compatible_with(FakeDataset("douyin-search"), config=MagicMock())

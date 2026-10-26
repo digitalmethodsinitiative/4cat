@@ -106,7 +106,7 @@ class VideoDownloaderPlus(BasicProcessor):
     followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
 
     # any collector's csv/ndjson output (except sources with their own downloaders), plus the tiktok-metadata helper
-    compatibility = Compatibility(is_collector=True, types={"tiktok-video-downloader-metadata"}, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
+    compatibility = Compatibility(is_collector=True, types={"tiktok-video-downloader-metadata"}, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search", "weibo-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
 
     references = [
         "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
@@ -156,7 +156,7 @@ class VideoDownloaderPlus(BasicProcessor):
             "help": "Allow indirect downloads",
             "tooltip": "Allow users to choose to download videos linked indirectly (e.g. embedded in a linked tweet, link to a YouTube video). "
                        "Enabling all can be confusing for users and download more than intended. Video downloaders for "
-                       "specific data sources (e.g. TikTok) may still use yt-dlp on that platform's post pages, to replace "
+                       "specific data sources (TikTok, Weibo) may still use yt-dlp on that platform's post pages, to replace "
                        "video links that no longer work."
         },
         "video-downloader.allow-multiple": {
@@ -1151,7 +1151,8 @@ class VideoDownloaderPlus(BasicProcessor):
         if consecutive_errors < 5:
             return None
             
-        if also_indirect != "none":
+        # in a preset (e.g. for TikTok or Weibo), the non-direct videos setting is not the user's to change
+        if also_indirect != "none" and not self.is_running_in_preset:
             message = f"Downloaded {self.downloaded_videos} videos. Errors {consecutive_errors} consecutive times; try deselecting the non-direct videos setting"
         else:
             message = f"Downloaded {self.downloaded_videos} videos. Errors {consecutive_errors} consecutive times; check logs to ensure video URLs are working links and you are not being blocked."
@@ -1175,6 +1176,10 @@ class VideoDownloaderPlus(BasicProcessor):
         # Fallback URLs; if a URL failed, this URL can be used as a backup
         _fallback_urls = {}
         _fallback_column = self.parameters.get("_ytdlp_fallback_column", None)
+        # Whether items without a video link are tried with yt-dlp, using their fallback URL. That is right when every
+        # item has a video (e.g. TikTok, once its image posts are left out), but not when an item without a video link
+        # simply has no video (e.g. Weibo)
+        _fallback_without_video_link = self.parameters.get("_ytdlp_fallback_without_video_link", True)
 
         columns = self.parameters.get("columns")
         if type(columns) is str:
@@ -1226,7 +1231,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             }
                     else:
                         urls[item_url]['post_ids'].add(post.get('id'))
-            elif has_fallback_links:
+            elif has_fallback_links and _fallback_without_video_link:
                 # Fallback queue only; no video URLs found in main columns, but fallback column has a URL that can be used
                 if fallback_url not in urls:
                     _fallback_urls[fallback_url] = {
