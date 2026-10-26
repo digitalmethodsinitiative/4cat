@@ -1560,6 +1560,19 @@ def urls_in_text(text):
     return list(dict.fromkeys(urls))
 
 
+def is_web_url(url):
+    """
+    Check whether a URL is a web address, starting with http:// or https://
+
+    Only web addresses are safe to link to: a link to a URL such as
+    javascript:alert(1) runs code when it is clicked.
+
+    :param url:  URL to check; anything else is turned into text first
+    :return bool:  Whether the URL is a web address
+    """
+    return bool(re.match(r"https?://", str(url), re.IGNORECASE))
+
+
 def link_urls_in_text(text, max_length=0, line_breaks=False, other_links=None, new_tab=False):
     """
     Turn the URLs in a text into links, as safe HTML
@@ -1597,7 +1610,7 @@ def link_urls_in_text(text, max_length=0, line_breaks=False, other_links=None, n
     # group of its own; None marks the group for URLs
     patterns = []
     url_for = []
-    urls = [url for url in urls_in_text(text) if re.match(r"https?://", url, re.IGNORECASE)]
+    urls = [url for url in urls_in_text(text) if is_web_url(url)]
     if urls:
         # with the longest URLs first, the longest one wins where several start at the same place
         patterns.append("|".join(re.escape(url) for url in sorted(urls, key=len, reverse=True)))

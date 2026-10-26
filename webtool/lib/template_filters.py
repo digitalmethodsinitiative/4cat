@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from webtool.lib.helpers import parse_markdown
-from common.lib.helpers import timify, ellipsiate, link_urls_in_text, link_urls_in_html
+from common.lib.helpers import timify, ellipsiate, is_web_url, link_urls_in_text, link_urls_in_html
 
 from flask import current_app, g
 from markupsafe import escape
@@ -156,6 +156,22 @@ def _jinja2_filter_add_ahref(content, ellipsiate=0):
     :return str:  HTML
     """
     return link_urls_in_text(content, max_length=ellipsiate, line_breaks=True)
+
+
+@current_app.template_filter("web_url")
+def _jinja2_filter_web_url(url):
+    """
+    Give a URL from a dataset to use as a link address
+
+    A field in a dataset can hold anything, such as javascript:alert(1), which
+    runs code when the link is clicked. So only web addresses (http:// and
+    https://) are kept; anything else becomes `#`, a link that goes nowhere.
+
+    :param url:  URL to link to
+    :return str:  The URL, or `#`
+    """
+    url = str(url).strip()
+    return url if is_web_url(url) else "#"
 
 
 @current_app.template_filter("add_base_url")
@@ -327,7 +343,10 @@ def _jinja2_filter_social_mediafy(body, datasource="", markdown=False, line_brea
         other_links[mention_pattern] = lambda mention: platform["mention"] + mention[1:]
 
     if markdown:
-        return link_urls_in_html(markdown2.markdown(str(body), safe_mode="escape"), other_links, new_tab=True)
+        # with code-friendly, an underscore does not make italics, so URLs
+        # with underscores in them stay whole; italics use * instead
+        body_html = markdown2.markdown(str(body), safe_mode="escape", extras=["code-friendly"])
+        return link_urls_in_html(body_html, other_links, new_tab=True)
 
     return link_urls_in_text(body, line_breaks=line_breaks, other_links=other_links, new_tab=True)
 
