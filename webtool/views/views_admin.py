@@ -148,6 +148,16 @@ def get_worker_status():
                 dataset = DataSet(key=worker["remote_id"], db=g.db, modules=g.modules)
             except DataSetException:
                 dataset = None
+
+        if worker["code"]["location"]:
+            worker["codepath"] = f"{worker['code']['location'][0]['path']}:{worker['code']['location'][0]['line']}"
+            if worker["code"]["origin"][1]:
+                # try to construct a URL to the current code location!
+                worker["url"] = worker["code"]["origin"][1]  # repository
+                worker["url"] += f"/blob/{worker['code']['origin'][0]}"
+                worker["url"] += worker["code"]["location"][0]["path"]
+                worker["url"] += f"#L{worker['code']['location'][0]['line']}"
+
         workers.append({**worker, "dataset": dataset})
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=g.modules.workers,
                            now=time.time())
