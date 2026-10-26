@@ -1,9 +1,12 @@
 import traceback
+import inspect
 import socket
 import time
 import json
 import sys
 import re
+
+from pathlib import Path
 
 from backend.lib.worker import BasicWorker
 from common.lib.helpers import get_software_commit
@@ -295,13 +298,33 @@ class InternalAPI(BasicWorker):
 					if frames.get(worker.ident):
 						stack = []
 						frame = frames[worker.ident]
+						have_root = False
 						while frame:
 							# each frame has a reference to the parent frame (if there is one)
 							# traverse this stack to construct the actual call stack
+							# only include frames within the 4CAT context
+							code_path = Path(frame.f_code.co_filename)
+							if code_path == Path(inspect.getfile(worker.__class__)):
+								# start the stack trace at the worker's own file
+								have_root = True
+
+							if not have_root or not code_path.is_relative_to(self.config.get("PATH_ROOT")):
+								frame = frame.f_back
+								continue
+
+							extension = ""
+							relative_path = code_path.relative_to(self.config.get("PATH_ROOT"))
+							if code_path.is_relative_to(self.config.get("PATH_EXTENSIONS")):
+								# for extension code, take the extension folder as root
+								relative_path = code_path.relative_to(self.config.get("PATH_EXTENSIONS"))
+								extension = code_path.parts[0]
+								relative_path = relative_path.relative_to(*relative_path.parts[:1])
+
 							stack.append({
-								"path": re.sub(f"^{re.escape(str(self.config.get('PATH_ROOT')))}", "", frame.f_code.co_filename),
+								"path": "/" + str(relative_path),
 								"line": frame.f_lineno,
-								"function": frame.f_code.co_name
+								"function": frame.f_code.co_name,
+								"extension": extension
 							})
 							frame = frame.f_back
 						stack = stack[:-2]
