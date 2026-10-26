@@ -10,6 +10,7 @@ These import the helper scripts directly (they have no heavy dependencies once
 `LLMAdapter` is imported lazily), so they run on host Python as well as in the
 `4cat_backend` container via `docker exec 4cat_backend pytest`.
 """
+import subprocess
 import sys
 from pathlib import Path
 
@@ -294,6 +295,30 @@ def test_plan_matrix_rejects_shell_injection_paths():
     assert [m["module"] for m in matrix] == ["ok"]
 
 
+def _git(cwd, *args):
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.com", *args],
+        cwd=cwd, check=True, capture_output=True, text=True,
+    )
+
+
+def test_git_diff_names_leaves_out_deleted_datasources(tmp_path, monkeypatch):
+    """A push that removes a datasource has nothing to translate, so the
+    deleted search file must not start a sync job."""
+    for module in ("kept", "removed"):
+        (tmp_path / "datasources" / module).mkdir(parents=True)
+        (tmp_path / "datasources" / module / "search_{}.py".format(module)).write_text("x = 1\n")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-q", "-m", "before")
+    (tmp_path / "datasources/kept/search_kept.py").write_text("x = 2\n")
+    (tmp_path / "datasources/removed/search_removed.py").unlink()
+    _git(tmp_path, "commit", "-q", "-am", "after")
+
+    monkeypatch.chdir(tmp_path)
+    assert ci._git_diff_names("HEAD~1", "HEAD") == ["datasources/kept/search_kept.py"]
+
+
 # --------------------------------------------------------------------------- #
 # build_pr_body
 # --------------------------------------------------------------------------- #
@@ -343,10 +368,78 @@ def test_build_pr_body_push_invokes_injected_diff():
     _, body = ci.build_pr_body(
         manifest, module="a", is_bootstrap=False, before="X", after="Y",
         run_id="1", event_name="push", repo="org/4cat", python_diff=fake_diff,
+        python_commits=lambda before, after, path: [],
     )
     assert calls == [("X", "Y", "datasources/a/search_a.py")]
     assert "<details><summary>Python diff</summary>" in body
     assert "+added" in body
+
+
+def test_build_pr_body_names_the_llm_server():
+    manifest = {
+        "model": "gpt-oss-120b", "provider": "litellm",
+        "base_url": "https://llm.example.org", "entries": [],
+    }
+    _, body = ci.build_pr_body(
+        manifest, module="a", is_bootstrap=False, before="", after="",
+        run_id="1", event_name="workflow_dispatch", repo="org/4cat",
+    )
+    assert "`litellm`" in body
+    assert "**LLM server:** `https://llm.example.org`" in body
+
+    # manifests written before base_url was recorded leave the line out
+    _, body = ci.build_pr_body(
+        {"entries": []}, module="a", is_bootstrap=False, before="", after="",
+        run_id="1", event_name="workflow_dispatch", repo="org/4cat",
+    )
+    assert "LLM server" not in body
+
+
+def test_build_pr_body_push_links_the_push_and_its_commits():
+    """The trigger links the whole pushed range, not the last commit, which is
+    often a `git pull` merge whose GitHub page shows changes already on
+    master. The commits that changed the file are listed by name."""
+    manifest = {"entries": [{
+        "python_file": "datasources/a/search_a.py", "js_file": "modules/a.js", "status": "ok",
+    }]}
+    before, after, fix = "1" * 40, "2" * 40, "3" * 40
+
+    _, body = ci.build_pr_body(
+        manifest, module="a", is_bootstrap=False, before=before, after=after,
+        run_id="1", event_name="push", repo="org/4cat",
+        python_diff=lambda b, a, p: "",
+        python_commits=lambda b, a, p: [(fix, "Fix the timestamp")],
+    )
+    assert "https://github.com/org/4cat/compare/{}...{}".format(before, after) in body
+    assert "/commit/{})".format(after) not in body
+    assert "- [`3333333`](https://github.com/org/4cat/commit/{}) Fix the timestamp".format(fix) in body
+
+
+def test_git_python_commits_leaves_out_the_pull_merge(tmp_path, monkeypatch):
+    """Both sides of a `git pull` changed the file, so plain `git log` would
+    list the merge too. Only the commit that the push brought in is wanted."""
+    path = "datasources/a/search_a.py"
+    (tmp_path / "datasources/a").mkdir(parents=True)
+    lines = ["line {}\n".format(i) for i in range(10)]
+    (tmp_path / path).write_text("".join(lines))
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-q", "-m", "base")
+
+    # already on GitHub: a change near the end of the file
+    _git(tmp_path, "checkout", "-q", "-b", "remote")
+    (tmp_path / path).write_text("".join(lines[:9] + ["remote\n"]))
+    _git(tmp_path, "commit", "-q", "-am", "remote change")
+
+    # local work, then `git pull`
+    _git(tmp_path, "checkout", "-q", "-b", "local", "HEAD~1")
+    (tmp_path / path).write_text("".join(["local\n"] + lines[1:]))
+    _git(tmp_path, "commit", "-q", "-am", "local change")
+    _git(tmp_path, "merge", "-q", "--no-edit", "-m", "Merge branch 'master'", "remote")
+
+    monkeypatch.chdir(tmp_path)
+    commits = ci._git_python_commits("remote", "HEAD", path)
+    assert [subject for _, subject in commits] == ["local change"]
 
 
 # --------------------------------------------------------------------------- #
@@ -440,6 +533,7 @@ def test_build_pr_body_diff_fence_survives_backticks():
     _, body = ci.build_pr_body(
         manifest, module="a", is_bootstrap=False, before="X", after="Y",
         run_id="1", event_name="push", repo="org/4cat", python_diff=fake_diff,
+        python_commits=lambda before, after, path: [],
     )
     # outer fence is longer than the inner ``` so the block isn't closed early
     assert "````diff" in body

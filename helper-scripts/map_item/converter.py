@@ -1234,7 +1234,8 @@ def main():
     fail_fast = not args.no_fail_fast
     print(
         f"Using model: {args.model} "
-        f"(output_mode: {args.output_mode}, "
+        f"(provider: {args.llm_provider} at {base_url}, "
+        f"output_mode: {args.output_mode}, "
         f"fail_fast: {fail_fast}, strict_lint: {args.strict_lint})"
     )
 
@@ -1288,6 +1289,7 @@ def main():
     manifest = {
         "model": args.model,
         "provider": args.llm_provider,
+        "base_url": base_url,
         "output_mode": args.output_mode,
         "fail_fast": fail_fast,
         "strict_lint": args.strict_lint,

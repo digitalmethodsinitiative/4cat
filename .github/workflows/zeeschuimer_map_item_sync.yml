@@ -24,7 +24,7 @@
 # Optional overrides — set in repo Settings -> Secrets and variables -> Actions to change
 # the provider used by automatic (push-triggered) runs without editing this file.
 # Resolution order for each setting (first non-empty wins):
-#   API key:         workflow_dispatch input  ->  LLM_PROVIDER_API_KEY secret  ->  DMI_OLLAMA_KEY secret
+#   API key:         LLM_PROVIDER_API_KEY secret  ->  DMI_OLLAMA_KEY secret
 #   provider/url/model/output_mode:  workflow_dispatch input  ->  repo variable  ->  hardcoded default below
 #
 #   LLM_PROVIDER_API_KEY  (secret)   - generic key for the active provider; swap when switching providers
@@ -60,10 +60,6 @@ on:
         default: ''
       llm_base_url:
         description: 'LLM provider base URL. Leave blank to use LLM_BASE_URL variable or default (https://ollama.digitalmethods.net).'
-        type: string
-        default: ''
-      llm_api_key:
-        description: 'LLM API key. Leave blank to use LLM_PROVIDER_API_KEY secret or DMI_OLLAMA_KEY secret.'
         type: string
         default: ''
       model:
@@ -180,7 +176,7 @@ jobs:
 
       - name: Run translation
         env:
-          PROVIDER_API_KEY: ${{ inputs.llm_api_key || secrets.LLM_PROVIDER_API_KEY || secrets.DMI_OLLAMA_KEY }}
+          PROVIDER_API_KEY: ${{ secrets.LLM_PROVIDER_API_KEY || secrets.DMI_OLLAMA_KEY }}
           LLM_PROVIDER: ${{ inputs.llm_provider || vars.LLM_PROVIDER || 'ollama' }}
           LLM_BASE_URL: ${{ inputs.llm_base_url || vars.LLM_BASE_URL || 'https://ollama.digitalmethods.net' }}
           LLM_MODEL: ${{ inputs.model || vars.LLM_MODEL || 'qwen2.5-coder:14b' }}
