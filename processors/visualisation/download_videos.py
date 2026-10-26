@@ -155,7 +155,9 @@ class VideoDownloaderPlus(BasicProcessor):
             "options": {"none": "No indirect links", "yt_only": "YouTube only", "all": "All links"},
             "help": "Allow indirect downloads",
             "tooltip": "Allow users to choose to download videos linked indirectly (e.g. embedded in a linked tweet, link to a YouTube video). "
-                       "Enabling all can be confusing for users and download more than intended."
+                       "Enabling all can be confusing for users and download more than intended. Video downloaders for "
+                       "specific data sources (e.g. TikTok) may still use yt-dlp on that platform's post pages, to replace "
+                       "video links that no longer work."
         },
         "video-downloader.allow-multiple": {
             "type": UserInput.OPTION_TOGGLE,
