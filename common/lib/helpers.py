@@ -224,7 +224,12 @@ def get_software_commit(worker=None):
             raise ValueError()
         repository = origin.stdout.decode("utf-8").strip()
         if repository.endswith(".git"):
+            # the actual git repository is here, but we usually want the web URL
             repository = repository[:-4]
+
+        if repository.endswith("/"):
+            # normalise trailing slashes; remove
+            repository = repository[:-1]
 
     except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
         return ("", "")
