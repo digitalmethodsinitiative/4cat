@@ -54,6 +54,7 @@ class DataSet(FourcatModule):
 
     _children = None
     available_processors = None
+    _available_processors_config = None # last known config for available_processors, so we can check if it needs to be refreshed
     _genealogy = None
     preset_parent = None
     parameters = None
@@ -121,7 +122,7 @@ class DataSet(FourcatModule):
         # Ensure mutable attributes are set in __init__ as they are unique to each DataSet
         self.data = {}
         self.parameters = {}
-        self.available_processors = {}
+        self.available_processors = None
         self._genealogy = None
         self.disposable_files = []
         self.modules = modules
@@ -2188,16 +2189,19 @@ class DataSet(FourcatModule):
         :param ConfigManager|None config:  Configuration reader to determine
         compatibility through. This may not be the same reader the dataset was
         instantiated with, e.g. when checking whether some other user should
-        be able to run processors on this dataset.
+        be able to run processors on this dataset. The result is saved and
+        reused for later calls with the same reader.
         :param bool exclude_hidden:  Exclude processors that should not be
         displayed in the UI? If `False`, all processors are returned.
 
         :return dict:  Available processors, `name => properties` mapping
         """
         # The cache always holds the full list, hidden processors included, so
-        # that every call can apply its own exclude_hidden to it
+        # that every call can apply its own exclude_hidden to it. It is None
+        # until the list has been worked out; an empty list is a valid result.
+        # Also cache the config used since the available processors may depend on it.
         # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-        if not self.available_processors:
+        if self.available_processors is None or config is not self._available_processors_config:
             processors = self.get_compatible_processors(config=config)
 
             for analysis in self.get_children(update=True):
@@ -2209,6 +2213,7 @@ class DataSet(FourcatModule):
                     del processors[analysis.type]
 
             self.available_processors = processors
+            self._available_processors_config = config
 
         return {
             processor_type: processor
