@@ -278,6 +278,14 @@ config_definition = {
     },
     # proxy stuff; one request queue is shared by the whole backend, so these
     # cannot differ per user tag
+    "proxies.intro": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Some 4CAT processors fetch many files or pages from sites (e.g. 'Download images' and 'Download videos'). "
+                    "These requests wait in a queue that follows the rules below. By default, requests are made directly from this "
+                    "server, but you can also configure a list of proxy servers to use as well or instead of `__localhost__`. The "
+                    "limits below apply to each proxy (including localhost/this server). **Note:** some changes only take effect "
+                    "after restarting 4CAT."
+        },
     "proxies.urls": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": ["__localhost__"],
@@ -299,7 +307,7 @@ config_definition = {
     "proxies.concurrent-overall": {
         "type": UserInput.OPTION_TEXT,
         "coerce_type": int,
-        "default": 1,
+        "default": 4,
         "min": 1,
         "help": "Max concurrent requests (overall)",
         "tooltip": "Per proxy, this many requests can run concurrently overall.",
