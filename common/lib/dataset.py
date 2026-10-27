@@ -2120,6 +2120,20 @@ class DataSet(FourcatModule):
 
         return self.modules.processors.get(processor_type)
 
+    def get_media_request_headers(self):
+        """
+        Get extra headers to send when downloading images or videos linked in
+        this dataset
+
+        These come from the data source the data was collected with, which is
+        found via the top dataset, since this dataset may itself be made from
+        that data (e.g. by a processor).
+
+        :return dict:  Headers; empty if the data source needs none
+        """
+        data_source = self.top_parent().get_own_processor()
+        return dict(getattr(data_source, "media_request_headers", {}))
+
     def get_producer_processor(self):
         """
         Get the processor class that actually produced this dataset.

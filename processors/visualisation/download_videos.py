@@ -643,7 +643,7 @@ class VideoDownloaderPlus(BasicProcessor):
             for _, response in self.iterate_proxied_requests(
                 request_urls,
                 preserve_order=True,
-                headers={"User-Agent": self.DIRECT_DOWNLOAD_UA},
+                headers={"User-Agent": self.DIRECT_DOWNLOAD_UA, **self.source_dataset.get_media_request_headers()},
                 stream=True,
                 timeout=20,
             ):

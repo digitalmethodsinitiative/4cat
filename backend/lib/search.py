@@ -42,6 +42,11 @@ class Search(BasicProcessor, ABC):
 	#: `posts_4chan`.
 	prefix = ""
 
+	#: Extra HTTP headers to send when downloading this platform's images and
+	#: videos, e.g. a Referer for platforms that refuse requests that seem to
+	#: come from another website
+	media_request_headers = {}
+
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'body', 'subject', 'timestamp']

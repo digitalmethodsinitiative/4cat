@@ -45,9 +45,28 @@ WEB_PAGE = FakeResponse(content_type="text/html")
 TIMEOUT = FailedProxiedRequest(requests.exceptions.Timeout("timed out"))
 
 
-def make_downloader(answers):
-    """A video downloader that gets the given answers, in order, for the links it requests"""
+class FakeSource:
+    """A dataset to download videos for, giving its mapped items"""
+    def __init__(self, items, media_request_headers=None):
+        self.items = items
+        self.num_rows = len(items)
+        self.media_request_headers = media_request_headers or {}
+
+    def iterate_items(self, processor=None, **kwargs):
+        yield from self.items
+
+    def get_media_request_headers(self):
+        return dict(self.media_request_headers)
+
+
+def make_downloader(answers, media_request_headers=None):
+    """
+    A video downloader that gets the given answers, in order, for the links it requests
+
+    What it asks for the links with is kept as `request_options`.
+    """
     downloader = VideoDownloaderPlus.__new__(VideoDownloaderPlus)
+    downloader.source_dataset = FakeSource([], media_request_headers)
     downloader.dataset = MagicMock()
     downloader.config = MagicMock()
     downloader.config.get.side_effect = lambda key, default=None, **kwargs: default
@@ -56,22 +75,29 @@ def make_downloader(answers):
     downloader.total_possible_videos = len(answers)
     downloader.warning_message = None
     downloader.flush_proxied_requests = MagicMock()
-    downloader.iterate_proxied_requests = lambda urls, **kwargs: zip(urls, answers)
+
+    def iterate_proxied_requests(urls, **kwargs):
+        downloader.request_options = kwargs
+        return zip(urls, answers)
+
+    downloader.iterate_proxied_requests = iterate_proxied_requests
     return downloader
 
 
-def download_directly(answers, tmp_path, domains=None, also_indirect="none", ignore_not_video=False):
+def download_directly(answers, tmp_path, domains=None, also_indirect="none", ignore_not_video=False,
+                      media_request_headers=None):
     """
     Run the direct download step
 
     :param list answers:  One website answer per link
     :param list domains:  Website of each link; all links are on the same website if not given
+    :param dict media_request_headers:  Extra headers the dataset's data source asks for
     :return tuple:  The downloader, the step's results, and what was noted per link
     """
     domains = domains or ["video.example.com"] * len(answers)
     urls = [f"https://{domain}/{number}.mp4" for number, domain in enumerate(domains)]
     urls_dict = {url: {"success": False, "retry": True} for url in urls}
-    downloader = make_downloader(answers)
+    downloader = make_downloader(answers, media_request_headers)
     results = downloader._process_direct_downloads(
         urls, urls_dict, tmp_path, max_video_size=100, also_indirect=also_indirect, amount=0,
         last_domains=[], ignore_not_video=ignore_not_video
@@ -145,6 +171,22 @@ def test_web_pages_from_different_websites_do_not_stop(tmp_path):
 
     assert not results["stop_processing"]
     assert results["processed"] == 15
+
+
+def test_direct_downloads_send_the_data_sources_headers(tmp_path):
+    # Weibo's video servers refuse a browser that does not say it came from Weibo
+    downloader, _, _ = download_directly([VIDEO], tmp_path, media_request_headers={"Referer": "https://weibo.com/"})
+
+    assert downloader.request_options["headers"] == {
+        "User-Agent": VideoDownloaderPlus.DIRECT_DOWNLOAD_UA,
+        "Referer": "https://weibo.com/",
+    }
+
+
+def test_direct_downloads_send_only_a_user_agent_by_default(tmp_path):
+    downloader, _, _ = download_directly([VIDEO], tmp_path)
+
+    assert downloader.request_options["headers"] == {"User-Agent": VideoDownloaderPlus.DIRECT_DOWNLOAD_UA}
 
 
 def test_ignoring_non_videos_does_not_stop(tmp_path):
@@ -240,16 +282,6 @@ def test_which_yt_dlp_errors_count(error, is_site_error, monkeypatch):
 
 
 # --- which links are collected -----------------------------------------------------
-
-class FakeSource:
-    """A dataset to download videos for, giving its mapped items"""
-    def __init__(self, items):
-        self.items = items
-        self.num_rows = len(items)
-
-    def iterate_items(self, processor=None, **kwargs):
-        yield from self.items
-
 
 VIDEO_POST = {
     "id": "1",

@@ -253,7 +253,7 @@ class ImageDownloader(BasicProcessor):
         for url, response in self.iterate_proxied_requests(
                 urls,
                 preserve_order=False,
-                headers={"User-Agent": ua},
+                headers={"User-Agent": ua, **self.source_dataset.get_media_request_headers()},
                 hooks={
                     # use hooks to download the content (stream=True) in parallel
                     "response": self.stream_url
