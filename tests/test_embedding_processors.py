@@ -71,7 +71,9 @@ def test_wording_follows_the_media_label(processor):
     options = processor.get_options(config=None)
     label, plural = processor.media_label, processor.media_label_plural
 
-    assert options["instruction"]["default"] == f"Represent the {label}."
+    # empty by default, so an instruction-aware model applies its own
+    assert options["instruction"]["default"] == ""
+    assert f"each {label}" in options["instruction"]["tooltip"]
     assert options["amount"]["help"] == f"No. of {plural}"
     assert f"**{label}**" in options["model_info"]["help"]
 
@@ -508,11 +510,11 @@ def test_read_sprite_rejects_anything_that_is_not_one(tmp_path):
 # the map finds sprite sheets made from the same media, and offers them
 
 def test_reducer_accepts_every_embedding_type():
-    """Image embeddings were missing, which is where thumbnails matter most."""
+    """Image and audio embeddings were missing, and both end up on the map."""
     from processors.machine_learning.reduce_embeddings import ReduceEmbeddings
 
     assert ReduceEmbeddings.compatibility.types == {"text-embeddings", "video-embeddings", "image-embeddings",
-                                                    "cluster-embeddings"}
+                                                    "audio-embeddings", "cluster-embeddings"}
 
 
 def test_map_only_runs_on_two_dimensional_reductions(monkeypatch):
@@ -1763,8 +1765,95 @@ def test_frame_options_are_offered_only_for_ollama():
     for key in ("max_duration", "fps", "crf"):
         assert options[key]["requires"] == "model!^=ollama", key
 
-    # and the audio length only matters when audio is included at all
-    assert options["audio_seconds"]["requires"] == "include_audio==true"
+    # the container path has its own soundtrack toggle, so each one can carry
+    # the default that suits its server
+    assert options["container_audio"]["requires"] == "model!^=ollama"
+
+    # and the audio length matters whenever either toggle is on
+    assert options["audio_seconds"]["requires"] == "include_audio==true || container_audio==true"
+
+
+@pytest.mark.parametrize("parameters,wanted", [
+    # on Ollama a single frame is little to go on, so audio is on by default
+    ({"model": "ollama://h/embeddinggemma-2"}, True),
+    ({"model": "ollama://h/embeddinggemma-2", "include_audio": False}, False),
+    # a server taking the whole clip often runs a video-only model, so opt-in
+    ({"model": "openai-like://h/Qwen3-VL-Embedding"}, False),
+    ({"model": "openai-like://h/Qwen3-VL-Embedding", "container_audio": True}, True),
+    # the toggles are per path and must not leak into each other
+    ({"model": "openai-like://h/m", "include_audio": True}, False),
+    ({"model": "ollama://h/m", "include_audio": False, "container_audio": True}, False),
+])
+def test_wants_audio_defaults_differ_per_server(parameters, wanted):
+    assert video_processor(**parameters).wants_audio() is wanted
+
+
+def container_processor(tmp_path, **parameters):
+    """A video processor wired up to a fake ffmpeg that writes a stub file."""
+    from types import SimpleNamespace
+
+    processor = video_processor(model="openai-like://gpu:8000/google/embeddinggemma-2", **parameters)
+    processor.ffmpeg = "ffmpeg"
+    processor.commands = []
+    processor.dataset = SimpleNamespace(log=lambda message: None)
+
+    def fake_run(command, cleanup_paths=()):
+        processor.commands.append(command)
+        Path(command[-1]).write_bytes(b"stub")
+        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+    processor.run_interruptable_process = fake_run
+    processor.encode = lambda path: "ENCODED"
+    return processor
+
+
+def test_container_path_sends_the_clip_alone_by_default(tmp_path):
+    source = tmp_path / "clip.mp4"
+    source.write_bytes(b"source video")
+
+    processor = container_processor(tmp_path)
+    payload, _, _ = processor.prepare_container(source, tmp_path / "compressed.mp4")
+
+    # a list of one, not a bare dict: the shape stays the same either way
+    assert [part["type"] for part in payload] == ["video"]
+    assert len(processor.commands) == 1
+
+
+def test_container_path_sends_the_soundtrack_as_its_own_part(tmp_path):
+    """
+    Audio muxed into the mp4 is discarded by a server that reads the visual
+    track only, so it has to travel as a second descriptor to be embedded.
+    """
+    source = tmp_path / "clip.mp4"
+    source.write_bytes(b"source video")
+
+    processor = container_processor(tmp_path, container_audio=True, audio_seconds=12)
+    payload, original_size, sent_size = processor.prepare_container(source, tmp_path / "compressed.mp4")
+
+    assert [part["type"] for part in payload] == ["video", "audio"]
+    assert payload[1]["mime"] == "audio/wav"
+    assert original_size == len(b"source video")
+    assert sent_size == 2 * len(b"stub")  # the clip and the audio both counted
+
+    # the video itself is still muxed silent, and the audio is a second pass
+    video_command, audio_command = processor.commands
+    assert "-an" in video_command
+    assert audio_command[audio_command.index("-t") + 1] == "12"
+    assert "16000" in audio_command
+
+
+def test_container_path_passes_paths_to_ffmpeg_unquoted(tmp_path):
+    """
+    `run_interruptable_process` calls Popen without a shell, so a shell-quoted
+    path would reach ffmpeg with its quotes intact and fail to open.
+    """
+    source = tmp_path / "a clip with spaces.mp4"
+    source.write_bytes(b"source video")
+
+    processor = container_processor(tmp_path)
+    processor.prepare_container(source, tmp_path / "compressed.mp4")
+
+    assert str(source) in processor.commands[0]
 
 
 def test_the_single_frame_limitation_is_stated_plainly():

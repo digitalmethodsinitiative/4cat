@@ -156,8 +156,9 @@ class OpenAICompatibleClient(LLMServerClient):
         """
         Build one OpenAI-style content part for a media descriptor.
 
-        vLLM keys the part by modality - `video_url` for video, `image_url` for
-        images - and accepts a `data:` URI in place of an http URL.
+        vLLM keys the part by modality - `video_url` for video, `audio_url` for
+        audio, `image_url` for images - and accepts a `data:` URI in place of an
+        http URL.
 
         :param dict item_media:  Media descriptor (`type`, `mime`, `data`).
         :return dict:  Content part for the `messages` payload.
@@ -166,7 +167,7 @@ class OpenAICompatibleClient(LLMServerClient):
         mime = item_media.get("mime") or f"{media_type}/*"
         url = item_media.get("url") or f"data:{mime};base64,{item_media.get('data', '')}"
 
-        key = "video_url" if media_type == "video" else "image_url"
+        key = {"video": "video_url", "audio": "audio_url"}.get(media_type, "image_url")
         return {"type": key, key: {"url": url}}
 
     def _post_embeddings(self, payload: dict, timeout: int, expected: int) -> list[list[float]]:

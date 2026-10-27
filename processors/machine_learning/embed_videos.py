@@ -3,8 +3,6 @@ Generate an embedding per video via a multimodal embedding model.
 """
 import shutil
 
-import oslex
-
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.user_input import UserInput
 from processors.machine_learning.embed_media import EmbedMedia
@@ -78,11 +76,19 @@ class EmbedVideos(EmbedMedia):
             },
             "include_audio": {
                 "type": UserInput.OPTION_TOGGLE,
-                "help": "Include the soundtrack",
+                "help": "Include audio",
                 "default": True,
-                "tooltip": "Embed the audio along with the frame, as one vector. Videos with no audio track are "
+                "tooltip": "Embed the audio along with the frame. Videos with no audio track are "
                            "embedded from the frame alone.",
                 "requires": "model^=ollama",
+            },
+            "container_audio": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Include ",
+                "default": False,
+                "tooltip": "Send the audio as a second part of the same request, which the model fuses into one "
+                           "vector together with the clip. Only enable this for a model that accepts audio.",
+                "requires": "model!^=ollama",
             },
             "audio_seconds": {
                 "type": UserInput.OPTION_TEXT,
@@ -91,9 +97,9 @@ class EmbedVideos(EmbedMedia):
                 "min": 5,
                 "max": 80,
                 "coerce_type": int,
-                "tooltip": "Taken from the same point in the video as the frame. The model refuses more than about "
-                           "80 seconds of audio in one request, whatever the context setting.",
-                "requires": "include_audio==true",
+                "tooltip": "Taken from the start of the clip, or from the frame position on Ollama. Models refuse "
+                           "more than about 80 seconds of audio in one request, whatever the context setting.",
+                "requires": "include_audio==true || container_audio==true",
             },
             "compression_info": {
                 "type": UserInput.OPTION_INFO,
@@ -165,6 +171,17 @@ class EmbedVideos(EmbedMedia):
         """
         return str(self.parameters.get("model", "")).startswith("ollama")
 
+    def accepts_audio(self) -> bool:
+        """
+        Whether this run should send the audio along with frame image/video.
+
+        :return bool:  True when the audio track should be embedded too
+        """
+        if self.single_frame_mode():
+            return bool(self.parameters.get("include_audio", True))
+
+        return bool(self.parameters.get("container_audio", False))
+
     def prepare_media(self, media_path, output_path) -> tuple:
         """
         Turn a video into something the chosen server can embed.
@@ -182,10 +199,7 @@ class EmbedVideos(EmbedMedia):
         """
         Reduce a video to one frame and, optionally, its soundtrack.
 
-        Ollama takes at most one image and one audio clip per item, and no video
-        container at all, so this is as much of a video as a single vector can
-        represent there. Both are taken from the same point in the clip, so the
-        two halves describe the same moment.
+        Ollama at the moment takes at most one image and one audio clip per item, no video.
 
         :param Path media_path:  Video to prepare
         :param Path output_path:  Working path, whose stem is reused
@@ -210,32 +224,48 @@ class EmbedVideos(EmbedMedia):
         sent_size = frame_path.stat().st_size
         frame_path.unlink(missing_ok=True)
 
-        if self.parameters.get("include_audio", True):
-            audio_path = output_path.with_suffix(".audio.wav")
-            audio_path.unlink(missing_ok=True)
-            # 16 kHz mono is what these models are trained on, and a shorter
-            # clip than the model's ceiling keeps a long video from failing
-            # outright
-            audio_result = self.run_interruptable_process([
-                self.ffmpeg, "-y", "-ss", f"{offset:.3f}", "-i", str(media_path),
-                "-t", str(self.parameters.get("audio_seconds", 75)),
-                "-vn", "-ac", "1", "-ar", "16000", str(audio_path),
-            ], cleanup_paths=(audio_path,))
-
-            if audio_result.returncode == 0 and audio_path.exists() and audio_path.stat().st_size:
-                payload.append({"type": "audio", "mime": "audio/wav", "data": self.encode(audio_path)})
-                sent_size += audio_path.stat().st_size
-            else:
-                # a silent clip, or one with no audio stream at all, is normal
-                self.dataset.log(f"{media_path.name}: no audio track, embedding the frame alone")
-
-            audio_path.unlink(missing_ok=True)
+        if self.accepts_audio():
+            audio, audio_size = self.extract_audio(media_path, output_path.with_suffix(".audio.wav"), offset)
+            if audio:
+                payload.append(audio)
+                sent_size += audio_size
 
         original_size = media_path.stat().st_size
         self.dataset.log(f"{media_path.name}: frame at {offset:.1f}s"
                          f"{' + audio' if len(payload) > 1 else ''}, {sent_size / 1024:.0f} KB")
 
         return payload, original_size, sent_size
+
+    def extract_audio(self, media_path, audio_path, offset: float = 0.0) -> tuple:
+        """
+        Take a clip out of a video's soundtrack, as its own media descriptor.
+
+        16 kHz mono is what these models are trained on, and a clip shorter than
+        the model's ceiling keeps a long video from failing outright.
+
+        :param Path media_path:  Video to take the audio from
+        :param Path audio_path:  Working path to write the clip to
+        :param float offset:  Seconds into the video to start at
+        :return tuple:  `(audio descriptor, size in bytes)`, or `(None, 0)` when
+          the video has no usable soundtrack
+        """
+        audio_path.unlink(missing_ok=True)
+        result = self.run_interruptable_process([
+            self.ffmpeg, "-y", "-ss", f"{offset:.3f}", "-i", str(media_path),
+            "-t", str(self.parameters.get("audio_seconds", 75)),
+            "-vn", "-ac", "1", "-ar", "16000", str(audio_path),
+        ], cleanup_paths=(audio_path,))
+
+        descriptor, size = None, 0
+        if result.returncode == 0 and audio_path.exists() and audio_path.stat().st_size:
+            descriptor = {"type": "audio", "mime": "audio/wav", "data": self.encode(audio_path)}
+            size = audio_path.stat().st_size
+        else:
+            # a silent clip, or one with no audio stream at all, is normal
+            self.dataset.log(f"{media_path.name}: no audio track, embedding the visuals alone")
+
+        audio_path.unlink(missing_ok=True)
+        return descriptor, size
 
     def probe_duration(self, media_path) -> float:
         """
@@ -256,24 +286,20 @@ class EmbedVideos(EmbedMedia):
         try:
             return float(probe.stdout.decode("utf-8", errors="replace").strip())
         except (ValueError, AttributeError):
-            # an unreadable duration is not worth failing over; start at 0
             return 0.0
 
     def prepare_container(self, media_path, output_path) -> tuple:
         """
-        Re-encode the whole video smaller and return it as one descriptor.
-
-        Audio is dropped here: a server that takes a video container reads the
-        visual track only, and the soundtrack would just be bytes it discards.
+        Re-encode the whole video smaller, optionally with its audio.
 
         :param Path media_path:  Video to prepare
         :param Path output_path:  Where to write the re-encoded video
-        :return tuple:  `(media descriptor, original size, sent size)`
+        :return tuple:  `(list of descriptors, original size, sent size)`
         """
         output_path.unlink(missing_ok=True)
 
         command = [
-            self.ffmpeg, "-y", "-i", oslex.quote(str(media_path)),
+            self.ffmpeg, "-y", "-i", str(media_path),
             "-t", str(self.parameters.get("max_duration", 30)),
             # scale down only if the video is larger; -2 keeps the other side
             # even, which H.264 requires. tpad repeats the last frame once: a
@@ -285,7 +311,7 @@ class EmbedVideos(EmbedMedia):
             "-preset", "veryfast",
             "-an",
             "-movflags", "+faststart",
-            oslex.quote(str(output_path)),
+            str(output_path),
         ]
 
         result = self.run_interruptable_process(command, cleanup_paths=(output_path,))
@@ -295,9 +321,16 @@ class EmbedVideos(EmbedMedia):
 
         original_size = media_path.stat().st_size
         sent_size = output_path.stat().st_size
-        self.dataset.log(f"{media_path.name}: {original_size / 1024:.0f} KB -> {sent_size / 1024:.0f} KB")
-
-        payload = {"type": "video", "mime": "video/mp4", "data": self.encode(output_path)}
+        payload = [{"type": "video", "mime": "video/mp4", "data": self.encode(output_path)}]
         output_path.unlink(missing_ok=True)
+
+        if self.accepts_audio():
+            audio, audio_size = self.extract_audio(media_path, output_path.with_suffix(".audio.wav"))
+            if audio:
+                payload.append(audio)
+                sent_size += audio_size
+
+        self.dataset.log(f"{media_path.name}: {original_size / 1024:.0f} KB -> {sent_size / 1024:.0f} KB"
+                         f"{' (with audio)' if len(payload) > 1 else ''}")
 
         return payload, original_size, sent_size

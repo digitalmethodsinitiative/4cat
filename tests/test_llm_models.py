@@ -300,6 +300,33 @@ def test_media_embed_uses_messages_with_a_video_part(openai_client, monkeypatch)
     assert {"type": "text", "text": "describe"} in content
 
 
+def test_media_embed_keys_each_modality_separately(openai_client, monkeypatch):
+    """
+    vLLM keys a content part by modality. Sending audio as `image_url` - which
+    is what every non-video descriptor used to become - makes a model that
+    reads audio reject the request, or worse, read the bytes as an image.
+    """
+    sent = {}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        sent["body"] = json
+        return FakeResponse(payload={"data": [{"index": 0, "embedding": [1.0]}]})
+
+    monkeypatch.setattr(openai_client._session, "post", fake_post)
+    media = [[
+        {"type": "video", "mime": "video/mp4", "data": "QUJD"},
+        {"type": "audio", "mime": "audio/wav", "data": "WFla"},
+        {"type": "image", "mime": "image/jpeg", "data": "SUlJ"},
+    ]]
+    openai_client.embed("m", [""], media=media)
+
+    # one request, one vector: the parts are fused, not embedded separately
+    assert [part["type"] for part in sent["body"]["messages"][0]["content"]] == [
+        "video_url", "audio_url", "image_url"]
+    assert sent["body"]["messages"][0]["content"][1] == {
+        "type": "audio_url", "audio_url": {"url": "data:audio/wav;base64,WFla"}}
+
+
 def test_media_embed_can_send_the_text_as_an_instruction(openai_client, monkeypatch):
     """
     An instruction steers the embedding from the system turn; left in the user
