@@ -23,9 +23,7 @@ class EmbedVideos(EmbedMedia):
     title = "Generate video embeddings"  # title displayed in UI
     description = ("Generate a numerical representation (an 'embedding') of each video using a multimodal embedding "
                    "model. This allows videos to be compared and clustered. Videos are compressed before sending. "
-                   "Requires an embedding model that accepts video, such as Qwen3-VL-Embedding. Ollama cannot take "
-                   "video yet (as of Nov. 2026), so models served there embed a **single frame** plus the "
-                   "audio.")
+                   "Requires an embedding model that accepts video. Otherwise, a single frame is used.")
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     media_label = "video"
@@ -58,10 +56,7 @@ class EmbedVideos(EmbedMedia):
             "ollama_info": {
                 "type": UserInput.OPTION_INFO,
                 "help": "Ollama's embedding endpoint does not accept video, and takes at most one image per item. "
-                        "**Only one frame of each video is embedded**, together with the soundtrack if you include "
-                        "it below. The visual side of the embedding therefore says nothing about how the video "
-                        "changes over time. For that, use a model on an OpenAI-compatible server, which takes the "
-                        "whole clip.",
+                        "Only one frame of each video is embedded, optionally with audio.",
                 "requires": "model^=ollama",
             },
             "frame_position": {
