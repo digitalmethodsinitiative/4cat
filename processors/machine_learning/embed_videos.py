@@ -23,7 +23,7 @@ class EmbedVideos(EmbedMedia):
     title = "Generate video embeddings"  # title displayed in UI
     description = ("Generate a numerical representation (an 'embedding') of each video using a multimodal embedding "
                    "model. This allows videos to be compared and clustered. Videos are compressed before sending. "
-                   "Requires an embedding model that accepts video. Otherwise, a single frame is used.")
+                   "Requires an embedding model that accepts video. Otherwise, a single frame with audio can be used.")
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     media_label = "video"
