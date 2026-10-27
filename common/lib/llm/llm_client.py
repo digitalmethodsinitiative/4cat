@@ -94,7 +94,6 @@ class LLMServerClient:
         :return:  `False` if the server is not responding, or an HTTP status code.
         """
         try:
-            print(f"{self.base_url}{self._models_info_path}")
             r = self._session.get(
                 f"{self.base_url}{self._models_info_path}",
                 headers=self._headers,
