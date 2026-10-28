@@ -597,3 +597,94 @@ def test_v1_read_normalizes_integer_post_ids():
 	m._populate_from_raw(raw)
 	assert m.get_entry("a.jpg")["post_ids"] == ["1", "2"]
 	assert m.failures[0]["post_ids"] == ["3"]
+
+
+def read_legacy(raw):
+	"""Read an old-format metadata file from a dict."""
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(raw)
+	return m
+
+
+def test_legacy_screenshot_ids_are_post_ids():
+	"""Screenshot processors stored the item IDs as `ids`."""
+	m = read_legacy({
+		"https://example.com/": {"filename": "example.png", "ids": [0, 1], "error": ""},
+	})
+	item = m.get_entry("example.png")
+	assert item["post_ids"] == ["0", "1"]
+	assert "ids" not in item.get("extra", {})
+
+
+def test_legacy_post_ids_as_text_are_split():
+	"""Some processors stored the post IDs as one text, separated by commas."""
+	m = read_legacy({
+		"https://example.com/": {"filename": "example.png", "post_ids": "12, 15", "error": ""},
+	})
+	assert m.get_entry("example.png")["post_ids"] == ["12", "15"]
+
+
+def test_legacy_entry_without_flag_or_file_is_a_failure():
+	"""A failed screenshot named no file and had no `success` flag."""
+	m = read_legacy({
+		"https://example.com@20250814012946": {
+			"url": "https://example.com", "fail_url": "https://web.archive.org/web/2025/https://example.com",
+			"error": "Archive page not properly loaded",
+		},
+		"https://example.com@20250821112625": {
+			"url": "https://example.com", "filename": "shot.png", "error": "",
+		},
+	})
+	assert list(m.items) == ["shot.png"]
+	assert len(m.failures) == 1
+	failure = m.failures[0]
+	assert failure["url"] == "https://example.com"
+	assert failure["reason"] == "error"
+	assert failure["reason_description"] == "Archive page not properly loaded"
+	assert failure["extra"]["fail_url"] == "https://web.archive.org/web/2025/https://example.com"
+
+
+def test_legacy_entry_marked_successful_without_file_is_still_dropped():
+	m = read_legacy({"https://example.com/a.jpg": {"success": True, "post_ids": ["1"]}})
+	assert not m.items
+	assert not m.failures
+
+
+def test_legacy_original_key_is_kept_when_not_url_or_filename():
+	m = read_legacy({
+		# a local path as key: kept
+		"/mnt/images/abc.jpg": {"filename": None, "success": False, "post_ids": ["1"]},
+		# a URL and date as key: kept
+		"https://example.com@20250814012946": {"url": "https://example.com", "filename": "shot.png", "error": ""},
+		# the URL as key: nothing to keep
+		"https://example.com/b.jpg": {"filename": "b.jpg", "success": True, "post_ids": ["2"]},
+		# the file name as key: nothing to keep
+		"c.jpg": {"filename": "c.jpg", "success": True, "post_ids": ["3"]},
+	})
+	assert m.failures[0]["extra"]["original_key"] == "/mnt/images/abc.jpg"
+	assert m.get_entry("shot.png")["extra"]["original_key"] == "https://example.com@20250814012946"
+	assert "original_key" not in m.get_entry("b.jpg").get("extra", {})
+	assert "original_key" not in m.get_entry("c.jpg").get("extra", {})
+
+
+def test_legacy_copied_entries_do_not_decide_source_dataset():
+	"""The old video downloader copied entries with the source of an earlier archive."""
+	m = read_legacy({
+		"https://example.com/1": {"from_dataset": "this_source", "post_ids": ["1"], "success": True,
+								  "files": [{"filename": "1.mp4", "success": True}]},
+		"https://example.com/2": {"from_dataset": "earlier_source", "file_dataset_key": "earlier_archive",
+								  "post_ids": ["2"], "success": True,
+								  "files": [{"filename": "2.mp4", "success": True}]},
+	})
+	assert m.from_dataset == "this_source"
+	# the copy itself stays visible
+	assert m.get_entry("2.mp4")["extra"]["file_dataset_key"] == "earlier_archive"
+
+
+def test_legacy_only_copied_entries_still_give_a_source_dataset():
+	m = read_legacy({
+		"https://example.com/2": {"from_dataset": "earlier_source", "file_dataset_key": "earlier_archive",
+								  "post_ids": ["2"], "success": True,
+								  "files": [{"filename": "2.mp4", "success": True}]},
+	})
+	assert m.from_dataset == "earlier_source"

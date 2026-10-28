@@ -316,22 +316,37 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		Translate pre-v1 metadata to v1.
 
 		Old format is a flat dict keyed by URL (image/video) or filename
-		(Telegram). Each entry has a `success` flag; failed entries become
-		`failures[]`, successful entries become `items[filename]`. The video
+		(Telegram), or by something else (e.g. a local file path, or a URL and
+		a date for web archive screenshots). Each entry has a `success` flag;
+		failed entries become `failures[]`, successful entries become
+		`items[filename]`. Screenshot processors wrote no `success` flag; an
+		entry of theirs that names no file is a failure too. The video
 		downloader's nested `files[]` list explodes to one item per file, and
 		a file listed under several URLs gets the post IDs of all of them.
 		All producer-specific data is carried across into `extra` (items) or
 		the failure dict (failures) so the migration loses nothing — see
 		`_legacy_extra`.
 		"""
+		# the source dataset named by entries that the old video downloader
+		# copied from an earlier archive; only used if no other entry names one
+		copied_source = None
+
 		for outer_key, entry in raw.items():
 			if not isinstance(entry, dict):
 				# malformed; should not exist
 				continue
 
+			# post IDs were stored as a list, as a single `post_id`, as `ids`
+			# (screenshot processors), or as one text with commas
 			post_ids = entry.get("post_ids")
 			if post_ids is None and "post_id" in entry:
 				post_ids = [entry["post_id"]]
+			if post_ids is None and "ids" in entry:
+				post_ids = entry["ids"]
+				# now a first-class field, so not kept in `extra` as well
+				entry = {key: value for key, value in entry.items() if key != "ids"}
+			if isinstance(post_ids, str) and "," in post_ids:
+				post_ids = post_ids.split(",")
 			post_ids = self._normalize_post_ids(post_ids)
 
 			url = entry.get("url")
@@ -340,10 +355,22 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					outer_key.startswith("http://") or outer_key.startswith("https://")):
 				url = outer_key
 
+			# keep the entry's key if it is not its URL, file name or post ID,
+			# e.g. a local file path, so it is still known what was downloaded
+			files = entry.get("files")
+			known_values = {url, entry.get("filename"), *post_ids}
+			if isinstance(files, list):
+				known_values |= {file.get("filename") for file in files if isinstance(file, dict)}
+			original_key = {"original_key": outer_key} if outer_key not in known_values else {}
+
 			# existing `from_dataset` is correct if exists; video downloads
 			# from early 2023 called it `source_dataset`
 			recorded_source = entry.get("from_dataset") or entry.get("source_dataset")
-			if recorded_source:
+			if recorded_source and entry.get("file_dataset_key"):
+				# copied from an earlier archive by the old video downloader,
+				# with that archive's source dataset, which can be another one
+				copied_source = copied_source or recorded_source
+			elif recorded_source:
 				self.from_dataset = recorded_source
 
 			success = entry.get("success", True)
@@ -354,7 +381,6 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			# downloaded for an earlier URL, or stopped part-way through a
 			# playlist. Those files are in the archive, so each one is recorded;
 			# the URL itself only counts as a failure if it has no file at all.
-			files = entry.get("files")
 			if isinstance(files, list) and files:
 				files_recorded = False
 				for file in files:
@@ -368,7 +394,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 							post_ids, url,
 							file.get("reason"),
 							file.get("reason_description") or file.get("error"),
-							entry, file,
+							entry, file, original_key,
 						))
 						files_recorded = True
 						continue
@@ -377,12 +403,18 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					# the same file can be listed under more than one URL;
 					# merge so the posts of every URL stay connected to it
 					self.add_item(file_filename, post_ids=post_ids, url=url,
-								  extra=self._legacy_extra(entry, file), merge=True)
+								  extra=self._legacy_extra(entry, file, original_key), merge=True)
 					files_recorded = True
 				if files_recorded or success:
 					continue
 
-			if not success:
+			has_filename = entry.get("filename") and isinstance(entry["filename"], str)
+			if success and has_filename:
+				self.add_item(entry["filename"], post_ids=post_ids, url=url,
+							  extra=self._legacy_extra(entry, original_key), merge=True)
+			elif not success or "success" not in entry:
+				# without a `success` flag (screenshot processors), an entry
+				# that names no file can only be a failure
 				reason = entry.get("reason")
 				if reason is None and entry.get("retry") is False:
 					# the old video downloader marked URLs that turned out not
@@ -392,12 +424,12 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					post_ids, url,
 					reason,
 					entry.get("reason_description") or entry.get("error"),
-					entry,
+					entry, original_key,
 				))
-			elif entry.get("filename") and isinstance(entry["filename"], str):
-				self.add_item(entry["filename"], post_ids=post_ids, url=url,
-							  extra=self._legacy_extra(entry), merge=True)
-			# else: malformed-but-tolerated; drop
+			# else: marked successful but names no file; malformed, dropped
+
+		if self.from_dataset is None and copied_source:
+			self.from_dataset = copied_source
 
 	# Legacy entry keys promoted to first-class v1 fields, or pure structure;
 	# every other key is producer data and is preserved under `extra`.
