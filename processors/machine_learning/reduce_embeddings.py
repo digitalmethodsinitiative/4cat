@@ -43,12 +43,12 @@ class ReduceEmbeddings(BasicProcessor):
     )
 
     references = [
-        "[McInnes, Leland, John Healy, and James Melville. 2018. 'UMAP: Uniform Manifold Approximation and Projection "
-        "for Dimension Reduction.' arXiv:1802.03426.](https://arxiv.org/abs/1802.03426)",
+        "[Basic UMAP Parameters](https://umap-learn.readthedocs.io/en/latest/parameters.html)",
         "[Understanding UMAP](https://pair-code.github.io/understanding-umap/)",
         "[How to Use t-SNE Effectively](https://distill.pub/2016/misread-tsne/)",
+        "[McInnes, Leland, John Healy, and James Melville. 2018. 'UMAP: Uniform Manifold Approximation and Projection "
+        "for Dimension Reduction.' arXiv:1802.03426.](https://arxiv.org/abs/1802.03426)"
     ]
-
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
