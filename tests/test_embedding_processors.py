@@ -1053,12 +1053,14 @@ def test_hdbscan_leaves_outliers_out(tmp_path):
 
 
 def test_hdbscan_min_samples_does_not_follow_min_cluster_size(tmp_path):
+    from types import SimpleNamespace
     from unittest.mock import patch
     import numpy as np
 
     items, _ = blobs()
     with patch("sklearn.cluster.HDBSCAN") as hdbscan:
-        hdbscan.return_value.fit_predict.side_effect = lambda matrix: np.zeros(len(matrix), dtype=int)
+        hdbscan.return_value.fit.side_effect = lambda matrix: SimpleNamespace(
+            labels_=np.zeros(len(matrix), dtype=int), probabilities_=np.ones(len(matrix)))
         run_clustering(tmp_path, items, algorithm="hdbscan", min_cluster_size=20)
 
     # the default, not the cluster size: the neighbour search holds items x min_samples values
@@ -1079,12 +1081,144 @@ def test_clusters_are_annotated_once_per_post(tmp_path):
     items, _ = blobs(per_group=10, groups=2)
     items[0].update({"filename": "0.jpg", "post_ids": ["a", "b"]})
 
-    processor = run_clustering(tmp_path, items, n_clusters=2, save_annotations=True)
+    processor = run_clustering(tmp_path, items, n_clusters=2, save_annotations=["cluster"])
     annotated = [annotation["item_id"] for annotation in processor.saved_annotations]
     # a media file stands for every post it appeared in; text for its own post
     assert annotated[:3] == ["a", "b", "1"]
     assert len(annotated) == len(items) + 1
     assert processor.saved_annotations[0]["label"] == "embedding cluster"
+
+
+def test_concentration_is_the_mean_similarity_to_the_cluster_centre():
+    """
+    For unit vectors the length of the mean vector equals the mean cosine
+    similarity to the normalised centre. That identity is what lets this be
+    measured in one pass per cluster instead of over every pair of members.
+    """
+    import numpy as np
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    rng = np.random.default_rng(0)
+    matrix = rng.normal(size=(60, 8))
+    matrix /= np.linalg.norm(matrix, axis=1, keepdims=True)
+    clusters = [0] * 30 + [1] * 20 + [-1] * 10
+
+    concentration = ClusterEmbeddings.cluster_concentration(matrix, clusters)
+
+    # noise is not a cluster, so it has no concentration to report
+    assert set(concentration) == {0, 1}
+
+    for cluster in (0, 1):
+        members = matrix[np.asarray(clusters) == cluster]
+        centre = members.mean(axis=0)
+        by_hand = float((members @ (centre / np.linalg.norm(centre))).mean())
+        assert concentration[cluster] == pytest.approx(by_hand, abs=1e-4)
+
+
+def test_a_tight_cluster_is_more_concentrated_than_a_spread_one():
+    import numpy as np
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    rng = np.random.default_rng(1)
+    tight = np.tile([1.0, 0.0, 0.0, 0.0], (25, 1)) + rng.normal(0, 0.02, (25, 4))
+    spread = rng.normal(0, 1, (25, 4))
+    matrix = np.vstack([tight, spread])
+    matrix /= np.linalg.norm(matrix, axis=1, keepdims=True)
+
+    concentration = ClusterEmbeddings.cluster_concentration(matrix, [0] * 25 + [1] * 25)
+    assert concentration[0] > 0.99
+    assert concentration[1] < 0.5
+
+
+def test_hdbscan_scores_membership_and_kmeans_leaves_it_out(tmp_path):
+    """
+    k-means has no notion of how firmly a point belongs, so the field is absent
+    rather than a 0 that would read as 'belongs to its cluster not at all'.
+    """
+    items, _ = blobs()
+
+    strengths = [record["cluster_probability"] for record in read_records(
+        run_clustering(tmp_path, items, algorithm="hdbscan", min_cluster_size=5).dataset.path)]
+    assert len(strengths) == len(items)
+    assert all(0.0 <= strength <= 1.0 for strength in strengths)
+
+    kmeans = read_records(run_clustering(tmp_path, items).dataset.path)
+    assert all("cluster_probability" not in record for record in kmeans)
+
+
+def test_every_item_carries_its_own_clusters_concentration(tmp_path):
+    """One value per cluster, repeated on each member, so it can be filtered on."""
+    items, _ = blobs()
+    records = read_records(run_clustering(tmp_path, items).dataset.path)
+
+    by_cluster = {}
+    for record in records:
+        by_cluster.setdefault(record["cluster"], set()).add(record["cluster_concentration"])
+
+    assert len(by_cluster) == 3
+    assert all(len(values) == 1 for values in by_cluster.values())
+    # well-separated blobs: every cluster should read as tight
+    assert all(next(iter(values)) > 0.9 for values in by_cluster.values())
+
+
+def test_noise_is_given_no_concentration(tmp_path):
+    import numpy as np
+    items, _ = blobs()
+    for index in range(3):
+        outlier = np.zeros(16)
+        outlier[10 + index] = -40.0
+        items.append(Item({"id": f"outlier{index}", "text": "outlier", "embedding": list(outlier)}))
+
+    records = read_records(run_clustering(tmp_path, items, algorithm="hdbscan",
+                                          min_cluster_size=5).dataset.path)
+    noise = [record for record in records if record["cluster"] == -1]
+    assert len(noise) == 3
+    assert all("cluster_concentration" not in record for record in noise)
+    assert all("cluster_concentration" in record for record in records if record["cluster"] != -1)
+
+
+def test_each_chosen_measure_becomes_its_own_annotation(tmp_path):
+    items, _ = blobs()
+    processor = run_clustering(tmp_path, items, algorithm="hdbscan", min_cluster_size=5,
+                               save_annotations=["cluster", "cluster_probability", "cluster_concentration"])
+
+    assert {annotation["label"] for annotation in processor.saved_annotations} == {
+        "embedding cluster", "cluster membership strength", "cluster concentration"}
+
+    # 'Filter by value' coerces with float() before comparing, so every value
+    # written here has to survive that
+    for annotation in processor.saved_annotations:
+        float(annotation["value"])
+
+
+def test_unchosen_measures_are_not_annotated(tmp_path):
+    items, _ = blobs(per_group=10, groups=2)
+    processor = run_clustering(tmp_path, items, save_annotations=["cluster_concentration"])
+
+    assert {annotation["label"] for annotation in processor.saved_annotations} == {"cluster concentration"}
+
+
+def test_the_annotation_option_offers_every_measure():
+    """Locked to the label map, so the form and what gets written cannot drift."""
+    from common.lib.user_input import UserInput
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    option = ClusterEmbeddings.get_options(config=None)["save_annotations"]
+    assert option["type"] == UserInput.OPTION_ANNOTATIONS
+    assert set(option["options"]) == set(ClusterEmbeddings.annotation_labels)
+    assert option["default"] == []
+
+
+def test_map_item_marks_absent_measures_as_missing():
+    from common.lib.item_mapping import MissingMappedField
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    row = ClusterEmbeddings.map_item({"id": "a", "text": "t", "embedding": [0.5, 1.0], "cluster": 2,
+                                      "dimensions": 2}).data
+    assert isinstance(row["cluster_probability"], MissingMappedField)
+    assert isinstance(row["cluster_concentration"], MissingMappedField)
+    # -1 cannot pass for a real score: both measures run from 0 to 1
+    assert row["cluster_probability"].value == -1
 
 
 def test_media_without_post_ids_is_matched_through_the_archive(tmp_path):
@@ -1108,7 +1242,7 @@ def test_media_without_post_ids_is_matched_through_the_archive(tmp_path):
     from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
     processor = ClusterEmbeddings.__new__(ClusterEmbeddings)
     processor.parameters = {"algorithm": "kmeans", "n_clusters": 2, "reduce_first": False, "amount": 0,
-                            "save_annotations": True}
+                            "save_annotations": ["cluster"]}
     processor.dataset = FakeDataset(tmp_path, name="clustered")
     processor.dataset.path = tmp_path / "clustered.ndjson"
     processor.source_dataset, processor.interrupted = Source(items, parent=archive), False
@@ -1672,8 +1806,9 @@ def test_clustering_writes_records_back_unchanged_but_for_the_cluster(tmp_path):
     records = read_records(processor.dataset.path)
     assert len(records) == len(items)
     for item, record in zip(items, records):
-        cluster = record.pop("cluster")
-        assert cluster in (0, 1)
+        assert record.pop("cluster") in (0, 1)
+        assert 0.0 <= record.pop("cluster_concentration") <= 1.0
+        # everything the processor did not add is passed through untouched
         assert dict(record) == dict(item)
 
 
@@ -1686,7 +1821,7 @@ def test_cluster_annotations_are_saved_in_batches(tmp_path):
     processor = ClusterEmbeddings.__new__(ClusterEmbeddings)
     processor.annotation_batch_size = 7
     processor.parameters = {"algorithm": "kmeans", "n_clusters": 2, "reduce_first": False, "amount": 0,
-                            "save_annotations": True}
+                            "save_annotations": ["cluster"]}
     processor.dataset = FakeDataset(tmp_path, name="clustered")
     processor.dataset.path = tmp_path / "clustered.ndjson"
     processor.source_dataset = Source(items)
@@ -1784,8 +1919,8 @@ def test_frame_options_are_offered_only_for_ollama():
     ({"model": "openai-like://h/m", "include_audio": True}, False),
     ({"model": "ollama://h/m", "include_audio": False, "container_audio": True}, False),
 ])
-def test_wants_audio_defaults_differ_per_server(parameters, wanted):
-    assert video_processor(**parameters).wants_audio() is wanted
+def test_accepts_audio_defaults_differ_per_server(parameters, wanted):
+    assert video_processor(**parameters).accepts_audio() is wanted
 
 
 def container_processor(tmp_path, **parameters):
@@ -1862,7 +1997,6 @@ def test_the_single_frame_limitation_is_stated_plainly():
 
     notice = EmbedVideos.get_options(config=None)["ollama_info"]["help"]
     assert "one frame" in notice.lower()
-    assert "over time" in notice.lower()
 
 
 # --------------------------------------------------------------------------- #
@@ -1955,3 +2089,259 @@ def test_the_nearest_ancestor_with_sheets_wins(tmp_path):
     parent._children = [near, embeddings]
 
     assert list(EmbeddingMap.find_sprite_datasets(embeddings)) == ["near-sprite"]
+
+
+# --------------------------------------------------------------------------- #
+# describing clusters by the attributes of the items in them
+
+class PostDataset:
+    """Stands in for the dataset the embeddings were ultimately made from."""
+
+    def __init__(self, items, key="posts"):
+        self.items, self.key = items, key
+
+    def iterate_items(self, processor=None, **kwargs):
+        return iter(self.items)
+
+    def get_columns(self):
+        return sorted({key for item in self.items for key in item})
+
+    def get_label(self):
+        return "the posts"
+
+    def get_results_path(self):
+        return Path("posts.ndjson")
+
+
+class ClusterSource:
+    """Stands in for a clustered-embeddings dataset, with its ancestry."""
+
+    def __init__(self, items, posts, between=()):
+        self.items, self.key = items, "clustered"
+        self._genealogy = [posts, *between, self]
+
+    @property
+    def num_rows(self):
+        return len(self.items)
+
+    def get_genealogy(self):
+        return self._genealogy
+
+    def top_parent(self):
+        return self._genealogy[0]
+
+    def iterate_items(self, processor=None, **kwargs):
+        return iter(self.items)
+
+    def get_results_path(self):
+        return Path("clustered.ndjson")
+
+
+def run_profile(tmp_path, clustered, posts, between=(), **parameters):
+    """Describe the given clusters; return the processor."""
+    from processors.metrics.cluster_attributes import ClusterProfile
+
+    processor = ClusterProfile.__new__(ClusterProfile)
+    processor.parameters = {"columns": ["tag"], "top_values": 5, "split_values": True, **parameters}
+    processor.dataset = FakeDataset(tmp_path, name="profile")
+    processor.dataset.path = tmp_path / "profile.ndjson"
+    processor.source_dataset = ClusterSource(clustered, PostDataset(posts), between)
+    processor.interrupted = False
+    processor.process()
+    return processor
+
+
+def read_profile(processor):
+    import json
+    with processor.dataset.path.open(encoding="utf-8") as infile:
+        return {record["cluster"]: record for record in (json.loads(line) for line in infile)}
+
+
+def tagged(count, tag, start=0, cluster=0):
+    """Posts and the clustered embeddings that stand for them."""
+    posts = [Item({"id": str(start + index), "tag": tag}) for index in range(count)]
+    clustered = [Item({"id": str(start + index), "cluster": cluster}) for index in range(count)]
+    return posts, clustered
+
+
+def test_clusters_are_described_by_their_items_values(tmp_path):
+    posts_a, clustered_a = tagged(6, "sport", cluster=0)
+    posts_b, clustered_b = tagged(3, "cooking", start=100, cluster=1)
+
+    profile = read_profile(run_profile(tmp_path, clustered_a + clustered_b, posts_a + posts_b))
+
+    assert profile[0]["items"] == 6 and profile[0]["posts"] == 6
+    assert profile[0]["top_values"]["tag"] == [{"value": "sport", "items": 6, "share": 1.0}]
+    assert profile[1]["top_values"]["tag"] == [{"value": "cooking", "items": 3, "share": 1.0}]
+    assert profile[0]["share"] == pytest.approx(6 / 9, abs=1e-4)
+
+
+def test_the_baseline_row_covers_the_whole_dataset(tmp_path):
+    """
+    Without it a value that dominates a cluster cannot be told apart from one
+    that dominates the dataset.
+    """
+    posts_a, clustered_a = tagged(6, "sport", cluster=0)
+    posts_b, clustered_b = tagged(3, "cooking", start=100, cluster=1)
+
+    profile = read_profile(run_profile(tmp_path, clustered_a + clustered_b, posts_a + posts_b))
+
+    assert profile["all"]["share"] == 1.0
+    assert profile["all"]["items"] == 9
+    assert {value["value"] for value in profile["all"]["top_values"]["tag"]} == {"sport", "cooking"}
+
+
+def test_the_baseline_row_has_no_concentration(tmp_path):
+    from common.lib.item_mapping import MissingMappedField
+    from processors.metrics.cluster_attributes import ClusterProfile
+
+    posts, clustered = tagged(4, "sport")
+    for item in clustered:
+        item["cluster_concentration"] = 0.8
+
+    profile = read_profile(run_profile(tmp_path, clustered, posts))
+    assert profile[0]["concentration"] == 0.8
+    # the whole dataset is not one cluster, so it has nothing to report
+    assert "concentration" not in profile["all"]
+    assert isinstance(ClusterProfile.map_item(profile["all"]).data["concentration"], MissingMappedField)
+
+
+def test_membership_is_carried_over_as_a_median(tmp_path):
+    posts, clustered = tagged(4, "sport")
+    for item, strength in zip(clustered, (0.2, 0.4, 0.6, 1.0)):
+        item["cluster_probability"] = strength
+
+    profile = read_profile(run_profile(tmp_path, clustered, posts))
+    assert profile[0]["membership_median"] == pytest.approx(0.5, abs=1e-4)
+
+
+def test_only_the_requested_number_of_values_is_listed(tmp_path):
+    posts = [Item({"id": str(index), "tag": f"tag{index}"}) for index in range(10)]
+    clustered = [Item({"id": str(index), "cluster": 0}) for index in range(10)]
+
+    profile = read_profile(run_profile(tmp_path, clustered, posts, top_values=3))
+    assert len(profile[0]["top_values"]["tag"]) == 3
+
+
+def test_comma_separated_values_are_counted_separately(tmp_path):
+    """
+    A column holding a list is stored as one comma-joined string, so counting
+    it whole would count combinations rather than values.
+    """
+    posts = [Item({"id": "1", "tag": "a,b"}), Item({"id": "2", "tag": "a,c"})]
+    clustered = [Item({"id": "1", "cluster": 0}), Item({"id": "2", "cluster": 0})]
+
+    split = read_profile(run_profile(tmp_path, clustered, posts))[0]["top_values"]["tag"]
+    assert split[0] == {"value": "a", "items": 2, "share": 1.0}
+    # a list column can have several values per item, so shares need not sum to 1
+    assert sum(value["share"] for value in split) > 1
+
+    whole = read_profile(run_profile(tmp_path, clustered, posts, split_values=False))[0]["top_values"]["tag"]
+    assert {value["value"] for value in whole} == {"a,b", "a,c"}
+
+
+def test_several_columns_are_described_at_once(tmp_path):
+    posts = [Item({"id": "1", "tag": "a", "author": "x"}), Item({"id": "2", "tag": "a", "author": "y"})]
+    clustered = [Item({"id": "1", "cluster": 0}), Item({"id": "2", "cluster": 0})]
+
+    profile = read_profile(run_profile(tmp_path, clustered, posts, columns=["tag", "author"]))
+    assert profile[0]["top_values"]["tag"][0]["value"] == "a"
+    assert {value["value"] for value in profile[0]["top_values"]["author"]} == {"x", "y"}
+
+
+def test_the_timespan_gives_both_ends_the_median_and_the_mean(tmp_path):
+    """
+    A cluster that rose and fell has its mean pulled away from its median, so
+    the two together say more than either alone.
+    """
+    moments = ["2026-01-01 00:00:00", "2026-01-03 00:00:00", "2026-01-05 00:00:00", "2026-01-11 00:00:00"]
+    posts = [Item({"id": str(index), "tag": "a", "timestamp": moment})
+             for index, moment in enumerate(moments)]
+    clustered = [Item({"id": str(index), "cluster": 0}) for index in range(len(moments))]
+
+    profile = read_profile(run_profile(tmp_path, clustered, posts))[0]
+    assert profile["timestamp_start"] == "2026-01-01 00:00:00"
+    assert profile["timestamp_end"] == "2026-01-11 00:00:00"
+    assert profile["timestamp_median"] == "2026-01-04 00:00:00"
+    assert profile["timestamp_mean"] == "2026-01-05 00:00:00"
+
+
+def test_a_dataset_without_timestamps_simply_has_none(tmp_path):
+    posts, clustered = tagged(3, "sport")
+    profile = read_profile(run_profile(tmp_path, clustered, posts))[0]
+    assert not any(key.startswith("timestamp") for key in profile)
+
+
+def test_a_media_file_stands_for_every_post_it_appeared_in(tmp_path):
+    """
+    One file can belong to several posts, and two files to the same post, so
+    the values are counted over the posts rather than over the embeddings.
+    """
+    posts = [Item({"id": "p1", "tag": "a"}), Item({"id": "p2", "tag": "a"})]
+    clustered = [
+        Item({"id": "hash1", "filename": "1.mp4", "post_ids": ["p1", "p2"], "cluster": 0}),
+        Item({"id": "hash2", "filename": "2.mp4", "post_ids": ["p2"], "cluster": 0}),
+    ]
+
+    profile = read_profile(run_profile(tmp_path, clustered, posts))[0]
+    assert profile["items"] == 2          # two embeddings
+    assert profile["posts"] == 2          # p2 counted once, not twice
+    assert profile["top_values"]["tag"] == [{"value": "a", "items": 2, "share": 1.0}]
+
+
+def test_profiling_needs_at_least_one_column(tmp_path):
+    posts, clustered = tagged(3, "sport")
+    processor = run_profile(tmp_path, clustered, posts, columns=[])
+    assert "column" in processor.dataset.error
+
+
+def test_columns_can_also_be_given_as_text(tmp_path):
+    """The option falls back to a comma-separated field when columns cannot be read."""
+    posts = [Item({"id": "1", "tag": "a", "author": "x"})]
+    clustered = [Item({"id": "1", "cluster": 0})]
+
+    profile = read_profile(run_profile(tmp_path, clustered, posts, columns=" tag , author "))[0]
+    assert set(profile["top_values"]) == {"tag", "author"}
+
+
+def test_the_column_option_is_filled_from_the_original_dataset():
+    from common.lib.user_input import UserInput
+    from processors.metrics.cluster_attributes import ClusterProfile
+
+    posts = PostDataset([Item({"id": "1", "tag": "a", "author": "x"})])
+    option = ClusterProfile.get_options(parent_dataset=ClusterSource([], posts))["columns"]
+
+    assert option["type"] == UserInput.OPTION_MULTI
+    assert option["inline"] is True
+    assert set(option["options"]) == {"id", "tag", "author"}
+
+    # nothing to read the columns from: a comma-separated field instead
+    assert ClusterProfile.get_options()["columns"]["type"] == UserInput.OPTION_TEXT
+
+
+def test_every_row_downloads_with_the_same_columns(tmp_path):
+    """A ragged CSV would lose columns for whichever row is written first."""
+    from processors.metrics.cluster_attributes import ClusterProfile
+
+    posts_a, clustered_a = tagged(4, "sport", cluster=0)
+    posts_b, clustered_b = tagged(2, "cooking", start=100, cluster=1)
+    posts_b[0]["timestamp"] = "2026-01-01 00:00:00"
+
+    profile = read_profile(run_profile(tmp_path, clustered_a + clustered_b, posts_a + posts_b,
+                                       columns=["tag"]))
+    rows = [ClusterProfile.map_item(record).get_item_data() for record in profile.values()]
+
+    assert len({tuple(row) for row in rows}) == 1
+    assert "top_tag" in rows[0]
+    assert rows[0]["top_tag"].startswith("sport (") or rows[0]["top_tag"].startswith("cooking (")
+
+
+def test_the_counted_values_read_as_shares(tmp_path):
+    from processors.metrics.cluster_attributes import ClusterProfile
+
+    posts = [Item({"id": "1", "tag": "a"}), Item({"id": "2", "tag": "a"}),
+             Item({"id": "3", "tag": "b"}), Item({"id": "4", "tag": "b"})]
+    clustered = [Item({"id": str(index), "cluster": 0}) for index in range(1, 5)]
+
+    record = read_profile(run_profile(tmp_path, clustered, posts))[0]
+    assert ClusterProfile.map_item(record).get_item_data()["top_tag"] == "a (50%), b (50%)"

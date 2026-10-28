@@ -34,12 +34,13 @@ def _cluster_in_child(matrix, parameters, messages):
     :param matrix:  2D numpy array, one normalised embedding per row
     :param dict parameters:  Processor parameters
     :param messages:  Queue for `(kind, value)` tuples: `log` and `status`
-      messages, then `labels` or `error`
+      messages, then `labels` - carrying `(labels, membership strengths)` -
+      or `error`
     """
     try:
-        labels = ClusterEmbeddings.reduce_and_cluster(matrix, parameters,
-                                                      lambda kind, message: messages.put((kind, message)))
-        messages.put(("labels", labels))
+        labels, probabilities = ClusterEmbeddings.reduce_and_cluster(
+            matrix, parameters, lambda kind, message: messages.put((kind, message)))
+        messages.put(("labels", (labels, probabilities)))
     except Exception as e:
         messages.put(("error", f"{type(e).__name__}: {e}"))
         raise
@@ -50,8 +51,8 @@ class ClusterEmbeddings(BasicProcessor):
     Group embeddings into clusters with k-means or HDBSCAN.
 
     Writes the embeddings unchanged plus a `cluster` field, so that anything
-    that runs on embeddings can also run on the reulst here. Clusters are numbered by size, the
-    largest first; HDBSCAN's outliers are cluster -1.
+    that runs on embeddings can also run on the result here. Clusters are
+    numbered by size, the largest first; HDBSCAN's outliers are cluster -1.
     """
     type = "cluster-embeddings"  # job type ID
     category = "Machine learning"  # category
@@ -66,6 +67,12 @@ class ClusterEmbeddings(BasicProcessor):
 
     # Label the clusters are written under when saved as annotations
     annotation_label = "embedding cluster"
+
+    annotation_labels = {
+        "cluster": annotation_label,
+        "cluster_probability": "cluster membership strength",
+        "cluster_concentration": "cluster concentration",
+    }
 
     # Annotations are saved in batches of this many while writing
     annotation_batch_size = 1000
@@ -171,11 +178,13 @@ class ClusterEmbeddings(BasicProcessor):
                 "tooltip": "Use '0' for all items. Clustering on a reduction slows down on very large datasets.",
             },
             "save_annotations": {
-                "type": UserInput.OPTION_ANNOTATION,
-                "label": cls.annotation_label,
-                "tooltip": "Add each item's cluster number as an annotation to the original dataset. Media files "
-                           "annotate every post they appeared in.",
-                "default": False,
+                "type": UserInput.OPTION_ANNOTATIONS,
+                "options": {
+                    "cluster": "Cluster number",
+                    "cluster_probability": "Cluster membership strength (HDBSCAN only)",
+                    "cluster_concentration": "Cluster concentration",
+                },
+                "default": []
             },
         }
 
@@ -211,11 +220,15 @@ class ClusterEmbeddings(BasicProcessor):
             self.dataset.log("Clustering the full vectors with HDBSCAN. This often finds few clusters and much noise; "
                              "reducing with UMAP first usually works better.")
 
-        labels = self.reduce_and_cluster_in_child(matrix)
-        del matrix
-        if labels is None:
+        clustered = self.reduce_and_cluster_in_child(matrix)
+        if clustered is None:
+            del matrix
             return
+
+        labels, probabilities = clustered
         clusters = self.renumber_by_size(labels)
+        concentration = self.cluster_concentration(matrix, clusters)
+        del matrix
 
         sizes = Counter(clusters)
         noise = sizes.pop(-1, 0)
@@ -225,7 +238,7 @@ class ClusterEmbeddings(BasicProcessor):
         self.dataset.log(summary + ". Cluster sizes: " +
                          ", ".join(f"{cluster}: {size:,}" for cluster, size in sorted(sizes.items())))
 
-        save_annotations = self.parameters.get("save_annotations", False)
+        save_annotations = self.parameters.get("save_annotations", [])
         annotations = []
         post_id_map = None
         unmatched = 0
@@ -246,6 +259,12 @@ class ClusterEmbeddings(BasicProcessor):
                 # a copy, so adding the cluster leaves the item itself alone
                 record = dict(item.original)
                 record["cluster"] = int(clusters[row])
+
+                if probabilities is not None:
+                    record["cluster_probability"] = round(float(probabilities[row]), 4)
+                if record["cluster"] in concentration:
+                    record["cluster_concentration"] = concentration[record["cluster"]]
+
                 row += 1
                 outfile.write(json.dumps(record, ensure_ascii=False) + "\n")
 
@@ -266,10 +285,10 @@ class ClusterEmbeddings(BasicProcessor):
 
                 annotations.extend({
                     "item_id": str(post_id),
-                    "label": self.annotation_label,
-                    "value": str(record["cluster"]),
+                    "label": self.annotation_labels[field],
+                    "value": str(record[field]),
                     "type": "text",
-                } for post_id in post_ids)
+                } for post_id in post_ids for field in save_annotations if field in record)
 
                 # saved in batches as we go: progress shows, and a run that
                 # fails halfway keeps what it saved
@@ -293,10 +312,6 @@ class ClusterEmbeddings(BasicProcessor):
         """
         Get the posts in the original dataset an embedding stands for.
 
-        A text embedding's ID is its post's ID. A media file's ID is a hash of
-        the file, which matches no post: it stands for the posts it appeared
-        in. Embeddings made before those were always recorded lack them.
-
         :param dict record:  Embedding record
         :return list|None:  Post IDs, or `None` for a media file whose posts
           were not recorded and have to be looked up in the archive
@@ -309,17 +324,11 @@ class ClusterEmbeddings(BasicProcessor):
         """
         Reduce and cluster the embeddings in a separate process.
 
-        UMAP and HDBSCAN run for a long time in compiled code that holds
-        Python's global interpreter lock, which would freeze every other thread
-        in the backend, the API included, until they finish. A child process
-        also gives its memory back to the system when it ends.
-
-        The child is forked, not spawned: spawning re-runs the daemon's main
-        script. Where forking is not possible (Windows), this runs in-process.
+        Similar to colink_urls process spawning.
 
         :param matrix:  2D numpy array, one normalised embedding per row
-        :return:  Cluster label per row, or `None` if the dataset was finished
-          with an error
+        :return tuple|None:  `(cluster labels, membership strengths or None)`,
+          or `None` if the dataset was finished with an error
         """
         def report(kind, message):
             (self.dataset.log if kind == "log" else self.dataset.update_status)(message)
@@ -332,9 +341,9 @@ class ClusterEmbeddings(BasicProcessor):
         child = context.Process(target=_cluster_in_child, args=(matrix, self.parameters, messages))
         child.start()
 
-        labels, error = None, None
+        result, error = None, None
         try:
-            while labels is None and error is None:
+            while result is None and error is None:
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while clustering embeddings")
                 if psutil.virtual_memory().percent >= 90:
@@ -351,20 +360,20 @@ class ClusterEmbeddings(BasicProcessor):
                     continue
 
                 if kind == "labels":
-                    labels = value
+                    result = value
                 elif kind == "error":
                     error = f"Clustering failed: {value}"
                 else:
                     report(kind, value)
         finally:
-            if labels is None and child.is_alive():
+            if result is None and child.is_alive():
                 child.terminate()
             child.join(timeout=5)
 
         if error:
             self.dataset.finish_with_error(error)
             return None
-        return labels
+        return result
 
     @staticmethod
     def reduce_and_cluster(matrix, parameters: dict, report) -> np.ndarray:
@@ -374,7 +383,8 @@ class ClusterEmbeddings(BasicProcessor):
         :param matrix:  2D numpy array, one normalised embedding per row
         :param dict parameters:  Processor parameters
         :param report:  `function(kind, message)`, with kind `log` or `status`
-        :return:  Cluster label per row; -1 for HDBSCAN's noise
+        :return tuple:  `(cluster label per row, membership strength per row or
+          None)`
         """
         if parameters.get("reduce_first", True):
             matrix = ClusterEmbeddings.reduce(matrix, parameters, report)
@@ -417,7 +427,8 @@ class ClusterEmbeddings(BasicProcessor):
         :param matrix:  2D numpy array, one (normalised or reduced) vector per row
         :param dict parameters:  Processor parameters
         :param report:  `function(kind, message)`, with kind `log` or `status`
-        :return:  Cluster label per row; -1 for HDBSCAN's noise
+        :return tuple:  `(cluster label per row, membership strength per row or
+          None)`. Labels are -1 for HDBSCAN's noise. Only HDBSCAN gives cluster strength.
         """
         point_count = len(matrix)
 
@@ -427,7 +438,7 @@ class ClusterEmbeddings(BasicProcessor):
             most = min(parameters.get("n_clusters", 8), point_count - 1)
             if not parameters.get("auto_clusters"):
                 report("log", f"Running k-means with {most} clusters")
-                return KMeans(n_clusters=most, n_init="auto", random_state=42).fit_predict(matrix)
+                return KMeans(n_clusters=most, n_init="auto", random_state=42).fit_predict(matrix), None
 
             from sklearn.metrics import silhouette_score
 
@@ -442,7 +453,7 @@ class ClusterEmbeddings(BasicProcessor):
                     best_score, best_labels = score, labels
 
             report("log", f"Chose {len(set(best_labels))} clusters (silhouette score {best_score:.3f})")
-            return best_labels
+            return best_labels, None
 
         from sklearn.cluster import HDBSCAN
 
@@ -455,8 +466,27 @@ class ClusterEmbeddings(BasicProcessor):
                       f"minimum samples")
         # kd_tree: never fall back to brute force, which holds all distances
         # between all items at once
-        return HDBSCAN(min_cluster_size=min_cluster_size, min_samples=min_samples,
-                       algorithm="kd_tree", copy=False).fit_predict(matrix)
+        clusterer = HDBSCAN(min_cluster_size=min_cluster_size, min_samples=min_samples,
+                            algorithm="kd_tree", copy=False).fit(matrix)
+
+        return clusterer.labels_, clusterer.probabilities_
+
+    @staticmethod
+    def cluster_concentration(matrix, clusters: list) -> dict:
+        """
+        How tightly each cluster sits together, from 0 to 1.
+
+        The mean cosine similarity between a cluster's members and its centre.
+        Calculated via full embeddings since UMAP does not preserve density.
+
+        :param matrix:  2D numpy array, one normalised embedding per row
+        :param list clusters:  Cluster number per row
+        :return dict:  Concentration per cluster number
+        """
+        numbers = np.asarray(clusters)
+
+        return {cluster: round(float(np.linalg.norm(matrix[numbers == cluster].mean(axis=0))), 4)
+                for cluster in sorted({int(number) for number in numbers if number != -1})}
 
     @staticmethod
     def renumber_by_size(labels) -> list:
@@ -489,6 +519,8 @@ class ClusterEmbeddings(BasicProcessor):
             "id": item.get("id"),
             "text": item.get("text"),
             "cluster": item.get("cluster"),
+            "cluster_probability": value_or_missing(item, "cluster_probability", -1),
+            "cluster_concentration": value_or_missing(item, "cluster_concentration", -1),
             # only media embeddings have these
             "filename": value_or_missing(item, "filename", ""),
             "post_ids": ", ".join([str(post_id) for post_id in item.get("post_ids", [])])
