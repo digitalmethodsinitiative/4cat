@@ -224,7 +224,9 @@ class ImageDownloader(BasicProcessor):
         ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0"
         downloaded_files = set()
         failures = []
-        metadata = {}
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type, from_dataset=self.source_dataset.key
+        )
 
         self.dataset.log(f"Filename prep for {len(urls)} URLs")
         # prepare filenames for each url
@@ -384,25 +386,29 @@ class ImageDownloader(BasicProcessor):
                         # before ending the loop and wrapping up
                         self.complete = True
 
+            resolved_url, url_extra = self.urls_for_metadata(url)
             if failure:
                 failures.append(url)
                 downloaded_file.unlink(missing_ok=True)
-
-            metadata[url] = {
-                "filename": self.filenames[url],
-                "url": self.resolve_url(url),
-                "success": not failure,
-                "from_dataset": self.source_dataset.key,
-                "post_ids": item_map[url],
-            }
+                metadata.add_failure(
+                    post_ids=item_map[url],
+                    reason="error",
+                    url=resolved_url,
+                    extra=url_extra,
+                )
+            else:
+                metadata.add_item(
+                    filename=self.filenames[url],
+                    post_ids=item_map[url],
+                    url=resolved_url,
+                    extra=url_extra,
+                    replace=True,
+                )
 
             if self.complete:
                 break
 
-        with self.staging_area.joinpath(".metadata.json").open(
-            "w", encoding="utf-8"
-        ) as outfile:
-            json.dump(metadata, outfile)
+        metadata.write(self.staging_area)
 
         # delete supernumerary partially downloaded files
         self.flush_proxied_requests()  # get rid of remaining queue
@@ -415,7 +421,7 @@ class ImageDownloader(BasicProcessor):
         # finish up
         self.dataset.update_progress(1.0)
         self.write_archive_and_finish(
-            self.staging_area, len([x for x in metadata.values() if x.get("success")]),
+            self.staging_area, len(metadata),
             finish=False
         )
         if self.warning_message:
@@ -563,6 +569,22 @@ class ImageDownloader(BasicProcessor):
 
         return url
 
+    def urls_for_metadata(self, url):
+        """
+        Get the URLs to record in the archive metadata for a download
+
+        The metadata's `url` is where the file was downloaded from, after
+        following any redirects. If the URL as it appeared in the dataset is
+        different, it is listed in `other_urls`, so the file can be found by
+        either.
+
+        :param str url:  URL as it appeared in the dataset
+        :return tuple:  The URL to record, and extra data for the metadata
+        """
+        resolved_url = self.resolve_url(url)
+        extra = {"other_urls": [url]} if resolved_url != url else {}
+        return resolved_url, extra
+
     @staticmethod
     def find_image_urls(value):
         """
@@ -610,20 +632,29 @@ class ImageDownloader(BasicProcessor):
             raise InvalidDownloadedFileException(getattr(e, "message", str(e))) from e
 
     @staticmethod
-    def map_metadata(url, data):
+    def map_metadata(filename, item):
         """
-        Iterator to yield modified metadata for CSV
-
-        :param str url:  string that may contain URLs
-        :param dict data:  dictionary with metadata collected previously
-        :yield dict:  	  iterator containing reformated metadata
+        Yield CSV row(s) for a successful `items[filename]` entry.
         """
-        row = {
-            "url": url,
-            "number_of_posts_with_url": len(data.get("post_ids", [])),
-            "post_ids": ", ".join(data.get("post_ids", [])),
-            "filename": data.get("filename"),
-            "download_successful": data.get("success", ""),
+        yield {
+            "url": item.get("url", ""),
+            "number_of_posts_with_url": len(item.get("post_ids", [])),
+            "post_ids": ", ".join(item.get("post_ids", [])),
+            "filename": filename,
+            "download_successful": True,
         }
 
-        yield row
+    @staticmethod
+    def map_failure_metadata(failure):
+        """
+        Yield CSV row(s) for a `failures[]` entry.
+        """
+        yield {
+            "url": failure.get("url", ""),
+            "number_of_posts_with_url": len(failure.get("post_ids", [])),
+            "post_ids": ", ".join(failure.get("post_ids", [])),
+            "filename": "",
+            "download_successful": False,
+            "reason": failure.get("reason", ""),
+            "reason_description": failure.get("reason_description", ""),
+        }

@@ -1,0 +1,680 @@
+"""
+Read and write metadata files packaged inside dataset archives.
+
+4CAT processors that produce ZIP archives can include a small JSON file
+describing the other files in the archive — what they are and where they came
+from. This module provides `ArchiveMetadataFile`, a base class handling the
+shared plumbing (locating the file inside a zip or results folder, schema
+versioning, atomic writes), and `MediaArchiveMetadata`, the schema for media
+download archives.
+
+`MediaArchiveMetadata` record per media file the source post IDs,
+originating URL (if any), and any platform-specific data. Download attempts
+that produced no file are recorded separately as failures.
+
+TODO:
+There are other metadata files (e.g. token sets, topic models) with their own
+metadata files with quite different schemas. They seem like they need their
+own classes as well (or would be super redundant in `ArchiveMetadataFile` 
+format).
+"""
+import json
+import os
+import zipfile
+from pathlib import Path
+from typing import Iterator, Optional
+
+from common.lib.exceptions import MetadataException
+
+
+class ArchiveMetadataFile:
+	"""
+	Base class for JSON metadata files inside dataset archives.
+
+	Handles only the shared plumbing: locate the file (zip member or
+	results folder), read it, check the schema version, and writing it
+	back. Subclasses define the actual schema by implementing
+	`_populate_from_raw` and `to_dict`, and optionally `validate`.
+	"""
+
+	# Subclasses must set these.
+	SCHEMA_VERSION: Optional[int] = None
+	DEFAULT_FILENAME: Optional[str] = None
+
+	def __init__(self, dataset=None, processor_type: Optional[str] = None, filename: Optional[str] = None):
+		self.dataset = dataset
+		# store the processor that created the archive and metadata
+		# leaving optional in cases we create metadata... some other way
+		self.processor_type = processor_type
+		# the 4CAT version that created the metadata: resolved by `new()`
+		self.software_version = None
+		self.software_source = None
+
+		# filename and schema
+		self._filename = filename or self.DEFAULT_FILENAME
+		self.schema_version = self.SCHEMA_VERSION
+
+	def _resolve_software_version(self) -> None:
+		"""
+		Record the 4CAT commit / repository creating this metadata.
+
+		Called by `new()` on the producer path. The dataset already records
+		the version its processor runs with (stored when the processor
+		starts), so it is copied from there. A no-op without a dataset (e.g.
+		metadata constructed outside a processor run).
+		"""
+		if self.dataset is None:
+			return
+		self.software_version = self.dataset.data.get("software_version")
+		self.software_source = self.dataset.data.get("software_source")
+
+	@classmethod
+	def read(cls, dataset, *, filename: Optional[str] = None):
+		"""
+		Load metadata from a finished dataset's archive or results folder.
+
+		:param dataset:  the DataSet to read from.
+		:param filename:  metadata filename; defaults to the class's
+			`DEFAULT_FILENAME`.
+
+		:raises FileNotFoundError:  the metadata file is not present.
+		:raises MetadataException:  the dataset is unfinished, or the file is
+			malformed or claims an unsupported schema version.
+		"""
+		filename = filename or cls.DEFAULT_FILENAME
+
+		# an unfinished dataset may still be writing its metadata. A finished
+		# dataset with no items is still read: an archive in which every
+		# download failed, or whose files were all copied from an earlier
+		# download, still has metadata worth reading. If there is no archive
+		# at all, reading it raises FileNotFoundError below.
+		if not dataset.is_finished():
+			raise MetadataException("Dataset is not finished; metadata may be incomplete.")
+
+		# load it
+		raw = cls._load_raw(dataset, Path(dataset.get_results_path()), filename)
+		# create the class
+		instance = cls(dataset, filename=filename)
+		# and populate
+		instance._populate_from_raw(raw)
+		return instance
+
+	@classmethod
+	def _load_raw(cls, dataset, results_file: Path, filename: str) -> dict:
+		"""
+		Locate and JSON-decode the metadata file (zip member or folder).
+
+		:raises FileNotFoundError:  the file is not present.
+		:raises MetadataException:  the archive is damaged, or the file is
+			present but not valid JSON.
+		"""
+		# if the dataset has a zip archive, look inside it
+		if results_file.suffix == ".zip":
+			try:
+				with zipfile.ZipFile(results_file, "r") as archive:
+					if filename not in archive.namelist():
+						raise FileNotFoundError(f"No metadata file {filename} in archive {results_file.name}.")
+					with archive.open(filename) as f:
+						return cls._decode_json(f, filename)
+			except zipfile.BadZipFile as e:
+				raise MetadataException(f"Archive {results_file.name} cannot be opened: {e}") from e
+
+		# it is possible we have a results folder w/ metadata instead; look there
+		results_folder = dataset.get_results_folder_path()
+		if not results_folder.is_dir():
+			raise FileNotFoundError(f"No metadata file {filename} found (no results folder).")
+
+		# check that the file exists
+		metadata_path = results_folder / filename
+		if not metadata_path.is_file():
+			raise FileNotFoundError(f"No metadata file {filename} in {results_folder}.")
+
+		# load the metadata! (`write` always writes UTF-8)
+		with open(metadata_path, encoding="utf-8") as f:
+			return cls._decode_json(f, filename)
+
+	@staticmethod
+	def _decode_json(fp, filename: str) -> dict:
+		"""
+		JSON-decode an open file object, surfacing decode errors as
+		`MetadataException`. Without this a corrupt metadata file raises
+		`json.JSONDecodeError` (or `UnicodeDecodeError` for text that is not
+		UTF-8), which escapes the `(FileNotFoundError, MetadataException)`
+		handler every consumer uses.
+		"""
+		try:
+			return json.load(fp)
+		except ValueError as e:
+			# JSONDecodeError and UnicodeDecodeError are both ValueErrors
+			raise MetadataException(f"Metadata file {filename} is not valid JSON: {e}") from e
+
+	@classmethod
+	def _check_schema_version(cls, raw: dict) -> Optional[int]:
+		"""
+		Read the `schema_version` of a raw metadata dict.
+
+		Returns the declared version, or None if the file predates schema
+		versioning (legacy). Raises MetadataException for a version this
+		class does not know how to read.
+
+		This is meant to allow us to change the schema later if needed
+		"""
+		version = raw.get("schema_version")
+		if version is not None and version != cls.SCHEMA_VERSION:
+			raise MetadataException(
+				f"Unsupported metadata schema_version {version}; expected {cls.SCHEMA_VERSION}."
+			)
+		return version
+
+	# -- subclass hooks --
+
+	def _populate_from_raw(self, raw: dict) -> None:
+		"""Populate instance state from a raw decoded dict."""
+		raise NotImplementedError
+
+	def to_dict(self) -> dict:
+		"""Serialise instance state to a JSON-encodable dict."""
+		raise NotImplementedError
+
+	def validate(self) -> None:
+		"""Strict schema check run before writing. Override as needed."""
+		pass
+
+	# -- output --
+
+	def write(self, staging_area, *, filename: Optional[str] = None) -> Path:
+		"""
+		Validate and atomically write the metadata file to
+		`<staging_area>/<filename>`. Returns the path written.
+		"""
+		if filename is None:
+			filename = self._filename
+
+		# validate before writing; this will be a sanity check for fields (or whatever)
+		self.validate()
+
+		# write it first to a staging area, then move it to the target location
+		# should avoid leaving a half-written file if something goes wrong
+		staging_area = Path(staging_area)
+		target = staging_area / filename
+		tmp = target.parent / (target.name + ".tmp")
+		try:
+			with open(tmp, "w", encoding="utf-8") as f:
+				json.dump(self.to_dict(), f)
+			os.replace(tmp, target)
+		except Exception:
+			# don't leave a partial .tmp file behind to be zipped into the archive
+			tmp.unlink(missing_ok=True)
+			raise
+		return target
+
+
+class MediaArchiveMetadata(ArchiveMetadataFile):
+	"""
+	Metadata for media download archives (`.metadata.json`).
+
+	Keyed by output filename; each item records the source post IDs, the
+	originating URL (if any), and an `extra` blob of platform-specific data.
+	Download attempts that produced no file are recorded in `failures`.
+
+	An item or failure can be reached through more than one URL, e.g. a short
+	and a long link to the same video, or a link in a post that redirected to
+	the file. The entry's `url` is one of them; the others are listed in
+	`extra["other_urls"]`, so that the entry can be found by any of them.
+	"""
+
+	SCHEMA_VERSION = 1
+	DEFAULT_FILENAME = ".metadata.json"
+
+	def __init__(self, dataset=None, *, processor_type: Optional[str] = None,
+				 from_dataset: Optional[str] = None,
+				 filename: Optional[str] = None):
+		# `dataset` is the target dataset (the one the archive belongs to).
+		# `from_dataset` is the source dataset key whose posts are being
+		# downloaded from; these are not generally the same and there is no
+		# safe default — producers must set it explicitly.
+		super().__init__(dataset, processor_type=processor_type, filename=filename)
+		# store the source dataset key (e.g. top dataset or some subdataset)
+		self.from_dataset = from_dataset
+
+		# the actual metadata content
+		self.items: dict = {}
+		self.failures: list = []
+
+	# -- constructors --
+
+	@classmethod
+	def new(cls, dataset=None, *, processor_type: str,
+			from_dataset: Optional[str] = None,
+			filename: Optional[str] = None) -> "MediaArchiveMetadata":
+		"""
+		Empty container for a producer that is building an archive.
+
+		:param dataset:  the DataSet the archive will belong to.
+		:param processor_type:  producer identifier, typically `processor.type`.
+		:param from_dataset:  key of the source dataset whose posts are being
+			downloaded from.
+		:param filename:  metadata filename inside the archive.
+		"""
+		instance = cls(dataset, processor_type=processor_type,
+					   from_dataset=from_dataset, filename=filename)
+		instance._resolve_software_version()
+		return instance
+
+	# -- schema population / legacy normalization --
+
+	def _populate_from_raw(self, raw: dict) -> None:
+		"""
+		Populate fields from a raw dict. v1 is read directly; older shapes
+		are translated through `_normalize_legacy`.
+		"""
+		if not isinstance(raw, dict):
+			raise MetadataException("Metadata file is not a JSON object.")
+
+		version = self._check_schema_version(raw)
+		if version == self.SCHEMA_VERSION:
+			# current schema. `_check_schema_version` has already rejected any
+			# mismatching version, so this is the only non-legacy branch.
+			self.schema_version = version
+			self.from_dataset = raw.get("from_dataset", self.from_dataset)
+			# pretty sure we did not store the processor or version info previously
+			self.processor_type = raw.get("processor_type")
+			self.software_version = raw.get("software_version")
+			self.software_source = raw.get("software_source")
+
+			# archives can be imported from elsewhere, so the file may have
+			# been edited by hand: refuse a file whose overall layout is wrong,
+			# and skip single entries that are not what consumers expect
+			items = raw.get("items") or {}
+			failures = raw.get("failures") or []
+			if not isinstance(items, dict):
+				raise MetadataException("Metadata 'items' must be a JSON object.")
+			if not isinstance(failures, list):
+				raise MetadataException("Metadata 'failures' must be a list.")
+
+			# post_ids are string-coerced on write, but normalize on read too
+			# so consumers never have to: some source datasets use integer ids,
+			# and hand-edited or externally-produced files may carry them.
+			self.items = {
+				filename: self._normalize_entry_post_ids(entry)
+				for filename, entry in items.items()
+				if isinstance(entry, dict)
+			}
+			self.failures = [
+				self._normalize_entry_post_ids(failure)
+				for failure in failures
+				if isinstance(failure, dict)
+			]
+			return
+
+		# version is None here (a mismatching version would have raised
+		# above): this is a pre-schema-versioned file.
+		self._normalize_legacy(raw)
+
+	def _normalize_legacy(self, raw: dict) -> None:
+		"""
+		Translate pre-v1 metadata to v1.
+
+		Old format is a flat dict keyed by URL (image/video) or filename
+		(Telegram), or by something else (e.g. a local file path, or a URL and
+		a date for web archive screenshots). Each entry has a `success` flag;
+		failed entries become `failures[]`, successful entries become
+		`items[filename]`. Screenshot processors wrote no `success` flag; an
+		entry of theirs that names no file is a failure too. The video
+		downloader's nested `files[]` list explodes to one item per file, and
+		a file listed under several URLs gets the post IDs of all of them.
+		All producer-specific data is carried across into `extra` (items) or
+		the failure dict (failures) so the migration loses nothing — see
+		`_legacy_extra`.
+		"""
+		# the source dataset named by entries that the old video downloader
+		# copied from an earlier archive; only used if no other entry names one
+		copied_source = None
+
+		for outer_key, entry in raw.items():
+			if not isinstance(entry, dict):
+				# malformed; should not exist
+				continue
+
+			# post IDs were stored as a list, as a single `post_id`, as `ids`
+			# (screenshot processors), or as one text with commas
+			post_ids = entry.get("post_ids")
+			if post_ids is None and "post_id" in entry:
+				post_ids = [entry["post_id"]]
+			if post_ids is None and "ids" in entry:
+				post_ids = entry["ids"]
+				# now a first-class field, so not kept in `extra` as well
+				entry = {key: value for key, value in entry.items() if key != "ids"}
+			if isinstance(post_ids, str) and "," in post_ids:
+				post_ids = post_ids.split(",")
+			post_ids = self._normalize_post_ids(post_ids)
+
+			url = entry.get("url")
+			# check if the key was a URL
+			if url is None and isinstance(outer_key, str) and (
+					outer_key.startswith("http://") or outer_key.startswith("https://")):
+				url = outer_key
+
+			# keep the entry's key if it is not its URL, file name or post ID,
+			# e.g. a local file path, so it is still known what was downloaded
+			files = entry.get("files")
+			known_values = {url, entry.get("filename"), *post_ids}
+			if isinstance(files, list):
+				known_values |= {file.get("filename") for file in files if isinstance(file, dict)}
+			original_key = {"original_key": outer_key} if outer_key not in known_values else {}
+
+			# existing `from_dataset` is correct if exists; video downloads
+			# from early 2023 called it `source_dataset`
+			recorded_source = entry.get("from_dataset") or entry.get("source_dataset")
+			if recorded_source and entry.get("file_dataset_key"):
+				# copied from an earlier archive by the old video downloader,
+				# with that archive's source dataset, which can be another one
+				copied_source = copied_source or recorded_source
+			elif recorded_source:
+				self.from_dataset = recorded_source
+
+			success = entry.get("success", True)
+
+			# `files` key from video downloader due to channels and playlists.
+			# A URL can list files even when the URL as a whole was not marked
+			# successful: e.g. yt-dlp recognised a video it had already
+			# downloaded for an earlier URL, or stopped part-way through a
+			# playlist. Those files are in the archive, so each one is recorded;
+			# the URL itself only counts as a failure if it has no file at all.
+			if isinstance(files, list) and files:
+				files_recorded = False
+				for file in files:
+					if not isinstance(file, dict):
+						continue
+					file_filename = file.get("filename")
+					if not file.get("success", True):
+						# the shared outer entry data is preserved alongside the
+						# per-file data so e.g. the video `downloader` survives
+						self.failures.append(self._legacy_failure(
+							post_ids, url,
+							file.get("reason"),
+							file.get("reason_description") or file.get("error"),
+							entry, file, original_key,
+						))
+						files_recorded = True
+						continue
+					if not file_filename or not isinstance(file_filename, str):
+						continue
+					# the same file can be listed under more than one URL;
+					# merge so the posts of every URL stay connected to it
+					self.add_item(file_filename, post_ids=post_ids, url=url,
+								  extra=self._legacy_extra(entry, file, original_key), merge=True)
+					files_recorded = True
+				if files_recorded or success:
+					continue
+
+			has_filename = entry.get("filename") and isinstance(entry["filename"], str)
+			if success and has_filename:
+				self.add_item(entry["filename"], post_ids=post_ids, url=url,
+							  extra=self._legacy_extra(entry, original_key), merge=True)
+			elif not success or "success" not in entry:
+				# without a `success` flag (screenshot processors), an entry
+				# that names no file can only be a failure
+				reason = entry.get("reason")
+				if reason is None and entry.get("retry") is False:
+					# the old video downloader marked URLs that turned out not
+					# to be videos with `retry: False` rather than a reason
+					reason = "not_a_video"
+				self.failures.append(self._legacy_failure(
+					post_ids, url,
+					reason,
+					entry.get("reason_description") or entry.get("error"),
+					entry, original_key,
+				))
+			# else: marked successful but names no file; malformed, dropped
+
+		if self.from_dataset is None and copied_source:
+			self.from_dataset = copied_source
+
+	# Legacy entry keys promoted to first-class v1 fields, or pure structure;
+	# every other key is producer data and is preserved under `extra`.
+	_LEGACY_NON_EXTRA_KEYS = frozenset({
+		"filename", "post_ids", "post_id", "url", "from_dataset", "source_dataset",
+		"success", "files", "metadata", "extra",
+	})
+	# Additionally promoted on the failure path: failures have no `extra` of
+	# their own, but carry these as first-class fields.
+	_LEGACY_FAILURE_KEYS = frozenset({"reason", "reason_description", "error"})
+
+	@classmethod
+	def _legacy_extra(cls, *sources, exclude=frozenset()) -> dict:
+		"""
+		Flatten producer data from one or more legacy dicts into a single flat
+		`extra` dict; later sources win on a key clash.
+
+		Pre-v1 files had no `extra` key — per-file data (yt-dlp dumps, the
+		Stable Diffusion `prompt`, the video `downloader`, ...) sat at the top
+		level or inside a `metadata` sub-dict. Everything not promoted to a
+		first-class v1 field is kept so the migration loses nothing. `extra`
+		is kept flat because v1 consumers read keys off it directly.
+		"""
+		skip = cls._LEGACY_NON_EXTRA_KEYS | exclude
+		extra = {}
+		for source in sources:
+			if not isinstance(source, dict):
+				continue
+			extra.update({k: v for k, v in source.items() if k not in skip})
+			# a `metadata` (yt-dlp dump) or explicit `extra` is flattened in
+			for nested_key in ("metadata", "extra"):
+				nested = source.get(nested_key)
+				if isinstance(nested, dict):
+					extra.update(nested)
+		return extra
+
+	@classmethod
+	def _legacy_failure(cls, post_ids, url, reason, reason_description,
+						*extra_sources) -> dict:
+		"""
+		Build a v1 failure dict from legacy data. Leftover producer data is
+		preserved under the failure's own `extra` key.
+		"""
+		failure = {
+			"post_ids": post_ids,
+			"reason": reason or "error",
+			"reason_description": reason_description or "",
+		}
+		if url is not None:
+			failure["url"] = url
+		extra = cls._legacy_extra(*extra_sources, exclude=cls._LEGACY_FAILURE_KEYS)
+		if extra:
+			failure["extra"] = extra
+		return failure
+
+	@staticmethod
+	def _build_item(filename: str, post_ids: list, url, extra: dict) -> dict:
+		item = {"filename": filename, "post_ids": list(post_ids)}
+		if url is not None:
+			item["url"] = url
+		if extra:
+			item["extra"] = extra
+		return item
+
+	# -- mutation --
+
+	def add_item(self, filename: str, *, post_ids,
+				 url: Optional[str] = None,
+				 extra: Optional[dict] = None,
+				 replace: bool = False,
+				 merge: bool = False) -> None:
+		"""
+		Record a successfully produced file.
+
+		:param filename:  the file's name inside the archive. Must be unique
+			within this metadata instance unless `replace` or `merge` is set.
+		:param post_ids:  list of source post IDs (string-coerced).
+		:param url:  optional originating URL.
+		:param extra:  optional free-form per-file data (e.g. yt-dlp dump).
+		:param replace:  overwrite an existing entry with the same filename.
+		:param merge:  if an entry with the same filename exists, add these
+			post IDs to it instead of overwriting it. Use this when one file
+			can be reached through several URLs (e.g. the same video linked in
+			different ways), so that every post linking to it stays connected
+			to the file. The existing URL is kept, and any other URL that led
+			to the same file is listed in `extra["other_urls"]`. The existing
+			extra data is kept; extra keys the entry does not have yet are
+			added.
+		"""
+		if not filename or not isinstance(filename, str):
+			raise MetadataException("add_item: 'filename' must be a non-empty string.")
+		if replace and merge:
+			raise MetadataException("add_item: use either 'replace' or 'merge', not both.")
+
+		existing = self.items.get(filename)
+		if existing is not None and merge:
+			known_ids = existing.setdefault("post_ids", [])
+			for post_id in self._normalize_post_ids(post_ids):
+				if post_id not in known_ids:
+					known_ids.append(post_id)
+			if extra:
+				existing["extra"] = {**extra, **existing.get("extra", {})}
+			if url is not None:
+				if existing.get("url") is None:
+					existing["url"] = url
+				elif url != existing["url"]:
+					entry_extra = existing.setdefault("extra", {})
+					other_urls = list(entry_extra.get("other_urls", []))
+					if url not in other_urls:
+						other_urls.append(url)
+					entry_extra["other_urls"] = other_urls
+			return
+
+		if existing is not None and not replace:
+			raise MetadataException(f"add_item: filename {filename!r} already present.")
+		self.items[filename] = self._build_item(
+			filename, self._normalize_post_ids(post_ids), url, dict(extra) if extra else {}
+		)
+
+	def add_failure(self, *, post_ids, reason: str,
+					reason_description: Optional[str] = None,
+					url: Optional[str] = None,
+					extra: Optional[dict] = None) -> None:
+		"""
+		Record a download attempt that did not produce a file.
+
+		:param post_ids:  list of source post IDs (string-coerced; may be empty).
+		:param reason:  structured failure code (e.g. "error", "no_media").
+		:param reason_description:  optional human-readable explanation.
+		:param url:  optional URL that was attempted.
+		:param extra:  optional free-form data about the attempt.
+		"""
+		if not reason or not isinstance(reason, str):
+			raise MetadataException("add_failure: 'reason' must be a non-empty string.")
+		failure = {
+			"post_ids": self._normalize_post_ids(post_ids),
+			"reason": reason,
+		}
+		if url is not None:
+			failure["url"] = url
+		if reason_description is not None:
+			failure["reason_description"] = reason_description
+		if extra:
+			failure["extra"] = dict(extra)
+		self.failures.append(failure)
+
+	@staticmethod
+	def _normalize_post_ids(post_ids) -> list:
+		if post_ids is None:
+			return []
+		if isinstance(post_ids, (str, int)):
+			post_ids = [post_ids]
+		# coerce to stripped strings, dropping null and blank ids rather than
+		# keeping them as the text "None" or "": some media (e.g. Instagram ads)
+		# records no usable id, and a fabricated id would only mislead anything
+		# that later matches on it.
+		return [str(p).strip() for p in post_ids if p is not None and str(p).strip()]
+
+	@classmethod
+	def _normalize_entry_post_ids(cls, entry):
+		"""
+		Return a copy of an item/failure dict with `post_ids` coerced to a
+		list of strings. Non-dict entries are returned unchanged.
+		"""
+		if not isinstance(entry, dict) or "post_ids" not in entry:
+			return entry
+		entry = dict(entry)
+		entry["post_ids"] = cls._normalize_post_ids(entry["post_ids"])
+		return entry
+
+	# -- access --
+
+	def get_entry(self, filename: str) -> Optional[dict]:
+		return self.items.get(filename)
+
+	def iter_entries(self) -> Iterator[tuple]:
+		return iter(self.items.items())
+
+	def iter_failures(self) -> Iterator[dict]:
+		return iter(self.failures)
+
+	def filename_to_post_ids(self) -> dict:
+		"""
+		Return a `{filename: [post_id, ...]}` mapping for successful entries.
+
+		Replaces the per-consumer map-building that strips extensions
+		and walks nested `files[]` lists.
+		"""
+		return {fn: list(entry.get("post_ids", [])) for fn, entry in self.items.items()}
+
+	def post_ids_for(self, filename: str) -> list:
+		"""
+		Return the list of source post IDs associated with a given filename, or
+		empty list if the filename is not present or has no post IDs.
+		"""
+		entry = self.items.get(filename)
+		return list(entry.get("post_ids", [])) if entry else []
+
+	# -- some helpers for common access patterns --
+
+	def __len__(self) -> int:
+		return len(self.items)
+
+	def __contains__(self, filename) -> bool:
+		return filename in self.items
+
+	# -- output --
+
+	def to_dict(self) -> dict:
+		return {
+			"schema_version": self.schema_version,
+			"from_dataset": self.from_dataset,
+			"processor_type": self.processor_type,
+			"software_version": self.software_version,
+			"software_source": self.software_source,
+			"items": self.items,
+			"failures": self.failures,
+		}
+
+	def validate(self) -> None:
+		"""
+		Strict schema check used before writing. Raises MetadataException on
+		any violation.
+		"""
+		if self.schema_version != self.SCHEMA_VERSION:
+			raise MetadataException(f"Unsupported schema_version {self.schema_version}.")
+		if not isinstance(self.items, dict):
+			raise MetadataException("items must be a dict.")
+		if not isinstance(self.failures, list):
+			raise MetadataException("failures must be a list.")
+		for filename, entry in self.items.items():
+			if not isinstance(entry, dict):
+				raise MetadataException(f"items[{filename!r}] must be a dict.")
+			if entry.get("filename") != filename:
+				raise MetadataException(
+					f"items[{filename!r}].filename must match its key "
+					f"(got {entry.get('filename')!r})."
+				)
+			if not isinstance(entry.get("post_ids"), list):
+				raise MetadataException(f"items[{filename!r}].post_ids must be a list.")
+		for i, failure in enumerate(self.failures):
+			if not isinstance(failure, dict):
+				raise MetadataException(f"failures[{i}] must be a dict.")
+			if not isinstance(failure.get("post_ids"), list):
+				raise MetadataException(f"failures[{i}].post_ids must be a list.")
+			reason = failure.get("reason")
+			if not isinstance(reason, str) or not reason:
+				raise MetadataException(f"failures[{i}].reason must be a non-empty string.")
