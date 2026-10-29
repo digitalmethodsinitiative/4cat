@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 import requests
 import yt_dlp
 from yt_dlp import DownloadError
-from yt_dlp.utils import ExistingVideoReached
+from yt_dlp.utils import ExistingVideoReached, MaxDownloadsReached
 
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
@@ -30,13 +30,6 @@ __email__ = "4cat@oilab.eu"
 
 
 # Custom Exception Classes
-class MaxVideosDownloaded(ProcessorException):
-    """
-    Raise if too many videos have been downloaded and the processor should stop future downloads
-    """
-    pass
-
-
 class FailedDownload(ProcessorException):
     """
     Raise if Download failed and will not be tried again
@@ -356,6 +349,9 @@ class VideoDownloaderPlus(BasicProcessor):
         download_channels = self.max_videos_per_url > 0
         if self.max_videos_per_url == 0:
             self.max_videos_per_url = 1  # Ensure unknown channels only end up with one video downloaded
+        # yt-dlp stops after this many videos per URL (one YoutubeDL is used per
+        # URL), between videos, so no video is left half-downloaded
+        ydl_opts["max_downloads"] = self.max_videos_per_url
 
         # Initialize counters
         self.downloaded_videos = 0
@@ -899,7 +895,7 @@ class VideoDownloaderPlus(BasicProcessor):
             try:
                 ydl.extract_info(url)
                 
-            except MaxVideosDownloaded:
+            except MaxDownloadsReached:
                 self.dataset.log("Max videos for URL reached.")
                 
             except ExistingVideoReached:
@@ -986,11 +982,38 @@ class VideoDownloaderPlus(BasicProcessor):
         self.dataset.log(f"Success rate (of processed URLs): {(self.downloaded_videos + self.copied_videos)}/{self.processed_urls} ({100*(self.downloaded_videos + self.copied_videos)/self.processed_urls if self.processed_urls > 0 else 0:.1f}%)")
         self.dataset.log("=" * 60)
 
+    def _remove_unfinished_downloads(self, results_path):
+        """
+        Remove the files yt-dlp leaves behind for downloads that did not finish
+
+        yt-dlp downloads to a `.part` file (or `.part-Frag` pieces, with a
+        `.ytdl` file to resume from) and only gives it its real name once the
+        download is complete. If a download breaks off, these stay behind;
+        they are not videos, so they should not end up in the archive.
+
+        :param Path results_path:  Staging area with the downloaded files
+        :return list:  Names of the removed files
+        """
+        unfinished = [file for file in results_path.iterdir() if file.is_file() and (
+            file.name.endswith((".part", ".ytdl")) or ".part-Frag" in file.name)]
+
+        for file in unfinished:
+            file.unlink()
+
+        if unfinished:
+            self.dataset.log(f"Removed {len(unfinished):,} file(s) of downloads that did not finish: "
+                             f"{', '.join(sorted(file.name for file in unfinished))}")
+
+        return [file.name for file in unfinished]
+
     def _finish_processing(self, results_path, total_urls):
         """Finish processing and create result archive"""
+        self._remove_unfinished_downloads(results_path)
         self.dataset.update_status("Writing downloaded videos to zip archive")
-        self.write_archive_and_finish(results_path, self.downloaded_videos + self.copied_videos, finish=False)
-        
+        # videos copied from earlier downloads are in the archive too
+        num_videos = self.downloaded_videos + self.copied_videos
+        self.write_archive_and_finish(results_path, num_videos, finish=False)
+
         status_msg = f"Downloaded {self.downloaded_videos} videos"
         if self.copied_videos > 0:
             status_msg += f"; {self.copied_videos} videos copied from previous downloads"
@@ -1003,16 +1026,14 @@ class VideoDownloaderPlus(BasicProcessor):
         
         if self.warning_message:
             self.dataset.update_status(status_msg)
-            self.dataset.finish_with_warning(self.downloaded_videos, f"Incomplete: {self.warning_message}")
+            self.dataset.finish_with_warning(num_videos, f"Incomplete: {self.warning_message}")
         else:
             self.dataset.update_status(status_msg, is_final=True)
-            self.dataset.finish(self.downloaded_videos)
+            self.dataset.finish(num_videos)
 
     def yt_dlp_monitor(self, d):
         """Can be used to gather information from yt-dlp while downloading"""
         self.last_dl_status = d
-        if len(self.videos_downloaded_from_url) != 0 and len(self.videos_downloaded_from_url) >= self.max_videos_per_url:
-            raise MaxVideosDownloaded('Max videos for URL reached.')
         if self.interrupted:
             raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
