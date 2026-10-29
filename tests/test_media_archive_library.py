@@ -216,3 +216,17 @@ def test_other_urls_that_are_not_a_list_are_ignored():
 def test_len_reports_archive_count():
 	lib = MediaArchiveLibrary([_meta(), _meta(), _meta()])
 	assert len(lib) == 3
+
+
+def test_success_prefers_the_archive_with_most_files():
+	"""Runs allowed different numbers of videos per URL: use the one that got most."""
+	m1 = _meta()
+	m1.add_item("one_1.mp4", post_ids=["p1"], url="https://example.com/channel")
+	m2 = _meta()
+	m2.add_item("two_1.mp4", post_ids=["p1"], url="https://example.com/channel")
+	m2.add_item("two_2.mp4", post_ids=["p1"], url="https://example.com/channel")
+	lib = MediaArchiveLibrary([m1, m2])
+
+	hit = lib.find("https://example.com/channel")
+	assert hit.metadata is m2
+	assert {fn for fn, _ in hit.entries} == {"two_1.mp4", "two_2.mp4"}

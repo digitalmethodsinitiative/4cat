@@ -182,13 +182,15 @@ class MediaArchiveLibrary:
 			return None
 
 		if bucket["items"]:
-			# success beats failure; take the first archive that has the URL
-			# and copy all of its files for that URL (one URL may yield many,
-			# e.g. a playlist)
-			first_metadata = bucket["items"][0][0]
-			entries = [(filename, item) for metadata, filename, item in bucket["items"]
-					   if metadata is first_metadata]
-			return MediaLibraryHit(is_success=True, metadata=first_metadata, entries=entries)
+			# success beats failure. One URL may yield many files (e.g. a
+			# playlist), and different runs may have been allowed a different
+			# number of them; take the archive with the most files for the URL,
+			# or the first one if several have as many
+			files_per_archive = {}
+			for metadata, filename, item in bucket["items"]:
+				files_per_archive.setdefault(id(metadata), (metadata, []))[1].append((filename, item))
+			metadata, entries = max(files_per_archive.values(), key=lambda archive: len(archive[1]))
+			return MediaLibraryHit(is_success=True, metadata=metadata, entries=entries)
 
 		# pass all the failures (e.g. in case one is "error", but later is "not_a_video", or
 		# something else the consumer wants to interpret), each with the archive

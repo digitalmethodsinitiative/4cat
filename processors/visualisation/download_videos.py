@@ -570,8 +570,16 @@ class VideoDownloaderPlus(BasicProcessor):
         if hit is None:
             return result
 
-        if hit.is_success:
-            # copy the previously downloaded file(s) instead of re-fetching
+        if hit.is_success and self._channel_has_more_videos(hit) \
+                and self._should_use_yt_dlp(url, self.parameters.get("also_indirect", "none")):
+            # a previous run stopped at its limit of videos for this URL, and
+            # this run allows more; download the URL again instead
+            self.dataset.log(f"Previously downloaded {len(hit.entries):,} video(s) of a channel or playlist with more; "
+                             f"this run allows {self.max_videos_per_url:,} per link, so downloading again: {url}")
+        elif hit.is_success:
+            # copy the previously downloaded file(s) instead of re-fetching, but
+            # no more than this run allows per URL
+            self._limit_to_videos_per_url(hit, url)
             try:
                 self.dataset.log(f"Copying previously downloaded video for url: {url}")
                 num_copied = self.copy_previous_video(hit, results_path)
@@ -623,6 +631,85 @@ class VideoDownloaderPlus(BasicProcessor):
             default=0
         )
         return current > previous
+
+    @staticmethod
+    def _playlist_position(item):
+        """
+        Where a video was in the channel or playlist it was downloaded from
+
+        yt-dlp records this as `playlist_index`; videos without it (e.g. not
+        from a playlist) sort last, in the order they were recorded.
+
+        :param dict item:  Metadata entry of the video
+        :return int|float:
+        """
+        try:
+            return int((item.get("extra") or {}).get("playlist_index"))
+        except (TypeError, ValueError):
+            return float("inf")
+
+    def _channel_has_more_videos(self, hit):
+        """
+        Could this run get more videos from a URL than a previous run did?
+
+        A previous run may have stopped at its limit of videos per URL, e.g.
+        one video of a channel. yt-dlp records which channel or playlist a
+        video came from and how many videos it holds; if it holds more than
+        were downloaded, and this run allows more, the URL is worth
+        downloading again. Where yt-dlp did not know how many videos the
+        playlist holds, the previous run counts as stopped if it got as many
+        videos as its own limit allowed.
+
+        :param MediaLibraryHit hit:  Successful library hit for the URL
+        :return bool:
+        """
+        downloaded = len(hit.entries)
+        if self.max_videos_per_url <= downloaded:
+            return False
+
+        for _, item in hit.entries:
+            extra = item.get("extra") or {}
+            if not any(field in extra for field in ("playlist_count", "n_entries", "playlist_index")):
+                # not from a channel or playlist
+                continue
+
+            try:
+                available = int(extra.get("playlist_count") or extra.get("n_entries"))
+            except (TypeError, ValueError):
+                available = None
+
+            if available is not None:
+                return available > downloaded
+
+            # playlist of unknown size: did the previous run reach its limit?
+            previous_dataset = hit.metadata.dataset if hit.metadata else None
+            if previous_dataset is None:
+                return False
+            try:
+                previous_limit = max(1, int(previous_dataset.parameters.get("channel_videos") or 0))
+            except (TypeError, ValueError):
+                return False
+            return downloaded >= previous_limit
+
+        return False
+
+    def _limit_to_videos_per_url(self, hit, url):
+        """
+        Copy no more videos of a URL than this run allows
+
+        A previous run may have been allowed more videos per URL. Keep the
+        first ones, in the order of the channel or playlist they came from.
+
+        :param MediaLibraryHit hit:  Successful library hit; its entries are
+          shortened in place
+        :param str url:  The URL, for the log
+        """
+        if len(hit.entries) <= self.max_videos_per_url:
+            return
+
+        self.dataset.log(f"Copying {self.max_videos_per_url:,} of {len(hit.entries):,} previously downloaded videos, "
+                         f"as this run allows {self.max_videos_per_url:,} per link: {url}")
+        hit.entries = sorted(hit.entries, key=lambda entry: self._playlist_position(entry[1]))[:self.max_videos_per_url]
 
     @staticmethod
     def _copied_url_fields(hit):
