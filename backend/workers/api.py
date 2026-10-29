@@ -1,9 +1,14 @@
 import traceback
+import inspect
 import socket
 import time
 import json
+import sys
+
+from pathlib import Path
 
 from backend.lib.worker import BasicWorker
+from common.lib.helpers import get_software_commit
 from common.lib.job import Job
 from common.lib.exceptions import JobNotFoundException
 
@@ -92,6 +97,7 @@ class InternalAPI(BasicWorker):
 				continue
 
 			self.api_response(client, address)
+			client.close()
 
 		if client:
 			client.close()
@@ -195,17 +201,7 @@ class InternalAPI(BasicWorker):
 			self.manager.request_interrupt(job=job, interrupt_level=level)
 			return "OK"
 
-		elif request == "workers":
-			# return the number of workers, sorted by type
-			workers = {}
-			for jobtype in self.manager.worker_pool:
-				workers[jobtype] = len(self.manager.worker_pool[jobtype])
-
-			workers["total"] = sum([workers[workertype] for workertype in workers])
-
-			return workers
-
-		if request == "jobs":
+		elif request == "jobs":
 			# return queued jobs, sorted by type
 			jobs = self.db.fetchall("SELECT * FROM jobs")
 			if jobs is None:
@@ -255,6 +251,9 @@ class InternalAPI(BasicWorker):
 			running = []
 			queue = {}
 
+			# get relevant frame stacks
+			frames = sys._current_frames()
+
 			for job in open_jobs:
 				# find the worker for this job, if it exists
 				queue_key = job["queue_id"]
@@ -291,6 +290,44 @@ class InternalAPI(BasicWorker):
 					# resolution is left to the frontend (which treats remote_id as
 					# a dataset key only for processor jobtypes); the API just
 					# reports job state.
+
+					# include the worker stack location, which shows where exactly
+					# the worker is currently executing code
+					stack = []
+					if frames.get(worker.ident):
+						stack = []
+						frame = frames[worker.ident]
+						have_root = False
+						while frame:
+							# each frame has a reference to the parent frame (if there is one)
+							# traverse this stack to construct the actual call stack
+							# only include frames within the 4CAT context
+							code_path = Path(frame.f_code.co_filename)
+							if code_path == Path(inspect.getfile(worker.__class__)):
+								# start the stack trace at the worker's own file
+								have_root = True
+
+							if not have_root or not code_path.is_relative_to(self.config.get("PATH_ROOT")):
+								frame = frame.f_back
+								continue
+
+							extension = ""
+							relative_path = code_path.relative_to(self.config.get("PATH_ROOT"))
+							if code_path.is_relative_to(self.config.get("PATH_EXTENSIONS")):
+								# for extension code, take the extension folder as root
+								relative_path = code_path.relative_to(self.config.get("PATH_EXTENSIONS"))
+								extension = code_path.parts[0]
+								relative_path = relative_path.relative_to(*relative_path.parts[:1])
+
+							stack.append({
+								"path": "/" + str(relative_path),
+								"line": frame.f_lineno,
+								"function": frame.f_code.co_name,
+								"extension": extension
+							})
+							frame = frame.f_back
+						stack = stack[:-2]
+
 					running.append({
 						"type": jobtype,
 						"queue_id": queue_key,
@@ -302,6 +339,10 @@ class InternalAPI(BasicWorker):
 						"is_recurring": (int(job["interval"]) > 0),
 						"is_parked": is_parked,
 						"is_maybe_crashed": is_claimed and not bool(worker),
+						"code": {
+							"origin": get_software_commit(worker),
+							"location": stack
+						},
 						"timestamp_queued": job["timestamp"],
 						"timestamp_claimed": timestamp_claimed,
 						"timestamp_lastclaimed": job["timestamp_lastclaimed"],

@@ -8,6 +8,7 @@ import shutil
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.dataset import StatusType
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -92,13 +93,21 @@ class BaseFilter(BasicProcessor):
 
         self.dataset.update_label(f"({self.title}) {self.source_dataset.get_label()}")
 
+        # a filter can end with a warning, e.g. that some matching items were
+        # left out; finish with that warning rather than as a plain success
+        warning = None
+        if self.dataset.data.get("status_type") == StatusType.WARNING.value:
+            warning = self.dataset.get_status()
+
         # Write the archive if needed and finish the dataset
         if zip_file:
             # check for metadata file and copy it over if it exists
             metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_dataset.get_results_path())
             if metadata_file:
                 shutil.copy2(metadata_file, staging_area)
-            self.write_archive_and_finish(staging_area, num_posts)
+            self.write_archive_and_finish(staging_area, num_posts, warning=warning)
+        elif warning:
+            self.dataset.finish_with_warning(num_posts, warning)
         else:
             self.dataset.finish(num_posts)
 

@@ -2,6 +2,7 @@
 Create an PixPlot of downloaded images
 """
 import shutil
+import html
 from datetime import datetime
 import csv
 import os
@@ -10,7 +11,7 @@ from werkzeug.utils import secure_filename
 
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
 from common.lib.exceptions import MetadataException
-from common.lib.helpers import UserInput, ellipsiate, urls_in_text
+from common.lib.helpers import UserInput, link_urls_in_text
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 
@@ -323,10 +324,10 @@ class PixPlotGenerator(BasicProcessor):
                     ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
                     for detail in ordered_descriptions:
                         if post.get(detail):
-                            image['description'] += '<p><span class="fieldname">' + detail + '</span>' + self.make_nice_link(post.get(detail)) + '</p>'
+                            image['description'] += '<p><span class="fieldname">' + html.escape(detail) + '</span>' + link_urls_in_text(post.get(detail), max_length=50, line_breaks=True) + '</p>'
                     for key, value in post.items():
                         if key not in ordered_descriptions:
-                            image['description'] += '<p><span class="fieldname">' + key + '</span> ' + self.make_nice_link(value) + '</p>'
+                            image['description'] += '<p><span class="fieldname">' + html.escape(str(key)) + '</span> ' + link_urls_in_text(value, max_length=50, line_breaks=True) + '</p>'
 
                     # Add tags or hashtags
                     if image['tags']:
@@ -373,6 +374,11 @@ class PixPlotGenerator(BasicProcessor):
             rows_written = 0
             for image in images.values():
                 rows_written += 1
+                # PixPlot shows the description after decoding its %-codes
+                # (with JavaScript's decodeURIComponent). Writing each % as
+                # %25 makes that give back exactly this HTML, and keeps a lone
+                # %, as in "50% off", from stopping the description showing
+                image['description'] = image['description'].replace('%', '%25')
                 writer.writerow(image)
 
         self.dataset.update_status("Metadata.csv created")
@@ -395,24 +401,3 @@ class PixPlotGenerator(BasicProcessor):
         for i in invalid_chars:
             s = s.replace(i, '')
         return s
-
-    def make_nice_link(self, content):
-        """
-        Add HTML links to text
-
-        Replaces URLs with a clickable link
-
-        :param str content:  Text to parse
-        :return str:  Parsed text
-        """
-        try:
-            content = str(content)
-        except ValueError:
-            return content
-
-        for link in urls_in_text(content):
-            link_text = ellipsiate(link, 50, True, "[&hellip;]")
-            content = content.replace(link,
-                                      f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
-
-        return content

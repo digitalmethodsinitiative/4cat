@@ -36,7 +36,7 @@ set all_known_fields = {
 {% if fields.get("url") and pseudonymised %}
 	<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
 {% elif fields.get("url") and not pseudonymised %}
-	<a href="{{ fields.url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+	<a href="{{ fields.url | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 {% endif %}
 
 
@@ -102,6 +102,22 @@ set all_known_fields = {
                 {% endif %}
             </div>
         </div>
+    {% else %}
+        <!-- If the item links to pictures or videos that were not downloaded, say so; text-only items have none -->
+        {% set media = namespace(images="", videos="") %}
+        {% for field in ["image_url", "image_urls", "images", "thumbnail_url", "video_thumbs", "media_url", "photos"] %}
+            {% set media.images = media.images ~ "," ~ (item.get(field) or "") %}
+        {% endfor %}
+        {% for field in ["video_url", "video_urls", "videos"] %}
+            {% set media.videos = media.videos ~ "," ~ (item.get(field) or "") %}
+        {% endfor %}
+        {% set images = media.images | split_urls | map("web_url") | reject("equalto", "#") | list %}
+        {% set videos = media.videos | split_urls | map("web_url") | reject("equalto", "#") | list %}
+        {% if images or videos %}
+            {% with placeholder_cover=images[0] if images else "", placeholder_original=fields.get("url"), placeholder_original_label="Open original" %}
+                {% include "explorer/media-placeholder.html" %}
+            {% endwith %}
+        {% endif %}
     {% endif %}
 
 	<!-- item body -->
@@ -115,7 +131,7 @@ set all_known_fields = {
 	{% if fields.get("tags") %}
 		<div class="tags">
         Tags:
-			{{ fields.tags.split(",")|join(", ") | safe }}
+			{{ fields.tags.split(",")|join(", ") }}
 		</div>
 	{% endif %}
 

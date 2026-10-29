@@ -10,7 +10,7 @@ import re
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField, value_or_missing
 from common.lib.exceptions import MapItemException
-from common.lib.helpers import normalize_url_encoding
+from common.lib.helpers import readable_url
 
 
 class SearchInstagram(Search):
@@ -46,6 +46,20 @@ class SearchInstagram(Search):
         if isinstance(caption, MissingMappedField):
             return ""
         return ",".join(SearchInstagram.HASHTAG_REGEX.findall(caption))
+
+    @staticmethod
+    def extract_timestamp(post_id) -> int:
+        """
+        Instagram post ID embeds timestamp of publication!
+
+        See https://slang.cx/instagram-id
+        :param post_id: Numerical post ID (i.e. not the string)
+        :retur int: timestamp
+        """
+        post_id = int(post_id)
+        instagram_epoch = 1314220021
+        embedded_timestamp = (post_id >> (64 - 41)) / 1000
+        return round(instagram_epoch + embedded_timestamp)
 
     @staticmethod
     def get_author(node):
@@ -209,6 +223,11 @@ class SearchInstagram(Search):
         unix_at = MissingMappedField(0)
         # 2026-2-24 node["caption"]["text"] 
         caption = MissingMappedField("") if "caption" not in node else "" if not node.get("caption") else node["caption"]["text"]
+
+        # we have no direct timestamp, but we can extract it from the post ID if available
+        if "pk" in node:
+            unix_at = SearchInstagram.extract_timestamp(node["pk"])
+            collected_at = datetime.datetime.fromtimestamp(unix_at).strftime("%Y-%m-%d %H:%M:%S"),
         
 
         author = SearchInstagram.get_author(node)
@@ -234,7 +253,7 @@ class SearchInstagram(Search):
         
         mapped_item = {
             # Post and caption
-            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(node.get("__import_meta", {}).get("source_platform_url")),  # Zeeschuimer metadata
             "collected_from_view": node.get("_zs_instagram_view", ""),
             "partial_item": partial_item,
             "id": node["code"],
@@ -355,7 +374,7 @@ class SearchInstagram(Search):
         mapped_item = {
             # Post data
             "id": node["shortcode"],
-            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(node.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "collected_from_view": SearchInstagram.get_value_or_missing(node, "_zs_instagram_view", ""),
             "partial_item": SearchInstagram.get_value_or_missing(node, "_zs_partial", ""),
             "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
@@ -536,12 +555,13 @@ class SearchInstagram(Search):
             unix_at = node["taken_at"]
         else:
             # grid and thumbnail views leave the post date out
-            collected_at = MissingMappedField(0)
-            unix_at = MissingMappedField(0)
+            # but we can get it from the post ID!
+            unix_at = SearchInstagram.extract_timestamp(node["pk"])
+            collected_at = datetime.datetime.fromtimestamp(unix_at).strftime("%Y-%m-%d %H:%M:%S")
 
         mapped_item = {
             # Post and caption
-            "collected_from_url": normalize_url_encoding(node.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(node.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "collected_from_view": node.get("_zs_instagram_view", ""),
             "partial_item": node.get("_zs_partial", ""),
             "id": code,

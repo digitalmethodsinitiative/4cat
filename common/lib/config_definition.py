@@ -28,7 +28,7 @@ config_definition = {
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
         "default": ["ninegag", "bsky", "douban", "douyin", "imgur", "upload", "instagram", "import_4cat", "linkedin", "media-import",
-                    "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab"],
+                    "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab", "weibo", "weibo-comments"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
@@ -276,14 +276,24 @@ config_definition = {
         "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
         "global": True
     },
-    # proxy stuff
+    # proxy stuff; one request queue is shared by the whole backend, so these
+    # cannot differ per user tag
+    "proxies.intro": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Some 4CAT processors fetch many files or pages from sites (e.g. 'Download images' and 'Download videos'). "
+                    "These requests wait in a queue that follows the rules below. By default, requests are made directly from this "
+                    "server, but you can also configure a list of proxy servers to use as well or instead of `__localhost__`. The "
+                    "limits below apply to each proxy (including localhost/this server). **Note:** some changes only take effect "
+                    "after restarting 4CAT."
+        },
     "proxies.urls": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": ["__localhost__"],
         "help": "Proxy URLs",
         "tooltip": "A JSON Array of full proxy URLs. Include any proxy login details in the URL itself (e.g. "
                    "http://username:password@proxy:port). There is one special value, '__localhost__'; this means a " 
-                   "direct request, without using a proxy."
+                   "direct request, without using a proxy.",
+        "global": True
     },
     "proxies.cooloff": {
         "type": UserInput.OPTION_TEXT,
@@ -291,15 +301,17 @@ config_definition = {
         "help": "Cool-off time",
         "tooltip": "After a request has finished, do not use the proxy again for this many seconds.",
         "default": 0.1,
-        "min": 0.0
+        "min": 0.0,
+        "global": True
     },
     "proxies.concurrent-overall": {
         "type": UserInput.OPTION_TEXT,
         "coerce_type": int,
-        "default": 1,
+        "default": 4,
         "min": 1,
         "help": "Max concurrent requests (overall)",
-        "tooltip": "Per proxy, this many requests can run concurrently overall."
+        "tooltip": "Per proxy, this many requests can run concurrently overall.",
+        "global": True
     },
     "proxies.concurrent-host": {
         "type": UserInput.OPTION_TEXT,
@@ -308,20 +320,23 @@ config_definition = {
         "min": 1,
         "help": "Max concurrent requests (per host)",
         "tooltip": "Per proxy, this many requests can run concurrently per host. Should be lower than or equal to the "
-                   "overall limit."
+                   "overall limit.",
+        "global": True
     },
     "proxies.allow-localhost-fallback": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
         "help": "Fall back to localhost",
-        "tooltip": "If all proxies are down, allow falling back to direct requests (i.e., no proxy)."
+        "tooltip": "If all proxies are down, allow falling back to direct requests (i.e., no proxy).",
+        "global": True
     },
     "proxies.healthcheck-url": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
         "help": "Proxy health check URL",
         "tooltip": "Known-good URL used to validate whether a proxy is actually down when a proxied request fails. "
-                   "Leave empty to auto-use this 4CAT frontend's /robots.txt URL based on Flask host and scheme."
+                   "Leave empty to auto-use this 4CAT frontend's /robots.txt URL based on Flask host and scheme.",
+        "global": True
     },
     "proxies.healthcheck-timeout": {
         "type": UserInput.OPTION_TEXT,
@@ -329,7 +344,8 @@ config_definition = {
         "default": 5,
         "min": 0.1,
         "help": "Proxy health check timeout",
-        "tooltip": "Timeout in seconds for the proxy health check request."
+        "tooltip": "Timeout in seconds for the proxy health check request.",
+        "global": True
     },
     # logging
     "logging.slack.level": {

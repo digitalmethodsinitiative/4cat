@@ -1,0 +1,25 @@
+{#
+For a post with pictures or videos that were not downloaded: the cover image,
+if there is one, with a note under it; otherwise the note in a box. The note
+links to the processors that download media, and to the original post.
+
+Set these with {% with %} around the include:
+- placeholder_cover: web address of an image to show, or nothing
+- placeholder_original: web address of the original post, or nothing
+- placeholder_original_label: text of the link to the original post
+#}
+{% set cover = placeholder_cover | web_url if placeholder_cover else "#" %}
+{% set dataset_url = url_for('dataset.show_result', key=dataset.key) %}
+<div class="media-placeholder{% if cover != '#' %} with-cover{% endif %}">
+	{% if cover != "#" %}
+		<img class="media-placeholder-cover" src="{{ cover }}" alt="" loading="lazy">
+	{% endif %}
+	<div class="media-placeholder-note">
+		<i class="fa-solid fa-video-slash"></i> Not downloaded
+		· <a href="{{ dataset_url }}#processor-list-item-video-downloader">Download videos</a>
+		· <a href="{{ dataset_url }}#processor-list-item-image-downloader">Download images</a>
+		{% if placeholder_original and not pseudonymised %}
+		· <a href="{{ placeholder_original | web_url }}" target="_blank">{{ placeholder_original_label or "Open original" }} <i class="fas fa-external-link-alt"></i></a>
+		{% endif %}
+	</div>
+</div>

@@ -106,7 +106,7 @@ LLM_SCHEMA = {
             "description": (
                 "Complete ES-module import statements that map_item needs. "
                 "Normally empty: Zeeschuimer's `js/lib.js` (which provides MappedItem, "
-                "MissingMappedField, normalize_url_encoding, strip_tags) is loaded as a "
+                "MissingMappedField, readable_url, strip_tags) is loaded as a "
                 "plain script, NOT an ES module — its declarations are already global, "
                 "so do not write `import { X } from '../js/lib.js'`. Only populate this "
                 "if you genuinely need to import from another ES module."
@@ -208,9 +208,9 @@ AVAILABLE_JS_HELPERS = [
         ),
     },
     {
-        "name": "normalize_url_encoding",
+        "name": "readable_url",
         "kind": "function",
-        "usage": "normalize_url_encoding(url)",
+        "usage": "readable_url(url)",
         "note": "Direct port of the Python helper of the same name.",
     },
     {
@@ -1234,7 +1234,8 @@ def main():
     fail_fast = not args.no_fail_fast
     print(
         f"Using model: {args.model} "
-        f"(output_mode: {args.output_mode}, "
+        f"(provider: {args.llm_provider} at {base_url}, "
+        f"output_mode: {args.output_mode}, "
         f"fail_fast: {fail_fast}, strict_lint: {args.strict_lint})"
     )
 
@@ -1288,6 +1289,7 @@ def main():
     manifest = {
         "model": args.model,
         "provider": args.llm_provider,
+        "base_url": base_url,
         "output_mode": args.output_mode,
         "fail_fast": fail_fast,
         "strict_lint": args.strict_lint,

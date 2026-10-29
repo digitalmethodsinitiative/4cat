@@ -1,6 +1,6 @@
 <header>
     {%- if not pseudonymised %}
-       <a href="{{ item.url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+       <a href="{{ item.url | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
        <span class="author"><strong><a href="https://instagram.com/{{ item.get('author') }}">{{ item.get("author") }}</a></strong>
        {%- if item.get("is_verified") -%} <i class="fa-solid fa-circle-check verified"></i>{% endif %}</span>
        {%- if item.get("coauthors") %}
@@ -65,7 +65,7 @@
        {% if pseudonymised %}
        <div class="comments">{{ item.get("num_comments") | commafy }} comments</div>
        {% else %}
-       <div class="comments"><a href="{{ item.url }}/comments" target="_blank">View all {{ item.get("num_comments") | commafy }} comments</a></div>
+       <div class="comments"><a href="{{ item.url | web_url }}/comments" target="_blank">View all {{ item.get("num_comments") | commafy }} comments</a></div>
        {% endif %}
     {% endif %}
 </article>
