@@ -65,10 +65,10 @@ class TelegramImageDownloader(TelegramVideoDownloader):
 
     async def _download_to_path(self, client, message, path):
         if hasattr(message.media, "photo"):
-            await message.download_media(str(path))
+            return await message.download_media(str(path))
         else:
             # video / webpage thumbnail
-            await client.download_media(message, str(path), thumb=-1)
+            return await client.download_media(message, str(path), thumb=-1)
 
     # ---- option / compatibility overrides ----
 
