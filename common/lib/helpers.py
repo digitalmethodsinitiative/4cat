@@ -225,7 +225,12 @@ def get_software_commit(worker=None):
             raise ValueError()
         repository = origin.stdout.decode("utf-8").strip()
         if repository.endswith(".git"):
+            # the actual git repository is here, but we usually want the web URL
             repository = repository[:-4]
+
+        if repository.endswith("/"):
+            # normalise trailing slashes; remove
+            repository = repository[:-1]
 
     except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
         return ("", "")
@@ -1566,7 +1571,20 @@ def urls_in_text(text):
     return list(dict.fromkeys(urls))
 
 
-def link_urls_in_text(text, max_length=0, line_breaks=False):
+def is_web_url(url):
+    """
+    Check whether a URL is a web address, starting with http:// or https://
+
+    Only web addresses are safe to link to: a link to a URL such as
+    javascript:alert(1) runs code when it is clicked.
+
+    :param url:  URL to check; anything else is turned into text first
+    :return bool:  Whether the URL is a web address
+    """
+    return bool(re.match(r"https?://", str(url), re.IGNORECASE))
+
+
+def link_urls_in_text(text, max_length=0, line_breaks=False, other_links=None, new_tab=False):
     """
     Turn the URLs in a text into links, as safe HTML
 
@@ -1576,44 +1594,97 @@ def link_urls_in_text(text, max_length=0, line_breaks=False):
     as it is written, with the URL in readable form (see `readable_url`) as
     the link text. Other kinds of URLs, such as javascript://, stay text.
 
+    Other things can become links too, such as hashtags and @-mentions: for
+    each kind, `other_links` gives a regular expression that finds them and
+    a function that gives the URL for what was found.
+
     The text is gone through once, from start to end, and where two of the
     URLs start at the same place, the longer one becomes the link. That way,
     a URL that is the start of another one (https://x.com/someone and
-    https://x.com/someone/status/123) does not break the other one's link.
+    https://x.com/someone/status/123) does not break the other one's link,
+    and a # or @ in a URL does not become a link of its own.
 
     :param text:  Text to add links to; anything else is turned into text first
-    :param int max_length:  Shorten link texts that are longer than this,
-    keeping their start and end; 0 to never shorten them
+    :param int max_length:  Shorten URLs in link texts that are longer than
+    this, keeping their start and end; 0 to never shorten them
     :param bool line_breaks:  Show the line breaks in the text as `<br>`
+    :param dict other_links:  Other things to turn into links, as
+    `{regular expression: function}`, e.g. `{r"(?<!\\w)#\\w+": lambda tag:
+    "https://x.com/hashtag/" + tag[1:]}`
+    :param bool new_tab:  Make the links open in a new tab
     :return str:  HTML
     """
     text = str(text)
+    target = ' target="_blank"' if new_tab else ""
 
-    urls = [url for url in urls_in_text(text) if re.match(r"https?://", url, re.IGNORECASE)]
-    if not urls:
-        result = html.escape(text)
-        return result.replace("\n", "<br>\n") if line_breaks else result
+    # one pattern for everything that becomes a link, with each kind in a
+    # group of its own; None marks the group for URLs
+    patterns = []
+    url_for = []
+    urls = [url for url in urls_in_text(text) if is_web_url(url)]
+    if urls:
+        # with the longest URLs first, the longest one wins where several start at the same place
+        patterns.append("|".join(re.escape(url) for url in sorted(urls, key=len, reverse=True)))
+        url_for.append(None)
 
-    # with the longest URLs first, the longest one wins where several start at the same place
-    url_pattern = re.compile("|".join(re.escape(url) for url in sorted(urls, key=len, reverse=True)))
+    for pattern, make_url in (other_links or {}).items():
+        patterns.append(pattern)
+        url_for.append(make_url)
 
     parts = []
     position = 0
-    for match in url_pattern.finditer(text):
-        url = match.group()
-        link_text = readable_url(url)
-        if max_length:
-            link_text = ellipsiate(link_text, max_length, inside=True, ellipsis_str="[…]")
+    if patterns:
+        link_pattern = re.compile("|".join(f"(?P<kind{index}>{pattern})" for index, pattern in enumerate(patterns)))
+        for match in link_pattern.finditer(text):
+            found = match.group()
+            kind = next(index for index in range(len(patterns)) if match.group(f"kind{index}") is not None)
+            if url_for[kind] is None:
+                url = found
+                link_text = readable_url(found)
+                if max_length:
+                    link_text = ellipsiate(link_text, max_length, inside=True, ellipsis_str="[…]")
+            else:
+                url = url_for[kind](found)
+                link_text = found
 
-        parts.append(html.escape(text[position:match.start()]))
-        parts.append(f'<a href="{html.escape(url)}" rel="external">{html.escape(link_text)}</a>')
-        position = match.end()
+            parts.append(html.escape(text[position:match.start()]))
+            parts.append(f'<a href="{html.escape(url)}" rel="external"{target}>{html.escape(link_text)}</a>')
+            position = match.end()
 
     parts.append(html.escape(text[position:]))
     result = "".join(parts)
 
-    # URLs never contain line breaks, so these are all in the text between them
+    # links never contain line breaks, so these are all in the text between them
     return result.replace("\n", "<br>\n") if line_breaks else result
+
+
+def link_urls_in_html(html_text, other_links=None, new_tab=False):
+    """
+    Turn the URLs in the text of safe HTML into links
+
+    Works like `link_urls_in_text`, for HTML that is safe already, such as
+    Markdown turned into HTML with the HTML in it escaped. Only the text
+    between the tags changes, and not the text of links it already has.
+
+    :param str html_text:  Safe HTML
+    :param dict other_links:  Other things to turn into links, as for `link_urls_in_text`
+    :param bool new_tab:  Make the new links open in a new tab
+    :return str:  HTML
+    """
+    # every odd part is a tag, every even part the text between tags
+    parts = re.split(r"(<[^>]*>)", str(html_text))
+    in_link = False
+    for index, part in enumerate(parts):
+        if index % 2:
+            if re.match(r"<a[\s>]", part, re.IGNORECASE):
+                in_link = True
+            elif re.match(r"</a\s*>", part, re.IGNORECASE):
+                in_link = False
+        elif part and not in_link:
+            # the text is escaped already; link_urls_in_text escapes it again
+            parts[index] = link_urls_in_text(html.unescape(part), other_links=other_links, new_tab=new_tab)
+
+    return "".join(parts)
 
 
 def holds_only_urls(text, urls):

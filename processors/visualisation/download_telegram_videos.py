@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 from collections import Counter
+from pathlib import Path
 
 from telethon import TelegramClient
 from telethon.errors import FloodError, BadRequestError
@@ -97,8 +98,31 @@ class TelegramVideoDownloader(BasicProcessor):
         return f"{entity}-{message.id}.{ext}"
 
     async def _download_to_path(self, client, message, path):
-        """Perform the actual file fetch; subclasses can switch on media variant."""
-        await message.download_media(str(path))
+        """
+        Perform the actual file fetch; subclasses can switch on media variant.
+
+        :return str|None:  Path of the file Telethon saved, which may differ
+          from the one given, or `None` if there was nothing to download
+        """
+        return await message.download_media(str(path))
+
+    def _downloaded_file(self, saved_path):
+        """
+        Get the file a download actually produced
+
+        Telethon does not raise an error when there is nothing to download
+        (e.g. media that is no longer available); it returns `None`. It can
+        also save under another name than the one asked for.
+
+        :param str|None saved_path:  What `_download_to_path` returned
+        :return Path|None:  The saved file in the staging area, or `None` if
+          there is none
+        """
+        if not saved_path:
+            return None
+
+        saved_file = self.staging_area.joinpath(Path(saved_path).name)
+        return saved_file if saved_file.is_file() else None
 
     # ---- standard processor surface ----
     @classmethod
@@ -313,10 +337,17 @@ class TelegramVideoDownloader(BasicProcessor):
                                        "dataset, this is expected.")
                     else:
                         try:
-                            await self._download_to_path(client, message, path)
-                            success = True
-                            reason_code = "ok"
-                            reason_text = "downloaded"
+                            saved_file = self._downloaded_file(
+                                await self._download_to_path(client, message, path))
+                            if saved_file:
+                                success = True
+                                filename = saved_file.name
+                                reason_code = "ok"
+                                reason_text = "downloaded"
+                            else:
+                                reason_code = "nothing_downloaded"
+                                reason_text = ("Telegram delivered no file for this media; it may no "
+                                               "longer be available")
                         except (AttributeError, RuntimeError, ValueError, TypeError, BadRequestError) as e:
                             reason_code, reason_text = self.categorize_download_error(e)
 

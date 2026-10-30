@@ -63,6 +63,20 @@ class MakeWordCloud(BasicProcessor):
 					"type": UserInput.OPTION_TEXT,
 					"default": 200,
 					"help": "Max words to show"
+				},
+				"width": {
+					"type": UserInput.OPTION_TEXT,
+					"default": 1600,
+					"min": 100,
+					"max": 4000,
+					"help": "Width (px)"
+				},
+				"height": {
+					"type": UserInput.OPTION_TEXT,
+					"default": 1000,
+					"min": 100,
+					"max": 4000,
+					"help": "Height (px)"
 				}
 			}
 		return options
@@ -81,7 +95,12 @@ class MakeWordCloud(BasicProcessor):
 		try:
 			max_words = int(self.parameters.get("max_words"))
 		except (ValueError, TypeError):
-			max_words = self.parameters["max_words"]["default"]
+			max_words = 200
+		try:
+			width = int(self.parameters.get("width", 1600))
+			height = int(self.parameters.get("height", 1000))
+		except (ValueError, TypeError):
+			width, height = 1600, 1000
 
 		self.dataset.update_status("Extracting words and counts.")
 
@@ -114,10 +133,20 @@ class MakeWordCloud(BasicProcessor):
 				words[word] = count
 
 		self.dataset.update_status("Making word cloud.")
-		cloud = WordCloud(prefer_horizontal=1, background_color="rgba(255, 255, 255, 0)", mode="RGBA", color_func=lambda *args, **kwargs: (0,0,0), width=1600, height=1000, collocations=False, max_words=max_words).generate_from_frequencies(words)
+		cloud = WordCloud(
+			prefer_horizontal=1,
+			random_state=42,
+			background_color="rgba(255, 255, 255, 0)",
+			mode="RGBA",
+			color_func=lambda *args, **kwargs: (0,0,0),
+			width=width,
+			height=height,
+			collocations=False,
+			max_words=max_words
+		).generate_from_frequencies(words)
 
 		# Write to svg
-		cloud = cloud.to_svg()
-		file = open(self.dataset.get_results_path(), "w")
+		cloud = cloud.to_svg(embed_font=True)  # we embed the font so placement stays the same
+		file = open(self.dataset.get_results_path(), "w", encoding="utf-8")
 		file.write(cloud)
 		self.dataset.finish(1)

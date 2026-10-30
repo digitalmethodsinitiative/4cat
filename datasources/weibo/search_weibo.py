@@ -32,6 +32,10 @@ class SearchWeibo(Search):
         "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)"
     ]
 
+    # Weibo's image and video servers refuse requests from a browser that does
+    # not say it came from Weibo
+    media_request_headers = {"Referer": "https://weibo.com/"}
+
     def get_items(self, query):
         """
         Run custom search

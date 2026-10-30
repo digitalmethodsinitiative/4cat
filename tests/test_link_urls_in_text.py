@@ -1,10 +1,13 @@
 import html
 import random
 import re
+from html.parser import HTMLParser
 
 import pytest
 
-from common.lib.helpers import link_urls_in_text, urls_in_text
+import markdown2
+
+from common.lib.helpers import is_web_url, link_urls_in_html, link_urls_in_text, urls_in_text
 
 
 """
@@ -82,6 +85,21 @@ def test_only_web_addresses_become_links(text):
     assert link_urls_in_text(text) == text
 
 
+@pytest.mark.parametrize("url, expected", [
+    ("https://example.com/x", True),
+    ("HTTP://EXAMPLE.COM/", True),
+    ("javascript:alert(1)", False),
+    ("JavaScript:alert(1)", False),
+    (" javascript:alert(1)", False),
+    ("data:text/html,<script>alert(1)</script>", False),
+    ("//example.com/x", False),
+    ("", False),
+    (None, False),
+])
+def test_is_web_url(url, expected):
+    assert is_web_url(url) == expected
+
+
 def test_link_leads_to_the_url_exactly_as_written():
     """Characters that mean something in HTML are escaped in the link, so the browser reads the URL back unchanged"""
     result = link_urls_in_text("https://en.wikipedia.org/wiki/O'Brien and https://example.com/?a=1&b=2")
@@ -144,3 +162,100 @@ def test_random_text_gives_safe_html(text):
     found = urls_in_text(text)
     for href in re.findall(r'<a href="([^"]*)"', result):
         assert html.unescape(href) in found
+
+
+# --- hashtags and @-mentions, as in the Explorer -----------------------------------------
+
+HASHTAGS_AND_MENTIONS = {
+    r"(?<!\w)#\w+": lambda tag: "https://x.com/hashtag/" + tag[1:],
+    r"(?<!\w)@[\w-]+": lambda mention: "https://x.com/" + mention[1:],
+}
+
+
+def test_hashtags_and_mentions_become_links():
+    assert link_urls_in_text("#tag by @someone", other_links=HASHTAGS_AND_MENTIONS) == \
+        link("https://x.com/hashtag/tag", "#tag") + " by " + link("https://x.com/someone", "@someone")
+
+
+def test_hashtag_or_mention_in_a_url_is_part_of_the_url():
+    text = "https://www.tiktok.com/@someone/video/1?q=%23tag#comments"
+    assert link_urls_in_text(text, other_links=HASHTAGS_AND_MENTIONS) == link(text)
+
+
+def test_no_mentions_in_e_mail_addresses_or_words():
+    text = "mail me@example.com, issue#12, C#"
+    assert link_urls_in_text(text, other_links=HASHTAGS_AND_MENTIONS) == html.escape(text)
+
+
+def test_hashtags_with_html_around_them():
+    assert link_urls_in_text("<b>#tag</b>", other_links=HASHTAGS_AND_MENTIONS) == \
+        "&lt;b&gt;" + link("https://x.com/hashtag/tag", "#tag") + "&lt;/b&gt;"
+
+
+def test_links_open_in_a_new_tab():
+    assert link_urls_in_text("https://example.com/x", new_tab=True) == \
+        '<a href="https://example.com/x" rel="external" target="_blank">https://example.com/x</a>'
+
+
+def test_link_with_a_quotation_mark_stays_one_attribute():
+    """The Explorer used to write href='...', so a ' in a URL could add attributes to the link"""
+    text = "https://example.com/x'onmouseover='alert(1) and https://example.com/y\"onclick=\"alert(2)"
+    tags = []
+    parser = HTMLParser()
+    parser.handle_starttag = lambda tag, attributes: tags.append(dict(attributes))
+    parser.feed(link_urls_in_text(text, new_tab=True))
+
+    assert len(tags) == 2
+    for attributes in tags:
+        assert list(attributes) == ["href", "rel", "target"]
+        assert attributes["href"] in urls_in_text(text)
+
+
+# --- links in HTML that is safe already ----------------------------------------------------
+
+def tumblr_markdown(text):
+    """Markdown turned into safe HTML with links, as `social_mediafy` does for Tumblr posts in the Explorer"""
+    return link_urls_in_html(markdown2.markdown(text, safe_mode="escape", extras=["code-friendly"]), HASHTAGS_AND_MENTIONS)
+
+
+def test_mentions_in_safe_markdown():
+    result = tumblr_markdown("**Hi** @someone, see [the post](https://example.com/post) <img src=x onerror=alert(1)>")
+    assert "<strong>Hi</strong> " + link("https://x.com/someone", "@someone") in result
+    assert '<a href="https://example.com/post">the post</a>' in result
+    assert "&lt;img src=x onerror=alert(1)&gt;" in result
+    assert "<img" not in result
+
+
+@pytest.mark.parametrize("markdown", [
+    # markdown2 2.4.2 let these through as HTML that runs
+    "<x <img src=x onerror=alert(1)//>",
+    "nice post <b <img src=x onerror=alert(2)//> thanks @someone",
+    "![a\nhttps://e.example/x/onerror=alert(1)//)](>onload  \nzz)",
+])
+def test_html_in_markdown_can_not_run(markdown):
+    attributes = []
+    parser = HTMLParser()
+    parser.handle_starttag = lambda tag, tag_attributes: attributes.extend(name for name, value in tag_attributes)
+    parser.feed(tumblr_markdown(markdown))
+    assert set(attributes) <= {"href", "src", "alt", "title", "rel", "target"}
+
+
+def test_plus_in_link_address_is_kept():
+    assert '<a href="https://example.com/C++/a+b">C++ docs</a>' in tumblr_markdown("[C++ docs](https://example.com/C++/a+b)")
+
+
+def test_url_with_underscores_stays_whole():
+    result = tumblr_markdown("see https://en.wikipedia.org/wiki/Hello_World_Program and *this*")
+    assert link("https://en.wikipedia.org/wiki/Hello_World_Program") in result
+    assert "<em>this</em>" in result
+
+
+def test_existing_links_and_tags_are_left_alone():
+    safe_html = '<p><a href="https://example.com/@someone">see @someone</a> and @other</p>'
+    assert link_urls_in_html(safe_html, HASHTAGS_AND_MENTIONS) == \
+        '<p><a href="https://example.com/@someone">see @someone</a> and ' + link("https://x.com/other", "@other") + "</p>"
+
+
+def test_text_in_html_stays_escaped():
+    assert link_urls_in_html("<p>a &lt;b&gt; &amp; https://example.com/?a=1&amp;b=2</p>") == \
+        "<p>a &lt;b&gt; &amp; " + link("https://example.com/?a=1&b=2") + "</p>"

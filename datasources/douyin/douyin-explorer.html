@@ -1,0 +1,50 @@
+<header>
+	{% if pseudonymised %}
+		<span title="Pseudonymous author" class="author pseudonymous"><i class="fa fa-user-secret tooltip-trigger"></i></span>
+	{% else %}
+		<a class="author" href="{{ item.get('author_profile_url') | web_url }}" target="_blank">
+			{% if item.get("author_thumbnail_url") %}<img class="avatar" src="{{ item.get('author_thumbnail_url') }}" alt="">{% endif %}
+			<span class="author-name">{{ item.get("author_nickname") }}</span>
+		</a>
+	{% endif %}
+	<span title="Date" class="datetime">{{ item.get("timestamp") }}</span>
+
+	<!-- Possible external link, if not pseudonymised -->
+	{% if pseudonymised %}
+		<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
+	{% else %}
+		<a class="external-url" href="{{ item.get('post_url') | web_url }}" target="_blank" title="Go to original item"><i class="fas fa-external-link-alt"></i></a>
+	{% endif %}
+</header>
+
+<!-- item body -->
+<div class="body">{{ item.get("body") | social_mediafy(datasource="douyin", line_breaks=True) | safe }}</div>
+
+{% if item.get("music_title") %}
+<div class="music" title="Music"><i class="fa-solid fa-music"></i> {{ item.get("music_title") }}{% if item.get("music_author") %} · {{ item.get("music_author") }}{% endif %}</div>
+{% endif %}
+
+<!-- Downloaded videos and images; otherwise the cover image with a note -->
+<div class="item-media">
+	{% if item.id in media_files %}
+		{% for media_file in media_files[item.id] %}
+			{% set filename = media_file[1] %}
+			{% set file_ext = filename.split(".")[-1].lower() %}
+			{% set dataset_key = media_file[0] %}
+			{% include 'explorer/media.html' %}
+		{% endfor %}
+	{% else %}
+		{% with placeholder_cover=item.get("video_thumbnail") or (item.get("image_urls") or "").split(",")[0], placeholder_original=item.get("post_url"), placeholder_original_label="Open on Douyin" %}
+			{% include "explorer/media-placeholder.html" %}
+		{% endwith %}
+	{% endif %}
+</div>
+
+<!-- Metrics. Views are left out: Douyin does not make them public and reports 0 for nearly every post. -->
+<div class="metrics">
+	{% for field, icon, label in [("digg_count", "fa-heart", "Likes"), ("comment_count", "fa-comment-dots", "Comments"), ("collect_count", "fa-star", "Saves"), ("share_count", "fa-share", "Shares")] %}
+		{% if item.get(field) is number and item.get(field) >= 0 %}
+		<span class="{{ field }}" title="{{ label }}"><i class="fa-solid {{ icon }}"></i> {{ item.get(field) | numberify }}</span>
+		{% endif %}
+	{% endfor %}
+</div>
