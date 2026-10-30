@@ -112,9 +112,10 @@ def test_korean_word_with_particles(match, expected):
 def test_whole_words_is_unchanged():
     """'word' is the default, and must find what the processors found before"""
     regex = compile_term_regex([re.escape("cat"), re.escape("dog")], flags=re.IGNORECASE)
-    assert regex.pattern == r"\b(cat|dog)\b"
     assert regex.search("A Cat sat")
+    assert regex.search("hot-dog!")
     assert not regex.search("cats")
+    assert not regex.search("dogma")
 
 
 def test_chinese_needs_anywhere():
@@ -122,9 +123,16 @@ def test_chinese_needs_anywhere():
     assert compile_term_regex(["北京"], match="anywhere").search("我爱北京天安门")
 
 
-def test_start_of_word_works_for_hashtags():
+@pytest.mark.parametrize("term, match, text, found", [
+    ("#서울", "word", "오늘 #서울 날씨", True),
+    ("#서울", "word", "오늘 #서울에서", False),
+    ("#서울", "start", "오늘 #서울에서", True),
+    ("#서울", "word", "a#서울", False),
+    ("c++", "word", "c++ 공부", True),
+])
+def test_terms_that_start_or_end_with_symbols(term, match, text, found):
     """with \\b, a term that starts with '#' is only found after a letter or digit"""
-    assert compile_term_regex([re.escape("#서울")], match="start").search("오늘 #서울에서")
+    assert bool(compile_term_regex([re.escape(term)], match=match).search(text)) is found
 
 
 COMPOSED = "학교에서 공부했다"
@@ -217,22 +225,48 @@ def test_kiwi_keeps_hashtags_and_mentions(tmp_path):
     assert tokens == [["새롭다", "정책", "#주말", "@jimin", "😂"]]
 
 
-@pytest.mark.parametrize("language, tokenizer, word_classes, stopwords", [
-    ("korean", "recommended", True, True),
-    ("korean", "kiwi", True, True),
-    # the word classes only apply where Kiwi runs, the stop words to Korean with any tokeniser
-    ("korean", "twitter", False, True),
-    ("korean", "jieba-cut", False, True),
-    ("other", "kiwi", False, True),
-    ("english", "recommended", False, False),
-    ("english", "twitter", False, False),
+def test_kiwi_symbols_are_not_hashtags(tmp_path):
+    """'@@' and '##' are symbols, and Kiwi also tags '#!' as a hashtag. Their punctuation is removed"""
+    tokens, _ = run_tokenise(tmp_path, ["@@ ## #! #서울 @jimin 맛집"], language="korean",
+                             kiwi_word_classes=["nouns", "social", "other"], kiwi_stopwords=False)
+    assert tokens == [["#서울", "@jimin", "맛집"]]
+
+
+@pytest.mark.parametrize("kiwi_stopwords", [True, False])
+def test_korean_stop_words_with_kiwi(tmp_path, kiwi_stopwords):
+    """with Kiwi, only Kiwi's own list is used, which has '사람' (person). The other word lists are hidden and ignored"""
+    tokens, _ = run_tokenise(tmp_path, ["the best 떡볶이 is here 사람들이 왔다"], language="korean",
+                             kiwi_stopwords=kiwi_stopwords, filter=["copy-language", "stopwords-iso-en"])
+    assert {"the", "떡볶이"} <= set(tokens[0])
+    assert ("사람" in tokens[0]) is not kiwi_stopwords
+
+
+def test_korean_stop_words_without_kiwi(tmp_path):
+    """other tokenisers use the stopwords-iso list for Korean, which has '그리고' (and)"""
+    tokens, _ = run_tokenise(tmp_path, ["떡볶이 그리고 김밥"], language="korean", tokenizer_type="twitter")
+    assert tokens == [["떡볶이", "김밥"]]
+
+
+@pytest.mark.parametrize("language, tokenizer, kiwi_runs", [
+    ("korean", "recommended", True),
+    ("korean", "kiwi", True),
+    ("korean", "twitter", False),
+    ("korean", "jieba-cut", False),
+    ("other", "kiwi", False),
+    ("english", "recommended", False),
+    ("english", "twitter", False),
 ])
-def test_kiwi_options_shown_when_they_apply(language, tokenizer, word_classes, stopwords):
-    """an option whose 'requires' is not met is left out, even if the form sends it"""
-    form = {"language": language, "tokenizer_type": tokenizer, "kiwi_word_classes": "nouns", "kiwi_stopwords": "on"}
+def test_kiwi_options_shown_when_they_apply(language, tokenizer, kiwi_runs):
+    """
+    the Kiwi options are only shown where Kiwi runs for Korean, and the word lists everywhere else. An option whose
+    'requires' is not met is left out, even if the form sends it
+    """
+    form = {"language": language, "tokenizer_type": tokenizer, "kiwi_word_classes": "nouns", "kiwi_stopwords": "on",
+            "filter": "copy-language"}
     parsed = UserInput.parse_all(Tokenise.get_options(config=mock_config()), form)
-    assert ("kiwi_word_classes" in parsed) is word_classes
-    assert ("kiwi_stopwords" in parsed) is stopwords
+    assert ("kiwi_word_classes" in parsed) is kiwi_runs
+    assert ("kiwi_stopwords" in parsed) is kiwi_runs
+    assert ("filter" in parsed) is not kiwi_runs
 
 
 def test_korean_without_kiwi_when_not_needed(tmp_path, monkeypatch):
@@ -263,6 +297,12 @@ def test_russian_sentences():
     assert not error
     assert [Tokenise.normalise_segment(s) for s in split("Привет. Как дела?", "russian")] == [
         "Привет.", "Как дела?"]
+
+
+def test_sentences_of_item_without_text(tmp_path):
+    """an item can have no value, e.g. in an NDJSON file. nltk's splitter failed on it"""
+    tokens, _ = run_tokenise(tmp_path, [None, "Cats sleep. Dogs bark."], **{"grouping-per": "sentence"})
+    assert tokens == [["cats", "sleep"], ["dogs", "bark"]]
 
 
 @pytest.mark.parametrize("language, tokenizer, asks", [
@@ -311,7 +351,7 @@ def test_word_tokenize_needs_a_sentence_model(language, refused):
 def test_word_tokenize_without_sentence_model_warns(tmp_path):
     """presets do not pass through validate_query, so the tokeniser itself must cope"""
     tokens, warning = run_tokenise(tmp_path, ["학교에서 공부했다. 친구가 왔다."], language="korean",
-                                   tokenizer_type="regular", kiwi_stopwords=False)
+                                   tokenizer_type="regular", filter=[])
     assert tokens == [["학교에서", "공부했다", "친구가", "왔다"]]
     assert "English model" in warning
 
@@ -325,8 +365,8 @@ def test_stop_words_for_every_language():
     with root.joinpath("common/assets/stopwords-iso.json").open(encoding="utf-8") as infile:
         stopwords_iso = json.load(infile)
 
-    # Korean has its own stop word option, and 'other' has no list
-    for language in set(languages) - {"korean", "other"}:
+    # 'other' has no list
+    for language in set(languages) - {"other"}:
         assert _tokenise.STOPWORDS_ISO_CODES.get(language) in stopwords_iso, language
 
 

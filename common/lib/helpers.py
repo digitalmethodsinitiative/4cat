@@ -1690,11 +1690,11 @@ def compile_term_regex(terms, match="word", flags=0):
     :return re.Pattern:  Compiled expression
     """
     pattern = "(" + "|".join([unicodedata.normalize("NFC", term) for term in terms]) + ")"
+    # unlike \b, these also work for terms that start or end with e.g. '#'
     if match == "start":
-        # unlike \b, this also works for terms that start with e.g. '#'
         pattern = r"(?<!\w)" + pattern
     elif match != "anywhere":
-        pattern = r"\b" + pattern + r"\b"
+        pattern = r"(?<!\w)" + pattern + r"(?!\w)"
 
     return re.compile(pattern, flags=flags)
 

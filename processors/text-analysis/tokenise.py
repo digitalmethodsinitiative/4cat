@@ -58,6 +58,8 @@ STOPWORDS_ISO_CODES = {
     "german": "de",
     "hungarian": "hu",
     "italian": "it",
+    # with Kiwi, Korean uses Kiwi's own list instead
+    "korean": "ko",
     "norwegian": "no",
     # 'porter' is the Porter stemmer, which is for English
     "porter": "en",
@@ -114,6 +116,12 @@ class Tokenise(BasicProcessor):
         """
         with config.get("PATH_ROOT").joinpath("common/assets/stopwords-languages.json").open() as infile:
             stopwords = json.load(infile)
+
+        # Kiwi runs for Korean with Kiwi or 'Recommended'. 'requires' cannot
+        # mix AND and OR, so this lists the other tokenisers. Kiwi with
+        # another language uses the defaults of the options that need this
+        kiwi_runs_for_korean = ["language==korean", "tokenizer_type!=twitter", "tokenizer_type!=regular",
+                                "tokenizer_type!=razdel", "tokenizer_type!^=jieba"]
 
         options = {
             "columns": {
@@ -177,11 +185,7 @@ class Tokenise(BasicProcessor):
                            "of the meaning in informal posts. They are kept in their dictionary form: '먹었는데' "
                            "becomes '먹다'. Adverbs are left out by default because the most common ones are words "
                            "like '안' (not) and '너무' (too). Add them for sentiment analysis, where negation matters.",
-                # only shown for Korean with Kiwi or 'Recommended', where Kiwi
-                # runs. 'requires' cannot mix AND and OR, so this lists the
-                # other tokenisers. Kiwi with another language uses the default
-                "requires": ["language==korean", "tokenizer_type!=twitter", "tokenizer_type!=regular",
-                             "tokenizer_type!=razdel", "tokenizer_type!^=jieba"]
+                "requires": kiwi_runs_for_korean
             },
             "grouping-per": {
                 "type": UserInput.OPTION_CHOICE,
@@ -228,17 +232,21 @@ class Tokenise(BasicProcessor):
                 "help": "Tokens to exclude",
                 "tooltip": "See the references for information on the word lists' provenance. It is highly recommended "
                            "to exclude stop words. Choosing more word lists increases processing time.",
-                "requires": "language!=korean"
+                # where Kiwi runs for Korean, 'kiwi_stopwords' is shown
+                # instead, so this is the opposite of `kiwi_runs_for_korean`
+                "requires": "language!=korean || tokenizer_type==twitter || tokenizer_type==regular || "
+                            "tokenizer_type==razdel || tokenizer_type^=jieba"
             },
             "kiwi_stopwords": {
                 "type": UserInput.OPTION_TOGGLE,
                 "default": True,
-                "help": "Remove Korean stop words",
-                "tooltip": "With Kiwi, this removes the 100 words in Kiwi's stop word list, e.g. '하다' (to do) and "
-                           "'것' (thing), but also '사람' (person). Other tokenisers use the stopwords-iso list for "
-                           "Korean (679 entries) instead. Both lists are in the references. To keep a word, add it to "
-                           "'Always allow these tokens'.",
-                "requires": "language==korean || tokenizer_type==kiwi"
+                "help": "Remove Korean stop words (Kiwi's list)",
+                "tooltip": "Kiwi's own list of 100 entries. It also checks the word class, e.g. it removes '하다' (to "
+                           "do) only as a verb. It removes '것' (thing), but also '사람' (person). On Korean news "
+                           "comments, it removed 11.5% of the tokens. Other stop word lists are not offered with Kiwi, "
+                           "because the word classes above already leave out most of their words. To keep or remove "
+                           "a single word, use 'Always allow these tokens' or 'Always delete these tokens'.",
+                "requires": kiwi_runs_for_korean
             },
             "accept_words": {
                 "type": UserInput.OPTION_TEXT,
@@ -402,14 +410,12 @@ class Tokenise(BasicProcessor):
                                      f"it used the English model. Use the 'Recommended' tokeniser for better "
                                      f"results.")
 
-        # load word filters - words to exclude from tokenisation
+        # load word filters - words to exclude from tokenisation. Where Kiwi
+        # runs for Korean, the word lists are hidden and Kiwi's own list is
+        # used instead. A hidden option still gets its default value
         wordlists = self.parameters.get("filter", [])
-        if language == "korean":
-            # the 'Remove Korean stop words' option replaces the word lists.
-            # Kiwi applies its own list, which needs Kiwi's word classes, so
-            # the other tokenisers use the stopwords-iso list instead
-            use_iso_list = self.parameters.get("kiwi_stopwords") and tokenizer_type != "kiwi"
-            wordlists = ["stopwords-iso-ko"] if use_iso_list else []
+        if language == "korean" and tokenizer_type == "kiwi":
+            wordlists = []
 
         word_filter = set()
         for wordlist in wordlists:
@@ -562,8 +568,9 @@ class Tokenise(BasicProcessor):
                     token = token.lower()
                     # Kiwi tags hashtags and mentions, and only keeps them if
                     # asked to. Keep their '#' or '@', to tell them apart from
-                    # other words
-                    is_social = tokenizer_type == "kiwi" and len(token) > 1 and token[0] in "#@"
+                    # other words. Symbols such as '@@' are not hashtags or
+                    # mentions, and neither is '#!', which Kiwi tags as one
+                    is_social = tokenizer_type == "kiwi" and re.match(r"[#@]\w", token)
                     if not is_social:
                         # jieba returns the spaces between words as tokens too
                         token = numbers.sub("", symbol.sub("", token)).strip()
@@ -677,6 +684,10 @@ class Tokenise(BasicProcessor):
         def kiwi_function(text, *args, **kwargs):
             return [sentence.text for sentence in kiwi.split_into_sents(text)] if text else []
 
+        # nltk cannot split None, which items without a value have
+        def nltk_function(text, language, *args, **kwargs):
+            return sent_tokenize(text, language) if text else []
+
         # nltk cannot split Chinese, so split after the punctuation that ends
         # a sentence, and keep that punctuation with its sentence
         def chinese_function(text, *args, **kwargs):
@@ -697,7 +708,7 @@ class Tokenise(BasicProcessor):
                     dataset.update_status(f"Language {language} not available for sentence tokenizer; grouping by items instead.")
                 return dummy_function, True
             else:
-                return sent_tokenize, False
+                return nltk_function, False
         else:
             return dummy_function, False
 
