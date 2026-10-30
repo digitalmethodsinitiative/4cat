@@ -48,7 +48,8 @@ class SimilarWords(ProcessorPreset):
 			},
 			"language": {
 				"type": UserInput.OPTION_CHOICE,
-				"options": {language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+				"options": {language: language[0].upper() + language[1:] for language in
+							sorted([*SnowballStemmer.languages, "chinese", "korean"])},
 				"default": "english",
 				"help": "Language"
 			}
