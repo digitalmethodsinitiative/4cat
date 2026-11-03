@@ -1491,6 +1491,11 @@ def split_urls(url_string, allowed_schemes=None):
     """
     if allowed_schemes is None:
         allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
+    elif isinstance(allowed_schemes, str):
+        # a single scheme may be given as text; the check below needs a tuple of schemes
+        allowed_schemes = (allowed_schemes,)
+    # compare schemes in lower case; URLs are case sensitive though
+    allowed_schemes = tuple(scheme.lower() for scheme in allowed_schemes)
     potential_urls = []
     # Split the text by \n
     for line in url_string.split('\n'):
@@ -1500,7 +1505,7 @@ def split_urls(url_string, allowed_schemes=None):
         for part in parts:
             # Spaces before a scheme still mean a new URL starts (e.g. "url1, url2"). Other spaces are left
             # alone, as a URL may contain them if it was not encoded (e.g. "https://example.com/?q=a, b")
-            if part.lstrip().startswith(allowed_schemes):  # Other schemes exist
+            if part.lstrip().lower().startswith(allowed_schemes):  # Other schemes exist
                 # New URL start detected
                 if recombined_url:
                     # Already have a URL, add to list
