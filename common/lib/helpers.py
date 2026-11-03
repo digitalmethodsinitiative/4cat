@@ -1248,35 +1248,37 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
     """
     Convert a URL to a hash. Allows removing scheme and www prefix before hashing.
     
-    :param url: URL to hash
+    :param str url: URL to hash. A URL that urlparse cannot read is hashed from its text, so
+    that it still gets an ID of its own; anything that is not text raises a TypeError
     :param remove_scheme: If True, removes the scheme from URL before hashing
     :param remove_www: If True, removes the www. prefix from URL before hashing
     :return: Hash of the URL
     """
-    parsed_url = urlparse(url.lower())
-    if parsed_url:
+    if not isinstance(url, str):
+        # a hash of e.g. None would be impossible to tell apart from the hash of a real URL
+        raise TypeError(f"url_to_hash() needs a URL as text, got {type(url).__name__}")
+
+    try:
+        parsed_url = urlparse(url.lower())
+    except ValueError:
+        # urlparse refuses some URLs (e.g. with a square bracket in the domain)
+        normalized_url = url.lower().strip("/")
+        if remove_scheme:
+            normalized_url = re.sub(r"^[a-z][a-z0-9+.\-]*://", "", normalized_url)
+        if remove_www:
+            scheme_match = re.match(r"^[a-z][a-z0-9+.\-]*://", normalized_url)
+            scheme = scheme_match.group() if scheme_match else ""
+            normalized_url = scheme + re.sub(r"^www\.", "", normalized_url[len(scheme):])
+    else:
+        # urlparse worked, use its output
         if remove_scheme:
             parsed_url = parsed_url._replace(scheme="")
         if remove_www:
             netloc = re.sub(r"^www\.", "", parsed_url.netloc)
             parsed_url = parsed_url._replace(netloc=netloc)
-        
+
         # Hash the normalized URL directly
         normalized_url = urlunparse(parsed_url).strip("/")
-    else:
-        # Unable to parse URL; use regex normalization
-        normalized_url = url.lower().strip("/")
-        if remove_scheme:
-            normalized_url = re.sub(r"^https?://", "", normalized_url)
-        if remove_www:
-            if not remove_scheme:
-                scheme_match = re.match(r"^https?://", normalized_url)
-                if scheme_match:
-                    scheme = scheme_match.group()
-                    temp_url = re.sub(r"^https?://", "", normalized_url)
-                    normalized_url = scheme + re.sub(r"^www\.", "", temp_url)
-            else:
-                normalized_url = re.sub(r"^www\.", "", normalized_url)
 
     return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
 
