@@ -96,6 +96,37 @@
 	color: rgb(104, 119, 130);
 }
 
+.items .item {
+	scroll-margin-top: 20px;
+}
+
+.metrics .item-nav button {
+	display: block;
+	width: 48px;
+	height: 48px;
+	margin-bottom: 16px;
+	padding: 0;
+	border: none;
+	border-radius: 100%;
+	background-color: rgb(241, 241, 242);
+	color: rgb(22, 24, 35);
+	font-size: 20px;
+	cursor: pointer;
+}
+
+.metrics .item-nav button:hover {
+	background-color: rgb(227, 227, 228);
+}
+
+.metrics .item-nav button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.metrics .item-nav button:disabled:hover {
+	background-color: rgb(241, 241, 242);
+}
+
 span.hashtag {
 	color: rgb(29, 155, 240);
 }

@@ -222,15 +222,12 @@ with app.app_context():
             return None
 
         filename = name.split("/", 1)[1]
-        datasource = filename.split("-")[0]
-        datasource_templates = datasources.get(datasource, {}).get("explorer-templates", {})
-        if datasource_templates:
-            if datasource_templates.get("css") and datasource_templates["css"].name == filename:
-                with open(datasource_templates["css"], "r", encoding="utf-8") as f:
-                    return f.read()
-            if datasource_templates.get("html") and datasource_templates["html"].name == filename:
-                with open(datasource_templates["html"], "r", encoding="utf-8") as f:
-                    return f.read()
+        datasource, _, extension = filename.rpartition("-explorer")
+        template_type = {".css": "css", ".html": "html"}.get(extension)
+        template_path = datasources.get(datasource, {}).get("explorer-templates", {}).get(template_type)
+        if template_path:
+            with open(template_path, "r", encoding="utf-8") as f:
+                return f.read()
 
         return None
 

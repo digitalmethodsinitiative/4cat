@@ -1,5 +1,26 @@
 [
   {
+    "model": "gpt-5.6-sol",
+    "name": "[OpenAI] GPT-5.6 Sol",
+    "model_card": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+    "provider": "openai"
+  },{
+    "model": "gpt-5.6-terra",
+    "name": "[OpenAI] GPT-5.6 Terra",
+    "model_card": "https://platform.openai.com/docs/models/gpt-5.6-terra",
+    "provider": "openai"
+  },{
+    "model": "gpt-5.6-luna",
+    "name": "[OpenAI] GPT-5.6 Luna",
+    "model_card": "https://platform.openai.com/docs/models/gpt-5.6-luna",
+    "provider": "openai"
+  },{
+    "model": "gpt-5.5",
+    "name": "[OpenAI] GPT-5.5",
+    "model_card": "https://platform.openai.com/docs/models/gpt-5.5",
+    "provider": "openai"
+  },
+  {
     "model": "gpt-5.5",
     "name": "[OpenAI] GPT-5.5",
     "model_card": "https://platform.openai.com/docs/models/gpt-5.5",
@@ -48,44 +69,32 @@
     "provider": "google"
   },
   {
-    "model": "gemini-3.5-flash",
-    "name": "[Google] Gemini 3.5 Flash",
-    "model_card": "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash",
+    "model": "gemini-3.8-flash",
+    "name": "[Google] Gemini 3.8 Flash",
+    "model_card": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
     "provider": "google"
   },
   {
-    "model": "gemini-3-flash-preview",
-    "name": "[Google] Gemini 3 Flash",
-    "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-flash",
+    "model": "gemini-3.5-flash-lite-preview",
+    "name": "[Google] Gemini 3.5 Flash Lite",
+    "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-5-flash-lite",
     "provider": "google"
   },
   {
-    "model": "gemini-3.1-flash-lite-preview",
-    "name": "[Google] Gemini 3.1 Flash Lite",
-    "provider": "google",
-    "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-flash-lite"
-  },
-  {
-    "model": "claude-fable-5",
-    "name": "[Anthropic] Claude Fable 5",
+    "model": "claude-fable-5-1",
+    "name": "[Anthropic] Claude Fable 5.1",
     "model_card": "https://www.anthropic.com/claude/fable",
     "provider": "anthropic"
   },
   {
-    "model": "claude-opus-4-8",
-    "name": "[Anthropic] Claude Opus 4.8",
+    "model": "claude-opus-5",
+    "name": "[Anthropic] Claude Opus 5",
     "model_card": "https://www.anthropic.com/claude/opus",
     "provider": "anthropic"
   },
   {
-    "model": "claude-opus-4-6",
-    "name": "[Anthropic] Claude Opus 4.6",
-    "model_card": "https://www.anthropic.com/claude/opus",
-    "provider": "anthropic"
-  },
-  {
-    "model": "claude-sonnet-4-6",
-    "name": "[Anthropic] Claude Sonnet 4.6 (latest)",
+    "model": "claude-sonnet-5",
+    "name": "[Anthropic] Claude Sonnet 5 (latest)",
     "model_card": "https://www.anthropic.com/claude/sonnet",
     "provider": "anthropic"
   },

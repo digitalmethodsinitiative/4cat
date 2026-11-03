@@ -421,7 +421,8 @@ class ModuleCollector:
                 "id": subdirectory.parts[-1],
                 "init": datasource.init_datasource,
                 "config": {} if not hasattr(datasource, "config") else datasource.config,
-                "explorer-templates": self.load_datasource_explorer_templates(datasource_id, subdirectory)
+                "explorer-templates": self.load_datasource_explorer_templates(datasource_id, subdirectory),
+                "explorer-templates-from": getattr(datasource, "EXPLORER_TEMPLATE", None)
             }
 
         # Load 4CAT core datasources
@@ -443,6 +444,22 @@ class ModuleCollector:
                 for subdirectory in Path(root, "datasources").iterdir():
                     if subdirectory.is_dir():
                         _load_datasource(subdirectory, expiration)
+
+        # a data source can reuse another one's Explorer templates by setting
+        # EXPLORER_TEMPLATE to that data source's ID in its __init__.py.
+        own_templates = {datasource_id: datasource.get("explorer-templates") for datasource_id, datasource in
+                         self.datasources.items()}
+        for datasource_id, datasource in self.datasources.items():
+            template_source = datasource.get("explorer-templates-from")
+            if not template_source:
+                continue
+
+            if template_source not in own_templates:
+                self.log_buffer += ("Data source '%s' uses the Explorer templates of '%s', but that data source is not "
+                                    "loaded; using its own templates instead.\n" % (datasource_id, template_source))
+                continue
+
+            datasource["explorer-templates"] = own_templates[template_source]
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in
                               sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}
