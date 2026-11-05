@@ -21,10 +21,57 @@ format).
 import json
 import os
 import zipfile
+from collections import UserDict
 from pathlib import Path
 from typing import Iterator, Optional
 
 from common.lib.exceptions import MetadataException
+
+
+def normalize_post_id(post_id) -> str:
+	"""
+	The text form a post ID is stored and compared as.
+
+	Item IDs reach 4CAT as text, as numbers, or not at all, and datasources
+	and processors from extensions are free to do the same, so neither the
+	IDs in a metadata file nor the `id` of a dataset item can be assumed to
+	be text already. Both sides of a comparison go through this, so that the
+	number 1234 and the text "1234" are the same ID.
+
+	:param post_id:  ID as a datasource, processor or metadata file gives it
+	:return str:  the ID as text, or an empty string if there is none
+	"""
+	return "" if post_id is None else str(post_id).strip()
+
+
+class PostIdMap(UserDict):
+	"""
+	A dict keyed by post ID, which treats IDs as text.
+
+	Use this for any map from post ID to something else, instead of a plain
+	dict. Storing and looking up a key both put it through
+	`normalize_post_id`, so the number 1234 and the text "1234" are the same
+	key and a consumer never has to coerce an item's `id` itself. That has to
+	happen somewhere: metadata files store post IDs as text, while a dataset
+	item's `id` is whatever its datasource mapped it as, and the same dataset
+	gives numbers when read from NDJSON and text when read from CSV.
+
+	`get`, `setdefault`, `pop`, `update` and `in` all run through the four
+	methods below, so they are all safe. Keys read back out (`keys()`,
+	iteration) are the normalized text form.
+	"""
+
+	def __setitem__(self, key, value):
+		super().__setitem__(normalize_post_id(key), value)
+
+	def __getitem__(self, key):
+		return super().__getitem__(normalize_post_id(key))
+
+	def __contains__(self, key):
+		return super().__contains__(normalize_post_id(key))
+
+	def __delitem__(self, key):
+		super().__delitem__(normalize_post_id(key))
 
 
 class ArchiveMetadataFile:
@@ -240,6 +287,10 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		# the actual metadata content
 		self.items: dict = {}
 		self.failures: list = []
+
+		# `post_id_to_filenames` walks every item, so it is built once on
+		# demand; `add_item` drops it again
+		self._post_id_index: Optional[PostIdMap] = None
 
 	# -- constructors --
 
@@ -524,6 +575,9 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		if replace and merge:
 			raise MetadataException("add_item: use either 'replace' or 'merge', not both.")
 
+		# both paths below change which items a post ID points at
+		self._post_id_index = None
+
 		existing = self.items.get(filename)
 		if existing is not None and merge:
 			known_ids = existing.setdefault("post_ids", [])
@@ -586,7 +640,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		# keeping them as the text "None" or "": some media (e.g. Instagram ads)
 		# records no usable id, and a fabricated id would only mislead anything
 		# that later matches on it.
-		return [str(p).strip() for p in post_ids if p is not None and str(p).strip()]
+		return [post_id for post_id in map(normalize_post_id, post_ids) if post_id]
 
 	@classmethod
 	def _normalize_entry_post_ids(cls, entry):
@@ -619,6 +673,26 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		and walks nested `files[]` lists.
 		"""
 		return {fn: list(entry.get("post_ids", [])) for fn, entry in self.items.items()}
+
+	def post_id_to_filenames(self) -> PostIdMap:
+		"""
+		Return a `{post_id: [filename, ...]}` map of the successful entries.
+
+		The inverse of `filename_to_post_ids`: an item can have several files
+		and a file can belong to several items. Looking an ID up in the result
+		compares it as text, so an `id` its datasource mapped as a number
+		still finds its files — see `PostIdMap`.
+
+		Built once and kept, so a consumer can look up every item of a
+		dataset in turn without walking the archive each time.
+		"""
+		if self._post_id_index is None:
+			index = PostIdMap()
+			for filename, entry in self.items.items():
+				for post_id in entry.get("post_ids", []):
+					index.setdefault(post_id, []).append(filename)
+			self._post_id_index = index
+		return self._post_id_index
 
 	def post_ids_for(self, filename: str) -> list:
 		"""

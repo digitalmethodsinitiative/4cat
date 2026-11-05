@@ -21,8 +21,10 @@ from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api, hash_to_md5, convert_to_float
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
+from common.lib.archive_metadata import MediaArchiveMetadata, PostIdMap, normalize_post_id
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
-                                   MapItemException, MappedItemIncompleteException, AnnotationException)
+                                   MapItemException, MappedItemIncompleteException, AnnotationException,
+                                   MetadataException)
 
 
 class StatusType(Enum):
@@ -2432,8 +2434,6 @@ class DataSet(FourcatModule):
         :param list item_ids:   A list of item IDs to limit the filename retrieval to.
         returns dict: item_id as key and a list of tuples (child dataset key -> filename) as items
         """
-        from common.lib.exceptions import MetadataException
-
         children = self.get_children()
         if not children:
             return {}
@@ -2446,9 +2446,12 @@ class DataSet(FourcatModule):
             if ("video-downloader" in p.type or "image-downloader" in p.type) and p.data.get("num_rows", 0) > 0 and p.is_finished()
         ]
 
-        media_map = {}
+        # keyed by post ID, so that the caller can look an item up by its own
+        # `id` whichever way its datasource mapped it
+        media_map = PostIdMap()
         seen_files = set()
-        item_ids = [str(i_id) for i_id in item_ids]
+        # the IDs to filter on come from the caller, not from the metadata
+        item_ids = {normalize_post_id(i_id) for i_id in item_ids}
 
         for media_dataset in media_datasets:
             try:
@@ -2457,7 +2460,8 @@ class DataSet(FourcatModule):
                 continue
 
             for filename, entry in metadata.iter_entries():
-                post_ids = [str(p_id) for p_id in entry.get("post_ids", [])]
+                # the metadata class stores these as text already
+                post_ids = entry.get("post_ids", [])
                 if not post_ids:
                     continue
                 if item_ids and not any(p_id in item_ids for p_id in post_ids):
@@ -2500,7 +2504,6 @@ class DataSet(FourcatModule):
         `MetadataException` if the dataset is unfinished or the file is
         malformed.
         """
-        from common.lib.archive_metadata import MediaArchiveMetadata
         return MediaArchiveMetadata.read(self, filename=filename)
 
     def new_media_metadata(self, from_dataset, processor_type, filename=".metadata.json"):
@@ -2512,7 +2515,6 @@ class DataSet(FourcatModule):
             being downloaded from (this is generally not the same as `self`).
         :param str processor_type:  type of the processor, used for metadata.
         """
-        from common.lib.archive_metadata import MediaArchiveMetadata
         return MediaArchiveMetadata.new(self, processor_type=processor_type,
                                         from_dataset=from_dataset, filename=filename)
 

@@ -6,6 +6,7 @@ Designed to work with any processor that has a 'map_metadata' method
 import csv
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import normalize_post_id
 from common.lib.compatibility import Compatibility
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, MetadataException, ProcessorInterruptedException
@@ -394,6 +395,6 @@ class ViewMetadata(BasicProcessor):
 		:return list:  Item IDs, as text
 		"""
 		if "ids" in item:
-			return [str(item_id).strip() for item_id in str(item.get("ids", "")).split(",")]
+			return [normalize_post_id(item_id) for item_id in str(item.get("ids", "")).split(",")]
 
-		return [str(item.get("id", "")).strip()]
+		return [normalize_post_id(item.get("id"))]

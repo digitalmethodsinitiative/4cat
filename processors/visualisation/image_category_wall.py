@@ -13,6 +13,7 @@ from svgwrite.text import Text
 
 from PIL import Image
 
+from common.lib.archive_metadata import PostIdMap
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, MetadataException
@@ -188,10 +189,10 @@ class ImageCategoryWallGenerator(BasicProcessor):
         # Map post IDs to filenames
         if image_dataset.type == "video-hasher-1":
             # We know the post ID is the filename.stem as this dataset is derived from the image dataset
-            filename_map = {filename.stem + ".mp4": [filename] for filename in staging_area.iterdir()}
+            filename_map = PostIdMap({filename.stem + ".mp4": [filename] for filename in staging_area.iterdir()})
         elif special_case:
             # We know the post ID is the filename.stem as this dataset is derived from the image dataset
-            filename_map = {filename.stem: [filename] for filename in staging_area.iterdir()}
+            filename_map = PostIdMap({filename.stem: [filename] for filename in staging_area.iterdir()})
         else:
             # Use image metadata to map post IDs to filenames
             try:
@@ -199,7 +200,7 @@ class ImageCategoryWallGenerator(BasicProcessor):
             except (FileNotFoundError, MetadataException):
                 self.dataset.finish_with_error("No metadata file found")
                 return
-            filename_map = {}
+            filename_map = PostIdMap()
             # Images can belong to multiple posts; posts can have multiple images
             for filename, item in metadata.iter_entries():
                 for post_id in item.get("post_ids", []):

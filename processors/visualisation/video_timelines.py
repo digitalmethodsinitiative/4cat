@@ -13,6 +13,7 @@ from svgwrite.image import Image as ImageElement
 from ural import is_url
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import normalize_post_id
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import DataSetNotFoundException, ProcessorInterruptedException, MetadataException
 from common.lib.user_input import UserInput
@@ -241,7 +242,7 @@ class VideoTimelines(BasicProcessor):
             if source_dataset is not None:
                 for item in source_dataset.iterate_items(self):
                     for filename in urls:
-                        if str(item["id"]) in mapping_ids[filename]:
+                        if normalize_post_id(item["id"]) in mapping_ids[filename]:
                             labels[filename] = mapper(item)
 
         return labels

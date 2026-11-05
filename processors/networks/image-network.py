@@ -11,6 +11,7 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+from common.lib.archive_metadata import PostIdMap
 from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.user_input import UserInput
 from common.lib.compatibility import Compatibility
@@ -127,7 +128,7 @@ class ImageGrapher(BasicProcessor):
         file_hash_map = {filename: filename for filename, _ in metadata.iter_entries()}
         hash_file_map = {}
         seen_hashes = set()
-        id_file_map = {}
+        id_file_map = PostIdMap()
 
         for image in self.source_dataset.iterate_items(filename_filter=filename_filter):
             if image.file.name == ".metadata.json":

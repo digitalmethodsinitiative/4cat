@@ -34,6 +34,7 @@ import csv
 import datetime
 import json
 import os
+import re
 import sys
 import time
 import zipfile
@@ -463,6 +464,7 @@ by_year = collections.defaultdict(collections.Counter)
 finding_archives = collections.Counter()
 finding_types = collections.defaultdict(set)
 finding_total = collections.Counter()
+made_by_other = collections.Counter()
 
 for index, (dataset, path) in enumerate(datasets):
 	if index and index % 250 == 0:
@@ -474,6 +476,15 @@ for index, (dataset, path) in enumerate(datasets):
 	year = created[:4] or "unknown"
 	dataset_type = dataset["type"] or "unknown"
 	findings = result["findings"]
+
+	# the file name says which processor made the archive; a filtered copy
+	# keeps the type of the dataset it was filtered from, and its metadata.
+	# Searches and imports name the file after their query, and presets use
+	# the file of the processor they run, so those are not counted
+	made_by = re.sub(r"-[0-9a-f]{32}\.zip$", "", Path(str(dataset["result_file"])).name)
+	if dataset["type"] and made_by != dataset_type and not dataset_type.endswith(("-search", "-import")) \
+			and dataset_type != f"preset-{made_by}":
+		made_by_other[(dataset_type, made_by)] += 1
 
 	by_status[result["status"]] += 1
 	by_type[dataset_type][result["status"]] += 1
@@ -488,6 +499,7 @@ for index, (dataset, path) in enumerate(datasets):
 	rows.append({
 		"key": dataset["key"],
 		"type": dataset_type,
+		"made_by": made_by,
 		"created": created,
 		"finished": dataset["is_finished"],
 		"software_version": dataset["software_version"],
@@ -506,6 +518,7 @@ for index, (dataset, path) in enumerate(datasets):
 	if findings and (findings.counts or result["note"]):
 		details[dataset["key"] or dataset["result_file"]] = {
 			"type": dataset_type,
+			"made_by": made_by,
 			"created": created,
 			"software_version": dataset["software_version"],
 			"status": result["status"],
@@ -540,6 +553,13 @@ for status, count in by_status.most_common():
 
 print_table("By processor type:", by_type)
 print_table("By year the dataset was made:", by_year)
+
+print("\nArchives made by another processor than their type (e.g. filtered copies, which keep the metadata of "
+	  "the dataset they were filtered from, so files missing from them are expected):")
+if not made_by_other:
+	print("  none")
+for (dataset_type, made_by), count in sorted(made_by_other.items()):
+	print(f"  {count:,}  type {dataset_type}, made by {made_by}")
 
 print("\nFindings in old-format archives (archives / times / processor types):")
 if not finding_archives:

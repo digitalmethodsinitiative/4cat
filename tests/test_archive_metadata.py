@@ -10,7 +10,7 @@ import zipfile
 
 import pytest
 
-from common.lib.archive_metadata import MediaArchiveMetadata
+from common.lib.archive_metadata import MediaArchiveMetadata, PostIdMap, normalize_post_id
 from common.lib.exceptions import MetadataException
 
 CURRENT_SCHEMA_VERSION = MediaArchiveMetadata.SCHEMA_VERSION
@@ -301,6 +301,144 @@ def test_post_ids_for():
 	m.add_item("a.jpg", post_ids=["1"])
 	assert m.post_ids_for("a.jpg") == ["1"]
 	assert m.post_ids_for("missing.jpg") == []
+
+
+@pytest.mark.parametrize("given, expected", [
+	("p1", "p1"),
+	(42, "42"),
+	(1.0, "1.0"),
+	("  p1  ", "p1"),
+	(None, ""),
+	("", ""),
+	("   ", ""),
+])
+def test_normalize_post_id(given, expected):
+	"""
+	Consumers compare a dataset item's own `id` against the post IDs in a
+	metadata file. Neither side is guaranteed to be text - a datasource or an
+	extension may map an `id` as a number - so both go through this.
+	"""
+	assert normalize_post_id(given) == expected
+
+
+def test_normalize_post_id_is_the_rule_stored_ids_follow():
+	"""
+	An ID put through `normalize_post_id` matches the stored form of the same
+	ID, whichever type it was given as.
+	"""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[1234, " 5678 "])
+	stored = m.get_entry("a.jpg")["post_ids"]
+	assert normalize_post_id(1234) in stored
+	assert normalize_post_id("1234") in stored
+	assert normalize_post_id(5678) in stored
+
+
+def test_post_id_map_looks_up_by_any_type():
+	"""
+	A consumer keys a map by the post IDs from a metadata file (text) but looks
+	items up by a dataset item's own `id`, which its datasource may have mapped
+	as a number. Both go through `normalize_post_id`, so either finds the entry.
+	"""
+	m = PostIdMap()
+	m["1234"] = ["a.jpg"]
+	m[5678] = ["b.jpg"]
+
+	for key in ("1234", 1234, " 1234 "):
+		assert key in m
+		assert m[key] == ["a.jpg"]
+		assert m.get(key) == ["a.jpg"]
+	for key in ("5678", 5678):
+		assert key in m
+		assert m[key] == ["b.jpg"]
+
+	# keys read back out are the normalized text form
+	assert sorted(m.keys()) == ["1234", "5678"]
+	assert len(m) == 2
+
+
+def test_post_id_map_normalizes_in_every_dict_method():
+	"""
+	`get`, `setdefault`, `pop`, `update`, `in` and `del` all have to agree, or
+	a consumer using one of them is still comparing a number against text.
+	"""
+	m = PostIdMap({42: ["a.jpg"]})
+	assert "42" in m
+
+	# setdefault is how consumers build these maps
+	m.setdefault(42, []).append("b.jpg")
+	assert m["42"] == ["a.jpg", "b.jpg"]
+	m.setdefault(99, []).append("c.jpg")
+	assert m["99"] == ["c.jpg"]
+
+	m.update({7: ["d.jpg"]})
+	assert m["7"] == ["d.jpg"]
+
+	assert m.pop(7) == ["d.jpg"]
+	assert 7 not in m
+
+	del m[99]
+	assert "99" not in m
+
+	assert m.get(12345, "fallback") == "fallback"
+
+
+def test_post_id_map_drops_blank_and_null_keys_to_one_key():
+	"""
+	Media with no traceable item records no ID; those all normalize to the
+	empty string rather than to several different unusable keys.
+	"""
+	m = PostIdMap()
+	m[None] = ["a.jpg"]
+	assert "" in m
+	assert m[None] == ["a.jpg"]
+	m["  "] = ["b.jpg"]
+	assert m[None] == ["b.jpg"]
+
+
+def test_post_id_to_filenames_inverts_the_entries():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[1, 2])
+	m.add_item("b.jpg", post_ids=[2, 3])
+
+	index = m.post_id_to_filenames()
+	# an item can have several files and a file several items
+	assert index[1] == ["a.jpg"]
+	assert index[2] == ["a.jpg", "b.jpg"]
+	assert index["3"] == ["b.jpg"]
+	assert 4 not in index
+
+	# the inverse of filename_to_post_ids
+	assert m.filename_to_post_ids() == {"a.jpg": ["1", "2"], "b.jpg": ["2", "3"]}
+
+
+def test_post_id_to_filenames_is_cached_but_not_stale():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[1])
+
+	first = m.post_id_to_filenames()
+	# built once, so a consumer can look up every item of a dataset in turn
+	assert m.post_id_to_filenames() is first
+
+	# ... but a producer that adds a file afterwards must not see the old map
+	m.add_item("b.jpg", post_ids=[2])
+	second = m.post_id_to_filenames()
+	assert second is not first
+	assert second[2] == ["b.jpg"]
+
+	# merging more posts into an existing file also changes the mapping
+	m.add_item("b.jpg", post_ids=[3], merge=True)
+	assert m.post_id_to_filenames()[3] == ["b.jpg"]
+
+
+def test_post_id_to_filenames_ignores_failures():
+	"""Failures name no file, so they have nothing to map to."""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[1])
+	m.add_failure(post_ids=[2], reason="error")
+	index = m.post_id_to_filenames()
+	assert index[1] == ["a.jpg"]
+	assert 2 not in index
 
 
 def test_add_item_normalizes_post_ids():

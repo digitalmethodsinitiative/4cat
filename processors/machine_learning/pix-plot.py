@@ -9,6 +9,7 @@ import os
 from urllib.parse import unquote
 from werkzeug.utils import secure_filename
 
+from common.lib.archive_metadata import PostIdMap
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
 from common.lib.exceptions import MetadataException
 from common.lib.helpers import UserInput, link_urls_in_text
@@ -285,7 +286,7 @@ class PixPlotGenerator(BasicProcessor):
         # Keyed by archive filename so the post-loop below can look up images by
         # post id without going through the originating URL.
         images = {}
-        post_id_image_dictionary = {}
+        post_id_image_dictionary = PostIdMap()
         successful_image_count = 0
         for archive_filename, item in source_metadata.iter_entries():
             post_ids = item.get("post_ids", [])
