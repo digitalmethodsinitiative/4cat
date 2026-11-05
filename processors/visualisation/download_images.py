@@ -260,6 +260,11 @@ class ImageDownloader(BasicProcessor):
             ):
             downloaded_file = self.staging_area.joinpath(self.filenames[url])
             failure = False
+            # the archive metadata records *why* a download failed, so a reader
+            # can tell a timeout from a dead link or a file that was not an
+            # image without going through the dataset log
+            failure_reason = "error"
+            failure_description = ""
 
             if self.interrupted:
                 self.complete = True
@@ -273,31 +278,14 @@ class ImageDownloader(BasicProcessor):
                     raise ProcessorInterruptedException()
 
             if type(response) is FailedProxiedRequest:
-                if type(response.context) is requests.exceptions.Timeout:
-                    self.dataset.log(
-                        f"Error: Timeout while trying to download from {url}: {response.context}"
-                    )
-                elif type(response.context) is requests.exceptions.SSLError:
-                    self.dataset.log(
-                        f"Error: SSL Error for URL {url}: {response.context}"
-                    )
-                elif type(response.context) is requests.exceptions.TooManyRedirects:
-                    self.dataset.log(
-                        f"Error: Too many redirects for URL {url}: {response.context}"
-                    )
-                elif type(response.context) is requests.exceptions.ConnectionError:
-                    self.dataset.log(
-                        f"Error: Connection Error for URL {url}: {response.context}"
-                    )
-                else:
-                    self.dataset.log(f"Error: Error for URL {url}: {response.context}")
-
+                failure_reason, failure_description = self.request_failure_reason(response.context, url)
+                self.dataset.log(f"Error: {failure_description}")
                 failure = True
 
             elif response.status_code != 200:
-                self.dataset.log(
-                    f"Error: File not found (status {response.status_code}) at {url}"
-                )
+                failure_reason = "http_error"
+                failure_description = f"File not found (status {response.status_code}) at {url}"
+                self.dataset.log(f"Error: {failure_description}")
                 failure = True
 
             if not failure:
@@ -349,15 +337,20 @@ class ImageDownloader(BasicProcessor):
                             continue
 
                         except (json.JSONDecodeError, KeyError, IndexError):
-                            self.dataset.log(
-                                f"Error: Could not get image URL for Imgur album {url}"
-                            )
-                            failures.append(url)
+                            # the gallery page is not an image and holds no
+                            # readable reference to one, so nothing was
+                            # downloaded for this URL
+                            failure_reason = "no_image_in_gallery"
+                            failure_description = f"Could not get image URL for Imgur album {url}"
+                            self.dataset.log(f"Error: {failure_description}")
+                            failure = True
 
                 elif not response.headers.get("content-type", "").startswith("image"):
-                    self.dataset.log(
-                        f"Error: URL does not seem to be of the required type ({response.headers.get('content-type', '').split(';')[0]} found instead) at {url}"
-                    )
+                    failure_reason = "not_an_image"
+                    failure_description = (f"URL does not seem to be of the required type "
+                                           f"({response.headers.get('content-type', '').split(';')[0]} found instead) "
+                                           f"at {url}")
+                    self.dataset.log(f"Error: {failure_description}")
                     failure = True
 
                 else:
@@ -371,9 +364,9 @@ class ImageDownloader(BasicProcessor):
                             self.filenames[url] = new_filename
 
                     except InvalidDownloadedFileException as e:
-                        self.dataset.log(
-                            f"Error: File downloaded from {url}, but does not seem to be valid file ({e})"
-                        )
+                        failure_reason = "invalid_file"
+                        failure_description = f"File downloaded from {url}, but does not seem to be valid file ({e})"
+                        self.dataset.log(f"Error: {failure_description}")
                         failure = True
 
                 if not failure:
@@ -395,7 +388,8 @@ class ImageDownloader(BasicProcessor):
                 downloaded_file.unlink(missing_ok=True)
                 metadata.add_failure(
                     post_ids=item_map[url],
-                    reason="error",
+                    reason=failure_reason,
+                    reason_description=failure_description,
                     url=resolved_url,
                     extra=url_extra,
                 )
@@ -578,6 +572,29 @@ class ImageDownloader(BasicProcessor):
             url = self.url_redirects[url]
 
         return url
+
+    # why a proxied request failed, as a reason code for the archive metadata
+    # and the message to log. Matched on the exact exception type, as before -
+    # requests' exception hierarchy overlaps (a ConnectTimeout is both a
+    # Timeout and a ConnectionError), so anything else is left as "error".
+    REQUEST_FAILURE_REASONS = {
+        requests.exceptions.Timeout: ("timeout", "Timeout while trying to download from"),
+        requests.exceptions.SSLError: ("ssl_error", "SSL Error for URL"),
+        requests.exceptions.TooManyRedirects: ("too_many_redirects", "Too many redirects for URL"),
+        requests.exceptions.ConnectionError: ("connection_error", "Connection Error for URL"),
+    }
+
+    @classmethod
+    def request_failure_reason(cls, context, url):
+        """
+        Say why a request for an image failed
+
+        :param context:  The exception the request failed with
+        :param str url:  URL that was requested
+        :return tuple:  A reason code for the metadata, and a description
+        """
+        reason, message = cls.REQUEST_FAILURE_REASONS.get(type(context), ("error", "Error for URL"))
+        return reason, f"{message} {url}: {context}"
 
     def filename_for_extension(self, url, extension):
         """

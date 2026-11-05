@@ -4,6 +4,9 @@ Tests for which URLs the image downloader records in its archive metadata.
 The downloader is built with `__new__` and given only the redirects it has
 seen, so none of the worker machinery has to be started up.
 """
+import pytest
+import requests
+
 from common.lib.archive_metadata import MediaArchiveMetadata
 from common.lib.helpers import UniqueFilenames
 from common.lib.media_archive_library import MediaArchiveLibrary
@@ -80,6 +83,27 @@ def test_correcting_an_extension_avoids_a_file_already_on_disk(tmp_path):
         staging_filenames=names,
     )
     assert downloader.filename_for_extension("http://a/photo.png", ".jpeg") != "photo.jpeg"
+
+
+@pytest.mark.parametrize("context, expected_reason", [
+    (requests.exceptions.Timeout("too slow"), "timeout"),
+    (requests.exceptions.SSLError("bad cert"), "ssl_error"),
+    (requests.exceptions.TooManyRedirects("round and round"), "too_many_redirects"),
+    (requests.exceptions.ConnectionError("no route"), "connection_error"),
+    # requests' hierarchy overlaps, so anything not matched exactly stays generic
+    (requests.exceptions.ConnectTimeout("both at once"), "error"),
+    (ValueError("something else entirely"), "error"),
+])
+def test_request_failures_are_recorded_by_kind(context, expected_reason):
+    """
+    The metadata says *why* a download failed, so a reader can tell a timeout
+    from a dead link without going through the dataset log.
+    """
+    reason, description = ImageDownloader.request_failure_reason(context, "http://a/photo.jpg")
+    assert reason == expected_reason
+    # the description names the URL and carries the underlying error
+    assert "http://a/photo.jpg" in description
+    assert str(context) in description
 
 
 def test_two_urls_leading_to_one_file_keep_both_their_posts():
