@@ -18,7 +18,7 @@ from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
-from common.lib.helpers import UserInput, sets_to_lists, url_to_filename, split_urls, urls_in_text
+from common.lib.helpers import UserInput, UniqueFilenames, sets_to_lists, split_urls, urls_in_text
 from common.lib.media_archive_library import MediaArchiveLibrary
 
 __author__ = "Dale Wahl"
@@ -327,6 +327,11 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # Prepare staging area for videos and video tracking
         results_path = self.dataset.get_staging_area()
+        # Three things write into this folder - videos copied from an earlier
+        # archive, direct downloads, and yt-dlp - each naming files its own
+        # way. They share one register of names so they cannot overwrite each
+        # other's videos.
+        self.staging_filenames = UniqueFilenames(results_path)
 
         # Collect parameters
         also_indirect = self.parameters.get("also_indirect", "none")
@@ -981,7 +986,11 @@ class VideoDownloaderPlus(BasicProcessor):
                 continue
 
             self.videos_downloaded_from_url = set()
-            ydl_opts["outtmpl"] = str(results_path) + '/' + re.sub(r"[^0-9a-z]+", "_", url.lower())[:100] + '_%(autonumber)s.%(ext)s'
+            # the slug is cut to 100 characters, so two long URLs can share
+            # it; and `autonumber` restarts per URL because a YoutubeDL is made
+            # per URL, so it cannot tell them apart either
+            url_slug = self.staging_filenames.reserve(re.sub(r"[^0-9a-z]+", "_", url.lower())[:100])
+            ydl_opts["outtmpl"] = str(results_path) + '/' + url_slug + '_%(autonumber)s.%(ext)s'
             
             ytdlp_result = self._download_single_ytdlp(url, ydl_opts, urls_dict)
             
@@ -1211,6 +1220,8 @@ class VideoDownloaderPlus(BasicProcessor):
                 "success": True
             }
             self.url_files[info_dict.get('_filename', {})] = file
+            # yt-dlp named this itself, so claim it before anything else does
+            self.staging_filenames.claim(file["filename"])
 
             # Record this in the archive map immediately, so a later video that yt-dlp recognises
             # as already-downloaded can still be matched to the file that was written for it,
@@ -1259,7 +1270,7 @@ class VideoDownloaderPlus(BasicProcessor):
         if extension not in ["mp4", "mp3"]:
             self.dataset.log(f"DEBUG: Odd extension type {extension}; Notify 4CAT maintainers if video. Content-Type for url {original_url}: {content_type}")
 
-        unique_filename = url_to_filename(original_url, staging_area=results_path, default_ext="." + extension)
+        unique_filename = self.staging_filenames.reserve_for_url(original_url, default_ext="." + extension)
         save_location = results_path.joinpath(unique_filename)
 
         if max_video_size != 0:
@@ -1480,6 +1491,8 @@ class VideoDownloaderPlus(BasicProcessor):
                 self.dataset.log(f"Copying previously downloaded video {filename} to new staging area")
                 archive_file.extract(filename, staging_area)
                 self.files_copied_from_library[filename] = source_dataset.key
+                # keeps a later download from overwriting the copy
+                self.staging_filenames.claim(filename)
                 num_copied += 1
 
         return num_copied

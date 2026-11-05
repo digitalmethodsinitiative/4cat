@@ -10,6 +10,7 @@ import zipfile
 from types import SimpleNamespace
 
 from common.lib.archive_metadata import MediaArchiveMetadata
+from common.lib.helpers import UniqueFilenames
 from common.lib.media_archive_library import MediaArchiveLibrary
 from processors.visualisation.download_videos import VideoDownloaderPlus
 
@@ -38,6 +39,7 @@ def make_downloader(parameters=None):
     downloader.source_dataset = SimpleNamespace(key="posts")
     downloader.parameters = parameters or {}
     downloader.files_copied_from_library = {}
+    downloader.staging_filenames = UniqueFilenames()
     downloader.max_videos_per_url = (parameters or {}).get("channel_videos") or 1
     return downloader
 

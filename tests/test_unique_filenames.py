@@ -113,6 +113,32 @@ def test_replace_avoids_a_name_another_file_has(tmp_path):
 	assert second == "photo-1.jpeg"
 
 
+def test_claim_records_a_name_chosen_elsewhere(tmp_path):
+	"""
+	The video downloader has three things writing into one folder: files copied
+	out of an earlier archive keep the name they had there, and yt-dlp names
+	its own downloads. Neither asks first, so they are claimed afterwards.
+	"""
+	names = UniqueFilenames(tmp_path)
+	names.claim("copied-from-an-earlier-run.mp4")
+	names.claim("some_url_00001.mp4")
+
+	assert names.reserve("copied-from-an-earlier-run.mp4") == "copied-from-an-earlier-run-1.mp4"
+	assert names.reserve_for_url("https://example.com/some_url_00001.mp4") == "some_url_00001-1.mp4"
+
+
+def test_long_urls_sharing_a_slug_prefix_get_different_names(tmp_path):
+	"""
+	The video downloader builds yt-dlp's output template from the URL
+	slugified and cut to 100 characters, so two long URLs that differ only
+	near the end would otherwise be given the same template.
+	"""
+	names = UniqueFilenames(tmp_path)
+	slug = "a" * 100
+	assert names.reserve(slug) == slug
+	assert names.reserve(slug) == f"{slug}-1"
+
+
 def test_deduplicate_filename_rejects_a_non_set():
 	with pytest.raises(TypeError):
 		deduplicate_filename("clip.wav", existing_filenames=["clip.wav"])

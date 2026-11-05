@@ -1555,6 +1555,19 @@ class UniqueFilenames:
         self.taken.add(filename)
         return filename
 
+    def claim(self, filename) -> None:
+        """
+        Record a name that something else chose as taken
+
+        Not everything writing into the directory asks first: yt-dlp names its
+        own downloads, and a file copied out of an earlier archive keeps the
+        name it had there. Telling this about those names keeps them from being
+        handed out again.
+
+        :param str filename:  Name to record as taken
+        """
+        self.taken.add(filename)
+
     def replace(self, current, filename, **kwargs) -> str:
         """
         Give up a reserved name and reserve another instead
