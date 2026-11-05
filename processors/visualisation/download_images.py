@@ -336,9 +336,22 @@ class ImageDownloader(BasicProcessor):
 
                             image_url = self.clean_url(image_url)
                             self.url_redirects[url] = image_url
-                            self.filenames[image_url] = url_to_filename(image_url, staging_area=self.staging_area, default_name="file", default_ext=".png")
-                            self.push_proxied_request(image_url, 0)
-                            item_map[image_url] = item_map[url]
+                            if image_url not in self.filenames:
+                                # give it a name no other URL has, and queue it
+                                self.filenames[image_url] = url_to_filename(
+                                    image_url,
+                                    staging_area=self.staging_area,
+                                    default_name="file",
+                                    default_ext=".png",
+                                    existing_filenames=url_filenames_seen,
+                                )
+                                url_filenames_seen.add(self.filenames[image_url])
+                                self.push_proxied_request(image_url, 0)
+                            # the dataset may link the image directly as well, in
+                            # which case it is queued already and has posts of its
+                            # own; add this gallery's posts rather than replacing
+                            known_ids = item_map.setdefault(image_url, [])
+                            known_ids.extend(item_id for item_id in item_map[url] if item_id not in known_ids)
                             del self.filenames[url], item_map[url]
                             downloaded_file.unlink(missing_ok=True)
 
@@ -363,9 +376,10 @@ class ImageDownloader(BasicProcessor):
                     # test by trying to read it with PIL
                     try:
                         extension = self.get_valid_file_extension(downloaded_file)
-                        downloaded_file.rename(downloaded_file.with_suffix(extension))
-                        # update filename mapping to reflect new extension
-                        self.filenames[url] = self.filenames[url].rsplit(".", 1)[0] + extension
+                        new_filename = self.filename_for_extension(url, extension, url_filenames_seen)
+                        if new_filename != self.filenames[url]:
+                            downloaded_file.rename(self.staging_area.joinpath(new_filename))
+                            self.filenames[url] = new_filename
 
                     except InvalidDownloadedFileException as e:
                         self.dataset.log(
@@ -397,12 +411,19 @@ class ImageDownloader(BasicProcessor):
                     extra=url_extra,
                 )
             else:
+                filename = self.filenames[url]
+                if filename in metadata:
+                    # filenames are unique per URL, so this means two URLs led
+                    # to the same file. Merge, so that neither URL's posts lose
+                    # their image, and say so: it is worth knowing about.
+                    self.dataset.log(f"Note: {filename} was already downloaded for another URL; recording "
+                                     f"{url} against the same file")
                 metadata.add_item(
-                    filename=self.filenames[url],
+                    filename=filename,
                     post_ids=item_map[url],
                     url=resolved_url,
                     extra=url_extra,
-                    replace=True,
+                    merge=True,
                 )
 
             if self.complete:
@@ -568,6 +589,40 @@ class ImageDownloader(BasicProcessor):
             url = self.url_redirects[url]
 
         return url
+
+    def filename_for_extension(self, url, extension, existing_filenames):
+        """
+        Correct a downloaded file's extension, keeping its name unique
+
+        The prep loop gives every URL a filename of its own, but the extension
+        it took from the URL can turn out to be wrong, and correcting it can
+        land on the name another URL already has - `photo.png` and `photo.jpg`
+        both become `photo.jpeg` once PIL has had a look at them. Renaming one
+        onto the other would destroy that image and leave its posts pointing at
+        this one, so a free name is picked instead.
+
+        :param str url:  URL whose file was downloaded
+        :param str extension:  The extension the file turned out to have
+        :param set existing_filenames:  Names taken by other URLs; updated in
+          place if the file is given a new one
+        :return str:  The name to use, which is the current one if the
+          extension was already right
+        """
+        current = self.filenames[url]
+        corrected = current.rsplit(".", 1)[0] + extension
+        if corrected == current:
+            return current
+
+        existing_filenames.discard(current)
+        corrected = url_to_filename(
+            corrected,
+            staging_area=self.staging_area,
+            default_name="file",
+            default_ext=extension,
+            existing_filenames=existing_filenames,
+        )
+        existing_filenames.add(corrected)
+        return corrected
 
     def urls_for_metadata(self, url):
         """
