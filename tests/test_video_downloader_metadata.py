@@ -9,9 +9,11 @@ config) has to be started up.
 import zipfile
 from types import SimpleNamespace
 
+import pytest
+
 from common.lib.archive_metadata import MediaArchiveMetadata
 from common.lib.helpers import UniqueFilenames
-from common.lib.media_archive_library import MediaArchiveLibrary
+from common.lib.media_archive_library import MediaArchiveLibrary, MediaLibraryHit
 from processors.visualisation.download_videos import VideoDownloaderPlus
 
 
@@ -288,6 +290,87 @@ def test_playlist_of_unknown_size_uses_the_earlier_runs_limit(tmp_path):
     not_stopped = earlier_channel_archive(tmp_path, "not_stopped", [1], channel_videos=3)
     result, _, _ = try_copy(tmp_path, not_stopped, {"channel_videos": 5, "also_indirect": "all"}, "staging_b")
     assert result["copied"] is True
+
+
+def channel_hit(entries, channel_videos=0):
+    """
+    A successful library hit for a channel URL, built directly so a single
+    entry's yt-dlp data can be varied without writing an archive.
+
+    :param list entries:  One `extra` dict per video the earlier run has
+    :param int channel_videos:  Videos per link the earlier run was allowed
+    """
+    dataset = SimpleNamespace(key="earlier", parameters={"channel_videos": channel_videos})
+    metadata = MediaArchiveMetadata(dataset)
+    return MediaLibraryHit(
+        is_success=True,
+        metadata=metadata,
+        entries=[(f"channel_{i:05d}.mp4", {"extra": extra}) for i, extra in enumerate(entries, 1)],
+    )
+
+
+@pytest.mark.parametrize("extra, expected", [
+    ({"playlist_count": 630}, 630),
+    ({"playlist_count": "630"}, 630),
+    # a count of zero is a count, not a missing value
+    ({"playlist_count": 0}, 0),
+    # yt-dlp writes a null when it does not know
+    ({"playlist_count": None}, None),
+    ({"playlist_count": None, "n_entries": 12}, 12),
+    ({"n_entries": 12}, 12),
+    # neither field says anything usable
+    ({"playlist_index": 3}, None),
+    ({"playlist_count": "not a number"}, None),
+    # junk in one field does not hide a usable value in the other
+    ({"playlist_count": "not a number", "n_entries": 12}, 12),
+])
+def test_playlist_size_is_read_from_either_field(extra, expected):
+    assert VideoDownloaderPlus._playlist_size(extra) == expected
+
+
+def test_a_playlist_that_holds_nothing_more_is_copied_not_downloaded_again():
+    """
+    A count of zero used to be read as "yt-dlp did not say", which sent the
+    decision to the earlier run's own limit and downloaded the URL again.
+    """
+    downloader = make_downloader({"channel_videos": 5})
+    hit = channel_hit([{"playlist_index": 1, "playlist_count": 0}])
+
+    assert downloader._channel_has_more_videos(hit) is False
+
+
+def test_the_largest_playlist_size_across_entries_decides():
+    """
+    One file can be recorded for several URLs, so a URL's entries can carry
+    data from different playlists. The first one must not decide on its own.
+    """
+    downloader = make_downloader({"channel_videos": 5})
+
+    # the entry that knows about more videos comes second
+    assert downloader._channel_has_more_videos(channel_hit([
+        {"playlist_index": 1, "playlist_count": 1},
+        {"playlist_index": 1, "playlist_count": 630},
+    ])) is True
+
+    # ... and the same the other way round
+    assert downloader._channel_has_more_videos(channel_hit([
+        {"playlist_index": 1, "playlist_count": 630},
+        {"playlist_index": 1, "playlist_count": 1},
+    ])) is True
+
+    # nothing reports more than was downloaded
+    assert downloader._channel_has_more_videos(channel_hit([
+        {"playlist_index": 1, "playlist_count": 2},
+        {"playlist_index": 2, "playlist_count": 1},
+    ])) is False
+
+
+def test_an_entry_without_playlist_data_does_not_hide_one_with_it():
+    """A plain video merged into the same URL should not end the search."""
+    downloader = make_downloader({"channel_videos": 5})
+    hit = channel_hit([{"downloader": "yt_dlp"}, {"playlist_index": 1, "playlist_count": 630}])
+
+    assert downloader._channel_has_more_videos(hit) is True
 
 
 def test_only_as_many_videos_as_this_run_allows_are_copied(tmp_path):

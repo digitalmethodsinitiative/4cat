@@ -657,6 +657,30 @@ class VideoDownloaderPlus(BasicProcessor):
         except (TypeError, ValueError):
             return float("inf")
 
+    @staticmethod
+    def _playlist_size(extra):
+        """
+        How many videos yt-dlp said the channel or playlist holds
+
+        It records this as `playlist_count` and, for some extractors, as
+        `n_entries`, and writes a null for either when it does not know. A
+        count of zero is a count, so the two cannot be chosen between with
+        `or`.
+
+        :param dict extra:  Per-file data of a metadata entry
+        :return int|None:  Number of videos, or None if yt-dlp did not know
+        """
+        for field in ("playlist_count", "n_entries"):
+            size = extra.get(field)
+            if size is None:
+                continue
+            try:
+                return int(size)
+            except (TypeError, ValueError):
+                # not a number; the other field may still be usable
+                continue
+        return None
+
     def _channel_has_more_videos(self, hit):
         """
         Could this run get more videos from a URL than a previous run did?
@@ -676,31 +700,36 @@ class VideoDownloaderPlus(BasicProcessor):
         if self.max_videos_per_url <= downloaded:
             return False
 
+        # a file can be recorded for more than one URL, so these entries do not
+        # all have to come from the same playlist. Take the largest size any of
+        # them reports: that is the most videos this URL is known to lead to,
+        # and guessing high only costs a download that could have been a copy.
+        from_a_playlist = False
+        available = None
         for _, item in hit.entries:
             extra = item.get("extra") or {}
             if not any(field in extra for field in ("playlist_count", "n_entries", "playlist_index")):
                 # not from a channel or playlist
                 continue
+            from_a_playlist = True
+            size = self._playlist_size(extra)
+            if size is not None:
+                available = size if available is None else max(available, size)
 
-            try:
-                available = int(extra.get("playlist_count") or extra.get("n_entries"))
-            except (TypeError, ValueError):
-                available = None
+        if not from_a_playlist:
+            return False
+        if available is not None:
+            return available > downloaded
 
-            if available is not None:
-                return available > downloaded
-
-            # playlist of unknown size: did the previous run reach its limit?
-            previous_dataset = hit.metadata.dataset if hit.metadata else None
-            if previous_dataset is None:
-                return False
-            try:
-                previous_limit = max(1, int(previous_dataset.parameters.get("channel_videos") or 0))
-            except (TypeError, ValueError):
-                return False
-            return downloaded >= previous_limit
-
-        return False
+        # playlist of unknown size: did the previous run reach its limit?
+        previous_dataset = hit.metadata.dataset if hit.metadata else None
+        if previous_dataset is None:
+            return False
+        try:
+            previous_limit = max(1, int(previous_dataset.parameters.get("channel_videos") or 0))
+        except (TypeError, ValueError):
+            return False
+        return downloaded >= previous_limit
 
     def _limit_to_videos_per_url(self, hit, url):
         """
