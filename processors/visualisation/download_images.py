@@ -232,6 +232,8 @@ class ImageDownloader(BasicProcessor):
         # prepare filenames for each url
         self.filenames = CaseInsensitiveDict()
         self.url_redirects = {}
+        # the reverse of `url_redirects`: which URLs led to a given one
+        self.url_sources = {}
 
         # hands out a name per URL that no other URL has; the staging area is
         # new and empty, so this is the only thing a name can collide with
@@ -317,7 +319,7 @@ class ImageDownloader(BasicProcessor):
                                 )
 
                             image_url = self.clean_url(image_url)
-                            self.url_redirects[url] = image_url
+                            self.record_redirect(url, image_url)
                             if image_url not in self.filenames:
                                 # give it a name no other URL has, and queue it
                                 self.filenames[image_url] = self.staging_filenames.reserve_for_url(
@@ -532,8 +534,7 @@ class ImageDownloader(BasicProcessor):
             # Trust the current response URL as final; record mapping only if different
             final_url = response_url
 
-        if final_url != original_url:
-            self.url_redirects[original_url] = final_url
+        self.record_redirect(original_url, final_url)
 
         destination = self.staging_area.joinpath(self.filenames[original_url])
 
@@ -555,6 +556,30 @@ class ImageDownloader(BasicProcessor):
                     # in that case
                     pass
 
+
+    def record_redirect(self, original_url, final_url):
+        """
+        Note that one URL led to another
+
+        Both the redirects `requests` followed and the image URL taken from an
+        imgur gallery page are recorded here, so the metadata can name every
+        URL a file can be reached by. `resolve_url` follows these forwards,
+        `urls_for_metadata` reads them back.
+
+        :param str original_url:  URL that was requested
+        :param str final_url:  URL it led to
+        """
+        if original_url == final_url:
+            return
+
+        self.url_redirects[original_url] = final_url
+        # carry over whatever already led to `original_url`, so that a chain -
+        # an imgur gallery page, the image URL it names, wherever that
+        # redirects - leaves every one of its URLs pointing at the file
+        known = self.url_sources.setdefault(final_url, [])
+        for source in [original_url, *self.url_sources.pop(original_url, [])]:
+            if source not in known:
+                known.append(source)
 
     def resolve_url(self, url):
         """
@@ -624,16 +649,17 @@ class ImageDownloader(BasicProcessor):
         Get the URLs to record in the archive metadata for a download
 
         The metadata's `url` is where the file was downloaded from, after
-        following any redirects. If the URL as it appeared in the dataset is
-        different, it is listed in `other_urls`, so the file can be found by
-        either.
+        following any redirects. Every other URL that led there is listed in
+        `other_urls`, so the file can be found by any of them: the URL as it
+        appeared in the dataset, and any step in between - an imgur gallery
+        page names an image URL, which may itself redirect.
 
-        :param str url:  URL as it appeared in the dataset
+        :param str url:  URL as it was requested
         :return tuple:  The URL to record, and extra data for the metadata
         """
         resolved_url = self.resolve_url(url)
-        extra = {"other_urls": [url]} if resolved_url != url else {}
-        return resolved_url, extra
+        other_urls = [other for other in self.url_sources.get(resolved_url, []) if other != resolved_url]
+        return resolved_url, {"other_urls": other_urls} if other_urls else {}
 
     @staticmethod
     def find_image_urls(value):

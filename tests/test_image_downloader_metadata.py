@@ -15,9 +15,12 @@ from processors.visualisation.download_images import ImageDownloader
 
 def make_downloader(redirects=None, filenames=None, staging_filenames=None):
     downloader = ImageDownloader.__new__(ImageDownloader)
-    downloader.url_redirects = redirects or {}
+    downloader.url_redirects = {}
+    downloader.url_sources = {}
     downloader.filenames = filenames or {}
     downloader.staging_filenames = staging_filenames or UniqueFilenames()
+    for original, final in (redirects or {}).items():
+        downloader.record_redirect(original, final)
     return downloader
 
 
@@ -31,8 +34,8 @@ def test_redirected_url_is_recorded_with_the_dataset_url_as_other_url():
 
     # where the file was downloaded from, after following every redirect
     assert url == "https://cdn.example.com/a.jpg"
-    # the URL as it appeared in the dataset
-    assert extra == {"other_urls": ["http://example.com/a.jpg"]}
+    # every URL that led there, so the file can be found by any of them
+    assert extra == {"other_urls": ["https://example.com/a.jpg", "http://example.com/a.jpg"]}
 
 
 def test_url_without_redirect_has_no_other_urls():
@@ -124,6 +127,56 @@ def test_two_urls_leading_to_one_file_keep_both_their_posts():
     library = MediaArchiveLibrary([metadata])
     for found_by in ("http://a/photo.png", "http://b/photo.jpg"):
         assert library.find(found_by).is_success
+
+
+def test_an_imgur_gallery_url_still_finds_the_image_it_named():
+    """
+    An imgur gallery page is not an image; it names one, which is queued and
+    downloaded in its place. The gallery URL is the one in the dataset, so the
+    file has to be findable by it - the image URL alone is of no use to anyone
+    reading their own data back.
+    """
+    downloader = make_downloader()
+    gallery = "https://imgur.com/a/xyz.json"
+    image = "https://i.imgur.com/abc.png"
+    downloader.record_redirect(gallery, image)
+
+    # the image URL is what gets processed, the gallery URL having produced no file
+    url, extra = downloader.urls_for_metadata(image)
+
+    assert url == image
+    assert extra == {"other_urls": [gallery]}
+
+    metadata = MediaArchiveMetadata.new(processor_type="image-downloader", from_dataset="posts")
+    metadata.add_item("abc.png", post_ids=["p1"], url=url, extra=extra, merge=True)
+
+    library = MediaArchiveLibrary([metadata])
+    for found_by in (gallery, image):
+        assert library.find(found_by).is_success
+
+
+def test_an_imgur_image_that_then_redirects_keeps_the_whole_chain():
+    """The gallery, the image URL it named, and where that ended up."""
+    downloader = make_downloader()
+    gallery = "https://imgur.com/a/xyz.json"
+    image = "https://i.imgur.com/abc.png"
+    cdn = "https://cdn.imgur.com/abc.png"
+    downloader.record_redirect(gallery, image)
+    downloader.record_redirect(image, cdn)
+
+    url, extra = downloader.urls_for_metadata(image)
+
+    assert url == cdn
+    assert extra == {"other_urls": [image, gallery]}
+
+
+def test_two_urls_redirecting_to_one_file_are_both_recorded():
+    downloader = make_downloader()
+    downloader.record_redirect("http://a/photo.jpg", "https://cdn/photo.jpg")
+    downloader.record_redirect("http://b/photo.jpg", "https://cdn/photo.jpg")
+
+    _, extra = downloader.urls_for_metadata("http://a/photo.jpg")
+    assert extra == {"other_urls": ["http://a/photo.jpg", "http://b/photo.jpg"]}
 
 
 def test_redirected_image_can_be_found_by_either_url():
