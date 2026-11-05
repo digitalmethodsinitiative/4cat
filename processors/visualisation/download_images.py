@@ -9,7 +9,7 @@ import json
 from PIL import Image, UnidentifiedImageError
 from requests.structures import CaseInsensitiveDict
 
-from common.lib.helpers import UserInput, url_to_filename, urls_in_text, holds_only_urls, looks_like_image_url
+from common.lib.helpers import UserInput, UniqueFilenames, urls_in_text, holds_only_urls, looks_like_image_url
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.exceptions import ProcessorInterruptedException, FourcatException
@@ -233,19 +233,13 @@ class ImageDownloader(BasicProcessor):
         self.filenames = CaseInsensitiveDict()
         self.url_redirects = {}
 
-        # Use a set for O(1) membership during filename uniqueness checks
-        url_filenames_seen = set()
+        # hands out a name per URL that no other URL has; the staging area is
+        # new and empty, so this is the only thing a name can collide with
+        self.staging_filenames = UniqueFilenames(self.staging_area)
         for i, url in enumerate(urls):
-            url_filename = url_to_filename(
-                url,
-                staging_area=None,  # we do not check on-disk here as we know we have a new empty staging area
-                default_name="file",
-                default_ext=".png",
-                existing_filenames=url_filenames_seen,  # set instead of list
+            self.filenames[url] = self.staging_filenames.reserve_for_url(
+                url, default_name="file", default_ext=".png"
             )
-            
-            self.filenames[url] = url_filename
-            url_filenames_seen.add(url_filename)  # record membership
             if i in (0, 9, 49) or ((i + 1) % 200 == 0):
                 # Log progress every 10, 50, then every 200
                 self.dataset.log(f"Filename progress {i+1}/{len(urls)} filenames done")
@@ -338,14 +332,9 @@ class ImageDownloader(BasicProcessor):
                             self.url_redirects[url] = image_url
                             if image_url not in self.filenames:
                                 # give it a name no other URL has, and queue it
-                                self.filenames[image_url] = url_to_filename(
-                                    image_url,
-                                    staging_area=self.staging_area,
-                                    default_name="file",
-                                    default_ext=".png",
-                                    existing_filenames=url_filenames_seen,
+                                self.filenames[image_url] = self.staging_filenames.reserve_for_url(
+                                    image_url, default_name="file", default_ext=".png"
                                 )
-                                url_filenames_seen.add(self.filenames[image_url])
                                 self.push_proxied_request(image_url, 0)
                             # the dataset may link the image directly as well, in
                             # which case it is queued already and has posts of its
@@ -376,7 +365,7 @@ class ImageDownloader(BasicProcessor):
                     # test by trying to read it with PIL
                     try:
                         extension = self.get_valid_file_extension(downloaded_file)
-                        new_filename = self.filename_for_extension(url, extension, url_filenames_seen)
+                        new_filename = self.filename_for_extension(url, extension)
                         if new_filename != self.filenames[url]:
                             downloaded_file.rename(self.staging_area.joinpath(new_filename))
                             self.filenames[url] = new_filename
@@ -590,7 +579,7 @@ class ImageDownloader(BasicProcessor):
 
         return url
 
-    def filename_for_extension(self, url, extension, existing_filenames):
+    def filename_for_extension(self, url, extension):
         """
         Correct a downloaded file's extension, keeping its name unique
 
@@ -603,8 +592,6 @@ class ImageDownloader(BasicProcessor):
 
         :param str url:  URL whose file was downloaded
         :param str extension:  The extension the file turned out to have
-        :param set existing_filenames:  Names taken by other URLs; updated in
-          place if the file is given a new one
         :return str:  The name to use, which is the current one if the
           extension was already right
         """
@@ -613,16 +600,7 @@ class ImageDownloader(BasicProcessor):
         if corrected == current:
             return current
 
-        existing_filenames.discard(current)
-        corrected = url_to_filename(
-            corrected,
-            staging_area=self.staging_area,
-            default_name="file",
-            default_ext=extension,
-            existing_filenames=existing_filenames,
-        )
-        existing_filenames.add(corrected)
-        return corrected
+        return self.staging_filenames.replace(current, corrected)
 
     def urls_for_metadata(self, url):
         """

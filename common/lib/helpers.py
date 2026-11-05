@@ -1404,78 +1404,172 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         # remove some problematic characters
         base_filename = re.sub(r"[:~]", "", base_filename)
 
-        if existing_filenames is None:
-            existing_filenames = set()
-        if type(existing_filenames) is not set:
-            # Could force set() here, but likely would be forcing in a loop
-            raise TypeError("existing_filenames must be a set")
+        return deduplicate_filename(base_filename, staging_area=staging_area, max_bytes=max_bytes,
+                                    existing_filenames=existing_filenames,
+                                    fallback_name=default_name, fallback_ext=default_ext)
 
-        # Split base filename into name and extension
-        if '.' in base_filename:
-            name_part, ext_part = base_filename.rsplit('.', 1)
-            ext_part = '.' + ext_part
-        else:
-            name_part = base_filename
-            ext_part = ''
 
-        # Truncate base filename if it exceeds max_bytes
-        if len(base_filename.encode('utf-8')) > max_bytes:
-            # Reserve space for extension
+def deduplicate_filename(filename, staging_area=None, existing_filenames=None, max_bytes=255,
+                         fallback_name="file", fallback_ext="") -> str:
+    """
+    Make a filename unique within a directory
+
+    Returns `filename` unchanged if nothing has it yet, else the same name with
+    `-1`, `-2`, ... appended before the extension, truncating the name if the
+    result would exceed `max_bytes`. Takes a filename rather than a URL, so it
+    also serves names that are not derived from one - an audio file named after
+    its video, a folder of video frames - and names without an extension.
+
+    :param str filename:  The name to use if it is free
+    :param Path staging_area:  Directory to check for a file of this name; if
+      None, only `existing_filenames` is consulted
+    :param set existing_filenames:  Names already taken
+    :param int max_bytes:  Maximum number of bytes for the filename
+    :param str fallback_name:  Name to fall back on in the extreme case of an
+      extension that does not itself fit within `max_bytes`
+    :param str fallback_ext:  Extension to use in that same case
+    :return str:  A name nothing else has
+    """
+    if existing_filenames is None:
+        existing_filenames = set()
+    if type(existing_filenames) is not set:
+        # Could force set() here, but likely would be forcing in a loop
+        raise TypeError("existing_filenames must be a set")
+
+    # Split base filename into name and extension
+    if '.' in filename:
+        name_part, ext_part = filename.rsplit('.', 1)
+        ext_part = '.' + ext_part
+    else:
+        name_part = filename
+        ext_part = ''
+
+    # Truncate base filename if it exceeds max_bytes
+    if len(filename.encode('utf-8')) > max_bytes:
+        # Reserve space for extension
+        available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+        if available_bytes <= 0:
+            # If extension is too long, use minimal name
+            name_part = fallback_name
+            ext_part = fallback_ext
             available_bytes = max_bytes - len(ext_part.encode('utf-8'))
-            if available_bytes <= 0:
-                # If extension is too long, use minimal name
-                name_part = default_name
-                ext_part = default_ext
-                available_bytes = max_bytes - len(ext_part.encode('utf-8'))
-            
-            # Truncate name part to fit
-            name_bytes = name_part.encode('utf-8')
-            if len(name_bytes) > available_bytes:
-                # Truncate byte by byte to ensure valid UTF-8
-                while len(name_bytes) > available_bytes:
-                    name_part = name_part[:-1]
-                    name_bytes = name_part.encode('utf-8')
-            
-            base_filename = name_part + ext_part
 
-        filename = base_filename
+        # Truncate name part to fit
+        name_bytes = name_part.encode('utf-8')
+        if len(name_bytes) > available_bytes:
+            # Truncate byte by byte to ensure valid UTF-8
+            while len(name_bytes) > available_bytes:
+                name_part = name_part[:-1]
+                name_bytes = name_part.encode('utf-8')
 
-        if staging_area or existing_filenames:
-            # Ensure the filename is unique in the staging area
-            file_index = 1
+        filename = name_part + ext_part
 
-            file_path = staging_area.joinpath(filename) if staging_area else None
-            
-            # Loop while collision in-memory OR on disk (if staging_area given)
-            while (filename in existing_filenames) or (staging_area and file_path.exists()):
-                # Calculate space needed for index suffix
-                index_suffix = f"-{file_index}"
-                
-                # Check if filename with index would exceed max_bytes
-                test_filename = name_part + index_suffix + ext_part
-                if len(test_filename.encode('utf-8')) > max_bytes:
-                    # Need to truncate name_part to make room for index
-                    available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
-                    if available_bytes <= 0:
-                        # Extreme case - use minimal name
-                        truncated_name = "f"
-                    else:
-                        # Truncate name_part to fit
-                        truncated_name = name_part
-                        name_bytes = truncated_name.encode('utf-8')
-                        while len(name_bytes) > available_bytes:
-                            truncated_name = truncated_name[:-1]
-                            name_bytes = truncated_name.encode('utf-8')
-                    
-                    filename = truncated_name + index_suffix + ext_part
+    if staging_area or existing_filenames:
+        # Ensure the filename is unique in the staging area
+        file_index = 1
+
+        file_path = staging_area.joinpath(filename) if staging_area else None
+
+        # Loop while collision in-memory OR on disk (if staging_area given)
+        while (filename in existing_filenames) or (staging_area and file_path.exists()):
+            # Calculate space needed for index suffix
+            index_suffix = f"-{file_index}"
+
+            # Check if filename with index would exceed max_bytes
+            test_filename = name_part + index_suffix + ext_part
+            if len(test_filename.encode('utf-8')) > max_bytes:
+                # Need to truncate name_part to make room for index
+                available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
+                if available_bytes <= 0:
+                    # Extreme case - use minimal name
+                    truncated_name = "f"
                 else:
-                    filename = test_filename
-                
-                file_index += 1
-                if staging_area:
-                    file_path = staging_area.joinpath(filename)
+                    # Truncate name_part to fit
+                    truncated_name = name_part
+                    name_bytes = truncated_name.encode('utf-8')
+                    while len(name_bytes) > available_bytes:
+                        truncated_name = truncated_name[:-1]
+                        name_bytes = truncated_name.encode('utf-8')
 
+                filename = truncated_name + index_suffix + ext_part
+            else:
+                filename = test_filename
+
+            file_index += 1
+            if staging_area:
+                file_path = staging_area.joinpath(filename)
+
+    return filename
+
+
+class UniqueFilenames:
+    """
+    Hands out names that nothing else in a directory has taken
+
+    Processors that write a file per item have to make sure two items cannot
+    claim the same name, or the second write destroys the first file and
+    whatever the archive's metadata said about it. Doing that by hand means
+    passing a set of names around *and* remembering to add to it, and
+    forgetting either is the bug. This keeps the two together: every name it
+    returns is recorded as taken.
+
+    The directory is read once on construction, so files already in it are
+    taken too. Nothing is checked on disk after that, which also means a
+    thousand names cost no disk access - so reserve a name before writing to
+    it, rather than relying on the file being there.
+    """
+
+    def __init__(self, directory=None):
+        """
+        :param Path directory:  Directory the names are for. Files already in
+          it count as taken. May be None for a directory that does not exist
+          yet or when only this run's names matter.
+        """
+        self.directory = directory
+        self.taken = set()
+        if directory is not None and directory.is_dir():
+            self.taken = {item.name for item in directory.iterdir()}
+
+    def reserve(self, filename, **kwargs) -> str:
+        """
+        Reserve a name, adding `-1`, `-2`, ... if it is taken
+
+        :param str filename:  The name to use if it is free. May be a plain
+          name without an extension, e.g. for a folder.
+        :param kwargs:  Passed on to `deduplicate_filename`
+        :return str:  The name reserved, which is `filename` if it was free
+        """
+        filename = deduplicate_filename(filename, existing_filenames=self.taken, **kwargs)
+        self.taken.add(filename)
         return filename
+
+    def reserve_for_url(self, url, **kwargs) -> str:
+        """
+        Reserve a name derived from a URL
+
+        :param str url:  URL the file is downloaded from
+        :param kwargs:  Passed on to `url_to_filename`, e.g. `default_ext`
+        :return str:  The name reserved
+        """
+        filename = url_to_filename(url, existing_filenames=self.taken, **kwargs)
+        self.taken.add(filename)
+        return filename
+
+    def replace(self, current, filename, **kwargs) -> str:
+        """
+        Give up a reserved name and reserve another instead
+
+        For a file that has to be renamed after it was written, e.g. because
+        its extension turned out to be wrong. Frees `current` for anything
+        else, so the name is not left blocked.
+
+        :param str current:  Name to give up
+        :param str filename:  Name to use instead, if it is free
+        :param kwargs:  Passed on to `deduplicate_filename`
+        :return str:  The name reserved
+        """
+        self.taken.discard(current)
+        return self.reserve(filename, **kwargs)
 
 
 def split_urls(url_string, allowed_schemes=None):

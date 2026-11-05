@@ -5,15 +5,16 @@ The downloader is built with `__new__` and given only the redirects it has
 seen, so none of the worker machinery has to be started up.
 """
 from common.lib.archive_metadata import MediaArchiveMetadata
+from common.lib.helpers import UniqueFilenames
 from common.lib.media_archive_library import MediaArchiveLibrary
 from processors.visualisation.download_images import ImageDownloader
 
 
-def make_downloader(redirects=None, filenames=None, staging_area=None):
+def make_downloader(redirects=None, filenames=None, staging_filenames=None):
     downloader = ImageDownloader.__new__(ImageDownloader)
     downloader.url_redirects = redirects or {}
     downloader.filenames = filenames or {}
-    downloader.staging_area = staging_area
+    downloader.staging_filenames = staging_filenames or UniqueFilenames()
     return downloader
 
 
@@ -43,40 +44,42 @@ def test_correcting_an_extension_does_not_take_another_url_s_filename(tmp_path):
     really JPEG. Renaming the second onto the first would overwrite that image
     and leave its posts pointing at this one, so it gets a free name.
     """
+    names = UniqueFilenames(tmp_path)
     downloader = make_downloader(
-        filenames={"http://a/photo.png": "photo.png", "http://b/photo.jpg": "photo.jpg"},
-        staging_area=tmp_path,
+        filenames={
+            "http://a/photo.png": names.reserve("photo.png"),
+            "http://b/photo.jpg": names.reserve("photo.jpg"),
+        },
+        staging_filenames=names,
     )
-    seen = {"photo.png", "photo.jpg"}
 
-    first = downloader.filename_for_extension("http://a/photo.png", ".jpeg", seen)
+    first = downloader.filename_for_extension("http://a/photo.png", ".jpeg")
     downloader.filenames["http://a/photo.png"] = first
-    second = downloader.filename_for_extension("http://b/photo.jpg", ".jpeg", seen)
+    second = downloader.filename_for_extension("http://b/photo.jpg", ".jpeg")
 
     assert first == "photo.jpeg"
     assert second != first
     assert second.endswith(".jpeg")
-    # the names they no longer use are free again, the ones they do use are taken
-    assert seen == {first, second}
 
 
 def test_right_extension_keeps_the_same_filename(tmp_path):
+    names = UniqueFilenames(tmp_path)
     downloader = make_downloader(
-        filenames={"http://a/photo.jpeg": "photo.jpeg"}, staging_area=tmp_path
+        filenames={"http://a/photo.jpeg": names.reserve("photo.jpeg")},
+        staging_filenames=names,
     )
-    seen = {"photo.jpeg"}
-    assert downloader.filename_for_extension("http://a/photo.jpeg", ".jpeg", seen) == "photo.jpeg"
-    assert seen == {"photo.jpeg"}
+    assert downloader.filename_for_extension("http://a/photo.jpeg", ".jpeg") == "photo.jpeg"
 
 
 def test_correcting_an_extension_avoids_a_file_already_on_disk(tmp_path):
     """A file already written by an earlier download is a collision too."""
     tmp_path.joinpath("photo.jpeg").touch()
+    names = UniqueFilenames(tmp_path)
     downloader = make_downloader(
-        filenames={"http://a/photo.png": "photo.png"}, staging_area=tmp_path
+        filenames={"http://a/photo.png": names.reserve("photo.png")},
+        staging_filenames=names,
     )
-    seen = {"photo.png"}
-    assert downloader.filename_for_extension("http://a/photo.png", ".jpeg", seen) != "photo.jpeg"
+    assert downloader.filename_for_extension("http://a/photo.png", ".jpeg") != "photo.jpeg"
 
 
 def test_two_urls_leading_to_one_file_keep_both_their_posts():

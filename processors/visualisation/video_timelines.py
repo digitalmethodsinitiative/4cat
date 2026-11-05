@@ -85,6 +85,10 @@ class VideoTimelines(BasicProcessor):
         timeline_widths = {}
 
         # why not just loop through iterate_items?
+        # reading the labels walks the whole source dataset, and nothing about
+        # them changes while the frames are rendered, so do it once
+        labels = self.get_video_labels(metadata)
+
         # in SVG the order of elements matters, so we want to do some things
         # _after_ adding the last frame of a timeline. If we do this within the
         # loop we need to do the same outside of the loop after it finishes the
@@ -111,8 +115,6 @@ class VideoTimelines(BasicProcessor):
                 continue
             else:
                 video = str(item.file.parent.name)
-
-            labels = self.get_video_labels(metadata)
 
             # at the end of each timeline (or at the end of the archive) add a
             # footer to it and paint to the canvas
