@@ -248,32 +248,71 @@ def test_build_fieldnames_unions_rows_and_appends_source_columns(tmp_path):
         ({"media_url": "b", "media_error": "timed out"}, []),  # a column only some rows have
     ]
 
-    fieldnames, source_map = processor.build_fieldnames(media_rows, ["id", "body"])
+    fieldnames, source_map, matched_column = processor.build_fieldnames(media_rows, ["id", "body"])
 
     assert fieldnames == ["media_url", "media_filename", "media_error",
                           "media_source_matched", "id", "body"]
     assert source_map == {"id": "id", "body": "body"}
+    assert matched_column == "media_source_matched"
 
 
 def test_build_fieldnames_without_source_dataset(tmp_path):
     processor, _ = make_processor(tmp_path)
-    fieldnames, source_map = processor.build_fieldnames([({"media_url": "a"}, [])], [])
+    fieldnames, source_map, matched_column = processor.build_fieldnames([({"media_url": "a"}, [])], [])
 
     # nothing to combine with, so no column saying whether a row was traced back
     assert fieldnames == ["media_url"]
     assert source_map == {}
+    assert matched_column == "media_source_matched"
 
 
 def test_build_fieldnames_renames_clashing_source_column(tmp_path):
     processor, _ = make_processor(tmp_path)
     media_rows = [({"media_url": "a", "media_filename": "1.jpg"}, [])]
 
-    fieldnames, source_map = processor.build_fieldnames(media_rows, ["id", "media_filename"])
+    fieldnames, source_map, _ = processor.build_fieldnames(media_rows, ["id", "media_filename"])
 
     assert fieldnames == ["media_url", "media_filename", "media_source_matched", "id",
                           "source_media_filename"]
     # the renamed column must still be filled from the original column name
     assert source_map == {"id": "id", "media_filename": "source_media_filename"}
+
+
+def test_build_fieldnames_renames_the_matched_flag_if_a_producer_took_it(tmp_path):
+    """
+    The flag column is `media_` + `source_matched`, so a producer writing a
+    `source_matched` column of its own lands on exactly that name. Writing both
+    would give the CSV two columns of the same name, after which the header no
+    longer lines up with the rows.
+    """
+    processor, _ = make_processor(tmp_path)
+    media_rows = [({"media_url": "a", "media_source_matched": "producer's own"}, [])]
+
+    fieldnames, _, matched_column = processor.build_fieldnames(media_rows, ["id"])
+
+    assert len(fieldnames) == len(set(fieldnames))
+    # the producer keeps the name it chose; the flag moves out of the way
+    assert fieldnames == ["media_url", "media_source_matched", "media_source_matched_flag", "id"]
+    assert matched_column == "media_source_matched_flag"
+
+
+def test_build_fieldnames_keeps_renaming_until_the_name_is_free(tmp_path):
+    """
+    A source dataset can hold both `media_filename` and `source_media_filename`,
+    so renaming the first to the second is not enough on its own.
+    """
+    processor, _ = make_processor(tmp_path)
+    media_rows = [({"media_filename": "1.jpg"}, [])]
+
+    fieldnames, source_map, _ = processor.build_fieldnames(
+        media_rows, ["media_filename", "source_media_filename"]
+    )
+
+    assert len(fieldnames) == len(set(fieldnames))
+    assert source_map == {
+        "media_filename": "source_media_filename",
+        "source_media_filename": "source_source_media_filename",
+    }
 
 
 # -- finding the dataset the media came from --

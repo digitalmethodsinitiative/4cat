@@ -287,7 +287,7 @@ class ViewMetadata(BasicProcessor):
 		:param list source_columns:  Columns to add from the source dataset
 		:param dict source_items:  Item ID to source column values
 		"""
-		fieldnames, source_column_map = self.build_fieldnames(media_rows, source_columns)
+		fieldnames, source_column_map, matched_column = self.build_fieldnames(media_rows, source_columns)
 		num_rows = 0
 		matched = 0
 
@@ -300,7 +300,7 @@ class ViewMetadata(BasicProcessor):
 
 				if not items:
 					if source_columns:
-						row = {**row, self.matched_column: False}
+						row = {**row, matched_column: False}
 					writer.writerow(remove_nuls(row))
 					num_rows += 1
 					continue
@@ -309,7 +309,7 @@ class ViewMetadata(BasicProcessor):
 				for item in items:
 					writer.writerow(remove_nuls({
 						**row,
-						self.matched_column: True,
+						matched_column: True,
 						**{source_column_map[column]: value for column, value in item.items()}
 					}))
 					num_rows += 1
@@ -347,30 +347,58 @@ class ViewMetadata(BasicProcessor):
 		:param list media_rows:  Rows as returned by `collect_media_rows`
 		:param list source_columns:  Columns of the dataset the media came from,
 		  or an empty list if there is none to combine the metadata with
-		:return tuple:  Column names in the order they are written, and a map of
-		  source dataset column name to the column it is written as
+		:return tuple:  Column names in the order they are written, a map of
+		  source dataset column name to the column it is written as, and the
+		  name the matched flag is written as
 		"""
 		fieldnames = []
+		taken = set()
+
+		def claim(column, fallback):
+			"""
+			Add `column`, or a free variation on `fallback` if it is taken
+
+			Every column needs a name of its own. Two columns sharing one name
+			collide twice over: a row is a dict, so one value silently
+			overwrites the other before anything is written, and
+			`csv.DictWriter` does not object to the repeated fieldname either -
+			it writes whichever value survived under both of them.
+			"""
+			if column in taken:
+				column = fallback
+				suffix = 2
+				while column in taken:
+					column = f"{fallback}_{suffix}"
+					suffix += 1
+			taken.add(column)
+			fieldnames.append(column)
+			return column
+
+		# the producer decides these, and they are already prefixed, so they
+		# only have to be deduplicated across rows
 		for row, _ in media_rows:
-			fieldnames.extend(column for column in row if column not in fieldnames)
+			for column in row:
+				if column not in taken:
+					taken.add(column)
+					fieldnames.append(column)
 
 		if not source_columns:
-			return fieldnames, {}
+			return fieldnames, {}, self.matched_column
 
-		fieldnames.append(self.matched_column)
+		# a producer is free to write a column that prefixes to this one
+		matched_column = claim(self.matched_column, f"{self.matched_column}_flag")
+
 		source_column_map = {}
 		for column in source_columns:
-			written_as = column
-			if written_as in fieldnames:
-				# the source dataset happens to have a column of its own by this
-				# name; rename it rather than overwrite the metadata column
-				written_as = f"source_{column}"
+			# the source dataset may have a column by the same name as one of
+			# the metadata columns; rename it rather than overwrite that one
+			written_as = claim(column, f"source_{column}")
+			if written_as != column:
 				self.dataset.log(f"Source dataset column '{column}' written as '{written_as}' to avoid a clash "
-								 f"with the metadata column of the same name")
+								 f"with another column of the same name")
 			source_column_map[column] = written_as
-			fieldnames.append(written_as)
 
-		return fieldnames, source_column_map
+		return fieldnames, source_column_map, matched_column
 
 	@classmethod
 	def is_media_archive(cls, module):
