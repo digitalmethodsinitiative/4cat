@@ -1513,10 +1513,17 @@ class UniqueFilenames:
     forgetting either is the bug. This keeps the two together: every name it
     returns is recorded as taken.
 
-    The directory is read once on construction, so files already in it are
-    taken too. Nothing is checked on disk after that, which also means a
-    thousand names cost no disk access - so reserve a name before writing to
-    it, rather than relying on the file being there.
+    Files already in the directory are taken too: it is read on construction,
+    and every name handed out afterwards is checked against it as well. That
+    second check is what catches a file written by something that never asked
+    for a name - yt-dlp naming its own download, a video copied out of an
+    earlier archive - and it is the file system's own answer, so on Windows
+    and macOS it also catches a name that an existing file differs from only
+    in its capitals.
+
+    A name that has been reserved but not yet written exists only in this
+    object, so reserve a name before writing to it rather than relying on the
+    file being there.
     """
 
     def __init__(self, directory=None):
@@ -1539,7 +1546,8 @@ class UniqueFilenames:
         :param kwargs:  Passed on to `deduplicate_filename`
         :return str:  The name reserved, which is `filename` if it was free
         """
-        filename = deduplicate_filename(filename, existing_filenames=self.taken, **kwargs)
+        filename = deduplicate_filename(filename, staging_area=self.directory,
+                                        existing_filenames=self.taken, **kwargs)
         self.taken.add(filename)
         return filename
 
@@ -1551,7 +1559,8 @@ class UniqueFilenames:
         :param kwargs:  Passed on to `url_to_filename`, e.g. `default_ext`
         :return str:  The name reserved
         """
-        filename = url_to_filename(url, existing_filenames=self.taken, **kwargs)
+        filename = url_to_filename(url, staging_area=self.directory,
+                                   existing_filenames=self.taken, **kwargs)
         self.taken.add(filename)
         return filename
 

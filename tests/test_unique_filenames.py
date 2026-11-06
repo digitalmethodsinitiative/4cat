@@ -54,19 +54,32 @@ def test_files_already_in_the_directory_are_taken(tmp_path):
 	assert names.reserve("other.wav") == "other.wav"
 
 
-def test_directory_is_read_once_not_per_name(tmp_path):
+def test_a_file_written_behind_our_back_is_taken(tmp_path):
 	"""
-	Reserving is in-memory after construction, so a name must be reserved
-	before the file is written rather than relying on the file being there.
+	Not every file in the directory was asked for here: yt-dlp names its own
+	downloads, and a video copied out of an earlier archive keeps the name it
+	had there. Every name handed out is checked against the directory as well,
+	so a file nobody reserved cannot be handed out on top of.
 	"""
 	names = UniqueFilenames(tmp_path)
 	assert names.reserve("clip.wav") == "clip.wav"
-	# something else writes the file we just handed out, plus another
+	# something else writes the file we just handed out, plus one we never saw
 	tmp_path.joinpath("clip.wav").touch()
 	tmp_path.joinpath("late.wav").touch()
-	# the one we reserved is still known, the one written behind our back is not
+
 	assert names.reserve("clip.wav") == "clip-1.wav"
-	assert names.reserve("late.wav") == "late.wav"
+	assert names.reserve("late.wav") != "late.wav"
+
+
+def test_a_reserved_name_is_taken_before_its_file_exists(tmp_path):
+	"""
+	A reservation counts from the moment it is made, so a name has to be
+	reserved before it is written rather than relying on the file being there.
+	"""
+	names = UniqueFilenames(tmp_path)
+	assert names.reserve("clip.wav") == "clip.wav"
+	assert not tmp_path.joinpath("clip.wav").exists()
+	assert names.reserve("clip.wav") == "clip-1.wav"
 
 
 def test_missing_directory_is_fine(tmp_path):
