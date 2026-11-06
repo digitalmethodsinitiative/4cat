@@ -545,6 +545,29 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			item["extra"] = extra
 		return item
 
+	@staticmethod
+	def _add_other_urls(entry: dict, urls) -> None:
+		"""
+		Record more URLs that lead to an entry's file, in `extra["other_urls"]`.
+
+		The entry's own `url` and any URL it already lists are left out, and
+		nothing is added to an entry that gains no URL by it, so an entry that
+		is only ever reached one way keeps no `extra` of its own.
+
+		:param dict entry:  Item or failure to add the URLs to
+		:param urls:  URLs that lead to the same file
+		"""
+		new_urls = [url for url in urls if url and url != entry.get("url")]
+		if not new_urls:
+			return
+
+		entry_extra = entry.setdefault("extra", {})
+		other_urls = list(entry_extra.get("other_urls", []))
+		for url in new_urls:
+			if url not in other_urls:
+				other_urls.append(url)
+		entry_extra["other_urls"] = other_urls
+
 	# -- mutation --
 
 	def add_item(self, filename: str, *, post_ids,
@@ -584,17 +607,18 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			for post_id in self._normalize_post_ids(post_ids):
 				if post_id not in known_ids:
 					known_ids.append(post_id)
+			if url is not None and existing.get("url") is None:
+				existing["url"] = url
 			if extra:
+				# the entry keeps its own value where both sides have a key,
+				# except for `other_urls`: both sides are listing URLs that
+				# lead to this same file, so the two lists are joined instead
+				# of one of them being dropped
+				incoming_other_urls = extra.get("other_urls") or []
 				existing["extra"] = {**extra, **existing.get("extra", {})}
+				self._add_other_urls(existing, incoming_other_urls)
 			if url is not None:
-				if existing.get("url") is None:
-					existing["url"] = url
-				elif url != existing["url"]:
-					entry_extra = existing.setdefault("extra", {})
-					other_urls = list(entry_extra.get("other_urls", []))
-					if url not in other_urls:
-						other_urls.append(url)
-					entry_extra["other_urls"] = other_urls
+				self._add_other_urls(existing, [url])
 			return
 
 		if existing is not None and not replace:
@@ -636,6 +660,15 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			return []
 		if isinstance(post_ids, (str, int)):
 			post_ids = [post_ids]
+		try:
+			post_ids = list(post_ids)
+		except TypeError:
+			# an archive can come from another 4CAT or have been edited by
+			# hand, so this can hold anything. A value that cannot be read as
+			# a list of IDs leaves the entry without IDs; raising here would
+			# escape the errors every consumer of the metadata catches and
+			# fail the whole processor over one unreadable entry.
+			return []
 		# coerce to stripped strings, dropping null and blank ids rather than
 		# keeping them as the text "None" or "": some media (e.g. Instagram ads)
 		# records no usable id, and a fabricated id would only mislead anything

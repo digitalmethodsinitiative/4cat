@@ -540,6 +540,28 @@ def test_add_item_merge_lists_each_other_url_once():
 	assert entry["extra"]["other_urls"] == ["https://b.example/v", "https://c.example/v"]
 
 
+def test_add_item_merge_joins_the_other_urls_of_both_sides():
+	"""
+	Both sides of a merge list URLs that lead to this same file, so the lists
+	are joined. The image downloader hands over the URLs that redirected to a
+	file in `extra`, and both of its URLs resolve to the same final one - so
+	the URL argument adds nothing, and letting the entry's own list win would
+	drop every URL the second one knew about.
+	"""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("photo.jpeg", post_ids=["1"], url="https://cdn.example/p",
+			   extra={"other_urls": ["https://a.example/p"]})
+	m.add_item("photo.jpeg", post_ids=["2"], url="https://cdn.example/p",
+			   extra={"other_urls": ["https://a.example/p", "https://b.example/p"]},
+			   merge=True)
+
+	entry = m.get_entry("photo.jpeg")
+	assert entry["post_ids"] == ["1", "2"]
+	assert entry["extra"]["other_urls"] == ["https://a.example/p", "https://b.example/p"]
+	# the entry's own URL is never one of its other URLs
+	assert entry["url"] == "https://cdn.example/p"
+
+
 def test_add_item_merge_fills_in_missing_url():
 	"""A file first recorded without a URL takes the next URL as its own."""
 	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
@@ -735,6 +757,27 @@ def test_v1_read_normalizes_integer_post_ids():
 	m._populate_from_raw(raw)
 	assert m.get_entry("a.jpg")["post_ids"] == ["1", "2"]
 	assert m.failures[0]["post_ids"] == ["3"]
+
+
+def test_read_survives_post_ids_that_cannot_be_read():
+	"""
+	An archive can come from another 4CAT or have been edited by hand, so
+	`post_ids` can hold anything. A JSON number with a decimal point decodes
+	to a float, which cannot be read as a list of IDs - and would not match an
+	item's id anyway. The entry is left without IDs rather than the read
+	raising something no consumer of the metadata catches.
+	"""
+	raw = {
+		"schema_version": 1,
+		"items": {"a.jpg": {"filename": "a.jpg", "post_ids": 1.5}},
+		"failures": [{"post_ids": 2.5, "reason": "error"}],
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(raw)
+	assert m.get_entry("a.jpg")["post_ids"] == []
+	assert m.failures[0]["post_ids"] == []
+	# and the result is still a file we can write back out
+	m.validate()
 
 
 def read_legacy(raw):
