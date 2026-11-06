@@ -9,7 +9,7 @@ import json
 from PIL import Image, UnidentifiedImageError
 from requests.structures import CaseInsensitiveDict
 
-from common.lib.helpers import UserInput, url_to_filename, urls_in_text, holds_only_urls, looks_like_image_url
+from common.lib.helpers import UserInput, UniqueFilenames, urls_in_text, holds_only_urls, looks_like_image_url
 from backend.lib.processor import BasicProcessor
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.exceptions import ProcessorInterruptedException, FourcatException
@@ -224,26 +224,24 @@ class ImageDownloader(BasicProcessor):
         ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0"
         downloaded_files = set()
         failures = []
-        metadata = {}
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type, from_dataset=self.source_dataset.key
+        )
 
         self.dataset.log(f"Filename prep for {len(urls)} URLs")
         # prepare filenames for each url
         self.filenames = CaseInsensitiveDict()
         self.url_redirects = {}
+        # the reverse of `url_redirects`: which URLs led to a given one
+        self.url_sources = {}
 
-        # Use a set for O(1) membership during filename uniqueness checks
-        url_filenames_seen = set()
+        # hands out a name per URL that no other URL has; the staging area is
+        # new and empty, so this is the only thing a name can collide with
+        self.staging_filenames = UniqueFilenames(self.staging_area)
         for i, url in enumerate(urls):
-            url_filename = url_to_filename(
-                url,
-                staging_area=None,  # we do not check on-disk here as we know we have a new empty staging area
-                default_name="file",
-                default_ext=".png",
-                existing_filenames=url_filenames_seen,  # set instead of list
+            self.filenames[url] = self.staging_filenames.reserve_for_url(
+                url, default_name="file", default_ext=".png"
             )
-            
-            self.filenames[url] = url_filename
-            url_filenames_seen.add(url_filename)  # record membership
             if i in (0, 9, 49) or ((i + 1) % 200 == 0):
                 # Log progress every 10, 50, then every 200
                 self.dataset.log(f"Filename progress {i+1}/{len(urls)} filenames done")
@@ -264,6 +262,11 @@ class ImageDownloader(BasicProcessor):
             ):
             downloaded_file = self.staging_area.joinpath(self.filenames[url])
             failure = False
+            # the archive metadata records *why* a download failed, so a reader
+            # can tell a timeout from a dead link or a file that was not an
+            # image without going through the dataset log
+            failure_reason = "error"
+            failure_description = ""
 
             if self.interrupted:
                 self.complete = True
@@ -277,31 +280,14 @@ class ImageDownloader(BasicProcessor):
                     raise ProcessorInterruptedException()
 
             if type(response) is FailedProxiedRequest:
-                if type(response.context) is requests.exceptions.Timeout:
-                    self.dataset.log(
-                        f"Error: Timeout while trying to download from {url}: {response.context}"
-                    )
-                elif type(response.context) is requests.exceptions.SSLError:
-                    self.dataset.log(
-                        f"Error: SSL Error for URL {url}: {response.context}"
-                    )
-                elif type(response.context) is requests.exceptions.TooManyRedirects:
-                    self.dataset.log(
-                        f"Error: Too many redirects for URL {url}: {response.context}"
-                    )
-                elif type(response.context) is requests.exceptions.ConnectionError:
-                    self.dataset.log(
-                        f"Error: Connection Error for URL {url}: {response.context}"
-                    )
-                else:
-                    self.dataset.log(f"Error: Error for URL {url}: {response.context}")
-
+                failure_reason, failure_description = self.request_failure_reason(response.context, url)
+                self.dataset.log(f"Error: {failure_description}")
                 failure = True
 
             elif response.status_code != 200:
-                self.dataset.log(
-                    f"Error: File not found (status {response.status_code}) at {url}"
-                )
+                failure_reason = "http_error"
+                failure_description = f"File not found (status {response.status_code}) at {url}"
+                self.dataset.log(f"Error: {failure_description}")
                 failure = True
 
             if not failure:
@@ -333,10 +319,18 @@ class ImageDownloader(BasicProcessor):
                                 )
 
                             image_url = self.clean_url(image_url)
-                            self.url_redirects[url] = image_url
-                            self.filenames[image_url] = url_to_filename(image_url, staging_area=self.staging_area, default_name="file", default_ext=".png")
-                            self.push_proxied_request(image_url, 0)
-                            item_map[image_url] = item_map[url]
+                            self.record_redirect(url, image_url)
+                            if image_url not in self.filenames:
+                                # give it a name no other URL has, and queue it
+                                self.filenames[image_url] = self.staging_filenames.reserve_for_url(
+                                    image_url, default_name="file", default_ext=".png"
+                                )
+                                self.push_proxied_request(image_url, 0)
+                            # the dataset may link the image directly as well, in
+                            # which case it is queued already and has posts of its
+                            # own; add this gallery's posts rather than replacing
+                            known_ids = item_map.setdefault(image_url, [])
+                            known_ids.extend(item_id for item_id in item_map[url] if item_id not in known_ids)
                             del self.filenames[url], item_map[url]
                             downloaded_file.unlink(missing_ok=True)
 
@@ -345,15 +339,20 @@ class ImageDownloader(BasicProcessor):
                             continue
 
                         except (json.JSONDecodeError, KeyError, IndexError):
-                            self.dataset.log(
-                                f"Error: Could not get image URL for Imgur album {url}"
-                            )
-                            failures.append(url)
+                            # the gallery page is not an image and holds no
+                            # readable reference to one, so nothing was
+                            # downloaded for this URL
+                            failure_reason = "no_image_in_gallery"
+                            failure_description = f"Could not get image URL for Imgur album {url}"
+                            self.dataset.log(f"Error: {failure_description}")
+                            failure = True
 
                 elif not response.headers.get("content-type", "").startswith("image"):
-                    self.dataset.log(
-                        f"Error: URL does not seem to be of the required type ({response.headers.get('content-type', '').split(';')[0]} found instead) at {url}"
-                    )
+                    failure_reason = "not_an_image"
+                    failure_description = (f"URL does not seem to be of the required type "
+                                           f"({response.headers.get('content-type', '').split(';')[0]} found instead) "
+                                           f"at {url}")
+                    self.dataset.log(f"Error: {failure_description}")
                     failure = True
 
                 else:
@@ -361,14 +360,15 @@ class ImageDownloader(BasicProcessor):
                     # test by trying to read it with PIL
                     try:
                         extension = self.get_valid_file_extension(downloaded_file)
-                        downloaded_file.rename(downloaded_file.with_suffix(extension))
-                        # update filename mapping to reflect new extension
-                        self.filenames[url] = self.filenames[url].rsplit(".", 1)[0] + extension
+                        new_filename = self.filename_for_extension(url, extension)
+                        if new_filename != self.filenames[url]:
+                            downloaded_file.rename(self.staging_area.joinpath(new_filename))
+                            self.filenames[url] = new_filename
 
                     except InvalidDownloadedFileException as e:
-                        self.dataset.log(
-                            f"Error: File downloaded from {url}, but does not seem to be valid file ({e})"
-                        )
+                        failure_reason = "invalid_file"
+                        failure_description = f"File downloaded from {url}, but does not seem to be valid file ({e})"
+                        self.dataset.log(f"Error: {failure_description}")
                         failure = True
 
                 if not failure:
@@ -384,25 +384,37 @@ class ImageDownloader(BasicProcessor):
                         # before ending the loop and wrapping up
                         self.complete = True
 
+            resolved_url, url_extra = self.urls_for_metadata(url)
             if failure:
                 failures.append(url)
                 downloaded_file.unlink(missing_ok=True)
-
-            metadata[url] = {
-                "filename": self.filenames[url],
-                "url": self.resolve_url(url),
-                "success": not failure,
-                "from_dataset": self.source_dataset.key,
-                "post_ids": item_map[url],
-            }
+                metadata.add_failure(
+                    post_ids=item_map[url],
+                    reason=failure_reason,
+                    reason_description=failure_description,
+                    url=resolved_url,
+                    extra=url_extra,
+                )
+            else:
+                filename = self.filenames[url]
+                if filename in metadata:
+                    # filenames are unique per URL, so this means two URLs led
+                    # to the same file. Merge, so that neither URL's posts lose
+                    # their image, and say so: it is worth knowing about.
+                    self.dataset.log(f"Note: {filename} was already downloaded for another URL; recording "
+                                     f"{url} against the same file")
+                metadata.add_item(
+                    filename=filename,
+                    post_ids=item_map[url],
+                    url=resolved_url,
+                    extra=url_extra,
+                    merge=True,
+                )
 
             if self.complete:
                 break
 
-        with self.staging_area.joinpath(".metadata.json").open(
-            "w", encoding="utf-8"
-        ) as outfile:
-            json.dump(metadata, outfile)
+        metadata.write(self.staging_area)
 
         # delete supernumerary partially downloaded files
         self.flush_proxied_requests()  # get rid of remaining queue
@@ -415,7 +427,7 @@ class ImageDownloader(BasicProcessor):
         # finish up
         self.dataset.update_progress(1.0)
         self.write_archive_and_finish(
-            self.staging_area, len([x for x in metadata.values() if x.get("success")]),
+            self.staging_area, len(metadata),
             finish=False
         )
         if self.warning_message:
@@ -522,8 +534,7 @@ class ImageDownloader(BasicProcessor):
             # Trust the current response URL as final; record mapping only if different
             final_url = response_url
 
-        if final_url != original_url:
-            self.url_redirects[original_url] = final_url
+        self.record_redirect(original_url, final_url)
 
         destination = self.staging_area.joinpath(self.filenames[original_url])
 
@@ -546,6 +557,30 @@ class ImageDownloader(BasicProcessor):
                     pass
 
 
+    def record_redirect(self, original_url, final_url):
+        """
+        Note that one URL led to another
+
+        Both the redirects `requests` followed and the image URL taken from an
+        imgur gallery page are recorded here, so the metadata can name every
+        URL a file can be reached by. `resolve_url` follows these forwards,
+        `urls_for_metadata` reads them back.
+
+        :param str original_url:  URL that was requested
+        :param str final_url:  URL it led to
+        """
+        if original_url == final_url:
+            return
+
+        self.url_redirects[original_url] = final_url
+        # carry over whatever already led to `original_url`, so that a chain -
+        # an imgur gallery page, the image URL it names, wherever that
+        # redirects - leaves every one of its URLs pointing at the file
+        known = self.url_sources.setdefault(final_url, [])
+        for source in [original_url, *self.url_sources.pop(original_url, [])]:
+            if source not in known:
+                known.append(source)
+
     def resolve_url(self, url):
         """
         Find final redirect for URL
@@ -562,6 +597,69 @@ class ImageDownloader(BasicProcessor):
             url = self.url_redirects[url]
 
         return url
+
+    # why a proxied request failed, as a reason code for the archive metadata
+    # and the message to log. Matched on the exact exception type, as before -
+    # requests' exception hierarchy overlaps (a ConnectTimeout is both a
+    # Timeout and a ConnectionError), so anything else is left as "error".
+    REQUEST_FAILURE_REASONS = {
+        requests.exceptions.Timeout: ("timeout", "Timeout while trying to download from"),
+        requests.exceptions.SSLError: ("ssl_error", "SSL Error for URL"),
+        requests.exceptions.TooManyRedirects: ("too_many_redirects", "Too many redirects for URL"),
+        requests.exceptions.ConnectionError: ("connection_error", "Connection Error for URL"),
+    }
+
+    @classmethod
+    def request_failure_reason(cls, context, url):
+        """
+        Say why a request for an image failed
+
+        :param context:  The exception the request failed with
+        :param str url:  URL that was requested
+        :return tuple:  A reason code for the metadata, and a description
+        """
+        reason, message = cls.REQUEST_FAILURE_REASONS.get(type(context), ("error", "Error for URL"))
+        return reason, f"{message} {url}: {context}"
+
+    def filename_for_extension(self, url, extension):
+        """
+        Correct a downloaded file's extension, keeping its name unique
+
+        The prep loop gives every URL a filename of its own, but the extension
+        it took from the URL can turn out to be wrong, and correcting it can
+        land on the name another URL already has - `photo.png` and `photo.jpg`
+        both become `photo.jpeg` once PIL has had a look at them. Renaming one
+        onto the other would destroy that image and leave its posts pointing at
+        this one, so a free name is picked instead.
+
+        :param str url:  URL whose file was downloaded
+        :param str extension:  The extension the file turned out to have
+        :return str:  The name to use, which is the current one if the
+          extension was already right
+        """
+        current = self.filenames[url]
+        corrected = current.rsplit(".", 1)[0] + extension
+        if corrected == current:
+            return current
+
+        return self.staging_filenames.replace(current, corrected)
+
+    def urls_for_metadata(self, url):
+        """
+        Get the URLs to record in the archive metadata for a download
+
+        The metadata's `url` is where the file was downloaded from, after
+        following any redirects. Every other URL that led there is listed in
+        `other_urls`, so the file can be found by any of them: the URL as it
+        appeared in the dataset, and any step in between - an imgur gallery
+        page names an image URL, which may itself redirect.
+
+        :param str url:  URL as it was requested
+        :return tuple:  The URL to record, and extra data for the metadata
+        """
+        resolved_url = self.resolve_url(url)
+        other_urls = [other for other in self.url_sources.get(resolved_url, []) if other != resolved_url]
+        return resolved_url, {"other_urls": other_urls} if other_urls else {}
 
     @staticmethod
     def find_image_urls(value):
@@ -610,20 +708,29 @@ class ImageDownloader(BasicProcessor):
             raise InvalidDownloadedFileException(getattr(e, "message", str(e))) from e
 
     @staticmethod
-    def map_metadata(url, data):
+    def map_metadata(filename, item):
         """
-        Iterator to yield modified metadata for CSV
-
-        :param str url:  string that may contain URLs
-        :param dict data:  dictionary with metadata collected previously
-        :yield dict:  	  iterator containing reformated metadata
+        Yield CSV row(s) for a successful `items[filename]` entry.
         """
-        row = {
-            "url": url,
-            "number_of_posts_with_url": len(data.get("post_ids", [])),
-            "post_ids": ", ".join(data.get("post_ids", [])),
-            "filename": data.get("filename"),
-            "download_successful": data.get("success", ""),
+        yield {
+            "url": item.get("url", ""),
+            "number_of_posts_with_url": len(item.get("post_ids", [])),
+            "post_ids": ", ".join(item.get("post_ids", [])),
+            "filename": filename,
+            "download_successful": True,
         }
 
-        yield row
+    @staticmethod
+    def map_failure_metadata(failure):
+        """
+        Yield CSV row(s) for a `failures[]` entry.
+        """
+        yield {
+            "url": failure.get("url", ""),
+            "number_of_posts_with_url": len(failure.get("post_ids", [])),
+            "post_ids": ", ".join(failure.get("post_ids", [])),
+            "filename": "",
+            "download_successful": False,
+            "reason": failure.get("reason", ""),
+            "reason_description": failure.get("reason_description", ""),
+        }
