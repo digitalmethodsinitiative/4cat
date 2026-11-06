@@ -294,7 +294,7 @@ class InternalAPI(BasicWorker):
 					# include the worker stack location, which shows where exactly
 					# the worker is currently executing code
 					stack = []
-					if frames.get(worker.ident):
+					if hasattr(worker, "ident") and frames.get(worker.ident):
 						stack = []
 						frame = frames[worker.ident]
 						have_root = False
