@@ -56,12 +56,12 @@
                     {% endif %}
                     {% if __user_config("privileges.can_make_dataset_public") %}
                     <div class="form-element">
-                        <label for="data-make-private">Make private:</label>
+                        <label for="data-make-public">Make public:</label>
                         <div class="filter-parameters">
-                            <label><input type="checkbox" name="make-private" id="data-make-private" checked="checked"> Make dataset private</label>
-                            <button class="tooltip-trigger" aria-controls="tooltip-dataset-private" aria-label="Extended help for option">?</button>
+                            <label><input type="checkbox" name="make-public" id="data-make-public"> Make dataset public</label>
+                            <button class="tooltip-trigger" aria-controls="tooltip-dataset-public" aria-label="Extended help for option">?</button>
                         </div>
-                        <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and server administrators will still be able to view it. If you are working with sensitive data, you should consider running your own 4CAT instance.</p>
+                        <p role="tooltip" id="tooltip-dataset-public">Other users of this 4CAT server will be able to find and view this dataset. If you leave this off, the dataset is hidden from other users, but it is not encrypted and server administrators can still view it.</p>
                     </div>
                     {% endif %}
                     {% if __user_config("ui.option_email") in ["both", "datasources_only"] and __user_config("mail.server") %}
