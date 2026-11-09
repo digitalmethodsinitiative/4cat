@@ -911,11 +911,6 @@ def show_result(key):
         except DataSetException:
             copy_source = dataset.parameters.get("copied_from")
 
-    # we can either show this view as a separate page or as a bunch of html
-    # to be retrieved via XHR
-    standalone = "processors" not in request.url
-    template = "dataset-page/view-dataset.html" if standalone else "components/result-details.html"
-
     breadcrumbs = [{
             "url": url_for("dataset.show_results"),
             "label": "Datasets"
@@ -933,7 +928,7 @@ def show_result(key):
     # off it.
     explore = request.args.get("view") == "explore" and dataset.is_finished() and dataset.num_rows > 0
 
-    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=g.modules.processors,
+    return render_template("dataset-page/view-dataset.html", dataset=dataset, parent_key=dataset.key, processors=g.modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
                            expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, breadcrumbs=breadcrumbs,
