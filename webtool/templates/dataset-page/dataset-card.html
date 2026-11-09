@@ -84,7 +84,7 @@ included inside one.
                 available
                 after {{ dataset.is_expiring(config=__config)|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You
                 can
-                <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+                <a href="{{ url_for("dataset.keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
             </span>
         </dl>
     {% endif %}
