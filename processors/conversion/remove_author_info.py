@@ -11,6 +11,7 @@ from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.author_info import AuthorInfoReplacer
 from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
+from common.lib.outputs import Filter
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

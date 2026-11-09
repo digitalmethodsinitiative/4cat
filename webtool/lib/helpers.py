@@ -368,7 +368,7 @@ def common_dataset_options(config, user=None):
 			}
 		}
 
-	if config.get("ui.offer_private"):
+	if config.get("privileges.can_make_dataset_public"):
 		options["make-private"] = {
 			"type": UserInput.OPTION_TOGGLE,
 			"name": "make-private",

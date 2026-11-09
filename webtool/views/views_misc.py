@@ -150,7 +150,13 @@ def datasource_ids_by_worker():
 
     :return dict:  {worker type: data source ID}
     """
-    return {"%s-search" % datasource: datasource for datasource in g.modules.datasources}
+    mapping = {}
+    for datasource in g.modules.datasources:
+        worker = g.modules.get_datasource_worker(datasource)
+        if worker:
+            mapping[worker.type] = datasource
+
+    return mapping
 
 
 def datasource_detail(datasource_id):
@@ -165,7 +171,7 @@ def datasource_detail(datasource_id):
     :return dict:  Detail context for components/module-detail-datasource.html
     """
     metadata = g.modules.datasources[datasource_id]
-    worker = g.modules.workers.get("%s-search" % datasource_id)
+    worker = g.modules.get_datasource_worker(datasource_id)
 
     description = None
     description_path = Path(metadata.get("path"), "DESCRIPTION.md")
@@ -176,9 +182,9 @@ def datasource_detail(datasource_id):
     # the fields items from this data source have; skipped for uploads, whose
     # fields are whatever the uploaded file happens to contain
     example_keys = None
-    if datasource_id not in ("upload",):
+    if worker and datasource_id not in ("upload",):
         example_keys = get_datasource_example_keys(db=g.db, modules=g.modules,
-                                                   dataset_type="%s-search" % datasource_id)
+                                                   dataset_type=worker.type)
 
     expiration = metadata.get("expire-datasets") or {}
     github_url = (g.config.get("4cat.github_url") or "").rstrip("/")
@@ -305,8 +311,9 @@ def data_overview(datasource=None):
 
     :param str datasource:  Data source that was being looked at
     """
-    if datasource and datasource in g.modules.datasources:
-        return redirect(url_for("misc.module_catalog", module_type="%s-search" % datasource))
+    worker = g.modules.get_datasource_worker(datasource) if datasource else None
+    if worker:
+        return redirect(url_for("misc.module_catalog", module_type=worker.type))
 
     return redirect(url_for("misc.module_catalog"))
 

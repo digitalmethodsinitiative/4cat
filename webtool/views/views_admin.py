@@ -685,9 +685,14 @@ def manipulate_settings():
     definition = g.config.config_definition
     categories = config_definition.categories
 
+    datasource_names = {}
+    for datasource, datasource_definition in g.modules.datasources.items():
+        datasource_worker = g.modules.get_datasource_worker(datasource)
+        if datasource_worker:
+            datasource_names[datasource_worker.type] = datasource_definition["name"]
+
     modules = {
-        **{datasource + "-search": definition["name"] for datasource, definition in
-           g.modules.datasources.items()},
+        **datasource_names,
         **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in
            g.modules.processors.values()}
     }

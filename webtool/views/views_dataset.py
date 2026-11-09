@@ -75,11 +75,7 @@ def datasource_filter_options(pairs):
     """
     variant_titles = {}
     for datasource in {datasource for datasource, variant in pairs if variant}:
-        # `-import` as well as `-search`: both name a data source's search
-        # worker (see AGENTS.md), and this only wants to read from whichever
-        # one this data source has
-        worker = g.modules.workers.get("%s-search" % datasource,
-                                       g.modules.workers.get("%s-import" % datasource))
+        worker = g.modules.get_datasource_worker(datasource)
         if worker:
             variant_titles[datasource] = datasource_variants(worker, g.config)
 
@@ -152,7 +148,7 @@ def datasource_grid():
     """
     modules = {}
     for datasource_id, metadata in available_datasources().items():
-        worker = g.modules.workers[datasource_id + "-search"]
+        worker = g.modules.get_datasource_worker(datasource_id)
         status = worker.get_status()
         card = {
             "title": metadata["name"],
@@ -252,7 +248,7 @@ def datasource_metadata(datasource_id):
     if datasource_id not in datasources:
         return error(404, error="This data source is not available.")
 
-    worker = g.modules.workers[datasource_id + "-search"]
+    worker = g.modules.get_datasource_worker(datasource_id)
 
     title = datasources[datasource_id]["name"]
     variant = request.args.get("variant")
@@ -266,7 +262,7 @@ def datasource_metadata(datasource_id):
         "components/module-metadata.html",
         module={"title": title},
         icon=getattr(worker, "icon", None),
-        info_url=url_for("misc.module_catalog", module_type="%s-search" % datasource_id),
+        info_url=url_for("misc.module_catalog", module_type=worker.type),
         info_label="How is this data collected?",
         code_url=worker.get_repo_link(g.config),
         code_label="View data source code",

@@ -496,7 +496,7 @@ def save_annotation_fields(key: str):
     old_fields = dataset.annotation_fields
     fields = read_annotation_field_form(request.form, old_fields)
 
-    def refuse(warning: str, errors: dict = None):
+    def refuse(warning: str, errors: dict | None = None):
         """
         Send the editor back with the submitted fields still in it
 

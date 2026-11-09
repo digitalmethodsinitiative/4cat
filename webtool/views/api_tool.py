@@ -202,8 +202,10 @@ def get_processor_options(processor_type, dataset_id=None):
 	:return: A JSON object with the `status`, `processor`, `dataset`, and `options` for the processor.
 	"""
 	if processor_type in g.modules.datasources:
-		# Datasources were poorly named
-		processor_type = processor_type + "-search"
+		# a data source is addressed by its ID, but its worker has its own type
+		datasource_worker = g.modules.get_datasource_worker(processor_type)
+		if datasource_worker:
+			processor_type = datasource_worker.type
 
 	if processor_type not in g.modules.processors:
 		return error(404, message="Processor '%s' does not exist" % processor_type)
@@ -287,7 +289,7 @@ def datasource_form(datasource_id):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = g.modules.datasources[datasource_id]
-	worker_class = g.modules.workers.get(datasource_id + "-search")
+	worker_class = g.modules.get_datasource_worker(datasource_id)
 
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
@@ -444,11 +446,11 @@ def queue_dataset():
 	if datasource_id not in g.modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	search_worker_id = datasource_id + "-search"
-	if search_worker_id not in g.modules.workers:
+	search_worker = g.modules.get_datasource_worker(datasource_id)
+	if not search_worker:
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
-	search_worker = g.modules.workers[search_worker_id]
+	search_worker_id = search_worker.type
 
 	# which variant of the data source this is for, if it has any; the form
 	# carries it because the options depend on it, and so does the query

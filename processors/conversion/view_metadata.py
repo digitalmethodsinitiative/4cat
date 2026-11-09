@@ -11,6 +11,7 @@ from common.lib.compatibility import Compatibility
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, MetadataException, ProcessorInterruptedException
 from common.lib.helpers import remove_nuls
+from common.lib.outputs import Table
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -34,6 +35,8 @@ class ViewMetadata(BasicProcessor):
 		icon="circle-info",
 	)
 	extension = "csv"  # extension of result file, used internally and in UI
+	# a derived table
+	output = Table()
 	
 	# Archives made by these processors contain a .metadata.json file. Also used
 	# when looking for the dataset the media came from, because a media archive
