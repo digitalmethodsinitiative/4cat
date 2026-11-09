@@ -371,14 +371,14 @@ def common_dataset_options(config, user=None):
 		}
 
 	if config.get("privileges.can_make_dataset_public"):
-		options["make-private"] = {
+		options["make-public"] = {
 			"type": UserInput.OPTION_TOGGLE,
-			"name": "make-private",
-			"help": "Make dataset private",
-			"default": True,
-			"tooltip": "This will only hide your dataset from other users. It will NOT encrypt your "
-					   "data and server administrators will still be able to view it. If you are working "
-					   "with sensitive data, you should consider running your own 4CAT instance."
+			"name": "make-public",
+			"help": "Make dataset public",
+			"default": False,
+			"tooltip": "Other users of this 4CAT server will be able to find and view this dataset. If you "
+					   "leave this off, the dataset is hidden from other users, but it is not encrypted and "
+					   "server administrators can still view it."
 		}
 
 	if config.get("ui.option_email") in ("both", "datasources_only") and config.get("mail.server"):
