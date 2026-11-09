@@ -140,8 +140,12 @@ def explorer_page_context(dataset: DataSet, page=1, sort="", reverse=False) -> d
     context = annotation_field_context(dataset)
     context.update({
         "datasource": dataset.parameters.get("datasource"),
-        # data source templates hide identifying details for these
-        "pseudonymised": bool(dataset.parameters.get("pseudonymise", False)),
+        # data source templates hide identifying details for these. Author
+        # details can be hidden when the dataset is made, or afterwards with
+        # the 'Pseudonymise or anonymise' processor, which is the only way to
+        # do it for a dataset that was imported rather than collected
+        "pseudonymised": bool(dataset.parameters.get("pseudonymise")
+                              or (dataset.parameters.get("author_info_replaced") or {}).get("replaced")),
         "items": items,
         "media_files": dataset.get_media_from_children(item_ids=item_ids),
         "annotations": item_annotations,

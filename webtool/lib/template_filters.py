@@ -454,7 +454,7 @@ def _jinja2_filter_visible_parameters(parameters):
             # for internal 4CAT preset/dataset linking/parsing
             continue
 
-        elif key in ("pseudonymise", "user", "board", "datasource", "type", "label", "header", "expires-after", "email-complete", "original_timestamp", "session_id"):
+        elif key in ("pseudonymise", "author_info_replaced", "user", "board", "datasource", "type", "label", "header", "expires-after", "email-complete", "original_timestamp", "session_id"):
             # these are used, but not directly in the dataset parameter list
             continue
 

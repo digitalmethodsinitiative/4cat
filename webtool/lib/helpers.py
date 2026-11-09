@@ -351,10 +351,12 @@ def common_dataset_options(config, user=None):
 	if config.get("ui.offer_hashing"):
 		options["pseudonymise-info"] = {
 			"type": UserInput.OPTION_INFO,
-			"help": "4CAT can remove information it identifies as relating to an item's author, or "
-					"replace it with a [hashed](https://techterms.com/definition/hash) value. Other "
-					"personal information may persist; it is your responsibility to further anonymise "
-					"data where appropriate."
+			"help": f"{config.get('4cat.name')} can remove information it identifies as relating to "
+					"an item's author, or replace it with a [hashed](https://techterms.com/definition/hash) "
+					"value. It finds that information by field name, so how much it covers differs per "
+					"platform, and other personal information may persist. Once the dataset is ready, "
+					"check what was replaced - you can replace more with the 'Pseudonymise or anonymise' "
+					"processor. It is your responsibility to further anonymise data where appropriate."
 		}
 		options["pseudonymise"] = {
 			"type": UserInput.OPTION_CHOICE,

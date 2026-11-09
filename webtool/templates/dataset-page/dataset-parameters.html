@@ -14,14 +14,39 @@
     {% endcall %}
 {% endif %}
 
-{# Special case: dataset is anonymised/pseudonymised #}
-{% if "pseudonymise" in dataset.parameters and (dataset.parameters.pseudonymise == True or dataset.parameters.pseudonymise == "pseudonymise") %}
-    {% call format_parameter(dataset, "Pseudonymised", "Author data has been pseudonymised") %}
-        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+{# What was done to the author data. A dataset that records what was replaced
+   can say what actually happened and how much of it there was; for the rest
+   all that is known is what was asked for when they were made, so those say
+   that instead. #}
+{% set author_info = dataset.parameters.get("author_info_replaced") %}
+{% set author_requested = dataset.parameters.get("pseudonymise") %}
+{% if author_info %}
+    {% set author_modes = author_info.modes %}
+    {% set author_count %}{{ author_info.replaced|commafy }} value{{ "" if author_info.replaced == 1 else "s" }}{% endset %}
+{% elif author_requested == True %}
+    {% set author_modes = ["pseudonymise"] %}
+{% elif author_requested in ("pseudonymise", "anonymise") %}
+    {% set author_modes = [author_requested] %}
+{% else %}
+    {% set author_modes = [] %}
+{% endif %}
+{% set author_unknown = "4CAT did not record what was replaced, so how much of it was covered is not known." %}
+
+{% if author_info and not author_info.replaced %}
+    {% call format_parameter(dataset, "Author data", "Author data was left as it is. None of the fields to replace (" ~ author_info.fields|join(", ") ~ ") were found in this dataset.") %}
+        <i class="fa fa-triangle-exclamation" aria-hidden="true"></i> Left as it is
     {% endcall %}
-{% elif "pseudonymise" in dataset.parameters and dataset.parameters.pseudonymise == "anonymise" %}
-    {% call format_parameter(dataset, "Anonymised", "Author data has been anonymised") %}
-        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+{% elif "pseudonymise" in author_modes and "anonymise" in author_modes %}
+    {% call format_parameter(dataset, "Pseudonymised and anonymised", "Author data has been pseudonymised and anonymised: " ~ author_count ~ " replaced in total, some with a hash and some with 'REDACTED'.") %}
+        {{ author_count }}
+    {% endcall %}
+{% elif "pseudonymise" in author_modes %}
+    {% call format_parameter(dataset, "Pseudonymised", "Author data has been pseudonymised: " ~ author_count ~ " replaced with a hash." if author_info else "Author data was set to be pseudonymised when this dataset was made. " ~ author_unknown) %}
+        {% if author_info %}{{ author_count }}{% else %}<i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>{% endif %}
+    {% endcall %}
+{% elif "anonymise" in author_modes %}
+    {% call format_parameter(dataset, "Anonymised", "Author data has been anonymised: " ~ author_count ~ " replaced with 'REDACTED'." if author_info else "Author data was set to be anonymised when this dataset was made. " ~ author_unknown) %}
+        {% if author_info %}{{ author_count }}{% else %}<i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>{% endif %}
     {% endcall %}
 {% endif %}
 
