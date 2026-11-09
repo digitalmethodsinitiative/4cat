@@ -1,0 +1,46 @@
+{# A single module in a module grid (components/module-grid.html).
+
+   The card itself is context-free: what selecting a module does is delegated to
+   `select_template`, since it means different things in different places - in
+   the slideout it slides the module's options over the grid, in the module
+   catalogue it loads the module's detail into the top of the page.
+
+   Expects:
+     module         the module itself; only `title` and `description` are read
+     module_id      identifier of the module
+     search_terms   lower-case haystack the grid's search box filters on
+     tags           (optional) list of tags; rendered as badges on the card and
+                    matched against the grid's tag filter
+     select_template  template rendering this card's action button; omit for a
+                    card with no action at all
+     icon           (optional) Font Awesome icon name
+     info_url       (optional) 'more information' quick link
+     code_url       (optional) 'view source code' quick link
+     card_extra     (optional) template rendered below the description
+     select_label   (optional) label for the action button
+#}
+<div class="module-card"
+     data-search="{{ search_terms|lower }}"
+     data-tags="{{ (tags if tags is not string else [tags])|join('|') if tags }}"
+     x-show="moduleVisible($el)">
+    <header class="card-header module-header">
+        {% include 'components/module-icon.html' %}
+        <h3>{{ module.title }}</h3>
+        {% include 'components/module-card-actions.html' %}
+        {% if tags %}{% include 'components/module-tags.html' %}{% endif %}
+
+        <nav class="actions">
+            {% if select_template %}
+                {% include select_template %}
+            {% endif %}
+        </nav>
+    </header>
+    <section class="card-content">
+        <div class="module-card-content">
+            <div class="card-description">
+                {{ module.description }}
+            </div>
+            {% if card_extra %}{% include card_extra %}{% endif %}
+        </div>
+    </section>
+</div>

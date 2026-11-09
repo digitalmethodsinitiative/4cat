@@ -1,0 +1,119 @@
+.module-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--spacing-regular);
+}
+
+.module-grid > .module-card {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: calc((100% - 2 * var(--spacing-regular)) / 3);
+    min-width: min(30rem, 100%);
+    box-sizing: border-box;
+}
+
+.module-grid .module-card .badge-list {
+    margin: 0;
+    overflow-x: scroll;
+    margin-right: var(--spacing-regular);
+}
+
+.module-grid-section + .module-grid-section {
+    margin-top: var(--spacing-large);
+}
+
+.module-grid-header {
+    margin: 0 0 var(--spacing-regular) 0;
+}
+
+.no-results {
+    padding: var(--spacing-large);
+    text-align: center;
+    color: var(--semidark);
+}
+.module-grid-note {
+    margin: 0 0 var(--spacing-regular) 0;
+    color: var(--semidark);
+}
+
+/* Sits below the grid at all times, quietly. When a search matches nothing the
+   grid above it is empty, so it moves to the middle of the panel and speaks up:
+   that is the moment someone wants to ask for what is not there. */
+.module-grid-footer {
+    margin-top: var(--spacing-large);
+    padding-top: var(--spacing-regular);
+    border-top: var(--stroke-light) dashed var(--panel-bg-2);
+    text-align: center;
+    color: var(--semidark);
+}
+
+.module-grid-footer p {
+    margin: 0;
+}
+
+.module-grid-footer.is-empty {
+    margin-top: 0;
+    padding: var(--spacing-large);
+    border-top: 0;
+    font-size: var(--font-h3);
+}
+
+.module-grid-footer .module-grid-footer-message {
+    margin-bottom: var(--spacing-regular);
+}
+
+.module-grid-footer .module-request a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.module-grid-footer .module-request a:hover {
+    color: var(--fourcat-accent);
+}
+
+/* Tag filter above a module grid. The chips reuse the .module-tag colours, so a
+   tag looks the same here as it does on a card. All of them keep their colour
+   until one is picked; the rest then dim rather than disappear, so the whole
+   vocabulary stays visible while filtering. */
+.tag-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--spacing-regular);
+    row-gap: var(--spacing-small);
+    margin-bottom: var(--spacing-regular);
+    padding-bottom: var(--spacing-regular);
+    border-bottom: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
+.tag-filter-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-tiny);
+}
+
+.tag-filter .module-tag.is-dimmed {
+    filter: grayscale(1);
+    opacity: 0.4;
+}
+
+/* a link, not a button, wherever the grid is shown; keep .self-styled on it if
+   it is ever a <button> again, or `.plain-page button` makes it button-like on
+   the catalogue page but not in the slideout */
+.tag-filter .tag-filter-reset {
+    font: inherit;
+    font-size: var(--font-body);
+    text-transform: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--semidark);
+    text-decoration: underline;
+    cursor: pointer;
+    margin-left: auto;
+}
+
+.tag-filter .tag-filter-reset:hover {
+    color: var(--fourcat-accent);
+}

@@ -9,6 +9,7 @@ from datetime import datetime
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.helpers import readable_url
+from common.lib.outputs import Datasource
 
 
 class SearchRedNoteComments(Search):
@@ -16,10 +17,11 @@ class SearchRedNoteComments(Search):
     Import scraped RedNote/Xiaohongshu/XSH comment data
     """
     type = "xiaohongshu-comments-search"  # job ID
-    category = "Search"  # category
+    tags = ["import"]
     title = "Import scraped RedNote comment data"  # title displayed in UI
-    description = "Import RedNote comment data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    description = "Import RedNote comment data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    output = Datasource()
     is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets

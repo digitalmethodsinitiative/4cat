@@ -12,17 +12,21 @@ import re
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
 from common.lib.helpers import readable_url
+from common.lib.outputs import Datasource
 
 class SearchLinkedIn(Search):
     """
     Import scraped LinkedIn data
     """
     type = "linkedin-search"  # job ID
-    category = "Search"  # category
+    tags = ["import"]
     title = "Import scraped LinkedIn data"  # title displayed in UI
-    description = "Import LinkedIn data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    description = "Import LinkedIn data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # the tag column the co-tag and hashtag networks look for
+    output = Datasource(columns={"hashtags"})
     is_from_zeeschuimer = True
+    icon = "brand-linkedin"
 
     # not available as a processor for existing datasets
     accepts = [None]

@@ -24,6 +24,7 @@ from backend.lib.search import Search
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.outputs import Datasource
 
 # only make this worker available when explicitly enabled, so it never loads on
 # a normal/production instance (the datasource folder is always discovered, but
@@ -37,10 +38,11 @@ if TEST_DATASOURCE_ENABLED:
         Dummy search worker for exercising the worker/queue status pages
         """
         type = "test-search"  # job ID
-        category = "Search"  # category
+        
         title = "Test datasource (dev only)"  # title displayed in UI
         description = "Development-only datasource that creates dummy datasets in various states (complete, forever, crash) to exercise admin status pages."
         extension = "ndjson"  # extension of result file
+        output = Datasource()
 
         # not offered as a processor for existing datasets
         accepts = [None]

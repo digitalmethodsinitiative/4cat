@@ -9,8 +9,9 @@ from io import StringIO
 from urllib.parse import unquote
 import networkx as nx
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Network
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import urls_in_text, get_software_version
 
@@ -25,10 +26,19 @@ class WikiURLCoLinker(BasicProcessor):
 	Generate URL co-link network
 	"""
 	type = "wiki-category-network"  # job type ID
-	category = "Networks"  # category
-	title = "Wikipedia category network"  # title displayed in UI
-	description = "Create a GEXF network file comprised network comprised of linked-to Wikipedia pages, linked to the categories they are part of. English Wikipedia only. Will only fetch the first 10,000 links."  # description displayed in UI
+	description = ProcessorDescription(
+		title="Wikipedia category network",
+		tags=["networks", "urls"],
+		description="Create a network of linked-to Wikipedia pages connected to the categories they belong to. Wikipedia links are extracted from the post body and looked up through Wikipedia to find their categories.",
+		warnings=[
+			"Only English Wikipedia is supported, and only the first 10,000 links found are used.",
+			"Page categories are fetched from Wikipedia, an external service.",
+		],
+		icon="circle-nodes",
+	)
 	extension = "gexf"  # extension of result file, used internally and in UI
+	# a graph file, no column table
+	output = Network()
 
 	# Allow on top-level CSV/NDJSON datasets
 	compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})

@@ -1,0 +1,13 @@
+{# Maps a module map catalogue entry onto the generic module card, for the
+   module catalogue. `module_id` and `module` come from the loop in
+   components/module-grid.html.
+
+   No quick links in the header here: everything they would point at - what it
+   is, where its code lives, what it needs, what it unlocks - is in the detail
+   the select button loads at the top of the page. #}
+{% with icon = module.icon,
+        tags = module.tags,
+        search_terms = module.title ~ ' ' ~ module.description ~ ' ' ~ module_id ~ ' ' ~ module.tags|join(' '),
+        select_template = "components/module-select-catalog.html" %}
+    {% include "components/module-card.html" %}
+{% endwith %}

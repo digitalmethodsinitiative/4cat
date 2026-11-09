@@ -1,0 +1,56 @@
+{# Media archive preview fragment: a carousel of the first items in an
+   image/video/audio zip. See the csv.html partial for why the stylesheet link
+   is included. Each slide streams its file on demand via the get_result
+   endpoint's zip_member support. #}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fourcat-new.css') }}">
+<div class="preview-content media-preview">
+{% if not members %}
+    <p class="warning-text">No media items could be found in this archive.</p>
+{% else %}
+    {% if dataset.num_rows > max_items %}
+    <p class="warning-text">Showing the first {{ members|length }} of {{ "{:,}".format(dataset.num_rows) }} items in this archive. Download the dataset file for the rest.</p>
+    {% endif %}
+    <div class="media-carousel" x-data="{ current: 0, count: {{ members|length }} }">
+        <button type="button" class="media-carousel-nav media-carousel-prev button-like"
+                @click="current = (current - 1 + count) % count" x-show="count > 1"
+                aria-label="Previous item">
+            <i class="fa fa-chevron-left" aria-hidden="true"></i>
+        </button>
+
+        <div class="media-carousel-track">
+            {% for member in members %}
+            {% set file_ext = (member.rsplit('.', 1)[-1]|lower) if '.' in member else '' %}
+            {% set src = url_for('dataset.get_result', dataset_key=dataset.key, zip_member=member) %}
+            <figure class="media-carousel-slide" x-show="current === {{ loop.index0 }}" x-cloak>
+                {% if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'ico', 'heic', 'heif'] %}
+                    <img src="{{ src }}" alt="{{ member }}" class="media-image" loading="lazy">
+                {% elif file_ext in ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v'] %}
+                    <video controls class="media-video" preload="metadata">
+                        <source src="{{ src }}" type="video/{{ file_ext }}">
+                    </video>
+                {% elif file_ext in ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'] %}
+                    <audio controls class="media-audio" preload="metadata">
+                        <source src="{{ src }}" type="audio/{{ file_ext }}">
+                    </audio>
+                {% else %}
+                    <div class="media-item unknown-item">
+                        <i class="fa fa-file fa-3x" aria-hidden="true"></i>
+                    </div>
+                {% endif %}
+                <figcaption class="media-carousel-caption">{{ member }}</figcaption>
+            </figure>
+            {% endfor %}
+        </div>
+
+        <button type="button" class="media-carousel-nav media-carousel-next button-like"
+                @click="current = (current + 1) % count" x-show="count > 1"
+                aria-label="Next item">
+            <i class="fa fa-chevron-right" aria-hidden="true"></i>
+        </button>
+
+        <p class="media-carousel-status" x-show="count > 1" aria-live="polite">
+            <span x-text="current + 1"></span> / {{ members|length }}
+        </p>
+    </div>
+{% endif %}
+</div>

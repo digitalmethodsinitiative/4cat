@@ -6,8 +6,9 @@ import csv
 import json
 import shutil
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Filter
 from common.lib.dataset import StatusType
 
 __author__ = "Dale Wahl"
@@ -23,11 +24,18 @@ class BaseFilter(BasicProcessor):
     Retain only posts where a given column matches a given value
     """
     type = "column-filter"  # job type ID
-    category = "Filtering"  # category
-    title = "Base Filter"  # title displayed in UI
-    description = "This should not be available."
+    description = ProcessorDescription(
+        title="Base filter",
+        tags=["filtering", "internal"],
+        description="Abstract base class for filters that re-emit a parent dataset's rows. Not runnable on its own.",
+        icon="filter",
+    )
 
     item_ids = []
+
+    # A filter re-emits its parent's rows, so its extension, media and columns are
+    # the parent's. Subclasses keep this; one that adds a column declares its own.
+    output = Filter()
 
     # Abstract base filter; not runnable on its own (empty type set never matches)
     compatibility = Compatibility(types=set())

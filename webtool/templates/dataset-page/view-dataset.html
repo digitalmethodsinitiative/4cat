@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+
+{% block title %}{% if dataset.query %}Dataset: {{ dataset.get_label() }}{% else %}Dataset{% endif %}{% endblock %}
+{% block body_class %}result-page{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
+
+{% block body %}
+    <div class="dataset-container"
+         x-data="moduleSlideout"
+         @processor-queued.document="closeSlideout(); scrollToAfterSettle('child-' + $event.detail.key)"
+         @htmx:after:settle.document="settle()">
+        {# annotating an item, or changing what the annotation fields are, changes
+           what this dataset holds - so a preview fetched before that is stale.
+           It is dropped rather than refetched; asking for it again is what says
+           a fresh one is wanted #}
+        <section class="dark dataset-metadata dataset-preview-host" data-dataset-key="{{ dataset.key }}"
+                 x-data="datasetPreview"
+                 @annotation-saved.window="invalidate()"
+                 @annotation-fields-saved.window="invalidate()"
+                 @annotations-updated.window="invalidate()">
+
+            <nav>
+                <ul>
+                {% if current_user.is_authenticated and current_user.can_access_dataset(dataset) %}
+                    <li><a class="button-like" href="{{ url_for("toolapi.toggle_favourite", key=dataset.key) }}?redirect">{% if is_favourite %}Un-f{% else %}F{% endif %}avourite</a></li>
+                {% endif %}
+                {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner")) and (__user_config("privileges.can_make_dataset_public") or not dataset.is_private) %}
+                    <li><a class="button-like" href="{{ url_for('dataset.toggle_private_interactive', key=dataset.key) }}">{% if dataset.is_private %}Make public{% else %}Make private{% endif %}</a></li>
+                {% endif %}
+                    <li><a class="button-like" href="{{ url_for('dataset.show_result', key=dataset.key) }}">Permalink</a>
+                    </li>
+                    {% if __user_config("privileges.admin.can_manipulate_all_datasets") or
+                    dataset.is_accessible_by(current_user, "owner") %}
+                    <li><a class="button-like" href="{{ url_for('toolapi.add_dataset_owner') }}">
+                        Manage access
+                        {% if dataset.get_owners(None)|length > 1 %}
+                        (<i class="fa fa-users" aria-hidden="true"></i> {{ dataset.get_owners(None)|length }})
+                        {% endif %}
+                    </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            {% include "dataset-page/dataset-progress.html" %}
+
+        </section>
+
+        {# the two things a finished dataset can be doing: run processors on it,
+           or read and annotate its items. The toggle in the dataset card
+           dispatches `toggle-change`; the Explorer pane fills itself in the
+           first time it is shown. #}
+        <div class="dataset-panes" x-data='datasetPanes({{ ("explore" if explore else "analyze")|tojson }})'
+             @toggle-change.window="exploring = $event.detail.checked">
+            <div x-show="!exploring">
+                {% include "dataset-page/analysis-tree.html" %}
+            </div>
+
+            {# emitted whether or not the dataset is finished yet. A dataset
+               being created finishes while its page is open - the card polls
+               itself and swaps in the finished one, toggle and all - and only
+               the card and the analysis tree ride along on that swap. A pane
+               that was left out because the dataset was not ready when the page
+               was rendered would therefore never arrive, and flipping the
+               toggle would hide the analysis tree to show nothing. It is empty
+               and hidden until it is opened in any case, so there is nothing to
+               leave out. #}
+            {% if __user_config("privileges.can_use_explorer") %}
+                <div class="explorer-pane-host" x-show="exploring" x-cloak>
+                    {# a pane the address already asks for fills itself on load,
+                       rather than waiting for the toggle's event: that event is
+                       dispatched by Alpine, and whether htmx is listening for it
+                       yet is a question of which script got there first. One the
+                       toggle opens is still filled the first time it is shown #}
+                    <section class="explorer-pane" id="explorer-pane"
+                             hx-get="{{ url_for('explorer.explorer_pane', key=dataset.key, page=request.args.get('page'), sort=request.args.get('sort'), order=request.args.get('order'), hidden=request.args.get('hidden')) }}"
+                             {# `annotations-updated` is a processor having added
+                                annotations: the items show something else now,
+                                so the pane is fetched again the same way saving
+                                fields does it #}
+                             hx-trigger="{% if explore %}load{% else %}explore-open once from:'closest .dataset-panes'{% endif %}, annotation-fields-saved from:body, annotations-updated from:body"
+                             hx-swap="innerHTML"
+                             hx-indicator="#explorer-spinner"></section>
+                    {% with spinner_id = "explorer-spinner" %}{% include "components/spinner.html" %}{% endwith %}
+                </div>
+            {% endif %}
+        </div>
+
+        {% with genealogy = dataset.get_genealogy(),
+                preview_template = 'components/processor-preview-tree.html',
+                search_placeholder = "Search processors…",
+                search_label = "Search processors by title, description or category" %}
+            {% include 'components/module-slideout.html' %}
+        {% endwith %}
+    </div>
+{% endblock %}

@@ -20,7 +20,7 @@ class TwitterStatsBase(BasicProcessor):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-stats-base"  # job type ID
-    category = "Twitter analysis"  # category
+    tags = ["counting", "metadata"]  # tags
     title = "Twitter base statistics"  # title displayed in UI
     description = "This is a class to help other twitter classes"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI

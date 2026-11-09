@@ -1,110 +1,65 @@
 {% extends "layout.html" %}
 
 {% block title %}Create dataset{% endblock %}
-{% block body_class %}plain-page frontpage {% endblock %}
+{% block body_class %}result-page {% endblock %}
 {% block breadcrumbs %}{% set navigation.current = "create-dataset" %}{% endblock %}
-
 {% block body %}
-    <article class="with-aside">
-        <section>
-            <div>
-                <h2><span>Create new dataset</span></h2>
+<script src="{{ url_for('static', filename='js/lib/zip.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/query-form.js') }}"></script>
+<article id="main-content">
+    <div class="dataset-container create-dataset-container"
+         x-data="moduleSlideout"
+         @dataset-queued.document="closeSlideout()">
+        <section class="dark dataset-metadata"
+                 x-data="{ queued: null }"
+                 @dataset-queued.document="queued = $event.detail; setTimeout(() => window.location.href = queued.url, 900)"
+                 @pageshow.window="if ($event.persisted) queued = null">
+            <div x-show="!queued">
+                <p>
+                    Datasets can be created here or imported via 4CAT companion tools
+                    <a href="https://github.com/digitalmethodsinitiative/zeeschuimer" target="_blank">Zeeschuimer</a>
+                    (browser-based scraping) and
+                    <a href="https://github.com/digitalmethodsinitiative/webjutter" target="_blank">Webjutter</a>
+                    (large and continuous archives).
+                </p>
+                {% if __user_config("privileges.admin.can_manage_settings") %}
+                    <p>You can enable/disable data sources in the <a href="{{ url_for('admin.manipulate_settings') }}">settings</a>.</p>
+                {% else %}
+                    <p>The administrators can enable data sources.</p>
+                {% endif %}
+                {% if request_url %}
+                    <p>You can also <a href="{{ request_url }}" target="_blank" rel="noopener">request new data sources here</a>.</p>
+                {% endif %}
             </div>
+            <nav x-show="!queued">
+                <ul>
+                    <li>
+                        <button class="button-like"
+                                hx-get="{{ url_for('dataset.datasource_grid') }}"
+                                hx-target="#module-grid"
+                                hx-swap="innerHTML"
+                                hx-indicator="#module-grid-spinner"
+                                hx-trigger="click"
+                                @click="openSlideout('Data sources')">Select data source</button>
+                    </li>
+                </ul>
+            </nav>
 
-            <form id="query-form" action="{{ url_for('toolapi.queue_dataset') }}" method="POST" enctype="multipart/form-data">
-                <fieldset class="datasource-form">
-                    <p><br>Please be considerate of other users; {{ __user_config("4cat.name") }} is a shared resource and large dataset queries may
-                        prevent others from using it if they take a very long time to complete. We recommend to start
-                        with smaller date ranges and specific queries and then cast a wider net if needed.</p>
-
-                    <div class="form-element">
-                        <label for="datasource-select">Data source:</label>
-                        <div>
-                            <div class="datasource-explain-wrap">
-                                <select name="datasource" id="datasource-select" aria-label="Data sources">
-                                {% include 'components/datasource-select.html' %}
-                                </select>
-                                <span class="data-overview-link"><a href="{{ url_for('misc.data_overview') }}{{ datasource }}">How is this data collected?</a></span>
-                            </div>
-                            <button class="tooltip-trigger" aria-controls="tooltip-datasource-type" aria-label="Explain datasource type" id="datasource-type-label">Local</button>
-                        </div>
-                    </div>
-                </fieldset>
-
-                <div id="datasource-form">
-                    Loading query form for chosen datasource...
-                </div>
-
-                <div id="data-options">
-                    {% if __user_config("ui.offer_hashing") %}
-                    <p class="form-intro dataset-anonymisation">{{ __user_config("4cat.name") }} can remove information it identifies as relating to an item's
-                        author, or replace it with a <a href="https://techterms.com/definition/hash">hashed</a> value.
-                        It finds that information by field name, so how much it covers differs per platform, and other
-                        personal information may persist. Once the dataset is ready, check what was replaced &mdash;
-                        you can replace more with the 'Pseudonymise or anonymise' processor. It is your responsibility
-                        to further anonymise data where appropriate.</p>
-                    <div class="form-element dataset-anonymisation">
-                        <label for="data-pseudonymise">Pseudonymise:</label>
-                        <div class="filter-parameters">
-                            <select name="pseudonymise" id="data-pseudonymise">
-                                <option value="anonymise">Replace author information with 'REDACTED'</option>
-                                <option value="pseudonymise" selected="selected">Replace author information with hashed values</option>
-                                <option value="none">Leave author information as-is</option>
-                            </select>
-                        </div>
-                    </div>
-                    {% endif %}
-                    {% if __user_config("privileges.can_make_dataset_public") %}
-                    <div class="form-element">
-                        <label for="data-make-public">Make public:</label>
-                        <div class="filter-parameters">
-                            <label><input type="checkbox" name="make-public" id="data-make-public"> Make dataset public</label>
-                            <button class="tooltip-trigger" aria-controls="tooltip-dataset-public" aria-label="Extended help for option">?</button>
-                        </div>
-                        <p role="tooltip" id="tooltip-dataset-public">Other users of this 4CAT server will be able to find and view this dataset. If you leave this off, the dataset is hidden from other users, but it is not encrypted and server administrators can still view it.</p>
-                    </div>
-                    {% endif %}
-                    {% if __user_config("ui.option_email") in ["both", "datasources_only"] and __user_config("mail.server") %}
-                    <div class="form-element">
-                        <label for="data-email-complete">Receive email on completion:</label>
-                        <div class="filter-parameters">
-                            <label><input type="checkbox" name="email-complete" id="data-email-complete"></label>
-                            <label><input id="data-email-user" type="email" name="email-user" value={{ current_user.get_name() }}></label>
-                            <button class="tooltip-trigger" aria-controls="tooltip-dataset-email" aria-label="Extended help for option">?</button>
-                        </div>
-                        <p role="tooltip" id="tooltip-dataset-email">This will only function if your username is your email address.</p>
-                    </div>
-                    {% endif %}
-                    <div class="form-element dataset-labeling">
-                        <label for="dataset-label">Dataset name:</label>
-                        <input id="dataset-label" name="label">
-
-                        <button class="tooltip-trigger" aria-controls="tooltip-dataset-label" aria-label="Extended help for option">?</button>
-                        <p role="tooltip" id="tooltip-dataset-label">A name will be generated automatically if you do not provide one.</p>
-                    </div>
-                </div>
-
-                <div class="submit-container">
-                    <button>Create dataset</button>
-                </div>
-            </form>
+            <div class="dataset-queued" x-show="queued" x-cloak>
+                <p>
+                    <i class="fa fa-circle-notch fa-spin" aria-hidden="true"></i>
+                    Dataset is being created. Taking you to it&hellip;
+                </p>
+                <p class="dataset-queued-fallback">
+                    <a class="button-like" :href="queued ? queued.url : '#'">Go to dataset</a>
+                </p>
+            </div>
         </section>
 
-        <aside>
-            <div>
-                <h2 id="query-status-header"><span>Dataset status</span></h2>
-                <p id="query-status">
-                    <span class="message">Waiting for input...</span><span class="dots"></span>
-                </p>
-                <h2 id="search-queue-header"><span>Queue</span></h2>
-                <p id="search-queue-status">
-                    <span class="search-queue-message"></span>
-                    <span class="search-queue-list"></span>
-                </p>
-                <h2><span>Results</span></h2>
-                <ol id="query-results">
-                </ol>
-            </div>
-        </aside>
-    </article>
+        {% with search_placeholder = "Search data sources…",
+                search_label = "Search data sources by name or description" %}
+            {% include 'components/module-slideout.html' %}
+        {% endwith %}
+    </div>
+</article>
 {% endblock %}

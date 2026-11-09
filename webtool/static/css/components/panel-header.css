@@ -1,0 +1,47 @@
+/* Header bar over a panel: its title on one side, the controls acting on what
+   is below it on the other - a search box, a button closing the panel. Shared
+   by the module slideout (components/module-slideout.html) and the module
+   catalogue (module-catalog.html), so the same controls sit in the same place
+   and look the same wherever a module grid is shown.
+
+   Carries no positioning of its own, only the strip itself, so it works both
+   as a flex child of a slideout column and as a plain block on a page. */
+.panel-header {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-regular);
+    background: var(--panel-bg-0);
+    border-bottom: var(--stroke) solid var(--panel-bg-1);
+}
+
+.panel-header.narrow {
+    padding: var(--spacing-small);
+    padding-left: var(--spacing-regular);
+    padding-right: var(--spacing-regular);
+}
+
+.panel-header .panel-header-title {
+    flex-grow: 1;
+}
+
+.panel-header h1, .panel-header h2, .panel-header h3, .panel-header h4 {
+    font-family: Chivo, sans-serif;
+    font-weight: normal;
+    margin: 0;
+    line-height: 1;
+}
+
+.panel-header ul {
+    display: flex;
+    column-gap: var(--spacing-regular);
+    flex-grow: 1;
+    align-items: center;
+}
+
+.panel-header.narrow ul {
+    column-gap: var(--spacing-small);
+}

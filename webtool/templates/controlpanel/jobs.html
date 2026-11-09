@@ -88,7 +88,10 @@
                     {% endif %}
                 </table>
 
-                {% include "components/pagination.html" %}
+                {% from "components/pagination.html" import page_links %}
+{% call(number, label) page_links(pagination.page, pagination.pages, "Pages", "pagination", True) %}
+    <a href="{{ url_for(pagination.route, page=number, **pagination.route_args) }}?{{ filter|http_query }}&amp;depth={{ depth }}">{{ label }}</a>
+{% endcall %}
             </div>
         </section>
         <aside>

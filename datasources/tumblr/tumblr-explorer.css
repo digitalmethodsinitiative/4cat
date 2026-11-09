@@ -270,7 +270,7 @@ footer {
 }
 
 .note-counts {
-	padding-top: 19px;	
+	padding: 19px 0;
 }
 
 .note-count {
@@ -326,22 +326,16 @@ footer {
 .item-annotations {
 	background-color: #7c5cff;
 	color: white;
-	border-radius:  0px 0px 8px 8px;
 }
 
 .item-annotation {
 	padding: 15px;
 }
 
-.item-annotation input {
-	border-radius: 5px;
-}
-
 .item-annotation > .annotation-label {
 	display: inline-block;
 	vertical-align: middle;
 	text-align: right;
-	min-width: 150px;
 	margin-right: 5px;
 	line-height: 1.6em;
 	overflow-x: hidden;

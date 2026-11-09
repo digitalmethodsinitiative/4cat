@@ -9,9 +9,10 @@ import time
 import requests
 
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.helpers import UserInput, urls_in_text
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Stijn Peeters", "Dale Wahl", "Sal Hagen"]
@@ -26,10 +27,18 @@ class ExtractURLs(BasicProcessor):
     Retain only posts where a given column matches a given value
     """
     type = "extract-urls-filter"  # job type ID
-    category = "Conversion"  # category
-    title = "Extract and expand URLs"  # title displayed in UI
-    description = "Extract any URLs from selected column(s) with the option to expand shortened URLs."
+    description = ProcessorDescription(
+        title="Extract URLs",
+        tags=["conversion", "urls"],
+        description="Extract URLs from selected columns into a new table listing each item's unique URLs. Optionally expand shortened URLs to their final destination, and resolve CrowdTangle's inline links.",
+        warnings=[
+            "Expanding shortened URLs sends a request per URL and is slow; it is not recommended on datasets larger than 10,000 items.",
+        ],
+        icon="globe",
+    )
     extension = "csv"
+    # a derived table
+    output = Table()
 
     # any csv/ndjson dataset, except this processor's own filter output
     compatibility = Compatibility(extensions={"csv", "ndjson"}, excluded_types={"extract-urls-filter"})

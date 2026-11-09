@@ -1,0 +1,8 @@
+{# Shown in place of the item list when there is nothing to show: a dataset with
+   no items, or a page past the end of one.
+
+   Expects: dataset
+#}
+<p class="explorer-empty">
+    No items to show{% if dataset.num_rows %} on this page{% endif %}.
+</p>

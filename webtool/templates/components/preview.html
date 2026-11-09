@@ -1,0 +1,70 @@
+{#
+    Inline preview for a dataset, slid open by components/preview-toggle.html.
+
+    Both are rendered as siblings by their host component, which declares the
+    Alpine scope they share and the class the preview listens on
+    (x-data="datasetPreview" class="dataset-preview-host", see
+    js/alpine.preview.js): the .module-card or .dataset-metadata around a
+    dataset card, or the .processor-preview-box in the processor slideout's
+    lineage tree.
+
+    Safe, structured data (CSV, JSON/NDJSON, images, GEXF metadata) is loaded as
+    an inline htmx fragment so it inherits the page theme. Arbitrary HTML and
+    interactive GEXF are sandboxed in an iframe instead. Either way the fetch
+    happens on the `preview:open` the toggle dispatches on the host, once, and
+    the panel slides open when the content has arrived - the toggle spins in the
+    meantime.
+
+    A full-screen toggle floats in the top right of the preview, blowing it up
+    to fill the viewport without leaving the page.
+
+    Expects:
+      dataset  the DataSet to preview
+#}
+{% if dataset|previewable %}
+{% set _iframe = dataset.get_extension() in ("html", "gexf") %}
+{% set _preview_url = url_for('dataset.preview_items', key=dataset.key) %}
+<div class="dataset-preview" x-show="open" x-cloak
+     x-transition:enter="preview-slide"
+     x-transition:enter-start="preview-slide-collapsed"
+     x-transition:enter-end="preview-slide-expanded"
+     x-transition:leave="preview-slide"
+     x-transition:leave-start="preview-slide-expanded"
+     x-transition:leave-end="preview-slide-collapsed"
+     :class="{ 'dataset-preview--big': big }"
+     @keydown.escape.window="big = false">
+    <button type="button" class="dataset-preview-fullscreen"
+            @click="fullscreen()"
+            :aria-pressed="big ? 'true' : 'false'"
+            x-tooltip="Toggle full-screen preview">
+        <i class="fa fa-fw" :class="big ? 'fa-compress' : 'fa-expand'" aria-hidden="true"></i>
+        <span class="sr-only">Toggle full-screen preview</span>
+    </button>
+    <div class="dataset-preview-body">
+        {% if _iframe %}
+        {# an iframe loads even while hidden, and reports back the same way the
+           htmx fragment does. Binding src to null rather than '' leaves the
+           attribute off entirely until it is needed: an empty src resolves to
+           the page itself #}
+        <iframe class="dataset-preview-frame" title="Preview of {{ dataset.get_label() }}"
+                :src="loaded ? '{{ _preview_url }}' : null"
+                @load="if (loading) show()"></iframe>
+        {% else %}
+        <div
+                class="dataset-preview-content"
+                hx-get="{{ _preview_url }}"
+                {# htmx parses ':' as a modifier separator, so the event name is
+                   hyphenated and the multi-word selector quoted.
+
+                   Not `once`: the scope only dispatches this when it has nothing
+                   to show, which is the same one-fetch-per-preview `once` would
+                   buy, except that it can also decide what it has is stale (see
+                   `invalidate()`) and ask again #}
+                hx-trigger="preview-open from:'closest .dataset-preview-host'"
+                hx-swap="innerHTML"
+                @htmx:after:request="show()"
+        ></div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

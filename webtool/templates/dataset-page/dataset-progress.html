@@ -1,0 +1,21 @@
+{# The top-level dataset's card.
+
+   While the dataset is still being created this polls its own endpoint and
+   replaces itself with the re-rendered state, so status, progress and
+   parameters keep up with the worker; once finished the rendered markup no
+   longer carries the trigger and polling stops. Same pattern as
+   dataset-page/child-dataset.html.
+
+   The analysis tree rides along on the same response as an out-of-band swap
+   (see dataset.dataset_card_component), so the funnel and 'run processor'
+   button appear by themselves the moment collection completes. #}
+<div id="dataset-card" class="dataset-card-host"
+     {% if not dataset.is_finished() %}
+     hx-get="{{ url_for('dataset.dataset_card_component', key=dataset.key) }}"
+     hx-trigger="every 3s [document.hasFocus()]"
+     hx-swap="outerHTML"
+     {% endif %}>
+    {% with icon="database", main_header=True %}
+        {% include "dataset-page/dataset-card.html" %}
+    {% endwith %}
+</div>

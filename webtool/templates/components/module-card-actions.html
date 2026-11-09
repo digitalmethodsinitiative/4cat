@@ -1,0 +1,25 @@
+{# Quick links shown in a module card's header and in the header of the module
+   options slideout. Both links are optional; the nav is skipped entirely when
+   neither is given.
+
+   Expects:
+     info_url   (optional) link to more information about this module
+     code_url   (optional) link to this module's source code
+     info_label / code_label  (optional) tooltip overrides
+#}
+{% if info_url or code_url %}
+<nav class="quick-links">
+    <ul class="module-actions">
+        {% if info_url %}
+        <li class="button-secondary">
+            <a href="{{ info_url }}" x-tooltip="{{ info_label if info_label else "More information about this module" }}"><i class="fa-solid fa-circle-info"></i></a>
+        </li>
+        {% endif %}
+        {% if code_url %}
+        <li class="button-secondary">
+            <a href="{{ code_url }}" target="_blank" x-tooltip="{{ code_label if code_label else "View module code" }}"><i class="fa-brands fa-github"></i></a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}

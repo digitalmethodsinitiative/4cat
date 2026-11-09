@@ -1,0 +1,17 @@
+/** --------------------- *
+          Tooltips
+  * --------------------- */
+*[role=tooltip] {
+    background: var(--bright);
+    color: var(--text);
+    padding: var(--spacing-small);
+    box-sizing: border-box;
+    position: absolute;
+    max-width: 25rem;
+    border: var(--stroke-light) solid var(--dark);
+    border-bottom-width: var(--stroke-journey);
+    z-index: 99999;
+    border-radius: var(--radius);
+    margin: 0;
+    text-align: center;
+}

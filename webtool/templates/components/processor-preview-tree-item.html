@@ -1,0 +1,49 @@
+{# Recursive node for the processor preview lineage (see processor-preview-tree.html).
+   Walks the dataset genealogy (top parent -> selected dataset) linearly by
+   index, nesting each dataset under the previous. Every previewable dataset in
+   the lineage carries the same 'view' button as a dataset card, in its compact
+   variant, sliding the preview open inside its own box. The final node is the
+   dataset the user is about to run a processor on, and is always followed by
+   the "Adding new processor" box.
+
+   Expects:
+     genealogy  list of DataSets from top parent to the selected dataset
+     index      position in `genealogy` currently being rendered
+#}
+{% set dataset = genealogy[index] %}
+{% set is_last = index == (genealogy|length - 1) %}
+{% set _processor = dataset.get_own_processor() %}
+<li class="processor-preview-item">
+    {# the top parent has no line arriving at it, so it gets no marker #}
+    {% if index > 0 %}
+    <button class="journey-marker-preview">
+        <span></span>
+    </button>
+    {% endif %}
+    <div class="processor-preview-box {% if is_last %} is-current{% endif %}{% if dataset|previewable %} dataset-preview-host{% endif %}"
+         {% if dataset|previewable %}x-data="datasetPreview"{% endif %}>
+        <div class="processor-preview-box-header">
+            <span class="processor-preview-label">{{ _processor.title if _processor else dataset.get_label() }}</span>
+            {% if dataset|previewable %}
+            <span class="processor-preview-controls">
+                {% with small = True %}{% include "components/preview-toggle.html" %}{% endwith %}
+            </span>
+            {% endif %}
+        </div>
+        {% include 'components/preview.html' %}
+    </div>
+    <ul class="processor-preview-children">
+        {% if not is_last %}
+            {% with index = index + 1 %}{% include "components/processor-preview-tree-item.html" %}{% endwith %}
+        {% else %}
+        <li class="processor-preview-item processor-preview-new-hint">
+            <button class="journey-marker-preview">
+                <i class="fa-solid fa-star-of-life" aria-hidden="true"></i>
+            </button>
+            <div class="processor-preview-box">
+                <span class="processor-preview-label add-new">Adding new processor</span>
+            </div>
+        </li>
+        {% endif %}
+    </ul>
+</li>

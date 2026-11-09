@@ -7,6 +7,7 @@ from itertools import chain
 from backend.lib.preset import ProcessorPreset
 from common.lib.compatibility import Compatibility
 from common.lib.helpers import UserInput
+from common.lib.outputs import Delegated
 
 from common.lib.exceptions import (
     QueryParametersException,
@@ -25,6 +26,8 @@ class PromptCompassRunner(ProcessorPreset):
     description = ("Choose prompts used in other LLM-based research to test on this dataset. Outcomes are added to the "
                    "original dataset as a new column.")
     extension = "ndjson"
+    # a preset: its result is whatever the last processor in its pipeline writes
+    output = Delegated()
 
     compatibility = Compatibility(top_dataset_only=True, extensions={"csv", "ndjson"})
 

@@ -1,0 +1,25 @@
+{# The Explorer pane on the dataset page.
+
+   Swapped into #explorer-pane the first time the 'Annotate & Explore' toggle is
+   flipped. Holds the controls, the items and the pagination; paging and sorting
+   afterwards replace only the last two (see explorer/items.html), so the
+   controls and the data source's stylesheet below survive them.
+
+   Expects the context built by explorer.explorer_pane.
+#}
+{# The data source's own item styling, scoped to .explorer-content-container by
+   the filter - the structure every data source's stylesheet is written against,
+   so nothing here may rename it. It lives in this partial rather than in the
+   items one so that paging does not re-inject it on every swap. #}
+<style type="text/css">
+{{ datasource|explorer_css|safe }}
+</style>
+{% if datasource == "4chan" %}
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/flags.css') }}">
+{% endif %}
+
+{% include "explorer/controls.html" %}
+
+<div class="explorer-body" id="explorer-body">
+    {% include "explorer/items.html" %}
+</div>

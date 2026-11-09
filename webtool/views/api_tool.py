@@ -13,7 +13,8 @@ from flask import Blueprint, current_app, jsonify, request, render_template, ren
 	get_flashed_messages, send_from_directory, stream_with_context, g
 from flask_login import login_required, current_user
 
-from webtool.lib.helpers import error, setting_required, parse_markdown
+from webtool.lib.helpers import (error, setting_required, parse_markdown, datasource_variants,
+	datasource_worker_options)
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
 	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException, DataSetException, \
@@ -201,8 +202,10 @@ def get_processor_options(processor_type, dataset_id=None):
 	:return: A JSON object with the `status`, `processor`, `dataset`, and `options` for the processor.
 	"""
 	if processor_type in g.modules.datasources:
-		# Datasources were poorly named
-		processor_type = processor_type + "-search"
+		# a data source is addressed by its ID, but its worker has its own type
+		datasource_worker = g.modules.get_datasource_worker(processor_type)
+		if datasource_worker:
+			processor_type = datasource_worker.type
 
 	if processor_type not in g.modules.processors:
 		return error(404, message="Processor '%s' does not exist" % processor_type)
@@ -266,12 +269,18 @@ def datasource_form(datasource_id):
 	If the data source has no search worker or its search worker does not have
 	any parameters defined, this returns a 404 Not Found status.
 
+	A data source offering variants (see `Search.get_variants`) takes a
+	`variant` query argument saying which one the options are wanted for. It is
+	returned as given, so that whatever renders the form can send it back when
+	the form is submitted.
+
 	:param datasource_id:  Data source ID, as specified in the data source and
 						   config.py
-	:return: A JSON object with the `html` of the template, a `status` code and
-	the `datasource` ID.
+	:request-param str ?variant:  Variant of the data source to get options for
+	:return: A JSON object with the `html` of the template, a `status` code, the
+	`datasource` ID and the `variant`.
 
-	:return-error 404: If the datasource does not exist.
+	:return-error 404: If the datasource or variant does not exist.
 	"""
 	if datasource_id not in g.modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
@@ -280,33 +289,32 @@ def datasource_form(datasource_id):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = g.modules.datasources[datasource_id]
-	worker_class = g.modules.workers.get(datasource_id + "-search")
+	worker_class = g.modules.get_datasource_worker(datasource_id)
 
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
 
-	worker_options = worker_class.get_options(None, g.config)
+	variant = request.args.get("variant") or None
+	if variant and variant not in datasource_variants(worker_class, g.config):
+		return error(404, message="Datasource '%s' has no variant '%s'" % (datasource_id, variant))
+
+	worker_options = datasource_worker_options(worker_class, g.config, variant)
 	if not worker_options:
 		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
 
 	# Status labels to display in query form
 	labels = []
-	is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
-	is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
-
-	labels.append(is_local)
-	if is_static:
-		labels.append("static")
 	status = worker_class.get_status()
 	if status:
 		labels.append(status)
 
-	form = render_template("components/create-dataset-option.html", options=worker_options, labels=labels)
+	form = render_template("components/form-options.html", options=worker_options)
 	html = render_template_string(form, datasource_id=datasource_id, datasource=datasource)
 
 	return jsonify({
 		"status": "success",
 		"datasource": datasource_id,
+		"variant": variant,
 		"type": labels,
 		"html": html,
 		# "options": worker_options
@@ -315,7 +323,7 @@ def datasource_form(datasource_id):
 
 @component.route("/api/import-dataset/", methods=["POST"])
 @login_required
-@current_app.limiter.limit("5 per minute")
+@current_app.limiter.limit("10 per minute")
 @current_app.openapi.endpoint("tool")
 @setting_required("privileges.can_create_dataset")
 def import_dataset():
@@ -416,7 +424,7 @@ def import_dataset():
 @component.route("/api/queue-query/", methods=["POST"])
 @login_required
 @setting_required("privileges.can_create_dataset")
-@current_app.limiter.limit("5 per minute")
+@current_app.limiter.limit("10 per minute")
 @current_app.openapi.endpoint("tool")
 def queue_dataset():
 	"""
@@ -438,11 +446,17 @@ def queue_dataset():
 	if datasource_id not in g.modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	search_worker_id = datasource_id + "-search"
-	if search_worker_id not in g.modules.workers:
+	search_worker = g.modules.get_datasource_worker(datasource_id)
+	if not search_worker:
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
-	search_worker = g.modules.workers[search_worker_id]
+	search_worker_id = search_worker.type
+
+	# which variant of the data source this is for, if it has any; the form
+	# carries it because the options depend on it, and so does the query
+	variant = request.form.get("variant") or None
+	if variant and variant not in datasource_variants(search_worker, g.config):
+		return error(404, message="Datasource '%s' has no variant '%s'" % (datasource_id, variant))
 
 	# handle confirmation outside of parameter parsing, since it is not data
 	# source specific
@@ -453,27 +467,37 @@ def queue_dataset():
 		# just in case
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(search_worker.get_options(None, g.config), request.form, silently_correct=False)
+			sanitised_query = UserInput.parse_all(datasource_worker_options(search_worker, g.config, variant),
+												  request.form, silently_correct=False)
 
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
+			if variant:
+				# only when there is one: this is echoed back to the front-end
+				# in `keep` below, and a null would be re-submitted as "null"
+				sanitised_query["variant"] = variant
+
 			sanitised_query = search_worker.validate_query(sanitised_query, request, g.config)
 
 		except QueryNeedsFurtherInputException as e:
 			# ask the user for more input by returning a HTML snippet
 			# containing form fields to be added to the form before it is
 			# re-submitted
-			form = render_template("components/create-dataset-option.html", options=e.config)
+			form = render_template("components/form-options.html", options=e.config)
 			return jsonify({"status": "extra-form", "html": form})
 
 		except QueryParametersException as e:
 			# parameters need amending
-			return jsonify({"status": "error", "message": "Cannot create a dataset with these parameters. %s" % e})
+			message = "Cannot create a dataset with these parameters. %s" % e
+			return jsonify({"status": "error", "message": message,
+							"html": render_template("components/form-notice.html", message=message)})
 
 		except QueryNeedsExplicitConfirmationException as e:
 			# parameters are OK, but we need to be sure the user wants this
 			# (because it will e.g. take a long time)
-			return jsonify({"status": "confirm", "message": str(e)})
+			return jsonify({"status": "confirm", "message": str(e),
+							"html": render_template("components/form-notice.html", message=str(e),
+													needs_confirmation=True)})
 
 	else:
 		raise NotImplementedError("Data sources MUST sanitise input values with validate_query")
@@ -490,7 +514,8 @@ def queue_dataset():
 		# those to "[object Object],..." on the for-real re-submission.
 		# (Other list/dict fields, e.g. parsed URL lists are not touched.)
 		json_option_keys = {
-			option for option, settings in search_worker.get_options(None, g.config).items()
+			option for option, settings in
+			datasource_worker_options(search_worker, g.config, variant).items()
 			if settings.get("type") == UserInput.OPTION_TEXT_JSON
 		}
 		keep = {
@@ -501,6 +526,10 @@ def queue_dataset():
 
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
+	if variant:
+		# re-asserted after validation, since validate_query may return a dict
+		# it built from scratch
+		sanitised_query["variant"] = variant
 
 	if request.form.to_dict().get("pseudonymise") in ("pseudonymise", "anonymise"):
 		sanitised_query["pseudonymise"] = request.form.to_dict().get("pseudonymise")
@@ -539,7 +568,8 @@ def queue_dataset():
 	new_job = Job.get_by_remote_ID(dataset.key, g.db)
 	dataset.link_job(new_job)
 
-	return jsonify({"status": "success", "message": "", "key": dataset.key})
+	return jsonify({"status": "success", "message": "", "key": dataset.key,
+					"url": url_for("dataset.show_result", key=dataset.key)})
 
 
 @component.route('/api/check-query/')
@@ -1253,17 +1283,12 @@ def queue_processor(key=None, processor=None):
 		# ask the user for more input by returning a HTML snippet
 		# containing form fields to be added to the form before it is
 		# re-submitted
-		form = "\n".join(
-			[
-				render_template(
-					"components/processor-option.html",
-					option_override={k: v},
-					option=k,
-					dataset=dataset,
-					processor=processor_worker,
-				)
-				for k, v in e.config.items()
-			]
+		form = render_template(
+			"components/form-options.html",
+			options=e.config,
+			delegated=True,
+			dataset=dataset,
+			processor=processor_worker,
 		)
 		return jsonify({"status": "extra-form", "html": form})
 

@@ -14,9 +14,10 @@ import yt_dlp
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached, MaxDownloadsReached
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput, UniqueFilenames, sets_to_lists, split_urls, urls_in_text
 from common.lib.media_archive_library import MediaArchiveLibrary
@@ -85,12 +86,28 @@ class VideoDownloaderPlus(BasicProcessor):
     which attempts to keep up with a plethora of sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
     """
     type = "video-downloader"  # job type ID
-    category = "Visual"  # category
-    title = "Download videos"  # title displayed in UI
-    description = "Download videos from URLs and store in a zip file. May take a while to complete as videos are " \
-                  "retrieved externally."  # description displayed in UI
+    description = ProcessorDescription(
+        title="Download videos",
+        tags=["video", "download media", "urls"],
+        description="Find video links in a column and download the videos to a zip archive. Tries a direct download first and falls back to yt-dlp, which supports YouTube and many other video hosts.",
+        info=[
+            "A JSON metadata file recording the download outcome per video is included in the archive.",
+        ],
+        references=[
+            "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
+            "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
+        ],
+        warnings=[
+            "This can be slow and produce large datasets, as each video is retrieved from an external site.",
+            "Downloads only directly linked videos unless indirect links are enabled by an administrator."
+        ],
+        icon="film",
+    )
     extension = "zip"  # extension of result file, used internally and in UI
     media_type = "video"  # media type of the processor
+
+    # a zip archive of media files
+    output = MediaArchive(media="video")
 
     # Shared list -- other download_* processors reuse this as VideoDownloaderPlus.followups
     # (and preferred_followups below reuses it), so it stays a named attribute.
@@ -98,11 +115,6 @@ class VideoDownloaderPlus(BasicProcessor):
 
     # any collector's csv/ndjson output (except sources with their own downloaders), plus the tiktok-metadata helper
     compatibility = Compatibility(is_collector=True, types={"tiktok-video-downloader-metadata"}, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search", "weibo-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
-
-    references = [
-        "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
-        "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
-    ]
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 

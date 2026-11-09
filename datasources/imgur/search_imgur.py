@@ -8,6 +8,7 @@ from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
+from common.lib.outputs import Datasource
 from common.lib.helpers import readable_url
 
 class SearchImgur(Search):
@@ -15,10 +16,11 @@ class SearchImgur(Search):
     Import scraped Imgur data
     """
     type = "imgur-search"  # job ID
-    category = "Search"  # category
+    tags = ["import"]
     title = "Import scraped Imgur data"  # title displayed in UI
-    description = "Import Imgur data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    description = "Import Imgur data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    output = Datasource()
     is_from_zeeschuimer = True
 
     # not available as a processor for existing datasets

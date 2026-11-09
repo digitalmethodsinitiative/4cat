@@ -17,18 +17,20 @@ from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitCo
 from common.lib.helpers import timify
 from common.lib.user_input import UserInput
 from common.lib.item_mapping import MappedItem
+from common.lib.outputs import Datasource
 
 class SearchBluesky(Search):
     """
     Search for posts in Bluesky
     """
     type = "bsky-search"  # job ID
-    category = "Search"  # category
     title = "Bluesky Search"  # title displayed in UI
     description = "Collects Bluesky posts via its API."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_local = False  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
+    # the tag column the co-tag and hashtag networks look for
+    output = Datasource(columns={"tags"})
+    icon = "brand-bluesky"
+    tags = ["API"]
 
     config = {
         "bsky-search.max_results": {

@@ -1,0 +1,25 @@
+<div class="form-multi-option-header">
+    <h4>{{ settings.help }}</h4>
+</div>
+<ol class="form-multi-option-wrapper">
+    {# always include an empty item #}
+    {% set empty_item = settings.options|propmap("default") %}
+    {% if settings['default'] is mapping %}
+        {% set current_value = settings.default.values()|list %}
+    {% else %}
+        {% set current_value = settings.default %}
+    {% endif %}
+    {% do current_value.append(empty_item) %}
+    {% for item in current_value %}
+        {% set outerloop = loop %}
+        <li class="form-multi-option-option" data-multi-option-index="{{ outerloop.index }}">
+            {% for sub_option, sub_settings in settings.options.items() %}
+                {% do sub_settings.update({"original_default": sub_settings.default, "default": item[sub_option]}) %}
+                {% set sub_option = option ~ "-" ~ outerloop.index ~ "-" ~ sub_option %}
+                {% with option=sub_option, settings=sub_settings %}
+                    {% include "components/form-option.html" %}
+                {% endwith %}
+            {% endfor %}
+        </li>
+    {% endfor %}
+</ol>

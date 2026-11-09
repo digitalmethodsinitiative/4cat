@@ -1,0 +1,109 @@
+:root {
+    --fourcat-accent: #303DD0;
+
+    --blue-light: #CAE1F2;
+    --blue: #4A6782;
+    --green-light: #CDEDDE;
+    --green: #026C39;
+    --yellow-light: #FFF5BF;
+    --yellow: #8C741D;
+    --orange: #ff9300;
+    --red-light: #F6C5C5;
+    --red: #A63F3F;
+
+    --bright: #FFFFFF;
+    --dark: #161616;
+    --semidark: #333333;
+    --text-grey: #565656;
+    --text-grey-40: #56565666;
+    --text-grey-80: #565656CC;
+    --stroke-panel: var(--dark);
+    --stroke-thick: #C8C8C8;
+    --stroke-bright: #939393;
+    --button-grey: #E4E4E4;
+    --button-bg-regular: #525252;
+
+    --brighten-12: #FFFFFF1E;
+    --brighten-25: #FFFFFF40;
+    --darken-8: #00000014;
+
+    --panel-bg-0: hsl(0, 0%, 92%);
+    --panel-bg-1: hsl(0, 0%, 84%);
+    --panel-bg-2: hsl(0, 0%, 76%);
+    --panel-bg-3: hsl(0, 0%, 50%);
+
+    /* module tags */
+    --tag1: #92e23e;
+    --tag2: #712ed5;
+    --tag3: #6cdc76;
+    --tag4: #c845cc;
+    --tag5: #dac93c;
+    --tag6: #6d5cd4;
+    --tag7: #6ea035;
+    --tag8: #562a7a;
+    --tag9: #ccd885;
+    --tag10: #cc3c82;
+    --tag11: #6adfba;
+    --tag12: #dc4338;
+    --tag13: #71c3d6;
+    --tag14: #db893a;
+    --tag15: #6685cf;
+    --tag16: #947d36;
+    --tag17: #c77dc4;
+    --tag18: #43652e;
+    --tag19: #d26d7a;
+    --tag20: #589e6f;
+    --tag21: #702938;
+    --tag22: #bfd3b8;
+    --tag23: #31203a;
+    --tag24: #dcaa89;
+    --tag25: #62577f;
+    --tag26: #984726;
+    --tag27: #4e7b87;
+    --tag28: #c7b2d2;
+    --tag29: #383a25;
+    --tag30: #8c7264;
+    --tag31: #7a7a7a;
+
+    --max-width: 68rem; /** viewport width **/
+
+    --font-base: 0.625rem; /** the alpha and the omega **/
+
+    --font-normal: calc(var(--font-base) / 3 * 4);
+    --font-body: calc(var(--font-base) / 6 * 7);
+    --font-big: calc(6 * var(--font-normal));
+    --font-h0: calc(var(--font-base) / 4 * 10);
+    --font-h1: calc(var(--font-base) / 4 * 7);
+    --font-h2: calc(2 * var(--font-normal));
+    --font-h3: calc(1.5 * var(--font-normal));
+    --font-h4: calc(1.25 * var(--font-normal));
+
+    --spacing-tiny: calc(var(--font-base) / 3);
+    --spacing-smaller: calc(var(--spacing-tiny) / 2 * 3);
+    --spacing-small: calc(var(--spacing-tiny) * 2);
+    --spacing-regular: calc(var(--spacing-tiny) * 4);
+    --spacing-large: calc(var(--spacing-tiny) * 8);
+    --spacing-xlarge: calc(var(--spacing-tiny) * 12);
+
+    --card-height: calc(var(--font-h1) * 10);
+
+    --slideout-header-height: 3rem;
+    --form-gap: 1.5rem;
+    --tooltip-button-width: 2rem;
+
+    --stroke-light: calc(var(--font-base) * 0.1);
+    --stroke: calc(var(--stroke-light) * 2);
+    --stroke-heavy: calc(var(--stroke-light) * 4);
+    --stroke-journey: calc(var(--stroke-light) * 3);
+    --radius: calc(var(--font-base) / 6 * 5);
+    --double-radius: calc(2 * var(--radius));
+    --small-radius: calc(var(--font-base) / 6 * 2);
+
+    --z-journey-marker: 1;
+    --z-run-hint: 2;
+    --z-button: 10;
+    --z-button-dropdown: 15;
+    --z-footer-header: 1000;
+    --z-slideout: 1001;
+    --z-preview-fullscreen: 1100
+}

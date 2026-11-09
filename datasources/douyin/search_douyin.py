@@ -8,6 +8,7 @@ from datetime import datetime
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
 from common.lib.helpers import readable_url
+from common.lib.outputs import Datasource
 
 
 def defined(data, key, default=None):
@@ -123,17 +124,19 @@ def download_prevented(download):
 
     return MissingMappedField("Unknown")
 
-
 class SearchDouyin(Search):
     """
     Import scraped Douyin data
     """
     type = "douyin-search"  # job ID
-    category = "Search"  # category
+    tags = ["import"]
     title = "Import scraped Douyin data"  # title displayed in UI
-    description = "Import Douyin data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    description = "Import Douyin data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # the tag column the co-tag and hashtag networks look for
+    output = Datasource(columns={"hashtags"})
     is_from_zeeschuimer = True
+    icon = "brand-tiktok"
 
     # not available as a processor for existing datasets
     accepts = [None]

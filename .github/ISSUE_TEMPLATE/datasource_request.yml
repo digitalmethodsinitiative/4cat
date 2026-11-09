@@ -1,0 +1,100 @@
+name: Data source request
+description: Request a new data source for 4CAT.
+title: "[Data source] "
+labels: ["module-request", "data source"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you start:
+
+        - Check the [list of available data sources](https://github.com/digitalmethodsinitiative/4cat/wiki) and the open
+          [data source requests](https://github.com/digitalmethodsinitiative/4cat/issues?q=is%3Aissue+label%3A%22data+source%22)
+          first.
+        - Request new [Zeeschuimer data sources on its own GitHub]
+        (https://github.com/digitalmethodsinitiative/zeeschuimer) instead of here.
+
+  - type: input
+    id: datasource
+    attributes:
+      label: Data source name
+      description: The name of the datasource (platform, upload, etc) you want to collect data from.
+      placeholder: e.g. 'BlueSky'
+    validations:
+      required: true
+
+  - type: input
+    id: datasource_url
+    attributes:
+      label: URL of data source
+      placeholder: https://...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: access
+    attributes:
+      label: How is the data reachable?
+      description: Your best guess is fine — say so in the details below if you are unsure.
+      options:
+        - It has a documented public API
+        - It has an API, but it needs approval, an account, or payment
+        - No API — the data is only visible in the browser
+        - It offers a bulk export or data archive
+        - I don't know
+    validations:
+      required: true
+
+  - type: textarea
+    id: access_details
+    attributes:
+      label: API documentation and access details
+      description: >
+        Link to the API documentation if there is any. Does it need credentials, an approved research application, or a
+        paid plan? Are there rate limits or caps you know of? If there is no API, describe how you currently get at the
+        data.
+    validations:
+      required: false
+
+  - type: textarea
+    id: items
+    attributes:
+      label: What should one item in the dataset be?
+      description: >
+        4CAT datasets are tables of items. Say what a single item should be for this platform (a post, a comment, a
+        video, a profile, …) and which fields matter to you — timestamp, author, body text, engagement counts, media
+        URLs, and so on.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: What would you use this for?
+      description: >
+        A sentence or two on the research you have in mind. This helps us judge which fields and query options actually
+        need to exist.
+    validations:
+      required: true
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: Example data
+      description: >
+        If you can share a small sample of the raw data (an API response, an exported file), paste or attach it here.
+        This is the single most useful thing you can add. Remove anything personal or sensitive first.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Before submitting
+      options:
+        - label: >
+            I have considered whether collecting this data is compatible with the platform's terms of service and with
+            the privacy of the people in it, and I am not asking for a way to circumvent access restrictions.
+          required: true
+        - label: I searched the existing issues and this data source has not been requested yet.
+          required: true

@@ -2427,6 +2427,28 @@ class DataSet(FourcatModule):
         # Default to text
         return self.parameters.get("media_type", "text")
 
+    def set_media_type(self, media_type):
+        """
+        Set the media type of this dataset's file.
+
+        For processors whose output media is only known while running (for example,
+        from the type of an uploaded file). The processor's declared `output` states
+        the media it can produce; this pins the one it actually produced. Stored on
+        the instance for the current run and in the parameters so later reads (after
+        a reload) return it too.
+
+        :param str media_type:  Media type, e.g. "image"
+        :return str:  The media type that was set
+        """
+        self.media_type = media_type
+        self.parameters["media_type"] = media_type
+        self.db.update(
+            "datasets",
+            data={"parameters": json.dumps(self.parameters)},
+            where={"key": self.key},
+        )
+        return media_type
+
     def get_media_from_children(self, item_ids=None) -> dict:
         """ Returns a list of media filenames that have been downloaded
             via video or image download child processors
@@ -2814,10 +2836,11 @@ class DataSet(FourcatModule):
                     % field_id
                 )
 
-        # Check if fields are removed
+        # Check if fields are removed or changed into another type; both mean
+        # the annotations made with them have to be deleted or rewritten
         if not add and old_fields:
-            for field_id in old_fields.keys():
-                if field_id not in new_fields:
+            for field_id, old_field in old_fields.items():
+                if field_id not in new_fields or old_field.get("type") != new_fields[field_id].get("type"):
                     changes = True
 
         # Make sure to do nothing to processor-generated annotations; these must remain 'traceable' to their origin

@@ -1,0 +1,208 @@
+{#
+set: lite_header = True for a header included on another page as a clickable entry point
+                        into the dataset (e.g. dataset overview page)
+set: main_header = True for a header at the top of the analyiss tree (e.g. on the dataset
+                        result page)
+
+The header's 'view' button and the preview it slides open beneath it share the
+Alpine scope of whatever wraps this card (x-data="datasetPreview": the
+.module-card, .dataset-metadata or overview list item), so a card is always
+included inside one.
+#}
+{% set deprecated = (dataset.type not in processors) %}
+<header class="card-header dataset-header">
+    {% if dataset.get_own_processor().icon %}{% set icon = dataset.get_own_processor().icon %}{% endif %}
+    {% include 'components/module-icon.html' %}
+    <{% if main_header %}h1{% else %}h3{% endif %}>
+        {% if lite_header %}<a href="{{ url_for("dataset.show_result", key=dataset.key) }}">{% endif %}
+        {% if dataset.get_label(default=None) %}{{ dataset.get_label() }}{% else %}{{ processors[dataset.type].title if
+        not deprecated else "(Deprecated analysis) " + dataset.type }}{% endif %}
+        {% if lite_header %}</a>{% endif %}
+    </{% if main_header %}h1{% else %}h3{% endif %}>
+    {% if not lite_header %}
+        <nav class="quick-links">
+            <ul class="module-actions dataset-actions">
+                {% if current_user.is_authenticated and (__user_config("privileges.admin.can_manipulate_all_datasets") or
+            dataset.is_accessible_by(current_user, "owner")) %}
+                    <li class="button-secondary">
+                        <a href="#" x-tooltip="Edit dataset label">
+                            <i class="fa fa-fw fa-edit" aria-hidden="true"></i>
+                        </a>
+                    </li>
+                {% endif %}
+                <li class="button-secondary">
+                    <a href="#" x-tooltip="View documentation & references">
+                        <i class="fa fa-fw fa-mortar-board" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
+                <li class="button-secondary">
+                    <a href="{{ url_for('dataset.view_log', key=dataset.key) }}" x-tooltip="View dataset log">
+                        <i class="fa fa-fw fa-clipboard-list"
+                        aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% endif %}
+                {% if not deprecated %}
+                <li class="button-secondary">
+                    <a href="{{ dataset.get_version_url(" backend/processors/" + dataset.get_own_processor().filepath) }}"
+                        x-tooltip="View processor code">
+                        <i class="fab fa-fw fa-github" aria-hidden="true"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+    <nav class="actions">
+        {% if lite_header %}
+        <ul class="dataset-fetch">
+            <li>
+                <a class="button-like" href="{{ url_for("dataset.show_result", key=dataset.key) }}">Analyze</a>
+            </li>
+        </ul>
+        {% endif %}
+        {# slides the preview below this header open; see components/preview.html #}
+        {% if dataset|previewable %}
+        <ul class="dataset-fetch">
+            <li>
+                {% include "components/preview-toggle.html" %}
+            </li>
+        </ul>
+        {% endif %}
+        {% include "dataset-page/dropdown-button.html" %}
+    </nav>
+</header>
+
+{% include 'components/preview.html' %}
+
+<section class="card-content status">
+    {% if dataset.is_expiring(config=__config) %}
+        <dl class="badge-list">
+            <span class="notice notice-warning">
+                <i class="fa fa-warning" aria-hidden="true"></i> <strong>Note:</strong> this dataset will no longer be
+                available
+                after {{ dataset.is_expiring(config=__config)|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You
+                can
+                <a href="{{ url_for("dataset.keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+            </span>
+        </dl>
+    {% endif %}
+
+    {% if merge_sources %}
+        <dl class="badge-list">
+            <span class="notice notice-warning">
+                <i class="fa fa-arrows-to-dot" aria-hidden="true"></i> This dataset is a merger of
+                {% for source in merge_sources %}
+                    {% if source is string %}
+                        {{ source }}{% else %}
+                        <a href="{{ url_for('dataset.show_result', key=source.key) }}">{{ source.get_label() }}</a>{% endif %}
+                {% if
+            loop.index < (merge_sources|length - 1) %}, {% elif loop.index < (merge_sources|length) %} and{% endif %}
+                {% endfor %}.
+            </span>
+        </dl>
+    {% elif "copied_from" in dataset.parameters %}
+        <dl class="badge-list">
+            <span class="notice notice-warning">
+                <i class="fa fa-filter" aria-hidden="true"></i>
+                This dataset was generated from
+                {# `copy_source` is the dataset page's: it looked the source up
+                   so it can be named. A listing rendering this card has not,
+                   and should not look one up per card, so it links to the
+                   source without naming it - as it also does when the source
+                   is gone and only its key is left #}
+                {% if copy_source is defined and copy_source is not string %}
+                    the dataset '
+                    <a href="{{ url_for('dataset.show_result', key=copy_source.key) }}">{{ copy_source.get_label() }}</a>'.
+                {% else %}
+                    <a href="{{ url_for('dataset.show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
+                {% endif %}
+            </span>
+        </dl>
+    {% endif %}
+    <dl class="badge-list dataset-status{% if not dataset.is_finished() %} in-progress{% endif %}"
+        {% if not dataset.is_finished() %}style="--progress: {{ dataset.progress if dataset.progress else 0 }}"{% endif %}>
+        <div class="status-badge-annotated status-{% if not dataset.is_finished() %}neutral{% elif dataset.num_rows %}good{% else %}bad{% endif %}">
+            <dt>{% if not dataset.is_finished() %}Processing{% elif dataset.num_rows %}Completed{% else %}No
+                results{% endif %}{% if dataset.num_rows %} ({{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %}){% endif %}</dt>
+            <dd>{{ dataset.get_status() or "Processor finished." }}</dd>
+        </div>
+    </dl>
+
+    {% if main_header %}
+    <dl class="badge-list">
+        {% if __user_config("ui.show_datasource") and dataset.parameters.datasource %}
+            <div>
+                <dt>Created from</dt>
+                <dd>
+                    {% if dataset.parameters.datasource in datasources %}
+                        <a href="{{ url_for("misc.module_catalog", module_type=dataset.type) }}">
+                    {% endif %}
+                    {{ dataset.parameters.datasource }}
+                    {% if dataset.parameters.datasource in datasources %}
+                        </a>
+                    {% endif %}
+                </dd>
+            </div>
+        {% endif %}
+
+        <div>
+            <dt>Created</dt>
+            <dd>
+                {% if dataset.parameters.original_timestamp %}
+                    <i class="fa fa-file-import tooltip-trigger" aria-hidden="true"
+                       aria-controls="tooltip-{{ dataset.key }}-imported" x-tooltip="This dataset was imported and was originally created on {{ dataset.parameters.original_timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}."></i>
+                {% endif %}
+                {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
+            </dd>
+        </div>
+    </dl>
+        {% endif %}
+    {% if dataset.parameters|visible_parameters %}
+        <dl class="badge-list parameters with-overflow">
+            {% include "dataset-page/dataset-parameters.html" %}
+        </dl>
+    {% endif %}
+    {# the Explorer is a pane on this page, so its controls only belong on the
+       page that has it: the top-level card, not the cards in the analysis tree
+       or on the dataset overview #}
+    {% if main_header and __user_config("privileges.can_use_explorer") %}
+        {% if dataset.is_finished() %}
+            <dl class="badge-list annotation-fields">
+                {% include "explorer/annotation-fields-box.html" %}
+            </dl>
+        {% endif %}
+
+        {# there is nothing to explore until there are items to explore: a
+           dataset still being created has none yet, and one that finished
+           without collecting any never will. The toggle is shown either way,
+           inactive, rather than appearing once there is something - so it is
+           clear the Explorer is where it always is, and why it cannot be
+           opened right now #}
+        {% set unavailable = "" %}
+        {% if not dataset.is_finished() %}
+            {% set unavailable = "This dataset is still being created" %}
+        {% elif not dataset.num_rows %}
+            {% set unavailable = "This dataset collected no items, so there is nothing to explore or annotate" %}
+        {% endif %}
+        <nav class="analyze-or-explore">
+            <button type="button" class="toggle self-styled" role="switch"
+                    aria-checked="{{ "true" if explore else "false" }}"
+                    aria-label="Switch between analysing and annotating this dataset"
+                    {% if unavailable %}disabled{% endif %}
+                    x-data="toggleButton" @click="flip()" :aria-checked="checked">
+                <span>Analyze</span>
+                <span>Explore &amp; Annotate</span>
+            </button>
+            {% if unavailable %}
+                {# beside the toggle rather than on it: a disabled control does
+                   not report the pointer being over it, so a tooltip on the
+                   button itself would never show. Same arrangement as the
+                   Explorer's own sort control when sorting is unavailable #}
+                <span class="explore-unavailable" x-tooltip="{{ unavailable }}">
+                    <i class="fa fa-circle-info" aria-hidden="true"></i></span>
+            {% endif %}
+        </nav>
+    {% endif %}
+</section>

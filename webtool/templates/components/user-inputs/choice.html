@@ -1,0 +1,14 @@
+<select name="{{ field_name }}" id="forminput-{{ option }}" data-default="{{ settings.original_default }}">
+{% for choice in settings.options %}
+    {% if settings.options[choice] is mapping %}
+    <optgroup label="{{ choice }}">
+        {% set group = settings.options[choice] %}
+        {% for group_choice in group %}
+        <option value="{{ group_choice }}"{% if group_choice == settings.default %} selected{% endif %}>{{ group[group_choice] }}</option>
+        {% endfor %}
+    </optgroup>
+    {% else %}
+    <option value="{{ choice }}"{% if choice == settings.default %} selected{% endif %}>{{ settings.options[choice] }}</option>
+    {% endif %}
+{% endfor %}
+</select>

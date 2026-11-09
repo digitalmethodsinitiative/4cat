@@ -6,6 +6,7 @@ import datetime
 from common.lib.helpers import get_interval_descriptor
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
@@ -20,10 +21,13 @@ class TwitterUserVisibility(BasicProcessor):
     Collect User stats as both author and mention.
     """
     type = "twitter-user-visibility"  # job type ID
-    category = "Twitter analysis"  # category
+    tags = ["counting", "authors", "metadata"]  # tags
     title = "User visibility"  # title displayed in UI
     description = "Collects usernames and totals how many tweets are authored by the user and how many tweets mention the user"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    # a derived table
+    output = Table()
 
     # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
     compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})

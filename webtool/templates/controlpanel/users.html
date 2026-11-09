@@ -81,7 +81,10 @@
                     {% endfor %}
                 </table>
 
-                {% include "components/pagination.html" %}
+                {% from "components/pagination.html" import page_links %}
+{% call(number, label) page_links(pagination.page, pagination.pages, "Pages", "pagination", True) %}
+    <a href="{{ url_for(pagination.route, page=number, **pagination.route_args) }}?{{ filter|http_query }}&amp;depth={{ depth }}">{{ label }}</a>
+{% endcall %}
 
                 <p role="tooltip" class="multiple" id="tooltip-user-admin" aria-hidden="true">Admin user</p>
                 <p role="tooltip" class="multiple" id="tooltip-user-datasets" aria-hidden="true">View datasets for

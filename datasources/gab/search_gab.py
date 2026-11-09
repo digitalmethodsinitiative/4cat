@@ -5,6 +5,7 @@ import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
+from common.lib.outputs import Datasource
 from common.lib.helpers import readable_url
 
 
@@ -13,10 +14,12 @@ class SearchGab(Search):
     Import scraped gab data
     """
     type = "gab-search"  # job ID
-    category = "Search"  # category
+    tags = ["import"]
     title = "Import scraped Gab data"  # title displayed in UI
-    description = "Import Gab data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    description = "Import Gab data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
+    # the tag column the co-tag and hashtag networks look for
+    output = Datasource(columns={"tags"})
     is_from_zeeschuimer = True
     fake = ""
 

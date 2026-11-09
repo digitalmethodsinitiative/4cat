@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 
 from backend.lib.search import Search
 from common.lib.helpers import UserInput
+from common.lib.outputs import Datasource
 from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
 
@@ -29,12 +30,14 @@ class SearchTikTokByID(Search):
     Import scraped TikTok data
     """
     type = "tiktok-urls-search"  # job ID
-    category = "Search"  # category
+    
     title = "Search TikTok by post URL"  # title displayed in UI
     description = "Retrieve metadata for TikTok post URLs."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_local = False  # Whether this datasource is locally scraped
-    is_static = False  # Whether this datasource is still updated
+    # the tag column the co-tag and hashtag networks look for
+    output = Datasource(columns={"hashtags"})
+    icon = "brand-tiktok"
+    tags = ["scraping"]
 
     # not available as a processor for existing datasets
     accepts = [None]

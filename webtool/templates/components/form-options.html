@@ -1,0 +1,12 @@
+{# Render a set of user-input options as form elements.
+
+   Expects `options`, mapping option names to definitions. Delegated options
+   (only rendered on demand via an 'extra-form' response) are skipped unless
+   `delegated` is set, in which case all options are rendered and marked as
+   delegated.
+#}
+{% for option, settings in options.items() %}
+    {% if delegated or not settings.delegated %}
+        {% include "components/form-option.html" %}
+    {% endif %}
+{% endfor %}

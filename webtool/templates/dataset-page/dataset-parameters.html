@@ -1,0 +1,89 @@
+{% from "components/parameter.html" import format_parameter %}
+
+{% if not dataset.key_parent and dataset.is_private %}
+    {# Special case: dataset is private #}
+    {% call format_parameter(dataset, "Private", "This dataset is private and can only be viewed by your user and instance maintainers") %}
+        <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+    {% endcall %}
+{% endif %}
+
+{% if dataset.key_parent and dataset.is_expiring(config=__config) %}
+    {# Special case: dataset expires #}
+    {% call format_parameter(dataset, "Expires", "This dataset will automatically be deleted at this date") %}
+        {{ dataset.is_expiring(config=__config)|datetime|safe }}
+    {% endcall %}
+{% endif %}
+
+{# What was done to the author data. A dataset that records what was replaced
+   can say what actually happened and how much of it there was; for the rest
+   all that is known is what was asked for when they were made, so those say
+   that instead. #}
+{% set author_info = dataset.parameters.get("author_info_replaced") %}
+{% set author_requested = dataset.parameters.get("pseudonymise") %}
+{% if author_info %}
+    {% set author_modes = author_info.modes %}
+    {% set author_count %}{{ author_info.replaced|commafy }} value{{ "" if author_info.replaced == 1 else "s" }}{% endset %}
+{% elif author_requested == True %}
+    {% set author_modes = ["pseudonymise"] %}
+{% elif author_requested in ("pseudonymise", "anonymise") %}
+    {% set author_modes = [author_requested] %}
+{% else %}
+    {% set author_modes = [] %}
+{% endif %}
+{% set author_unknown = "4CAT did not record what was replaced, so how much of it was covered is not known." %}
+
+{% if author_info and not author_info.replaced %}
+    {% call format_parameter(dataset, "Author data", "Author data was left as it is. None of the fields to replace (" ~ author_info.fields|join(", ") ~ ") were found in this dataset.") %}
+        <i class="fa fa-triangle-exclamation" aria-hidden="true"></i> Left as it is
+    {% endcall %}
+{% elif "pseudonymise" in author_modes and "anonymise" in author_modes %}
+    {% call format_parameter(dataset, "Pseudonymised and anonymised", "Author data has been pseudonymised and anonymised: " ~ author_count ~ " replaced in total, some with a hash and some with 'REDACTED'.") %}
+        {{ author_count }}
+    {% endcall %}
+{% elif "pseudonymise" in author_modes %}
+    {% call format_parameter(dataset, "Pseudonymised", "Author data has been pseudonymised: " ~ author_count ~ " replaced with a hash." if author_info else "Author data was set to be pseudonymised when this dataset was made. " ~ author_unknown) %}
+        {% if author_info %}{{ author_count }}{% else %}<i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>{% endif %}
+    {% endcall %}
+{% elif "anonymise" in author_modes %}
+    {% call format_parameter(dataset, "Anonymised", "Author data has been anonymised: " ~ author_count ~ " replaced with 'REDACTED'." if author_info else "Author data was set to be anonymised when this dataset was made. " ~ author_unknown) %}
+        {% if author_info %}{{ author_count }}{% else %}<i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>{% endif %}
+    {% endcall %}
+{% endif %}
+
+{% for parameter in dataset.parameters|visible_parameters if parameter not in ("min_date", "max_date") %}
+    {% if parameter.startswith("mapping-") %}
+        {# Special case: CSV column mapping #}
+        {% set label %}{{ parameter|replace("mapping-", "column: ") }}{% endset %}
+        {% call format_parameter(dataset, label) %}
+            {% if dataset.parameters[parameter].startswith("__4cat") %}
+                <i>[{{ dataset.parameters[parameter]|replace("__4cat_", "")|replace("_", " ") }}]</i>
+            {% else %}
+                {{ dataset.parameters[parameter]|string }}
+            {% endif %}
+        {% endcall %}
+    {% elif dataset.parameters[parameter] %}
+        {# standard parameters, differentiate between booleans (get a checkmark) and other #}
+        {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
+            {% call format_parameter(dataset, parameter) %}
+                {{ dataset.parameters[parameter]|string }}
+            {% endcall %}
+        {% elif dataset.parameters[parameter] %}
+            {% call format_parameter(dataset, parameter) %}
+                <i class="fa fa-check" aria-hidden="true"></i> <span class="sr-only">Yes</span>
+            {% endcall %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+{% if (dataset.parameters.min_date and dataset.parameters.min_date > 0) or (dataset.parameters.max_date and dataset.parameters.max_date > 0) %}
+    {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
+        {% call format_parameter(dataset, "From") %}
+            {{ dataset.parameters.min_date|datetime|safe }}
+        {% endcall %}
+    {% endif %}
+    {% if dataset.parameters.max_date and dataset.parameters.max_date > 0 %}
+        {% call format_parameter(dataset, "Until") %}
+            {{ dataset.parameters.max_date|datetime|safe }}
+        {% endcall %}
+    {% endif %}
+{% endif %}

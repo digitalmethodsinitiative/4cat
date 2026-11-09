@@ -1,70 +1,30 @@
-<nav class="pagination">
+{# Page links for the Explorer.
 
-	{% if item_count > max_items %}
-		{% set item_count = max_items %}
-	{% endif %}
-	{% set pages = ((item_count / items_per_page) + (item_count % items_per_page > 0))|int %}
-	{% set current = "current" %}
-	{% set lower_bound = 3 %}
-	{% set upper_bound = pages - 2 %}
-	{% if not page %}
-		{% set page = 1 %}
-	{% endif %}
+   The bar itself is the shared one every paged listing renders
+   (components/pagination.html); only what a link *is* belongs here. Each one
+   swaps the item list in place rather than loading a page, and pushes its own
+   URL, so a page can still be linked to and the back button still works. The
+   href is what it pushes, and what happens without JavaScript.
 
-	{% set parameters = request.url | parameter_str %}
+   Included above and below the items, so a long page can be paged from either
+   end; both are inside #explorer-body, so both are replaced along with them.
 
-    <ol>
-
-	{# show all pages if it's 10 or less #}
-	{% if pages <= 10 %}
-		{% for i in range(pages) %}
-		{% set current_page = (i + 1) %}
-		<li class="page">{% if page == current_page %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ current_page }}{{ parameters }}">{{ current_page }}</a>{% endif %}</li>
-		{% endfor %}
-
-	{# More complex formatting if there are more than 10 pages #}
-	{% else %}
-
-		{# Always display the lower three pages #}
-		{% for i in range(lower_bound) %}
-		{% set current_page = (i + 1) %}
-		<li class="page">{% if page == current_page %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ current_page }}{{ parameters }}">{{ current_page }}</a>{% endif %}</li>
-		{% endfor %}
-
-		{# Show lower 'edge' pages #}
-        {% if lower_bound <= page <= lower_bound + 2 %}
-            {% for i in range(lower_bound, page + 1) %}
-                <li class="page">
-                {% if page == i + 1 %}
-                    <strong class="current">{{ page }}</strong>
-                {% else %}
-                    <a href="/results/{{key}}/explorer/page/{{ i + 1 }}{{ parameters }}">{{ i + 1 }}</a>
-                {% endif %}
-                </li>
-            {% endfor %}
-        {% endif %}
-
-		<li class="ellipsis">...</li>
-
-		{# Show middle pages #}
-		{% if (lower_bound + 2) < page < (upper_bound - 2)  %}
-			{% for i in range((page - 1), (page + 2)) %}
-			<li class="page">{% if page == i %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ i }}{{ parameters }}">{{ i }}</a>{% endif %}</li>
-			{% endfor %}
-			<li class="ellipsis">...</li>
-
-		{# Show upper 'edge' pages #}
-		{% elif upper_bound - 2 <= page <= upper_bound %}
-			{% for i in range(page - 1, upper_bound) %}
-			<li class="page">{% if page == i %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ i }}{{ parameters }}">{{ i }}</a>{% endif %}</li>
-			{% endfor %}
-		{% endif %}
-
-		{# Always display the upper three pages #}
-		{% for i in range(lower_bound) %}
-		{% set current_page = upper_bound + i %}
-		<li class="page">{% if page == current_page %}<strong class="current">{{ page }}</strong>{% else %}<a href="/results/{{key}}/explorer/page/{{ current_page }}{{ parameters }}">{{ current_page }}</a>{% endif %}</li>
-		{% endfor %}
-	{% endif %}
-	</ol>
-</nav>
+   Expects: dataset, page, item_count, items_per_page, max_items, sort, reverse
+            label (optional) what to call this bar, for screen readers
+            above (optional) whether this is the copy above the items
+#}
+{% from "components/pagination.html" import page_links %}
+{% set shown_count = item_count if item_count < max_items else max_items %}
+{% set pages = ((shown_count / items_per_page)|round(0, 'ceil'))|int %}
+{# every window onto the dataset keeps the sort it was opened with #}
+{% set order = "reverse" if reverse else "regular" %}
+{% call(number, link_label) page_links(page, pages, label|default("Item pages"),
+                                       "pagination above" if above else "pagination") %}
+    <a href="{{ url_for('dataset.show_result', key=dataset.key, view='explore', page=number, sort=sort, order=order) }}"
+       hx-get="{{ url_for('explorer.explorer_items', key=dataset.key, page=number, sort=sort, order=order) }}"
+       hx-target="#explorer-body"
+       hx-swap="innerHTML"
+       hx-indicator="#explorer-spinner"
+       hx-push-url="{{ url_for('dataset.show_result', key=dataset.key, view='explore', page=number, sort=sort, order=order) }}"
+    >{{ link_label }}</a>
+{% endcall %}

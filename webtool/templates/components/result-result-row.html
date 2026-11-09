@@ -33,7 +33,7 @@
         </a>
         <p role="tooltip" id="tooltip-get-result-{{ dataset.key }}" aria-hidden="true">Download original data as provided by the data source</p>
     </li>
-    {% if not dataset.is_filter() and (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item) and not __user_config("ui.inline_preview") %}
+    {% if not dataset.is_filter() and (dataset.get_extension() in ("csv", "gexf", "html") or dataset.get_own_processor().map_item) %}
         <li>
             <a href="{{ url_for('dataset.preview_items', key=dataset.key) }}"
                data-load-from="{{ url_for('dataset.preview_items', key=dataset.key) }}" class="popup-trigger"
@@ -45,7 +45,7 @@
     {% endif %}
     <li>
     {% if __user_config("privileges.can_use_explorer") %}
-        <a href="{{ url_for('explorer.explorer_dataset', dataset_key=dataset.key) }}" class="tooltip-trigger" aria-controls="tooltip-explore-items-{{ dataset.key }}">
+        <a href="{{ url_for('dataset.show_result', key=dataset.key, view='explore') }}" class="tooltip-trigger" aria-controls="tooltip-explore-items-{{ dataset.key }}">
             <i class="fa fa-binoculars" aria-hidden="true"></i> Explore & annotate
         </a>
         <p role="tooltip" id="tooltip-explore-items-{{ dataset.key }}" aria-hidden="true">Explore, sort, and add annotations to data interactively</p>

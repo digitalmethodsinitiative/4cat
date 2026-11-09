@@ -4,6 +4,7 @@ Twitter APIv2 general tweet statistics
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import Table
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -16,10 +17,12 @@ class TwitterStats(TwitterStatsBase):
     Collect Twitter statistics. Built to emulate TCAT statistic.
     """
     type = "twitter-0-stats"  # job type ID
-    category = "Twitter analysis"  # category
+    tags = ["statistics", "counting", "metadata"]  # tags
     title = "Twitter statistics"  # title displayed in UI
     description = "Contains the number of tweets, number of tweets with links, number of tweets with hashtags, number of tweets with mentions, number of retweets, and number of replies"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    # a derived table
+    output = Table()
 
     # Allow processor on Twitter/X datasets (API v2 or imported TCAT)
     compatibility = Compatibility(types={"twitterv2-search", "dmi-tcat-search"})

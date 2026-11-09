@@ -1,5 +1,5 @@
 <li{% if inline %} class="inline"{% endif %} id="processor-list-item-{{ processor.type }}">
-    <form action="{{ url_for('dataset.show_results') }}/{{ dataset.key }}/processors/queue/{{ processor.type }}/" data-async-action="{{ url_for('toolapi.queue_processor') }}" method="POST" class="processor-child-wrapper child-wrapper">
+    <form action="{{ url_for('dataset.show_results') }}/{{ dataset.key }}/processors/queue/{{ processor.type }}/" data-async-action="{{ url_for('toolapi.queue_processor') }}" method="POST" class="processor-child-wrapper child-wrapper" x-data="userinputForm">
 
     {# The button for this processor #}
     {% set processor_options = processor.get_options(dataset, __config) %}
@@ -52,9 +52,9 @@
         {% if processor_options %}
         <div class="processor-options-wrap" aria-expanded="false" id="processor-options-{{ dataset.key }}-{{ processor.type }}">
             <fieldset class="processor-options">
-                {% for option in processor_options %}{% if not processor_options[option].delegated %}
-                    {% include "components/processor-option.html" %}
-                {% endif %}{% endfor %}
+                {% with options=processor_options %}
+                    {% include "components/form-options.html" %}
+                {% endwith %}
             {% if __user_config("ui.option_email") in ["both", "processor_only"] and __user_config("mail.server") %}
                 <div class="form-element combo-checkbox-input">
                     <label>

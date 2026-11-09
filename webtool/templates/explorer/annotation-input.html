@@ -1,0 +1,155 @@
+{# One annotation on one item.
+
+   The input saves itself: it posts its own value to the annotation endpoint,
+   which reads what kind of field this is from the dataset rather than from the
+   request. Nothing is collected or serialised in the browser, and there is no
+   save button - the state chip says where the value stands.
+
+   The input is never swapped out by the response (the endpoint answers 204), so
+   the field someone is typing in is never replaced under their hands.
+
+   Expects: field_id, field, annotation (may be None), item_id, dataset,
+            can_annotate, from_datasets, processors
+#}
+{% set type = field.type %}
+{% set value = annotation.value if annotation else "" %}
+{% set editable = can_annotate and not field.from_dataset %}
+{% set post_url = url_for('explorer.save_annotation', key=dataset.key) %}
+{% set identity = {"field_id": field_id, "item_id": item_id}|tojson %}
+
+{# `data-annotation-field` is what the eye button in the field editor folds away;
+   the class is set here as well as there so a folded field is rendered folded
+   rather than being hidden by script once it is already on screen #}
+<div class="item-annotation type-{{ type }}{% if field_id in (hidden_fields or []) %} is-hidden{% endif %}"
+     data-annotation-field="{{ field_id }}"
+     x-data="annotationValue"
+     @htmx:before:request="saving($event)"
+     @htmx:after:request="settle($event)">
+    {# a checkbox field is a group of controls, not one, so nothing to point at #}
+    <label class="annotation-label" {% if editable and type != "checkbox" %}for="annotation-{{ item_id }}-{{ field_id }}"{% endif %}>
+        <i class="fa-solid fa-tag" aria-hidden="true"></i>
+        {% if field.from_dataset %}
+            <a href="{{ url_for('dataset.show_result', key=field.from_dataset) }}" target="_blank"
+               rel="noopener" class="from-dataset-link">{{ field.label }}</a>
+        {% else %}
+            {{ field.label }}
+        {% endif %}
+    </label>
+
+    {# form-controls: the inputs look like any other 4CAT input (forms.css) #}
+    <div class="item-annotation-value form-controls">
+        {% if not editable %}
+            {# processor-generated, or this user may only read: show the value as it stands #}
+            <div class="item-annotation-input is-readonly">{{ value|join(", ") if type == "checkbox" else value }}</div>
+
+        {% elif type == "textarea" %}
+            <textarea class="item-annotation-input" name="value"
+                      id="annotation-{{ item_id }}-{{ field_id }}"
+                      hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                      hx-trigger="input delay:800ms, blur"
+                      hx-swap="none" hx-sync="closest .item-annotation:replace">{{ value }}</textarea>
+
+        {% elif type in ("integer", "float") %}
+            {# `step` steps the spinner by whole numbers in an integer field and
+               makes the browser count a decimal typed into one as invalid,
+               which is what stops the value being sent (see `annotationValue`):
+               a value this input cannot stand behind is not posted at all #}
+            <input type="number" class="item-annotation-input" name="value" value="{{ value }}"
+                   step="{{ "1" if type == "integer" else "any" }}"
+                   inputmode="{{ "numeric" if type == "integer" else "decimal" }}"
+                   id="annotation-{{ item_id }}-{{ field_id }}"
+                   hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                   hx-trigger="input delay:2000ms, blur"
+                   hx-swap="none" hx-sync="closest .item-annotation:replace">
+
+        {% elif type == "dropdown" %}
+            <select class="item-annotation-input" name="value"
+                    id="annotation-{{ item_id }}-{{ field_id }}"
+                    hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                    hx-trigger="change"
+                    hx-swap="none" hx-sync="closest .item-annotation:replace">
+                <option value=""></option>
+                {% for option_id, option_label in field.get("options", {}).items() %}
+                    <option value="{{ option_label }}" {% if option_label == value %}selected{% endif %}>{{ option_label }}</option>
+                {% endfor %}
+            </select>
+
+        {% elif type == "checkbox" %}
+            {# the same tag list as a `multi` user input ('.option-tags' in
+               forms.css), but each box saves itself rather than waiting for a
+               submit. Every box posts the whole group, so unchecking the last
+               one still says 'nothing is checked' rather than saying nothing #}
+            <ul class="option-tags">
+                {% for option_id, option_label in field.get("options", {}).items() %}
+                    <li>
+                        <label class="module-tag option-tag">
+                            <input type="checkbox" name="value" value="{{ option_label }}"
+                                   id="annotation-{{ item_id }}-{{ field_id }}-{{ option_id }}"
+                                   {% if value and option_label in value %}checked{% endif %}
+                                   hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                                   hx-trigger="change"
+                                   hx-include="closest .option-tags"
+                                   hx-swap="none" hx-sync="closest .item-annotation:replace">
+                            {{ option_label }}
+                        </label>
+                    </li>
+                {% endfor %}
+            </ul>
+
+        {% else %}
+            <input type="text" class="item-annotation-input" name="value" value="{{ value }}"
+                   id="annotation-{{ item_id }}-{{ field_id }}"
+                   hx-post="{{ post_url }}" hx-vals='{{ identity }}'
+                   hx-trigger="input delay:2000ms, blur"
+                   hx-swap="none" hx-sync="closest .item-annotation:replace">
+        {% endif %}
+    </div>
+    <nav class="item-annotation-info-buttons">
+        {% set tooltip_parts = [] %}
+        {% if field.from_dataset and annotation %}
+            {% set from_dataset_item = from_datasets.get(field.from_dataset) %}
+            {% if from_dataset_item and from_dataset_item != "deleted" %}
+                {% do tooltip_parts.append("Generated by " ~ (processors[from_dataset_item.type].title if from_dataset_item.type in processors else from_dataset_item.type)) %}
+            {% endif %}
+        {% elif annotation and annotation.author %}
+            {% do tooltip_parts.append("Made by " ~ annotation.author) %}
+            {% if annotation.timestamp %}
+                {% do tooltip_parts.append("at " ~ annotation.timestamp|datetime(fmt="%d %b %Y, %H:%M", wrap=False)) %}
+            {% endif %}
+        {% endif %}
+        {% if tooltip_parts %}
+            <div class="item-annotation-info button-secondary"
+                 x-tooltip="{{ tooltip_parts|join(', ') }}">
+                <span><i class="fa-solid fa-fw fa-circle-info" aria-hidden="true"></i></span>
+            </div>
+        {% endif %}
+        {% if editable %}
+            <span class="annotation-state" x-cloak
+                  :class="'is-' + state" aria-live="polite">
+                <template x-if="state === 'saving'">
+                    <div class="item-annotation-info button-secondary button-warning" x-tooltip="Saving annotation">
+                        <span><i class="fa fa-circle-notch fa-spin" aria-hidden="true"></i></span>
+                    </div>
+                </template>
+                <template x-if="state === 'saved' || state === 'idle'">
+                    <div class="item-annotation-info button-secondary button-success" x-tooltip="Annotation saved">
+                        <span><i class="fa fa-check" aria-hidden="true"></i></span>
+                    </div>
+                </template>
+                {# the value is not one this field can hold, so it was never
+                   stored - what is in the input is not the annotation #}
+                <template x-if="state === 'refused'">
+                    <div class="item-annotation-info button-secondary button-warning"
+                         x-tooltip="This value is not valid for this field and was not saved">
+                        <span><i class="fa fa-circle-exclamation" aria-hidden="true"></i></span>
+                    </div>
+                </template>
+                <template x-if="state === 'error'">
+                    <div class="item-annotation-info button-secondary button-error" x-tooltip="Error when saving annotation">
+                        <span><i class="fa fa-exclamation-triangle" aria-hidden="true"></i></span>
+                    </div>
+                </template>
+            </span>
+        {% endif %}
+    </nav>
+</div>

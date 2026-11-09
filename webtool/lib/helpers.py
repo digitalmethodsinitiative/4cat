@@ -4,6 +4,7 @@ General helper functions for Flask templating and 4CAT views
 import markdown2
 import colorsys
 import csv
+import json
 import re
 
 from functools import wraps
@@ -12,6 +13,10 @@ from calendar import monthrange
 from flask_login import current_user
 from flask import (current_app, request, jsonify, g)
 from PIL import Image, ImageColor, ImageOps
+
+from common.lib.helpers import hash_to_md5
+from common.lib.module_map import ModuleMap
+from common.lib.user_input import UserInput
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -80,6 +85,233 @@ class Pagination(object):
 				last = num
 
 
+# Cache the built module map per modules object. `g.modules`
+# (app.fourcat_modules) is a single process-global, replaced only on a full
+# reload, so its identity is a safe cache key -- a new identity forces a
+# rebuild.
+# NOTE: config is NOT part of the key: the ModuleMap does not gate edges on
+# per-user config today. Per-user maps would need the config (or user) in the key.
+_MODULE_MAP_CACHE = {}  # id(modules) -> (modules, ModuleMap)
+
+
+def module_map():
+	"""
+	The module map for the currently loaded modules
+
+	Built lazily and cached, since building it walks every processor's
+	compatibility spec.
+
+	:return ModuleMap:
+	"""
+	modules = g.modules
+	cached = _MODULE_MAP_CACHE.get(id(modules))
+	if cached is None or cached[0] is not modules:
+		_MODULE_MAP_CACHE.clear()
+		_MODULE_MAP_CACHE[id(modules)] = (modules, ModuleMap(modules, g.config, logger=g.log))
+
+	return _MODULE_MAP_CACHE[id(modules)][1]
+
+
+def collect_grid_tags(grid_sections):
+	"""
+	Every tag present in a module grid, for its tag filter
+
+	The modules in a grid are whatever the grid's view put there - processor
+	classes in the processor grid, plain dicts elsewhere - so both are read.
+
+	:param list grid_sections:  `grid_sections` as passed to components/module-grid.html
+	:return list:  Sorted, de-duplicated tags
+	"""
+	tags = set()
+	for section in grid_sections:
+		for module in section["modules"].values():
+			module_tags = module.get("tags") if isinstance(module, dict) else getattr(module, "tags", None)
+			tags.update(module_tags or [])
+
+	return sorted(tags)
+
+
+def datasource_variants(worker, config):
+	"""
+	The variants a data source's search worker offers, if any
+
+	Variants let one data source appear as several cards on the create-dataset
+	page - see `Search.get_variants`. Only search workers can declare them, and
+	declaring them is optional, so anything that does not is simply a data
+	source without variants.
+
+	Whatever this reads is extension code that may be talking to a server that
+	is not answering, so a worker that raises is treated as having no variants
+	rather than taking the page down with it.
+
+	:param worker:  Search worker class
+	:param config:  Configuration reader
+	:return dict:  Variants by ID; empty if there are none
+	"""
+	getter = getattr(worker, "get_variants", None)
+	if not getter:
+		return {}
+
+	try:
+		return getter(config=config) or {}
+	except Exception as e:
+		g.log.warning("Could not read variants for data source worker %s (%s: %s)" %
+					  (getattr(worker, "type", "unknown"), type(e).__name__, e))
+		return {}
+
+
+def datasource_worker_options(worker, config, variant=None):
+	"""
+	A data source's dataset parameters, for the variant that was picked
+
+	The `variant` argument is only passed on to workers that actually declare
+	variants, so a data source that knows nothing about them keeps the
+	`get_options()` signature it always had.
+
+	:param worker:  Search worker class
+	:param config:  Configuration reader
+	:param str variant:  Variant ID, or None
+	:return dict:  Options, as `get_options()` returns them
+	"""
+	if variant and datasource_variants(worker, config):
+		return worker.get_options(None, config, variant=variant)
+
+	return worker.get_options(None, config)
+
+
+def module_request_url(kind):
+	"""
+	Link to the GitHub issue form for requesting a new module
+
+	Follows the configured repository, so an instance running its own fork
+	sends requests there rather than upstream. Returns None if no repository is
+	configured, in which case the front-end omits the link rather than
+	rendering a broken one.
+
+	:param str kind:  `datasource` or `processor`; matches the file name of the
+	                  issue form in .github/ISSUE_TEMPLATE/. None where both
+	                  kinds are in view, which lands on the form picker instead.
+	:return str|None:  URL to the issue form
+	"""
+	repository = g.config.get("4cat.github_url")
+	if not repository:
+		return None
+
+	if not kind:
+		return "%s/issues/new/choose" % repository.rstrip("/")
+
+	return "%s/issues/new?template=%s_request.yml" % (repository.rstrip("/"), kind)
+
+
+def can_annotate_dataset(dataset):
+	"""
+	Whether the current user may write annotations on a dataset
+
+	Reading a dataset is enough to see its annotations; writing them needs the
+	same standing as running a processor on it.
+
+	:param dataset:  The DataSet in question
+	:return bool:
+	"""
+	return bool(
+		g.config.get("privileges.can_run_processors")
+		and g.config.get("privileges.can_use_explorer")
+		and (g.config.get("privileges.admin.can_manipulate_all_datasets")
+			 or dataset.is_accessible_by(current_user, "owner"))
+	)
+
+
+def annotation_watch_state(dataset):
+	"""
+	Whether a processor could still be writing annotations, and what there is now
+
+	Processors write their annotations to the dataset they were ultimately run
+	on, which is the dataset whose page this is. That happens in the background,
+	so the page has to go and look: it polls for as long as an analysis is
+	running (`running`), and compares what it has (`state`) with what is there.
+
+	`state` stands for every annotation of this dataset at once rather than for
+	any one of them, since the page only needs to know *whether* it is behind,
+	not what changed. Both are strings so a rendered page can carry them back
+	unaltered.
+
+	:param dataset:  The DataSet being watched
+	:return dict:  `running`, the keys of its unfinished analyses, and `state`
+	"""
+	# every analysis below this dataset, however deep, in one query rather than
+	# one per level of a tree that can be several deep
+	running = [row["key"] for row in g.db.fetchall("""
+		WITH RECURSIVE analyses AS (
+			SELECT key, is_finished FROM datasets WHERE key_parent = %s
+			UNION ALL
+			SELECT child.key, child.is_finished FROM datasets child, analyses
+			WHERE child.key_parent = analyses.key
+		)
+		SELECT key FROM analyses WHERE NOT is_finished ORDER BY key
+	""", (dataset.key,))]
+
+	# the annotations themselves are counted rather than read: what matters is
+	# whether they are still the ones the page was rendered with
+	totals = g.db.fetchone("SELECT COUNT(*) AS count, COALESCE(MAX(timestamp), 0) AS latest "
+						   "FROM annotations WHERE dataset = %s", (dataset.key,))
+
+	state = "%s-%s-%s" % (
+		hash_to_md5(json.dumps(dataset.annotation_fields, sort_keys=True))[:12],
+		totals["count"], totals["latest"])
+
+	return {"running": ",".join(running), "state": state}
+
+
+def annotation_context(dataset):
+	"""
+	Context for anything rendering a dataset's annotation fields
+
+	The fields as the Explorer shows them - so without the ones processors keep
+	to themselves - plus, for processor-generated fields, the dataset that
+	generated them, since those are shown attributed to their origin.
+
+	Both the dataset page and the Explorer's own endpoints render annotation
+	fields, so both need this.
+
+	:param dataset:  The DataSet whose fields to describe
+	:return dict:  Template context
+	"""
+	# imported here: common.lib.dataset imports from this module's package, and
+	# only this function needs it
+	from common.lib.dataset import DataSet
+	from common.lib.exceptions import DataSetException
+
+	annotation_fields = {
+		field_id: field
+		for field_id, field in dataset.annotation_fields.items()
+		if not field.get("hide_in_explorer")
+	}
+
+	from_datasets = {}
+	for field in annotation_fields.values():
+		if field.get("from_dataset"):
+			child_key = field["from_dataset"]
+			try:
+				from_datasets[child_key] = DataSet(key=child_key, db=g.db, modules=g.modules)
+			except DataSetException:
+				# can be absent if this dataset is a filter and the original was deleted
+				from_datasets[child_key] = "deleted"
+
+	return {
+		"annotation_fields": annotation_fields,
+		"from_datasets": from_datasets,
+		"can_annotate": can_annotate_dataset(dataset),
+		"annotation_watch": annotation_watch_state(dataset),
+		# which fields the reader has folded away in the items below. Kept in the
+		# address so that it survives a refresh and can be linked to, and read
+		# back here so the items are rendered folded rather than folded by script
+		# once they are already on screen
+		"hidden_fields": {
+			field_id for field_id in request.args.get("hidden", "").split(",") if field_id
+		},
+	}
+
+
 def error(code=200, **kwargs):
 	"""
 	Custom HTTP response
@@ -91,6 +323,88 @@ def error(code=200, **kwargs):
 	response = jsonify(kwargs)
 	response.status_code = code
 	return response
+
+
+def common_dataset_options(config, user=None):
+	"""
+	Standard dataset creation options shown for every data source
+
+	These are the controls that are not data source-specific but are offered
+	whenever a dataset is created: pseudonymisation, privacy, e-mail
+	notification and the dataset label. They are returned as a `UserInput`
+	options dict so they can be rendered through the same user-input
+	components as data source options (see `components/form-options.html`).
+
+	Which options are offered depends on the instance configuration.
+
+	Note the `name` overrides: unlike data source options these are read
+	directly by `toolapi.queue_dataset` under their bare names (not
+	`option-`-prefixed), which keeps them out of the data source's
+	`UserInput.parse_all` whitelist and avoids colliding with option names.
+
+	:param config:  Configuration reader (e.g. `g.config`)
+	:param user:  The current user, used to pre-fill the e-mail address
+	:return dict:  Option name -> settings, ready for `form-options.html`
+	"""
+	options = {}
+
+	if config.get("ui.offer_hashing"):
+		options["pseudonymise-info"] = {
+			"type": UserInput.OPTION_INFO,
+			"help": f"{config.get('4cat.name')} can remove information it identifies as relating to "
+					"an item's author, or replace it with a [hashed](https://techterms.com/definition/hash) "
+					"value. It finds that information by field name, so how much it covers differs per "
+					"platform, and other personal information may persist. Once the dataset is ready, "
+					"check what was replaced - you can replace more with the 'Pseudonymise or anonymise' "
+					"processor. It is your responsibility to further anonymise data where appropriate."
+		}
+		options["pseudonymise"] = {
+			"type": UserInput.OPTION_CHOICE,
+			"name": "pseudonymise",
+			"help": "Pseudonymise",
+			"default": "pseudonymise",
+			"options": {
+				"anonymise": "Replace author information with 'REDACTED'",
+				"pseudonymise": "Replace author information with hashed values",
+				"none": "Leave author information as-is",
+			}
+		}
+
+	if config.get("privileges.can_make_dataset_public"):
+		options["make-public"] = {
+			"type": UserInput.OPTION_TOGGLE,
+			"name": "make-public",
+			"help": "Make dataset public",
+			"default": False,
+			"tooltip": "Other users of this 4CAT server will be able to find and view this dataset. If you "
+					   "leave this off, the dataset is hidden from other users, but it is not encrypted and "
+					   "server administrators can still view it."
+		}
+
+	if config.get("ui.option_email") in ("both", "datasources_only") and config.get("mail.server"):
+		options["email-complete"] = {
+			"type": UserInput.OPTION_TOGGLE,
+			"name": "email-complete",
+			"help": "Receive e-mail on completion",
+			"default": False,
+		}
+		options["email-user"] = {
+			"type": UserInput.OPTION_TEXT,
+			"name": "email-user",
+			"help": "E-mail address",
+			"default": user.get_name() if user and user.is_authenticated else "",
+			"requires": "email-complete==true",
+			"tooltip": "This will only function if your username is your e-mail address."
+		}
+
+	options["label"] = {
+		"type": UserInput.OPTION_TEXT,
+		"name": "label",
+		"help": "Dataset name",
+		"tooltip": "A name will be generated automatically if you do not provide one.",
+	}
+
+	return options
 
 
 def pad_interval(intervals, first_interval=None, last_interval=None):

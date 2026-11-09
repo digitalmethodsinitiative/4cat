@@ -1,0 +1,30 @@
+/* Notices on info, warnings, and success */
+.notice a {
+    text-decoration: underline;
+}
+
+.notice-info {
+    background: var(--blue-light);
+    color: var(--blue);
+}
+.notice-info i {
+    color: var(--blue);
+}
+.notice-warning {
+    background: var(--yellow-light);
+    color: var(--yellow)
+}
+.notice-warning i {
+    color: var(--yellow);
+}
+.notice-error {
+    background: var(--red-light);
+    color: var(--red)
+}
+.notice-error i {
+    color: var(--red);
+}
+.notice-success {
+    background: var(--green-light);
+    color: var(--green);
+}

@@ -1,0 +1,20 @@
+{# Compact lineage view shown at the top of the processor slideout: the direct
+   genealogy (top parent -> selected dataset) of the dataset a processor is
+   about to run on, rather than the whole analysis tree. It is rendered
+   server-side per selection and swapped in out-of-band from the processor grid
+   request, so the user always sees exactly what they are running a processor on.
+
+   Expects:
+     genealogy  list of DataSets from top parent to the selected dataset
+                (e.g. dataset.get_genealogy())
+     oob        (optional) emit hx-swap-oob so an htmx response can replace the
+                live tree in place
+#}
+<div id="processor-preview-tree" class="processor-preview-tree" aria-label="Dataset lineage"
+     {% if oob %}hx-swap-oob="true"{% endif %}>
+    <ul>
+        {% with index = 0 %}
+            {% include "components/processor-preview-tree-item.html" %}
+        {% endwith %}
+    </ul>
+</div>

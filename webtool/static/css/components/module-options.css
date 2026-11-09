@@ -1,0 +1,26 @@
+#module-options {
+    padding: var(--spacing-large);
+    max-width: var(--max-width);
+    margin: 0 auto;
+}
+
+#module-options .module-description {
+    font-size: 1rem;
+    margin-top: 0;
+}
+
+.module-header .quick-links {
+    flex-grow: 0;
+}
+
+.module-header .actions {
+    margin-left: auto;
+}
+
+fieldset {
+    border: none;
+}
+
+#module-options .module-queue-button {
+    margin-top: var(--spacing-regular);
+}

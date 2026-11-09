@@ -1,93 +1,100 @@
 {% extends "layout.html" %}
 
-{% block title %}Datasets &amp; previous results{% endblock %}
-{% block body_class %}result-list plain-page{% endblock %}
+{% block title %}My datasets{% endblock %}
+{% block body_class %}result-list{% endblock %}
 {% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
 
 {% block body %}
-    <nav class="view-controls block">
-        <form action="{{ url_for("dataset.show_results") }}" method="GET">
-            <input type="hidden" name="depth" value="{{ depth }}">
-            <ul>
-                <li><input aria-label="Filter by query or label" placeholder="Filter datasets..." name="filter"
-                           value="{{ filter.filter }}"></li>
-            {% if current_user.is_admin %}
-                <li><input aria-label="User" placeholder="User..." name="user"
-                           value="{{ filter.user }}"></li>
-                <li>
-                    <select aria-label="Sort datasets by" name="sort_by">
-                        <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>Sort by date</option>
-                        <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>Sort by size</option>
-                    </select>
-                </li>
-            {% endif %}
-                <li>
-                    <select name="datasource" aria-label="Data source">
-                        <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data sources</option>
-                    {% include 'components/datasource-select.html' %}
-                    </select>
-                </li>
-                <li><label><input type="checkbox" name="hide_empty" {% if filter.hide_empty %} checked="checked"{% endif %}> Hide empty datasets</label></li>
-            </ul>
-            <button>Filter</button>
-        </form>
-    </nav>
     <article>
-        <section>
-            <h2><span>Recently created datasets</span></h2>
-            <nav class="tabs">
-                <ul>
-                    {% if __user_config("privileges.can_view_all_datasets") %}<li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>{% endif %}
-                    <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
-                    <li{% if depth == "favourites" %} class="current"{% endif %}><a href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites only</a></li>
-                </ul>
+        <section class="dark result-list dataset-metadata">
+            <h1><span>Datasets</span></h1>
+
+            {# Which datasets are being looked at, over how they are narrowed
+               down. The first row are links, so picking a set takes effect at
+               once; it carries the filters along, so they keep applying within
+               the set that was picked. The second row needs submitting, so the
+               button doing that closes it off. #}
+            <nav class="tabs dataset-filters">
+                <form action="{{ url_for("dataset.show_results") }}" method="GET">
+                    <input type="hidden" name="depth" value="{{ depth }}">
+                    <ul class="dataset-filter-depth">
+                        {% if __user_config("privileges.can_view_all_datasets") %}
+                            <li><a class="button-like{% if depth == "all" %} current{% endif %}"
+                                   {% if depth == "all" %}aria-current="page"{% endif %}
+                                   href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=all">All
+                                datasets</a></li>
+                        {% endif %}
+                        <li><a class="button-like{% if not depth or depth == "own" %} current{% endif %}"
+                               {% if not depth or depth == "own" %}aria-current="page"{% endif %}
+                               href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=own">My
+                            own datasets</a></li>
+                        <li><a class="button-like{% if depth == "favourites" %} current{% endif %}"
+                               {% if depth == "favourites" %}aria-current="page"{% endif %}
+                               href="{{ url_for('dataset.show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites
+                            only</a></li>
+                    </ul>
+
+                    <ul class="dataset-filter-options">
+                        <li class="search-box">
+                            <input type="search" name="filter" value="{{ filter.filter }}"
+                                   aria-label="Search datasets by query or label"
+                                   placeholder="Search datasets...">
+                        </li>
+                        {% if current_user.is_admin %}
+                            <li class="search-box">
+                                <input type="search" name="user" value="{{ filter.user }}"
+                                       aria-label="Search datasets by user" placeholder="Search by user...">
+                            </li>
+                            <li>
+                                <select aria-label="Sort datasets by" name="sort_by">
+                                    <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>Sort by date</option>
+                                    <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>Sort by size</option>
+                                </select>
+                            </li>
+                        {% endif %}
+                        <li>
+                            {# only what there is something to filter to: one option
+                               per data source these datasets were collected from,
+                               or per variant of one where it has them #}
+                            <select name="datasource" aria-label="Filter by data source">
+                                <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data sources</option>
+                                {% for value, label in datasource_options.items() %}
+                                    <option value="{{ value }}"{% if filter.datasource == value %} selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </li>
+                        <li>
+                            <label><input type="checkbox" name="hide_empty"
+                                          {% if filter.hide_empty %}checked="checked"{% endif %}> Hide empty
+                                datasets</label>
+                        </li>
+                        <li class="dataset-filter-submit">
+                            <button class="button-like">Filter</button>
+                        </li>
+                    </ul>
+                </form>
             </nav>
         {% if datasets %}
-            <ol class="result-list">
+            <ol>
                 {% for dataset in datasets %}{% if dataset.key_parent in ("", None) %}
                     <li id="{{ dataset.key }}"
-                        class="result{% if dataset.is_finished() %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% else %} dataset-unfinished{% endif %}"
-                        data-numrows="{{ dataset.num_rows }}" data-dataset-key="{{ dataset.key }}">
-
-                        <div class="property-container">
-                            <div class="result">
-                                <a href="{{ url_for('dataset.show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>
-                                {% if __user_config("ui.show_datasource") %}<span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>{% endif %}
-                                <h4>{{ dataset.get_label() }}</h4>
-                                {% if dataset.is_finished() %}
-                                    <span class="result">({{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %})</span>
-                                {% endif %}
-                            </div>
-                            <div>{% include 'components/result-metadata.html' %}</div>
-                        </div>
-
-                        <div class="property-container status">
-                        {% if not dataset.is_finished() or dataset.num_rows == 0 %}
-                            <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status"><span class="result-status">{% include "components/result-status.html" %}</span></span></p>
-                        {% else %}
-                            {% if dataset.get_results_path().exists() %}
-                                {% if dataset.get_own_processor().map_item or dataset.annotation_fields %}
-                                <a class="button-like" href="{{ url_for('dataset.get_mapped_result', key=dataset.key) }}"><i class="fas fa-download" aria-hidden="true"></i> Download csv</a>
-                                {% else %}
-                                <a class="button-like" href="{{ url_for('dataset.get_result', query_file=dataset.result_file, dataset_key=dataset.key) }}"><i class="fas fa-download" aria-hidden="true"></i> Download {{ dataset.result_file.split(".")[-1] }}</a>
-                                {% endif %}
-                            {% endif %}
-                        {% endif %}
-                        </div>
-
-                        {% if dataset.is_finished() and dataset.num_rows > 0 %}
-                            <div class="property-container analysis">
-                                <a class="button-like processor-link" href="{{ url_for('dataset.show_result', key=dataset.key) }}">Analysis{% if dataset.get_children()|length > 0 %} (+{{ dataset.get_children()|length }}){% endif %}</a>
-                            </div>
-                        {% endif %}
+                        class="result dataset-preview-host{% if dataset.is_finished() %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% else %} dataset-unfinished{% endif %}"
+                        data-numrows="{{ dataset.num_rows }}" data-dataset-key="{{ dataset.key }}"
+                        x-data="datasetPreview">
+                        {% with lite_header=True %}
+                            {% include "dataset-page/dataset-card.html" %}
+                        {% endwith %}
                     </li>
                 {% endif %}{% endfor %}
             </ol>
         {% else %}
-            <p class="banner">No datasets available.{% if depth == "favourites" %} You can mark datasets as 'favourite'
+            <p class="notice notice-warning">No datasets available.{% if depth == "favourites" %} You can mark datasets as 'favourite'
                 to easily find them in this view.{% endif %}</p>
         {% endif %}
         </section>
     </article>
-    {% include "components/pagination.html" %}
+    {% from "components/pagination.html" import page_links %}
+{% call(number, label) page_links(pagination.page, pagination.pages, "Pages", "pagination", True) %}
+    <a href="{{ url_for(pagination.route, page=number, **pagination.route_args) }}?{{ filter|http_query }}&amp;depth={{ depth }}">{{ label }}</a>
+{% endcall %}
 {% endblock %}

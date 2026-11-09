@@ -1,0 +1,204 @@
+/* The module catalogue: a detail pane pinned above the module grid, and the
+   chips and chains that pane uses to show how modules connect. The cards below
+   it are the shared module cards, so nothing here restyles them. */
+
+/* Full width, like the slideout the same grid is shown in, so the cards lay out
+   in the same columns rather than stacking into one narrow one. Prose inside
+   the detail pane is capped separately, below, so it stays readable. */
+.module-catalog-page {
+    padding: var(--spacing-large) var(--spacing-regular);
+}
+
+/* --- detail pane --- */
+
+.module-detail {
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: var(--radius);
+    background: var(--bright);
+    padding: var(--spacing-regular) var(--spacing-large);
+    margin-bottom: var(--spacing-large);
+}
+
+.module-detail-placeholder {
+    margin: 0;
+    color: var(--semidark);
+    font-style: italic;
+}
+
+.module-detail-card .card-header {
+    padding: 0 0 var(--spacing-regular) 0;
+    background: transparent;
+    border: 0;
+}
+
+.module-detail-card .card-content {
+    border: 0;
+    padding: 0;
+}
+
+.module-detail-description {
+    margin: 0 0 var(--spacing-regular) 0;
+    line-height: 1.5;
+}
+
+/* the pane itself spans the page, but running text in it should not */
+.module-detail-description,
+.module-detail-note,
+.module-detail-datasource-description,
+.module-detail-references {
+    max-width: var(--max-width);
+}
+
+.module-detail-facts {
+    padding: var(--spacing-small) 0;
+    border-top: var(--stroke-light) dashed var(--panel-bg-2);
+}
+
+.module-detail-references h3,
+.module-detail-datasource h3 {
+    margin: var(--spacing-regular) 0 var(--spacing-small) 0;
+}
+
+.module-detail-muted {
+    color: var(--semidark);
+}
+
+.module-detail-note {
+    color: var(--semidark);
+    font-size: var(--font-body);
+    font-style: italic;
+    margin: var(--spacing-small) 0;
+}
+
+/* --- collapsible blocks --- */
+
+.module-detail-section {
+    border-top: var(--stroke-light) solid var(--panel-bg-2);
+    padding: var(--spacing-small) 0;
+}
+
+.module-detail-section > summary {
+    cursor: pointer;
+    font-family: Chivo, sans-serif;
+    font-size: var(--font-h4);
+    padding: var(--spacing-small) 0;
+}
+
+.module-detail-section > summary:hover {
+    color: var(--fourcat-accent);
+}
+
+.module-detail-section-body {
+    padding: var(--spacing-small) 0 var(--spacing-regular) 0;
+}
+
+.module-detail-section-body h3 {
+    margin: var(--spacing-regular) 0 var(--spacing-small) 0;
+    font-size: var(--font-body);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--semidark);
+}
+
+.module-detail-collapse > summary {
+    cursor: pointer;
+    font-size: var(--font-body);
+    color: var(--semidark);
+    padding: var(--spacing-small) 0;
+}
+
+.module-detail-collapse > summary:hover {
+    color: var(--fourcat-accent);
+}
+
+.module-detail-spec {
+    font-size: var(--font-body);
+    white-space: pre-wrap;
+}
+
+/* --- chips: one per module, opening that module's detail --- */
+
+.module-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-tiny);
+    margin: var(--spacing-small) 0 var(--spacing-regular) 0;
+}
+
+.module-chip {
+    font: inherit;
+    font-size: var(--font-body);
+    padding: var(--spacing-tiny) var(--spacing-small);
+    border-radius: var(--radius);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    background: var(--panel-bg-0);
+    color: var(--dark);
+    cursor: pointer;
+}
+
+.module-chip:hover {
+    border-color: var(--fourcat-accent);
+    color: var(--fourcat-accent);
+}
+
+/* a link the map is only unsure about: shown, but marked as unconfirmed */
+.module-chip.is-uncertain {
+    border-style: dashed;
+}
+
+.module-chip-marker {
+    font-weight: bold;
+}
+
+.module-chip.is-preferred {
+    border-color: var(--fourcat-accent);
+}
+
+/* not a module but a condition on the input: nothing to open */
+.module-chip.is-requirement,
+.module-chip.is-current {
+    cursor: default;
+}
+
+.module-chip.is-requirement:hover {
+    border-color: var(--panel-bg-2);
+    color: var(--dark);
+}
+
+.module-chip.is-current {
+    background: var(--fourcat-accent);
+    border-color: var(--fourcat-accent);
+    color: var(--bright);
+    font-weight: bold;
+}
+
+/* --- example chains: data source -> steps -> this module --- */
+
+.module-chain {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-tiny);
+    margin: var(--spacing-small) 0;
+}
+
+.module-chain-arrow {
+    color: var(--semidark);
+}
+
+/* --- the grid and the controls above it --- */
+
+/* The catalogue browses the same grid the slideout does, so it is given the
+   same chrome: a .panel-header strip with the search box, over a body holding
+   the tag filter and the cards. Padding and background match the slideout's
+   body, so the tags and cards sit on what they sit on there. */
+.module-catalog-browse {
+    background: var(--bright);
+    border: var(--stroke-light) solid var(--panel-bg-2);
+    border-radius: var(--radius);
+    overflow: hidden;  /* keeps the header strip inside the rounded corners */
+}
+
+.module-catalog-browse .module-catalog-grid {
+    padding: var(--spacing-regular);
+}

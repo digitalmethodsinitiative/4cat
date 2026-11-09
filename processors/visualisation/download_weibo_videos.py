@@ -3,6 +3,7 @@ Download Weibo videos
 """
 from backend.lib.preset import ProcessorPreset
 from common.lib.compatibility import Compatibility
+from common.lib.outputs import MediaArchive
 from processors.visualisation.download_videos import VideoDownloaderPlus
 
 
@@ -22,6 +23,8 @@ class WeiboVideoDownloader(ProcessorPreset):
                   "are collected; for those, yt-dlp finds the video on the post's own page instead."
     extension = "zip"
     media_type = "video"
+    # a zip of downloaded videos
+    output = MediaArchive(media="video")
 
     compatibility = Compatibility(types={"weibo-search"}, top_dataset_only=True, preferred_followups=VideoDownloaderPlus.followups)
 

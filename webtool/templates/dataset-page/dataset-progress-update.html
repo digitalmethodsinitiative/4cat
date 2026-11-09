@@ -1,0 +1,8 @@
+{# Response to the dataset card's poll (see dataset.dataset_card_component):
+   the re-rendered card, which replaces itself, plus the analysis tree as an
+   out-of-band swap. #}
+{% include "dataset-page/dataset-progress.html" %}
+
+{% with oob = True %}
+    {% include "dataset-page/analysis-tree.html" %}
+{% endwith %}

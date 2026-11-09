@@ -1,0 +1,76 @@
+.dataset-container {
+    position: relative;
+}
+
+.dataset-metadata {
+    background: var(--semidark);
+    padding: var(--spacing-regular) 0;
+}
+
+.dataset-metadata > * {
+    max-width: var(--max-width);
+    margin: 0 auto 0 auto;
+}
+
+.dataset-metadata > .dataset-header {
+    margin-top: var(--spacing-regular);
+}
+
+.dataset-metadata > nav li {
+    margin-right: var(--spacing-small);
+}
+
+.dataset-metadata .button-like {
+    color: var(--bright);
+}
+
+.dataset-metadata .badge-list {
+    background: var(--brighten-12);
+    padding: var(--spacing-small) var(--spacing-regular);
+    box-sizing: border-box;
+    border-top: var(--stroke-light) dashed var(--dark);
+    color: var(--bright);
+    margin: 0;
+}
+
+.dataset-metadata .badge-list dt {
+    color: var(--button-grey);
+}
+
+.dataset-metadata h1, .dataset-metadata i. {
+    font-size: var(--font-h1);
+    margin-right: var(--spacing-regular);
+    height: var(--font-normal);
+    padding: var(--spacing-small) var(--spacing-tiny);
+    line-height: var(--font-normal);
+}
+
+.dataset-metadata h1 {
+    font-family: Chivo, sans-serif;
+    font-weight: normal;
+}
+
+.dataset-metadata p.notice a {
+    text-decoration: underline;
+}
+
+.dataset-metadata .notice {
+    padding: var(--spacing-small);
+}
+
+.dataset-metadata > .dataset-card-host > .dataset-header {
+    margin-top: var(--spacing-regular);
+}
+
+.dataset-metadata .analyze-or-explore {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    margin-top: var(--spacing-regular);
+}
+
+/* why the toggle beside it cannot be flipped - see dataset-page/dataset-card.html */
+.explore-unavailable {
+    flex: 0 0 auto;
+    color: var(--semidark);
+}

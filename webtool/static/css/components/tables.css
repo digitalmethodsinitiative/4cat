@@ -1,0 +1,21 @@
+table {
+    padding: var(--spacing-small);
+    border: var(--stroke-light) solid var(--dark);
+    border-radius: var(--radius);
+    border-bottom-width: var(--stroke-journey);
+}
+
+table th {
+    border: none;
+    padding-bottom: var(--spacing-small);
+}
+
+table td {
+    padding: var(--spacing-small);
+    border: var(--stroke-light) solid var(--dark);
+}
+
+table td.missing-field-meta {
+    background-color: var(--red-light);
+    border-color: var(--red);
+}

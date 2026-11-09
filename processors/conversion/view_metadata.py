@@ -5,12 +5,13 @@ Designed to work with any processor that has a 'map_metadata' method
 """
 import csv
 
-from backend.lib.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.archive_metadata import normalize_post_id
 from common.lib.compatibility import Compatibility
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, MetadataException, ProcessorInterruptedException
 from common.lib.helpers import remove_nuls
+from common.lib.outputs import Table
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -27,11 +28,16 @@ class ViewMetadata(BasicProcessor):
 	adds the data of the dataset items each media file was downloaded from.
 	"""
 	type = "metadata-viewer"  # job type ID
-	category = "Conversion"  # category
-	title = "View media metadata"  # title displayed in UI
-	description = "Reformats the .metadata.json file and adds the data of the items the media was downloaded from"  # description displayed in UI
+	description = ProcessorDescription(
+		title="Extract media metadata",
+		tags=["conversion"],
+		description="Reformat the .metadata.json file produced by a media downloader into a flat table, with one row per downloaded item. By default, each row also gets the data of the item the file was downloaded from. Optionally include items whose download failed.",
+		icon="circle-info",
+	)
 	extension = "csv"  # extension of result file, used internally and in UI
-
+	# a derived table
+	output = Table()
+	
 	# Archives made by these processors contain a .metadata.json file. Also used
 	# when looking for the dataset the media came from, because a media archive
 	# can be made from another media archive (e.g. by filtering out duplicates).

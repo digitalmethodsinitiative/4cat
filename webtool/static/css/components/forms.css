@@ -1,0 +1,298 @@
+/* General form settings */
+.userinput-form {
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--form-gap);
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.submit-container {
+    text-align: center;
+    margin: var(--spacing-regular) auto;
+}
+
+.form-footer {
+    text-align: center;
+    margin: var(--spacing-regular) auto;
+}
+
+.form-element {
+    display: grid;
+    grid-template-columns: minmax(9rem, 20%) minmax(0, 1fr) var(--tooltip-button-width);
+    column-gap: var(--spacing-regular);
+    row-gap: var(--spacing-small);
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Text in form */
+.userinput-form h3 {
+    margin-top: .5rem;
+    margin-bottom: 0;
+}
+
+/* Specific user-inputs */
+.form-element:has(textarea),
+.form-element:has(.option-tags),
+.form-element:has(.multi-select-wrapper) {
+    align-items: start;
+}
+
+.form-element:has(textarea) > label,
+.form-element:has(.option-tags) > label,
+.form-element:has(.multi-select-wrapper) > label {
+    padding-top: var(--spacing-small);
+}
+
+.form-element > label {
+    grid-column: 1;
+    font-weight: bold;
+}
+
+.form-element > label p {
+    margin: 0;
+}
+
+.form-element > label.option-type-toggle,
+.form-element > label.option-type-annotation {
+    grid-column: 2;
+    display: flex;
+    align-items: baseline;
+    column-gap: var(--spacing-small);
+}
+
+.form-element > input,
+.form-element > textarea,
+.form-element > select,
+.form-element > .option-tags,
+.form-element > .multi-select-wrapper,
+.form-element > .daterange-wrapper,
+.form-element > .annotation-explainer {
+    grid-column: 2;
+    min-width: 0;
+}
+
+form .notice {
+    padding: var(--spacing-regular);
+}
+
+input:not([type=checkbox]):not([type=hidden]),
+textarea,
+select {
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+    color: var(--semidark);
+    background: var(--panel-bg-0);
+    border: none;
+    border-bottom: var(--stroke-heavy) solid var(--panel-bg-2);
+    border-radius: 0;
+    padding: var(--spacing-small);
+}
+
+select {
+    -moz-appearance:none;
+    -webkit-appearance:none;
+    appearance:none;
+    /* unfortunately dropdown glyphs don't have a reliable css pseudo class.. */
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="%23333333" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter"><polyline points="2,5 8,11 14,5"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-small) center;
+    padding-right: calc(var(--spacing-small) + 16px);
+}
+
+select:open {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="%23333333" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" transform="matrix(1,0,0,-1,0,0)"><polyline points="2,5 8,11 14,5"></polyline></svg>');
+}
+
+select:focus {
+    outline: none;
+    border-bottom: var(--stroke-heavy) solid var(--fourcat-accent);
+}
+
+input:not([type=checkbox]):focus,
+textarea:focus,
+select:focus {
+    outline: var(--stroke) solid var(--fourcat-accent);
+    border-bottom: var(--stroke-heavy) solid var(--fourcat-accent);
+    outline-offset: calc(-1 * var(--stroke-light));
+}
+
+input[type=checkbox] {
+  box-sizing: border-box;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0;
+  padding: 0;
+  border: var(--stroke) solid var(--button-bg-regular);
+  border-radius: var(--small-radius);
+  appearance: none;
+  background-color: var(--bright);
+  outline: none;
+  transition: outline 0.1s;
+}
+
+input[type=checkbox]:checked {
+  background-color: var(--button-bg-regular);
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink"><polyline points="2,7 7,12 14,3"></polyline></svg>');
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+option,
+optgroup {
+    font-family: Chivo, sans-serif;
+    font-size: var(--font-body);
+}
+
+textarea {
+    min-height: 8em;
+    resize: vertical;
+}
+
+input.invalid,
+input:user-invalid,
+input.invalid:not([type=checkbox]):not([type=hidden]),
+textarea.invalid,
+textarea:user-invalid {
+    background: var(--red-light);
+    border-color: var(--red);
+    color: var(--red);
+}
+
+/* UserInput form widgets */
+.form-element .daterange-wrapper {
+    display: flex;
+    align-items: center;
+    column-gap: var(--spacing-small);
+}
+
+.form-element .daterange-wrapper input {
+    width: auto;
+    flex: 1 1 auto;
+}
+
+/* Multi-input option tags. Rest of styling is in badges.css */
+.option-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-regular) var(--spacing-tiny);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+
+/* Structural (non-input) form option elements */
+.form-divider {
+    border: 0;
+    border-top: var(--stroke) solid var(--panel-bg-2);
+    margin: var(--spacing-regular) 0;
+}
+
+.form-intro p {
+    margin: 0 0 var(--spacing-small) 0;
+}
+
+/* Extra input fields requested by the server after initial validation */
+.datasource-extra-input {
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--spacing-large);
+    margin-bottom: var(--spacing-large);
+}
+
+.flash-once {
+    animation: flash-once 0.5s linear 1;
+}
+
+@keyframes flash-once {
+    0% {
+        background-color: var(--yellow-light);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.form-options-form {
+    display: flex;
+    flex-direction: column;
+}
+
+fieldset.form-options {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--spacing-large);
+}
+
+input[type=search] {
+    font-family: Roboto, serif;
+    border: none;
+    background-color: transparent;
+    color: var(--gray);
+    border-bottom: var(--stroke) solid var(--semidark);
+    line-height: 1.5rem;
+    /* the rule below only colours in; keeping the width put means the field
+       does not shift by a pixel when it is focused */
+    transition: border-color 0.15s ease-in;
+}
+
+input[type=search]:active,
+input[type=search]:focus {
+    outline: none;
+    border-bottom-color: var(--fourcat-accent);
+}
+
+/* the browser's own clear button, replaced by .search-box-clear below */
+input[type=search]::-webkit-search-cancel-button {
+    display: none;
+}
+
+.search-box {
+    position: relative;
+}
+
+.search-box::before {
+    content: "\f002";
+    font-family: "Font Awesome 7 Free";
+    font-weight: 900;
+    position: absolute;
+    left: var(--spacing-small);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--semidark);
+    pointer-events: none;
+}
+
+/* room for the magnifying glass on one side, the clear button on the other */
+.search-box input[type="search"] {
+    padding-left: calc(var(--spacing-small) * 2 + 1em);
+    padding-right: calc(var(--spacing-small) * 2 + 1em);
+}
+
+/* mirrors the magnifying glass above, but is only there while there is
+   something to clear; keep .self-styled on it, or `.plain-page button` makes
+   it button-like */
+.search-box-clear {
+    position: absolute;
+    right: var(--spacing-small);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0;
+    border: 0;
+    background: none;
+    line-height: 1;
+    color: var(--semidark);
+    cursor: pointer;
+}
+
+.search-box-clear:hover {
+    color: var(--fourcat-accent);
+}

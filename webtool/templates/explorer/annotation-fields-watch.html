@@ -1,0 +1,36 @@
+{# Watches for annotations a processor is making.
+
+   Processors write annotations to the dataset they were run on, in the
+   background, so nothing tells this page when new ones appear. This element
+   goes and asks - but only while there is something that could be writing
+   them, since that is the only time the answer can change on its own. The
+   reply renders this element again: while an analysis is still running it
+   comes back polling, and once none is it comes back listening for the next
+   one to be queued. Nothing here is visible; it is a question, not a control.
+
+   `running` and `state` are what the page currently has. The server compares
+   them with what is true now, and announces an update only when whatever could
+   have been writing has stopped *and* the annotations are no longer the ones
+   this page was rendered with. So a processor that annotated nothing never
+   disturbs anyone's reading, and one that is still going does not either - a
+   long analysis writing its annotations in batches is left to finish first.
+
+   Expects: dataset, annotation_fields, annotation_watch
+            updated (optional) whether this reply announces new annotations
+#}
+{# `processor-queued` is what starts this off on a page that was loaded with
+   nothing running, which is the usual way round: the dataset is finished, and
+   then someone runs a processor on it #}
+<span id="annotation-fields-watch" x-data
+      x-init="$dispatch('annotation-fields-present', {{ (annotation_fields|length > 0)|tojson }})"
+      hx-get="{{ url_for('explorer.annotation_fields_watch', key=dataset.key) }}"
+      hx-vals='{{ {"running": annotation_watch.running, "state": annotation_watch.state}|tojson }}'
+      hx-trigger="{% if annotation_watch.running %}every 3s, {% endif %}processor-queued from:body"
+      hx-swap="outerHTML"></span>
+
+{# the badges in the metadata box are the one thing this reply can put right by
+   itself; the editor and the items below fetch themselves when they hear the
+   event that comes with this #}
+{% if updated %}
+    {% with oob = True %}{% include "explorer/annotation-fields-badges.html" %}{% endwith %}
+{% endif %}

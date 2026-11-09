@@ -1,0 +1,13 @@
+{# Select button for a module card in the module catalogue: loads the module's
+   full detail into the pane at the top of the page, and puts the module in the
+   address bar so the view can be linked to.
+
+   Expects `module_id` - see components/module-card.html. #}
+<button
+    class="button-like"
+    hx-get="{{ url_for('misc.module_detail', module_type=module_id) }}"
+    hx-target="#module-detail"
+    hx-swap="innerHTML"
+    hx-indicator="#module-detail-spinner"
+    hx-push-url="{{ url_for('misc.module_catalog', module_type=module_id) }}"
+    @click="$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))">{{ select_label if select_label else "Select" }}</button>

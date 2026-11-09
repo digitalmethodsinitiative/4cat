@@ -6,13 +6,17 @@ import csv
 import io
 import json_stream
 import mimetypes
+import zipfile
+from natsort import natsorted
 from pathlib import Path
 from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, flash,
-                   get_flashed_messages, url_for, stream_with_context, g)
+                   get_flashed_messages, url_for, stream_with_context, g, make_response)
 from flask_login import login_required, current_user
 
-from webtool.lib.helpers import Pagination, error, setting_required
-from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor
+from webtool.lib.helpers import (Pagination, annotation_context, error, setting_required,
+                                 common_dataset_options, collect_grid_tags, module_request_url,
+                                 datasource_variants)
+from webtool.views.api_tool import toggle_favourite, toggle_private, queue_processor, datasource_form
 
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException
@@ -22,6 +26,96 @@ component = Blueprint("dataset", __name__)
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
+def available_datasources():
+    """
+    Enabled data sources, whether or not a dataset can be created from them
+
+    :return dict:  Data source metadata, by data source ID
+    """
+    return {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
+            metadata["has_worker"] and datasource in g.config.get("datasources.enabled", {})}
+
+
+def split_datasource_filter(value):
+    """
+    Read a data source filter value into what it selects
+
+    The dataset overview's data source filter is one `<select>`, so a value that
+    names a variant has to carry both the data source and the variant in one
+    string. A data source ID is a module directory name and so never contains a
+    colon; a variant ID is whatever the data source made up, so everything past
+    the first colon is the variant.
+
+    :param str value:  A filter value, as `datasource` or `datasource:variant`
+    :return tuple:  `(datasource, variant)`, with `variant` empty if there is none
+    """
+    datasource, _, variant = value.partition(":")
+    return datasource, variant
+
+
+def datasource_filter_options(pairs):
+    """
+    Name the data sources and variants a set of datasets came from
+
+    A data source that offers variants (see `Search.get_variants`) is one option
+    per variant rather than one option in total: the variant is what the data
+    was actually collected from, and so what someone filtering means. Variants
+    are named by asking the data source's own search worker, since only it knows
+    what they are called - and only for the data sources that have a dataset
+    with one, which on a 4CAT without variant-declaring extensions is none.
+
+    A data source outlives the module that made it, so anything no longer
+    installed is named by its ID: it is the only name left for it, and its
+    datasets are still there to be filtered to. Whether a data source has a
+    search worker is beside the point here - what is being filtered is datasets
+    that exist, not data sources one could collect from.
+
+    :param pairs:  `(datasource, variant)` pairs, `variant` empty if there is none
+    :return dict:  Option label by filter value, in no particular order
+    """
+    variant_titles = {}
+    for datasource in {datasource for datasource, variant in pairs if variant}:
+        worker = g.modules.get_datasource_worker(datasource)
+        if worker:
+            variant_titles[datasource] = datasource_variants(worker, g.config)
+
+    options = {}
+    for datasource, variant in pairs:
+        name = g.modules.datasources.get(datasource, {}).get("name") or datasource
+        if not variant:
+            options[datasource] = name
+        else:
+            title = variant_titles.get(datasource, {}).get(variant, {}).get("title") or variant
+            options["%s:%s" % (datasource, variant)] = "%s: %s" % (name, title)
+
+    return options
+
+
+def datasource_collector(datasource_id, metadata, worker):
+    """
+    What collects the data for a data source, for its card
+
+    Three answers: data captured in the browser comes in via Zeeschuimer, and
+    everything else is collected either by 4CAT itself or by a separate service
+    an extension talks to. In the latter case the service is what a user needs
+    to know about - it is where the data actually lives, it is what has to be
+    reachable, and the card's own title is a collection within it rather than
+    the source as a whole - so the data source is named instead of 4CAT.
+
+    :param str datasource_id:  Data source ID
+    :param dict metadata:  Data source metadata, from the module collector
+    :param worker:  The data source's search worker
+    :return str:  What to name as the collector
+    """
+    if metadata["importable"]:
+        return "Zeeschuimer"
+
+    if getattr(worker, "is_extension", False):
+        return metadata.get("name") or datasource_id
+
+    return "4CAT"
+
+
 @component.route('/create-dataset/')
 @login_required
 @setting_required("privileges.can_create_dataset")
@@ -29,11 +123,150 @@ def create_dataset():
     """
     Main tool frontend
     """
-    datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"] and datasource in g.config.get(
-                       "datasources.enabled", {})}
+    return render_template('create-dataset.html', datasources=available_datasources(),
+                           request_url=module_request_url("datasource"))
 
-    return render_template('create-dataset.html', datasources=datasources)
+
+@component.route('/create-dataset/datasources/')
+@login_required
+@setting_required("privileges.can_create_dataset")
+def datasource_grid():
+    """
+    Get the data sources to create a dataset from, as a module grid
+
+    Counterpart to `processor_grid`: fills the module slideout on the
+    create-dataset page. Data sources are split by how the data gets into 4CAT
+    - collected by 4CAT itself, or captured with Zeeschuimer and imported -
+    since that determines what the user needs to do next. Only the former can
+    be selected; the latter are listed at the end for reference.
+
+    A data source that declares variants (see `Search.get_variants`) gets one
+    card per variant instead of one card in total. Those cards are still the
+    same data source: they only differ in what they carry to the options form,
+    so the card ID is not a module ID and the URLs are built here rather than
+    from the ID in the template.
+    """
+    modules = {}
+    for datasource_id, metadata in available_datasources().items():
+        worker = g.modules.get_datasource_worker(datasource_id)
+        status = worker.get_status()
+        card = {
+            "title": metadata["name"],
+            "description": worker.description,
+            "icon": getattr(worker, "icon", None),
+            "tags": list(getattr(worker, "tags", []) or []),
+            "status": list(status) if isinstance(status, (list, tuple, set)) else ([status] if status else []),
+            "importable": metadata["importable"],
+            "selectable": metadata["has_options"],
+            "code_url": worker.get_repo_link(g.config),
+            # the module catalogue is keyed by worker type, not data source ID
+            "worker_type": worker.type,
+            "collected_via": datasource_collector(datasource_id, metadata, worker),
+        }
+
+        variants = datasource_variants(worker, g.config) if metadata["has_options"] else {}
+        if not variants:
+            modules[datasource_id] = {
+                **card,
+                "options_url": url_for("dataset.datasource_options", datasource_id=datasource_id),
+                "metadata_url": url_for("dataset.datasource_metadata", datasource_id=datasource_id),
+            }
+            continue
+
+        for variant_id, variant in variants.items():
+            modules["%s:%s" % (datasource_id, variant_id)] = {
+                **card,
+                "title": variant.get("title", variant_id),
+                "description": variant.get("description", card["description"]),
+                "tags": list(variant.get("tags", card["tags"]) or []),
+                "options_url": url_for("dataset.datasource_options", datasource_id=datasource_id,
+                                       variant=variant_id),
+                "metadata_url": url_for("dataset.datasource_metadata", datasource_id=datasource_id,
+                                        variant=variant_id),
+            }
+
+    collected = {k: v for k, v in modules.items() if not v["importable"]}
+    imported = {k: v for k, v in modules.items() if v["importable"]}
+
+    if collected and imported:
+        grid_sections = [
+            {"header": "Collected by 4CAT", "modules": collected},
+            {"header": "Captured through Zeeschuimer", "modules": imported,
+             "note": "Use Zeeschuimer to collect and upload data from these sources to 4CAT"},
+        ]
+    elif modules:
+        grid_sections = [{"header": None, "modules": modules}]
+    else:
+        grid_sections = []
+
+    return render_template("components/datasource-grid.html", grid_sections=grid_sections,
+                           grid_tags=collect_grid_tags(grid_sections),
+                           request_url=module_request_url("datasource"))
+
+
+@component.route('/create-dataset/datasource/<string:datasource_id>/options/')
+@login_required
+@setting_required("privileges.can_create_dataset")
+def datasource_options(datasource_id):
+    """
+    Get the query form for a data source as an HTML fragment
+
+    htmx-facing counterpart to the JSON `toolapi.datasource_form` endpoint.
+    Returns the rendered dataset parameter options for the data source picked
+    in the module slideout, as a form that js/query-form.js submits.
+
+    The picked variant, if the data source has any, is read from the query
+    string by `datasource_form` and travels with the form from here on.
+
+    :param str datasource_id:  Data source to show options for
+    """
+    result = datasource_form(datasource_id)
+    if not result.is_json or result.status_code != 200:
+        message = result.json.get("message", "This data source is not available.") \
+            if result.is_json else "This data source is not available."
+        return render_template("components/form-notice.html", message=message)
+
+    return render_template("components/datasource-form.html", options_html=result.json["html"],
+                           datasource_id=datasource_id, variant=result.json.get("variant"),
+                           common_options=common_dataset_options(g.config, current_user))
+
+
+@component.route('/create-dataset/datasource/<string:datasource_id>/metadata/')
+@login_required
+@setting_required("privileges.can_create_dataset")
+def datasource_metadata(datasource_id):
+    """
+    Get the header for a data source's options in the module slideout
+
+    Titled after the variant that was picked, if any, since that is the card the
+    user clicked; the links stay those of the data source the variant belongs
+    to, which is the module all its variants share.
+
+    :param str datasource_id:  Data source to show metadata for
+    """
+    datasources = available_datasources()
+    if datasource_id not in datasources:
+        return error(404, error="This data source is not available.")
+
+    worker = g.modules.get_datasource_worker(datasource_id)
+
+    title = datasources[datasource_id]["name"]
+    variant = request.args.get("variant")
+    if variant:
+        variants = datasource_variants(worker, g.config)
+        if variant not in variants:
+            return error(404, error="This data source is not available.")
+        title = variants[variant].get("title", variant)
+
+    return render_template(
+        "components/module-metadata.html",
+        module={"title": title},
+        icon=getattr(worker, "icon", None),
+        info_url=url_for("misc.module_catalog", module_type=worker.type),
+        info_label="How is this data collected?",
+        code_url=worker.get_repo_link(g.config),
+        code_label="View data source code",
+    )
 
 
 @component.route('/results/', defaults={'page': 1})
@@ -66,6 +299,13 @@ def show_results(page):
 
     if filters["sort_by"] not in ("timestamp", "num_rows"):
         filters["sort_by"] = "timestamp"
+
+    # read back the way the filter itself writes it, so that a value typed into
+    # the address bar matches the option that stands for it and the option is
+    # shown as the one in force
+    if filters["datasource"] and filters["datasource"] != "all":
+        datasource, variant = split_datasource_filter(filters["datasource"])
+        filters["datasource"] = "%s:%s" % (datasource, variant) if variant else datasource
 
     if not request.args:
         filters["hide_empty"] = False
@@ -115,11 +355,33 @@ def show_results(page):
     if filters["hide_empty"]:
         where.append("num_rows > 0")
 
+    # what this listing actually holds datasets from, so that the filter offers
+    # what there is something to filter to rather than every data source 4CAT
+    # knows of. Read before the data source filter itself is added below, which
+    # would otherwise leave only the one already picked to pick.
+    used_datasources = [
+        (row["datasource"], row["variant"]) for row in g.db.fetchall(
+            "SELECT DISTINCT parameters::json->>'datasource' AS datasource, "
+            "parameters::json->>'variant' AS variant FROM datasets WHERE "
+            + " AND ".join(where), tuple(replacements))
+        if row["datasource"]
+    ]
+
     # not all datasets have a datasource defined, but that is fine, since if
     # we are looking for all datasources the query just excludes this part
     if filters["datasource"] and filters["datasource"] != "all":
+        datasource, variant = split_datasource_filter(filters["datasource"])
         where.append("parameters::json->>'datasource' = %s")
-        replacements.append(filters["datasource"])
+        replacements.append(datasource)
+        # an option stands for the datasets it was made from and no others: one
+        # naming a variant means that variant, and one naming a data source with
+        # no variant means the datasets that have none. Every core data source
+        # has none, so for those this is the same filter it always was.
+        if variant:
+            where.append("parameters::json->>'variant' = %s")
+            replacements.append(variant)
+        else:
+            where.append("parameters::json->>'variant' IS NULL")
 
     where = " AND ".join(where)
 
@@ -143,11 +405,25 @@ def show_results(page):
     favourites = [row["key"] for row in
                   g.db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    datasources = {datasource: metadata for datasource, metadata in g.modules.datasources.items() if
-                   metadata["has_worker"]}
+    datasource_options = datasource_filter_options(used_datasources)
 
-    return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites)
+    # whatever is being filtered on now stays in the list even if nothing
+    # matches it any more, so that the filter can be changed and not only cleared
+    if filters["datasource"] and filters["datasource"] not in (*datasource_options, "all"):
+        datasource_options.update(datasource_filter_options([split_datasource_filter(filters["datasource"])]))
+
+    datasource_options = dict(sorted(datasource_options.items(), key=lambda option: option[1].lower()))
+
+    breadcrumbs = [{
+        "url": url_for("dataset.show_results"),
+        "label": "Datasets"
+    }]
+    # the dataset card names a dataset after the processor that made it, and
+    # calls it deprecated when there is no such processor any more - so a page
+    # rendering cards needs the processors, or every one of them looks defunct
+    return render_template("results.html", filter=filters, depth=depth, datasource_options=datasource_options,
+                           datasets=filtered, pagination=pagination, favourites=favourites, breadcrumbs=breadcrumbs,
+                           processors=g.modules.processors)
 
 
 """
@@ -381,9 +657,6 @@ def preview_items(key):
     """
     Preview a dataset file
 
-    Simply passes the first 25 rows of a dataset's csv result file to the
-    template renderer.
-
     :param str key:  Dataset key
     :return:  HTML preview
     """
@@ -396,7 +669,7 @@ def preview_items(key):
             g.config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
-    preview_size = 1000
+    preview_size = 100
     preview_bytes = (1024 * 1024 * 1)  # 1MB
 
     # json and ndjson can use mapped data for the preview or the raw json;
@@ -413,10 +686,37 @@ def preview_items(key):
                        hostname.endswith(".localhost")
         return render_template("preview/gexf.html", dataset=dataset, with_gephi_lite=(not in_localhost))
 
+    elif dataset.get_extension() == "zip" and dataset.get_media_type() in ("image", "video", "audio"):
+        # media archive (image/video/audio zip)
+        # show the first few items as a carousel; members are served on demand
+        # via the get_result endpoint's zip_member support, so nothing is
+        # extracted here beyond reading the archive's file listing
+        preview_media = 10
+        members = []
+        try:
+            with zipfile.ZipFile(dataset.get_results_path(), "r") as archive:
+                for info in natsorted(archive.infolist(), key=lambda f: f.filename):
+                    name = info.filename
+                    if info.is_dir() or name.rsplit("/", 1)[-1].startswith("."):
+                        # skip folders and dotfiles (e.g. .metadata.json)
+                        continue
+                    members.append(name)
+                    if len(members) >= preview_media:
+                        break
+        except zipfile.BadZipFile:
+            return render_template(
+                "components/error_message.html",
+                title="Preview not available",
+                message="This dataset's preview could not be generated. The archive may be corrupted.",
+            )
+
+        return render_template("preview/partials/media.html", dataset=dataset, members=members,
+                               max_items=preview_media)
+
     elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp", "mp4"):
         # image or video file
-        # just show image in an empty page
-        return render_template("preview/image.html", dataset=dataset)
+        # returned as a bare fragment for inline embedding
+        return render_template("preview/partials/image.html", dataset=dataset)
 
     elif dataset.get_extension() == "html":
         # just render the file!
@@ -456,7 +756,7 @@ def preview_items(key):
                 message="This dataset's preview could not be generated. The result file may be corrupted or in an unexpected format. An administrator has been notified.",
             )
 
-        return render_template("preview/csv.html", rows=rows, max_items=preview_size,
+        return render_template("preview/partials/csv.html", rows=rows, max_items=preview_size,
                                dataset=dataset)
 
     elif dataset.get_extension() == "json":
@@ -488,7 +788,7 @@ def preview_items(key):
             with datafile.open() as infile:
                 data = infile.read()
 
-        return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+        return render_template("preview/partials/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
 
     elif dataset.get_extension() == "ndjson":
         # mostly similar to JSON preview, but we don't have to stream the file
@@ -524,7 +824,7 @@ def preview_items(key):
                 message="This dataset's preview could not be generated. The result file may be corrupted or empty. An administrator has been notified.",
             )
 
-        return render_template("preview/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
+        return render_template("preview/partials/json.html", dataset=dataset, json=json.dumps(data, indent=2), truncated=truncated)
 
     else:
         return render_template(
@@ -537,14 +837,13 @@ def preview_items(key):
 """
 Individual result pages
 """
-@component.route('/results/<string:key>/processors/')
 @component.route('/results/<string:key>/')
 def show_result(key):
     """
     Show result page
 
     The page contains dataset details and a download link, but also shows a list
-    of finished and available processors.
+    of finished processors.
 
     :param key:  Result key
     :return:  Rendered template
@@ -612,17 +911,268 @@ def show_result(key):
         except DataSetException:
             copy_source = dataset.parameters.get("copied_from")
 
-    # we can either show this view as a separate page or as a bunch of html
-    # to be retrieved via XHR
-    standalone = "processors" not in request.url
-    template = "result.html" if standalone else "components/result-details.html"
+    breadcrumbs = [{
+            "url": url_for("dataset.show_results"),
+            "label": "Datasets"
+        },
+        {
+            "url": url_for("dataset.show_result", key=dataset.key),
+            "label": dataset.get_label()
+        }]
 
-    return render_template(template, dataset=dataset, parent_key=dataset.key, processors=g.modules.processors,
+    # the dataset page opens on the Explorer when asked to - the Explorer's old
+    # address redirects here, and its page links push URLs of this shape. Only
+    # when there is something to open, though: the toggle back to the analyses
+    # is inactive while there are no items to explore, so a page that opened on
+    # an Explorer it cannot fill would be a page with nothing on it and no way
+    # off it.
+    explore = request.args.get("view") == "explore" and dataset.is_finished() and dataset.num_rows > 0
+
+    return render_template("dataset-page/view-dataset.html", dataset=dataset, parent_key=dataset.key, processors=g.modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
-                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire,
-                           datasources=datasources, merge_sources=merge_sources, copy_source=copy_source)
+                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, breadcrumbs=breadcrumbs,
+                           datasources=datasources, merge_sources=merge_sources, copy_source=copy_source,
+                           explore=explore, **annotation_context(dataset))
 
+@component.route('/results/<string:key>/dataset-card/')
+@login_required
+def dataset_card_component(key):
+    """
+    Render the top-level dataset card as a partial
+
+    Polled by the card itself while the dataset is still being created.
+
+    :param str key:  Key of the dataset to re-render
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    return render_template(
+        "dataset-page/dataset-progress-update.html",
+        dataset=dataset,
+        processors=g.modules.processors,
+        # as in show_result: all data sources, so a dataset from a since-disabled
+        # one still links to its overview
+        datasources=g.modules.datasources,
+        # the last poll of a finishing dataset renders the card with the
+        # annotation fields box and the Explorer toggle in it, so it needs the
+        # same context
+        **annotation_context(dataset),
+    )
+
+
+@component.route('/results/<string:key>/processor-grid/')
+@login_required
+def processor_grid(key):
+
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    processors_available = dataset.get_available_processors(config=g.config)
+
+    own_processor = dataset.get_own_processor()
+    preferred_ids = list(own_processor.compatibility.preferred_followups) \
+        if own_processor and own_processor.compatibility else []
+
+    preferred_processors = {
+        processor_type: processors_available[processor_type]
+        for processor_type in preferred_ids
+        if processor_type in processors_available
+    }
+    other_processors = {
+        processor_type: processor
+        for processor_type, processor in processors_available.items()
+        if processor_type not in preferred_processors
+    }
+
+    if preferred_processors:
+        grid_sections = [
+            {"header": "Custom follow-ups", "modules": preferred_processors},
+            {"header": "All available processors", "modules": other_processors},
+        ]
+    else:
+        grid_sections = [{"header": None, "modules": other_processors}]
+
+    return render_template(
+        "components/processor-grid.html",
+        dataset=dataset,
+        grid_sections=grid_sections,
+        grid_tags=collect_grid_tags(grid_sections),
+        genealogy=dataset.get_genealogy(),
+        request_url=module_request_url("processor"),
+    )
+
+@component.route('/results/<string:key>/processor-options/<string:processor>/')
+@login_required
+def processor_options(key, processor):
+    """
+    Get the options form for a processor, rendered as a partial
+
+    :param str key:  Dataset key to show processor options for
+    :param str processor:  ID of the processor to show options for
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    available_processors = dataset.get_available_processors(config=g.config)
+    if processor not in available_processors:
+        return error(404, error="This processor is not available for this dataset.")
+
+    return render_template(
+        "components/processor-options.html",
+        dataset=dataset,
+        processor=available_processors[processor],
+    )
+
+@component.route('/results/<string:key>/processor-metadata/<string:processor>/')
+@login_required
+def processor_metadata(key, processor):
+    """
+    Get the metadata header for a processor.
+
+    :param str key:  Dataset key to show processor metadata for
+    :param str processor:  ID of the processor to show metadata for
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    available_processors = dataset.get_available_processors(config=g.config)
+    if processor not in available_processors:
+        return error(404, error="This processor is not available for this dataset.")
+
+    module = available_processors[processor]
+
+    return render_template(
+        "components/module-metadata.html",
+        module=module,
+        module_id=processor,
+        icon=module.icon,
+        tags=module.category,
+        info_url=url_for("misc.module_catalog", module_type=processor),
+        info_label="More information about this processor",
+        code_url=module.get_repo_link(g.config),
+        code_label="View processor code",
+    )
+
+@component.route('/results/<string:key>/child-dataset/')
+@login_required
+def child_dataset_component(key):
+    """
+    Render a single child dataset as a partial
+
+    Used by htmx to refresh an in-progress analysis in the dataset tree until
+    it is finished; the component polls this endpoint and replaces itself with
+    the re-rendered state (see child-dataset.html).
+
+    :param str key:  Dataset key to render
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    if not current_user.can_access_dataset(dataset):
+        return error(403, error="This dataset is private.")
+
+    return render_template(
+        "dataset-page/child-dataset.html",
+        dataset=dataset,
+        top_parent=dataset.get_genealogy()[0],
+        processors=g.modules.processors,
+    )
+
+@component.route('/results/<string:key>/queue-processor/', methods=["POST"])
+@login_required
+def queue_processor_component(key):
+    """
+    Queue a processor and return the updated dataset tree fragment
+
+    htmx-facing counterpart to `queue_processor_interactive`. On success the
+    response is a rendered child-dataset component: the new analysis itself
+    when the processor ran on the top-level dataset, or the re-rendered parent
+    (whose subtree now includes the new analysis) when it ran on a child. The
+    options form sets a matching hx-target/hx-swap for either case.
+
+    Failures are retargeted into the options form's notice area via response
+    headers, so the slideout stays open and shows what went wrong; only a
+    successful queue emits the `processor-queued` event that collapses it.
+
+    :param str key:  Key of dataset to queue the processor for
+    """
+    try:
+        dataset = DataSet(key=key, db=g.db, modules=g.modules)
+    except DataSetException:
+        return error(404, error="This dataset cannot be found.")
+
+    result = queue_processor(key)
+
+    if not result.is_json:
+        # permission/validation error() response from the API function
+        return result
+
+    status = result.json.get("status")
+    if status == "success":
+        if dataset.key_parent:
+            # processor ran on a child: re-render that child so its subtree
+            # includes the new analysis
+            subject = dataset
+        else:
+            # processor ran on the top-level dataset: render the new analysis
+            # to be appended to the tree
+            subject = DataSet(key=result.json["key"], db=g.db, modules=g.modules)
+
+        response = make_response(render_template(
+            "dataset-page/child-dataset.html",
+            dataset=subject,
+            top_parent=dataset.get_genealogy()[0],
+            processors=g.modules.processors,
+        ))
+        # note: the vendored htmx build only implements the plain HX-Trigger
+        # header, not HX-Trigger-After-Settle/-After-Swap, and dispatches it
+        # before the swap happens. The client-side listener closes the
+        # processor panel immediately (which doesn't depend on the new
+        # content existing yet) and defers scrolling the new analysis into
+        # view until htmx's own htmx:after:settle event fires.
+        response.headers["HX-Trigger"] = json.dumps(
+            {"processor-queued": {"key": result.json["key"]}}
+        )
+        return response
+
+    # not queued: show the message (and any extra form fields for the
+    # "extra-form" status) inside the options form instead
+    notice = render_template(
+        "components/form-notice.html",
+        message=result.json.get("message", "The processor could not be queued."),
+        needs_confirmation=(status == "confirm"),
+    )
+    if status == "extra-form":
+        notice += result.json.get("html", "")
+
+    response = make_response(notice)
+    response.headers["HX-Retarget"] = "#module-options-notice"
+    response.headers["HX-Reswap"] = "innerHTML"
+    return response
 
 @component.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
 @login_required

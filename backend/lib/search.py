@@ -12,6 +12,7 @@ from backend.lib.processor import BasicProcessor
 from common.lib.author_info import AuthorInfoReplacer
 from common.lib.helpers import strip_tags, remove_nuls, format_import_item
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
+from common.lib.outputs import Datasource
 
 
 class Search(BasicProcessor, ABC):
@@ -30,6 +31,15 @@ class Search(BasicProcessor, ABC):
 	#: Search worker identifier - should end with 'search' for
 	#: backwards-compatibility reasons. For example, `instagram-search`.
 	type = "abstract-search"
+
+	#: Default output shape: a collected, top-level dataset whose extension is this
+	#: worker's own (ndjson for most, csv/zip for some). A data source that produces
+	#: media (an uploaded archive) or whose shape is only known at run time overrides
+	#: this with a MediaArchive or a per-worker Output.
+	output = Datasource()
+
+	# generic icon
+	icon = "comments"
 
 	#: Amount of workers of this type that can run in parallel. Be careful with
 	#: this, because values higher than 1 will mean that e.g. API rate limits
@@ -53,6 +63,33 @@ class Search(BasicProcessor, ABC):
 
 	import_error_count = 0
 	import_warning_count = 0
+
+	@classmethod
+	def get_variants(cls, config=None):
+		"""
+		Variants of this data source, to offer as separate cards
+
+		Some data sources are one interface onto a number of distinct
+		collections - a database server hosting several corpora, say. Instead of
+		having the user select the data source and then pick the collection from
+		a dropdown, such a worker can return one entry per collection here, and
+		the create-dataset page shows one card per entry.
+
+		Variants are not modules: they share this worker's type, data source ID
+		and settings, and none of the module machinery knows about them. What is
+		picked is passed to `get_options()` as `variant` and stored in the
+		dataset's `variant` parameter, so `validate_query()` and `get_items()`
+		can read it back.
+
+		A worker returning variants MUST accept a `variant` keyword argument in
+		`get_options()`. Returning nothing (the default, and what every core data
+		source does) means this data source is a single card, as before.
+
+		:param config:  Configuration reader
+		:return dict:  `{variant ID: {"title": str, "description": str, "tags":
+		list}}`, all keys optional; empty if this data source has no variants
+		"""
+		return {}
 
 	def process(self):
 		"""

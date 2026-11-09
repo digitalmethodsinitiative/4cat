@@ -20,7 +20,7 @@ class SearchWeibo(Search):
     Import scraped Weibo data
     """
     type = "weibo-search"  # job ID
-    category = "Search"  # category
+    tags = ["import"]
     title = "Import scraped Weibo data"  # title displayed in UI
     description = "Import Weibo data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

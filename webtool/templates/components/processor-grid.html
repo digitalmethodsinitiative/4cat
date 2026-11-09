@@ -1,0 +1,12 @@
+{# The module grid, filled with the processors available for a dataset, plus an
+   out-of-band swap of the lineage preview so the slideout always shows which
+   dataset the processors would run on. `grid_sections` is built in
+   dataset.processor_grid. #}
+{% with card_template = "components/processor-card.html", noun = "processors",
+        request_label = "Missing a processor? Request a new one here." %}
+    {% include "components/module-grid.html" %}
+{% endwith %}
+
+{% with oob = True %}
+    {% include "components/processor-preview-tree.html" %}
+{% endwith %}

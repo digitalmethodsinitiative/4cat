@@ -1,0 +1,32 @@
+{# Options form for the selected data source, swapped into the module options
+   slideout (#module-options) when a data source is picked from the grid.
+   `options_html` contains the pre-rendered form options (see
+   dataset.datasource_options).
+
+   Unlike the processor options form this is not submitted by htmx: queries are
+   validated before they are run, and for file uploads only a snippet of the
+   file is sent for validation. js/query-form.js handles that two-phase
+   submission and renders the server's feedback into #module-options-notice. #}
+<form id="query-form" class="module-options-form"
+      action="{{ url_for('toolapi.queue_dataset') }}" method="POST"
+      enctype="multipart/form-data" x-data="userinputForm">
+
+    <input type="hidden" name="datasource" value="{{ datasource_id }}">
+    {# which variant of the data source these options are for, if it has any;
+       the options were built for it, so the query has to be submitted with it #}
+    {% if variant %}<input type="hidden" name="variant" value="{{ variant }}">{% endif %}
+
+    <fieldset class="query-options userinput-form" data-datasource="{{ datasource_id }}">
+        {{ options_html|safe }}
+
+        {% with options=common_options %}
+            {% include "components/form-options.html" %}
+        {% endwith %}
+    </fieldset>
+
+    <div id="module-options-notice"></div>
+
+    <button type="submit" class="button-like module-queue-button submit-container" id="query-form-submit">
+        <i class="fa fa-play" aria-hidden="true"></i> Create dataset
+    </button>
+</form>

@@ -1,6 +1,5 @@
 import {applyProgress, FileReaderPromise, find_parent, getRelativeURL} from "./util.js";
 import {popup} from "./popup.js";
-import {ui_helpers} from "./ui-helpers.js";
 import {multichoice} from "./multichoice.js";
 
 /**
@@ -371,7 +370,6 @@ export const query = {
                     $('#dataset-results').html(child.resultrow_html);
 
                     target.replaceWith(update);
-                    ui_helpers.conditional_form.init();
                     update.addClass('updated');
                     target.remove();
 
@@ -596,12 +594,11 @@ export const query = {
 
                 // Render custom multiple choice fields
                 // should also be rendered dynamically if processor options are expanded.
-                if ($('.multichoice-wrapper').length || $('.multi-select-wrapper').length) {
-                    multichoice.makeMultichoice();
+                // (`multi` options need nothing: they are rendered as tags
+                //  server-side, see components/user-inputs/multi.html)
+                if ($('.multi-select-wrapper').length) {
                     multichoice.makeMultiSelect();
                 }
-
-                ui_helpers.conditional_form.manage(document.getElementById('query-form'));
             },
             'error': function () {
                 $('#datasource-select').parents('form').trigger('reset');

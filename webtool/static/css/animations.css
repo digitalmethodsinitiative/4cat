@@ -1,0 +1,60 @@
+.slide-enter {
+    transition: transform 0.2s linear;
+    will-change: transform;
+    backface-visibility: hidden;
+}
+
+.slide-from {
+    transform: translateY(100vh);
+}
+
+.slide-to {
+    transform: translateY(0);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--semidark);
+    pointer-events: none;
+}
+
+.spinner .spinner-icon {
+    font-size: 2.5em;
+    animation: spin 0.8s linear infinite;
+}
+
+.htmx-indicator {
+    opacity: 0;
+    transition: opacity 0.2s ease-in;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}
+
+/* Reveal for content that appears while the user is watching, rather than on
+   page load - e.g. the analysis tree the moment a dataset finishes collecting. */
+.reveal-enter {
+    transition: opacity 0.4s ease-in, transform 0.4s ease-out;
+}
+
+.reveal-from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+}
+
+.reveal-to {
+    opacity: 1;
+    transform: translateY(0);
+}

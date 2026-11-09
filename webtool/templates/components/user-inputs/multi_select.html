@@ -1,0 +1,7 @@
+<div class="multi-select-wrapper">
+    <select name="{{ field_name }}" id="forminput-{{ option }}" multiple="multiple">
+    {% for choice in settings.options %}
+        <option value="{{ choice }}"{% if settings.default and choice in settings.default %} selected="selected"{% endif %}>{{ settings.options[choice] }}</option>
+    {% endfor %}
+    </select>
+</div>

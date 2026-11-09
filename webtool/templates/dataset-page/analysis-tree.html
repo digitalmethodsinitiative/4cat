@@ -1,0 +1,49 @@
+{# The analysis tree below the dataset card.
+
+   Nothing in here is rendered while the dataset is still being created
+   The section itself is always emitted so the
+   dataset card's polling has something to swap into (see
+   dataset-page/dataset-progress.html).
+
+   Expects:
+     dataset  the top-level dataset
+     oob      (optional) emit hx-swap-oob so an htmx response can replace the
+              live tree in place; also reveals the tree with a transition,
+              since in that case it appears while the user is watching
+#}
+<section class="analysis-results center-stage" id="analysis-results" {% if oob %}hx-swap-oob="true"{% endif %}>
+    {% if dataset.is_finished() %}
+        {% set has_processors = dataset.get_children() or (dataset.num_rows > 0 and current_user.is_authenticated
+           and dataset.get_available_processors(config=__config, exclude_hidden=True)) %}
+        <ul class="tree" id="dataset-tree"
+            {% if oob %}x-data="{ shown: false }" x-init="$nextTick(() => shown = true)" x-show="shown"
+            x-transition:enter="reveal-enter" x-transition:enter-start="reveal-from"
+            x-transition:enter-end="reveal-to" x-cloak{% endif %}>
+            {% if has_processors %}
+            <li>
+                <div class="big-button-wrap">
+                    <button class="big-module-button"
+                        hx-get="{{ url_for('dataset.processor_grid', key=dataset.key) }}"
+                        hx-target="#module-grid"
+                        hx-swap="innerHTML"
+                        hx-indicator="#module-grid-spinner"
+                        hx-trigger="click"
+                        @click='openSlideout({{ ("Processors for " ~ (processors[dataset.type].title if dataset.type in processors else dataset.type))|tojson }})'
+                    >
+                        <em>
+                            <span class="run-processor-button inline">
+                                <i class="fa-solid fa-star-of-life" aria-hidden="true"></i>
+                            </span>
+                            Run processor
+                        </em>
+                        <span class="byline">{{ dataset.get_available_processors(config=__config)|length }} processors available</span>
+                    </button>
+                </div>
+            </li>
+            {% endif %}
+            {% for child in dataset.get_children() %}
+                {% with top_parent=dataset, dataset=child %}{% include "dataset-page/child-dataset.html" %}{% endwith %}
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>
