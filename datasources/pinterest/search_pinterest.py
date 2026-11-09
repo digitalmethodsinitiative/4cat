@@ -17,7 +17,7 @@ class SearchPinterest(Search):
     Import scraped Pinterest data
     """
     type = "pinterest-search"  # job ID
-    
+    tags = ["import"]
     title = "Import scraped Pinterest data"  # title displayed in UI
     description = "Import Pinterest data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

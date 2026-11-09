@@ -129,7 +129,7 @@ class SearchDouyin(Search):
     Import scraped Douyin data
     """
     type = "douyin-search"  # job ID
-    
+    tags = ["import"]
     title = "Import scraped Douyin data"  # title displayed in UI
     description = "Import Douyin data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

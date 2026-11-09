@@ -18,7 +18,7 @@ class SearchWeiboComments(Search):
     Import scraped Weibo comment data
     """
     type = "weibo-comments-search"  # job ID
-    category = "Search"  # category
+    tags = ["import"]
     title = "Import scraped Weibo comment data"  # title displayed in UI
     description = "Import Weibo comment data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

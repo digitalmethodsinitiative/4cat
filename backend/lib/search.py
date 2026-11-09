@@ -28,9 +28,6 @@ class Search(BasicProcessor, ABC):
 	definition of the parameters that can be configured by the user, via the
 	`options` attribute and/or the `get_options()` class method.
 	"""
-	# inherited by every data source worker, and so also its first tag
-	category = "Search"
-
 	#: Search worker identifier - should end with 'search' for
 	#: backwards-compatibility reasons. For example, `instagram-search`.
 	type = "abstract-search"

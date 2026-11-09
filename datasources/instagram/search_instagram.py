@@ -19,7 +19,7 @@ class SearchInstagram(Search):
     Import scraped Instagram data
     """
     type = "instagram-search"  # job ID
-    
+    tags = ["import"]
     title = "Import scraped Instagram data"  # title displayed in UI
     description = "Import Instagram data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

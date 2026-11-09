@@ -20,7 +20,7 @@ class SearchRedNote(Search):
     Import scraped RedNote/Xiaohongshu/XSH data
     """
     type = "xiaohongshu-search"  # job ID
-    
+    tags = ["import"]
     title = "Import scraped RedNote data"  # title displayed in UI
     description = "Import RedNote data collected with Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI

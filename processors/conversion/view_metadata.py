@@ -31,7 +31,7 @@ class ViewMetadata(BasicProcessor):
 	description = ProcessorDescription(
 		title="Extract media metadata",
 		tags=["conversion"],
-		description="Reformats the .metadata.json file produced by a media downloader and turn it into a flat table, with one row per downloaded item. Optionally include items whose download failed.",
+		description="Reformat the .metadata.json file produced by a media downloader into a flat table, with one row per downloaded item. By default, each row also gets the data of the item the file was downloaded from. Optionally include items whose download failed.",
 		icon="circle-info",
 	)
 	extension = "csv"  # extension of result file, used internally and in UI
