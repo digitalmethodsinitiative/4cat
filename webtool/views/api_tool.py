@@ -537,12 +537,8 @@ def queue_dataset():
 	if request.form.to_dict().get("email-complete", False):
 		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
 
-	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
-	# users who are not allowed to make datasets public never get the checkbox, and always get a private dataset
-	if not g.config.get("privileges.can_make_dataset_public"):
-		is_private = True
-	else:
-		is_private = bool(request.form.get("make-private", True))
+	# private, unless the user may make datasets public and has asked for that
+	is_private = not (g.config.get("privileges.can_make_dataset_public") and request.form.get("make-public"))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
 

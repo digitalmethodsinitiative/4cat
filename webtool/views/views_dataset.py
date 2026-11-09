@@ -872,9 +872,7 @@ def show_result(key):
     datasources = g.modules.datasources
     datasource_expiration = g.config.get("datasources.expiration", {}).get(datasource, {})
     expires_datasource = False
-    can_unexpire = ((g.config.get("expire.allow_optout") and \
-                     datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout",
-                                                                                                   False)) \
+    can_unexpire = datasource_expiration.get("allow_optout", False) \
                    and (g.config.get("privileges.admin.can_manipulate_all_datasets") or dataset.is_accessible_by(current_user, "owner"))
 
     timestamp_expires = None
@@ -1270,11 +1268,6 @@ def keep_dataset(key):
     except DataSetException:
         return error(404, message="Dataset not found.")
 
-    if not g.config.get("expire.allow_optout"):
-        return render_template("error.html", title="Dataset cannot be kept",
-                               message="All datasets are scheduled for automatic deletion. This cannot be "
-                                       "overridden."), 403
-
     if not g.config.get("privileges.admin.can_manipulate_all_datasets") and not dataset.is_accessible_by(current_user, "owner"):
         return error(403, message="You cannot cancel deletion for this dataset.")
 
@@ -1284,8 +1277,7 @@ def keep_dataset(key):
         # cannot reset this
         datasource = dataset.parameters.get("datasource")
         datasource_expiration = g.config.get("datasources.expiration", {}).get(datasource, {})
-        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not g.config.get(
-                "expire.allow_optout"):
+        if datasource_expiration and not datasource_expiration.get("allow_optout"):
             return render_template("error.html", title="Dataset cannot be kept",
                                    message="All datasets of this data source (%s) are scheduled for automatic "
                                            "deletion. This cannot be overridden." % datasource), 403
