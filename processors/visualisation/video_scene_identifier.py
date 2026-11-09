@@ -2,7 +2,6 @@
 Detect scenes in videos
 """
 import shutil
-import oslex
 import json
 import os
 import re
@@ -10,9 +9,9 @@ import re
 from scenedetect import open_video, SceneManager, VideoOpenFailure, FrameTimecode
 
 from backend.lib.processor import BasicProcessor, ProcessorDescription
-from common.lib.compatibility import Compatibility
+from common.lib.compatibility import Compatibility, ExecutableSibling
 from common.lib.outputs import Table
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, MetadataException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -204,11 +203,10 @@ class VideoSceneDetector(BasicProcessor):
 				"default": False
 			}
 		}
-		# only offer ffmpeg option if we actually have ffmpeg
-		ffmpeg_path = config.get("video-downloader.ffmpeg_path")
-		if not ffmpeg_path or not os.path.exists(shutil.which(ffmpeg_path)):
+		# only offer ffmpeg option if we actually have ffmpeg and ffprobe
+		if not ExecutableSibling("ffmpeg", "ffprobe")(config.get("video-downloader.ffmpeg_path")):
 			del options["detector_type"]["options"]["ffmpeg_select"]
-			options["detector_type"]["default"] = list(options["detector_type"]["options"].values())[0]
+			options["detector_type"]["default"] = list(options["detector_type"]["options"].keys())[0]
 
 		return options
 
@@ -222,17 +220,16 @@ class VideoSceneDetector(BasicProcessor):
 		self.dataset.update_status("Detecting video scenes")
 		skipped = 0
 		processed_videos = 0
-		video_metadata = None
+		try:
+			video_metadata = self.source_dataset.read_media_metadata()
+		except (FileNotFoundError, MetadataException):
+			video_metadata = None
 		collected_scenes = {}
 		for original_video in self.source_dataset.iterate_items(self, immediately_delete=False):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while detecting video scenes")
 
-			# Check for 4CAT's metadata JSON and copy it
 			if original_video.file.name == ".metadata.json":
-				# Keep it and move on
-				with open(original_video.file) as file:
-					video_metadata = json.load(file)
 				continue
 			elif original_video.file.name == "video_archive":
 				# yt-dlp file
@@ -271,39 +268,29 @@ class VideoSceneDetector(BasicProcessor):
 					num_posts += 1
 		else:
 			self.dataset.update_status("Saving video scene results")
-			for url, video_data in video_metadata.items():
-				if video_data.get('success'):
-					files = video_data.get('files') if 'files' in video_data else [{"filename": video_data.get("filename"), "success":True}]
-					for file in files:
-						if not file.get("success") or file.get("filename") not in collected_scenes:
-							continue
-							
-						# List types are not super fun for CSV
-						if 'post_ids' in video_data:
-							video_data['post_ids'] = ','.join(video_data['post_ids'])
+			from_dataset = video_metadata.from_dataset
+			for filename, item in video_metadata.iter_entries():
+				if filename not in collected_scenes:
+					continue
+				post_ids = item.get("post_ids", [])
+				post_ids_csv = ','.join(post_ids)
+				for i, scene in enumerate(collected_scenes[filename]):
+					rows.append({
+						'id': filename + '_scene_' + str(i + 1),
+						'url': item.get("url", ""),
+						"from_dataset": from_dataset,
+						**scene,
+						"post_ids": post_ids_csv,
+					})
+					num_posts += 1
 
-
-						for i, scene in enumerate(collected_scenes[file.get('filename')]):
-							rows.append({
-								'id': file.get('filename') + '_scene_' + str(i+1),  # best if all datasets have unique identifier
-								'url': url,
-								"from_dataset": video_data.get("from_dataset"),
-								**scene,
-								"post_ids": ','.join(video_data.get("post_ids", [])),
+					if save_annotations and i == 0:
+						for item_id in post_ids:
+							annotations.append({
+								"label": "scene_amount",
+								"value": scene.get("num_scenes_detected", ""),
+								"item_id": item_id,
 							})
-							num_posts += 1
-
-							# Write amount of scenes for first scene detected
-							if save_annotations and i == 0:
-								item_ids = video_data.get("post_ids", [])
-								item_ids = [item_ids] if isinstance(item_ids, str) else item_ids
-								for item_id in item_ids:
-									annotation = {
-										"label": "scene_amount",
-										"value": scene.get("num_scenes_detected", ""),
-										"item_id": item_id
-									}
-									annotations.append(annotation)
 
 		if save_annotations and annotations:
 			self.save_annotations(annotations)
@@ -331,23 +318,40 @@ class VideoSceneDetector(BasicProcessor):
 		ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
 		# first get some video metadata
-		probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-show_entries",
-		                 "stream=avg_frame_rate,duration,nb_frames", "-of", "csv=p=0",
-						 oslex.quote(str(original_video.file))]
+		# -count_packets makes ffprobe count the packets in the video stream
+		# (one per frame), for videos that do not store their frame count;
+		# this only reads the file, which is quick compared to the detection
+		probe_command = [ffprobe_path, "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries",
+						 "stream=avg_frame_rate,duration,nb_frames,nb_read_packets:format=duration", "-of", "json",
+						 str(original_video.file)]
 
 		probe = self.run_interruptable_process(probe_command)
-		if probe.stderr.decode("utf-8"):
-			raise SceneDetectionException("Could not read video metadata with ffprobe. The video may be unreadable.")
+		if probe.stderr:
+			raise SceneDetectionException("Could not read video metadata with ffprobe. The video may be unreadable. "
+										  f"({probe.stderr.decode('utf-8', errors='replace').strip()})")
 
-		probe_output = probe.stdout.decode("utf-8")
-		fps, duration, total_frames = probe_output.split(",")
-		fps = float(fps.split("/")[0]) / float(fps.split("/")[1])
-		duration = float(duration)
-		total_frames = int(total_frames)
-		length_timecode = FrameTimecode(duration, fps).get_timecode()
+		try:
+			probe_output = json.loads(probe.stdout)
+			stream = probe_output["streams"][0]
+		except (json.JSONDecodeError, KeyError, IndexError):
+			raise SceneDetectionException("ffprobe found no video stream in the file.")
+
+		# ffprobe leaves out values it does not know. Some formats (e.g. webm)
+		# only store the duration of the whole file and no frame count
+		duration = stream.get("duration", probe_output.get("format", {}).get("duration"))
+		total_frames = stream.get("nb_frames", stream.get("nb_read_packets"))
+		try:
+			fps_numerator, fps_denominator = stream["avg_frame_rate"].split("/")
+			fps = float(fps_numerator) / float(fps_denominator)
+			duration = float(duration)
+			total_frames = int(total_frames)
+			length_timecode = FrameTimecode(duration, fps).get_timecode()
+		except (KeyError, TypeError, ValueError, ZeroDivisionError):
+			raise SceneDetectionException(f"Could not read the frame rate ({stream.get('avg_frame_rate')}), duration "
+										  f"({duration}) or frame count ({total_frames}) of the video.")
 
 		command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
-		command.extend(["-i", oslex.quote(str(original_video.file))])
+		command.extend(["-i", str(original_video.file)])
 		# select all frames with a diff to the previous frame of > 0
 		# make sure to always select at least first and last frames
 		# frames are 0-indexed, so the last frame is total_frames-1

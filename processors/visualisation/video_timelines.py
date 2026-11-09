@@ -2,7 +2,6 @@
 Create timelines from collections of video frames
 """
 import base64
-import json
 import io
 
 from PIL import Image
@@ -14,9 +13,10 @@ from svgwrite.image import Image as ImageElement
 from ural import is_url
 
 from backend.lib.processor import BasicProcessor, ProcessorDescription
+from common.lib.archive_metadata import normalize_post_id
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Render
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import DataSetNotFoundException, ProcessorInterruptedException, MetadataException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
 from common.lib.dataset import DataSet
@@ -73,7 +73,10 @@ class VideoTimelines(BasicProcessor):
         }
 
     def process(self):
-        metadata = {}
+        try:
+            metadata = self.source_dataset.read_media_metadata()
+        except (FileNotFoundError, MetadataException):
+            metadata = None
         base_height = self.parameters.get("height", 100)
         fontsize = 12
 
@@ -87,6 +90,10 @@ class VideoTimelines(BasicProcessor):
         timeline_widths = {}
 
         # why not just loop through iterate_items?
+        # reading the labels walks the whole source dataset, and nothing about
+        # them changes while the frames are rendered, so do it once
+        labels = self.get_video_labels(metadata)
+
         # in SVG the order of elements matters, so we want to do some things
         # _after_ adding the last frame of a timeline. If we do this within the
         # loop we need to do the same outside of the loop after it finishes the
@@ -104,19 +111,15 @@ class VideoTimelines(BasicProcessor):
                 # final iteration in which we finish things up (see below)
                 looping = False
 
-            # there is a metadata file, always read first, which we can use
+            # skip the metadata file (already read via read_media_metadata)
             if item.file.name == ".metadata.json":
-                with item.file.open() as infile:
-                    metadata = json.load(infile)
-                    continue
+                continue
 
             # skip if file is a real file but not an image
             if looping and item.file.suffix not in (".jpeg", ".jpg", ".png", ".gif"):
                 continue
             else:
                 video = str(item.file.parent.name)
-
-            labels = self.get_video_labels(metadata)
 
             # at the end of each timeline (or at the end of the archive) add a
             # footer to it and paint to the canvas
@@ -200,41 +203,53 @@ class VideoTimelines(BasicProcessor):
         determine an appropriate label. There is a generalised heuristic and
         some data source-specific pathways.
 
-        :param metadata:  Metadata as parsed from the 'Extract Frames' JSON
+        :param MediaArchiveMetadata metadata:  Loaded archive metadata.
         :return dict:  Filename -> label mapping
         """
-        mapping_dataset = {}
-        mapping_ids = {}
-        labels = {}
-
         if not metadata:
             return {}
 
-        for url, data in metadata.items():
-            if data.get('success'):
-                for filename in [f["filename"] for f in data.get("files", [])]:
-                    filename = ".".join(filename.split(".")[:-1])
-                    mapping_ids[filename] = data["post_ids"]
-                    if data.get("from_dataset", data.get("source_dataset")) not in mapping_dataset:
-                        mapping_dataset[data.get("from_dataset", data.get("source_dataset"))] = []
-                    mapping_dataset[data.get("from_dataset", data.get("source_dataset"))].append(filename)
-                    labels[filename] = filename
+        mapping_dataset = {}
+        mapping_ids = {}
+        labels = {}
+        from_dataset = metadata.from_dataset
+
+        for filename, item in metadata.iter_entries():
+            basename = filename.rsplit(".", 1)[0]
+            mapping_ids[basename] = item.get("post_ids", [])
+            if from_dataset:
+                mapping_dataset.setdefault(from_dataset, []).append(basename)
+            labels[basename] = basename
 
         for dataset, urls in mapping_dataset.items():
-            dataset = DataSet(key=dataset, db=self.db, modules=self.modules).nearest("*-search")
+            try:
+                video_dataset = DataSet(key=dataset, db=self.db, modules=self.modules)
+            except DataSetNotFoundException:
+                # Imported media datasets may not have the source on this instance
+                self.dataset.log(f"Could not find source dataset {dataset} on 4CAT for video frame labels")
+                continue
+            
+            source_dataset = video_dataset.nearest("*-search")
+            if source_dataset is None:
+                # One type ignored a convention years ago...
+                source_dataset = video_dataset.nearest("*-import")
+            # If the source dataset is a search or import dataset, we can use its type to determine how to label the videos
+            source_dataset_type = source_dataset.type if source_dataset else None
 
             # determine appropriate label
             # is this the right place? should it be in the datasource?
-            if dataset.type == "tiktok-search":
+            if source_dataset_type == "tiktok-search":
                 mapper = lambda item: item.get("tiktok_url")  # noqa: E731
-            elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
+            elif source_dataset_type == "upload-search" and source_dataset.parameters.get("board") == "youtube-video-list":
                 mapper = lambda item: item.get("youtube_url")  # noqa: E731
             else:
                 mapper = lambda item: item.get("id")  # noqa: E731
 
-            for item in dataset.iterate_items(self):
-                for filename in urls:
-                    if item["id"] in mapping_ids[filename]:
-                        labels[filename] = mapper(item)
+            # There may not be a "nearest" source e.g. Media Imports
+            if source_dataset is not None:
+                for item in source_dataset.iterate_items(self):
+                    for filename in urls:
+                        if normalize_post_id(item["id"]) in mapping_ids[filename]:
+                            labels[filename] = mapper(item)
 
         return labels

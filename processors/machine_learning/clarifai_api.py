@@ -9,6 +9,7 @@ from clarifai_grpc.grpc.api.status import status_code_pb2
 from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 
 from common.lib.helpers import UserInput, convert_to_int
+from common.lib.exceptions import MetadataException
 from backend.lib.processor import BasicProcessor, ProcessorDescription
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
@@ -48,6 +49,9 @@ class ClarifaiAPIFetcher(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
     # a derived table
     output = Table(extension="ndjson")
+
+    # Clarifai API has been shutdown July 2026. Keeping hidden so existing datasets still appear and processors can run on them
+    is_hidden = True  # Hide this processor from the UI, since the API is no longer available
 
     # Allow on image sets
     compatibility = Compatibility(extensions={"zip"}, media_types={"image"}, type_prefixes={"image-downloader"}, types={"video-frames"}, preferred_followups=["convert-clarifai-vision-to-csv", "clarifai-bipartite-network"])
@@ -146,6 +150,12 @@ class ClarifaiAPIFetcher(BasicProcessor):
         processed = 0
         annotated = 0
 
+        try:
+            source_metadata = self.source_dataset.read_media_metadata()
+            filename_to_post_ids = source_metadata.filename_to_post_ids()
+        except (FileNotFoundError, MetadataException):
+            filename_to_post_ids = {}
+
         # send batched requests per model
         for model_id in models:
             iterator = self.source_dataset.iterate_items()
@@ -166,10 +176,6 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     send_batch = True
 
                 if image:
-                    if image.file.name == ".metadata.json":
-                        # Metadata, we keep this for writing annotations
-                        image_metadata = json.load(image.file.open("r"))
-
                     if image.file.suffix in (".json", ".log"):
                         continue
 
@@ -231,8 +237,6 @@ class ClarifaiAPIFetcher(BasicProcessor):
         # Get original post IDs for annotations
         fourcat_annotations = []
         annotated = 0
-        if save_annotations:
-            filename_and_post_ids = {v["filename"]: v["post_ids"] for v in image_metadata.values()}
 
         # save the buffered results (we do this only now so we can also store
         # combined annotations)
@@ -253,7 +257,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 if save_annotations:
                     for label, confidence in all_annotations.items():
                         if confidence > annotation_threshold:
-                            for item_id in filename_and_post_ids[image]:
+                            for item_id in filename_to_post_ids.get(image, []):
                                 fourcat_annotations.append({
                                     "label": "clarifai_" + label,
                                     "value": confidence,

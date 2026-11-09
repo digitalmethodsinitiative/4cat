@@ -7,12 +7,12 @@ import psycopg2
 import json
 import time
 import sys
-import re
 import os
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 
 from common.lib.database import Database
+from common.lib.helpers import looks_like_email_address
 from common.lib.logger import Logger
 from common.lib.user import User
 from common.config_manager import CoreConfigManager, ConfigManager
@@ -48,7 +48,7 @@ args = cli.parse_args()
 if __name__ != "__main__":
     sys.exit(1)
 
-if not args.noemail and not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", args.username):
+if not args.noemail and not looks_like_email_address(args.username):
     print("Please provide an e-mail address as username.")
     sys.exit(1)
 

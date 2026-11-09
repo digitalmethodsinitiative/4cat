@@ -4,27 +4,23 @@ Download videos from URLs
 First attempt to download via request, but if that fails use yt-dlp.
 """
 import copy
-import json
 import re
-import shutil
-import time
 import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
 import yt_dlp
-from ural import urls_from_text
 from yt_dlp import DownloadError
-from yt_dlp.utils import ExistingVideoReached
+from yt_dlp.utils import ExistingVideoReached, MaxDownloadsReached
 
 from backend.lib.processor import BasicProcessor, ProcessorDescription
 from backend.lib.proxied_requests import FailedProxiedRequest
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import MediaArchive
-from common.lib.dataset import DataSet
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException, DataSetException
-from common.lib.helpers import UserInput, sets_to_lists, url_to_filename
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.helpers import UserInput, UniqueFilenames, sets_to_lists, split_urls, urls_in_text
+from common.lib.media_archive_library import MediaArchiveLibrary
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -33,13 +29,6 @@ __email__ = "4cat@oilab.eu"
 
 
 # Custom Exception Classes
-class MaxVideosDownloaded(ProcessorException):
-    """
-    Raise if too many videos have been downloaded and the processor should stop future downloads
-    """
-    pass
-
-
 class FailedDownload(ProcessorException):
     """
     Raise if Download failed and will not be tried again
@@ -50,6 +39,13 @@ class FailedDownload(ProcessorException):
 class VideoStreamUnavailable(ProcessorException):
     """
     Raise request stream does not contain video, BUT URL may be able to be processed by YT-DLP
+    """
+    pass
+
+
+class DownloadDenied(VideoStreamUnavailable):
+    """
+    Raise if the website refused to hand over the URL (HTTP 403); YT-DLP may still be able to get the video
     """
     pass
 
@@ -98,7 +94,7 @@ class VideoDownloaderPlus(BasicProcessor):
             "A JSON metadata file recording the download outcome per video is included in the archive.",
         ],
         references=[
-            "[yt-dlp python package](https://github.com/yt-dlp/yt-dlp/#readme)",
+            "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
             "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
         ],
         warnings=[
@@ -118,7 +114,7 @@ class VideoDownloaderPlus(BasicProcessor):
     followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
 
     # any collector's csv/ndjson output (except sources with their own downloaders), plus the tiktok-metadata helper
-    compatibility = Compatibility(is_collector=True, types={"tiktok-video-downloader-metadata"}, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
+    compatibility = Compatibility(is_collector=True, types={"tiktok-video-downloader-metadata"}, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search", "weibo-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 
@@ -162,7 +158,9 @@ class VideoDownloaderPlus(BasicProcessor):
             "options": {"none": "No indirect links", "yt_only": "YouTube only", "all": "All links"},
             "help": "Allow indirect downloads",
             "tooltip": "Allow users to choose to download videos linked indirectly (e.g. embedded in a linked tweet, link to a YouTube video). "
-                       "Enabling all can be confusing for users and download more than intended."
+                       "Enabling all can be confusing for users and download more than intended. Video downloaders for "
+                       "specific data sources (TikTok, Weibo) may still use yt-dlp on that platform's post pages, to replace "
+                       "video links that no longer work."
         },
         "video-downloader.allow-multiple": {
             "type": UserInput.OPTION_TOGGLE,
@@ -190,6 +188,7 @@ class VideoDownloaderPlus(BasicProcessor):
         self.last_dl_status = None
         self.last_post_process_status = None
         self.warning_message = None
+        self.yt_dlp_archive_map = None
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -219,13 +218,6 @@ class VideoDownloaderPlus(BasicProcessor):
                 "min": 1,
                 "tooltip": "Max of 100 MB set by 4CAT administrators",
             },
-            "split-comma": {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Split column values by comma",
-                "default": True,
-                "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-                        "separately"
-            }
         }
 
         # Update the amount max and help from config
@@ -337,12 +329,21 @@ class VideoDownloaderPlus(BasicProcessor):
             self.dataset.finish_with_error(str(e))
             return
 
-        self.dataset.update_status('Collected %i urls.' % len(urls))
+        if _preexisting_fallback_queue:
+            num_fallback = len(_preexisting_fallback_queue)
+            self.dataset.update_status(f"Collected {len(urls)} urls, plus {num_fallback} post {'URL' if num_fallback == 1 else 'URLs'} to try with yt-dlp only.")
+        else:
+            self.dataset.update_status('Collected %i urls.' % len(urls))
 
-        vid_lib = DatasetVideoLibrary(self.dataset, modules=self.modules)
+        vid_lib = MediaArchiveLibrary.collect(self.dataset, self.modules, ["video-downloader"])
 
         # Prepare staging area for videos and video tracking
         results_path = self.dataset.get_staging_area()
+        # Three things write into this folder - videos copied from an earlier
+        # archive, direct downloads, and yt-dlp - each naming files its own
+        # way. They share one register of names so they cannot overwrite each
+        # other's videos.
+        self.staging_filenames = UniqueFilenames(results_path)
 
         # Collect parameters
         also_indirect = self.parameters.get("also_indirect", "none")
@@ -363,20 +364,27 @@ class VideoDownloaderPlus(BasicProcessor):
         download_channels = self.max_videos_per_url > 0
         if self.max_videos_per_url == 0:
             self.max_videos_per_url = 1  # Ensure unknown channels only end up with one video downloaded
+        # yt-dlp stops after this many videos per URL (one YoutubeDL is used per
+        # URL), between videos, so no video is left half-downloaded
+        ydl_opts["max_downloads"] = self.max_videos_per_url
 
         # Initialize counters
         self.downloaded_videos = 0
         self.failed_downloads = 0
         self.copied_videos = 0
+        # filename -> key of the earlier dataset it was copied from, so a video
+        # that several URLs lead to is copied (and counted) only once
+        self.files_copied_from_library = {}
         consecutive_errors = 0
         # not_a_video tracked within direct_results
         self.total_not_a_video = 0
         self.skipped_urls = 0
         self.processed_urls = 0
         last_domains = []
-        total_urls = len(urls)
-        self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
-        yt_dlp_archive_map = {}
+        # count the URLs that are only tried with yt-dlp too; they are added to `urls` further down
+        total_urls = len(set(urls) | set(_preexisting_fallback_queue))
+        self.total_possible_videos = min(total_urls, amount) if amount != 0 else total_urls
+        self.yt_dlp_archive_map = {}
 
         # Process URLs in three tiers:
         # Tier 1: Check library and copy if available
@@ -449,7 +457,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 self.dataset.update_status("Downloading videos with YT-DLP")
                 ytdlp_results = self._process_ytdlp_downloads(
                     ytdlp_fallback_queue, urls, ydl_opts, results_path,
-                    amount, also_indirect, yt_dlp_archive_map, consecutive_errors
+                    amount, also_indirect, consecutive_errors
                 )
                 
                 self.failed_downloads += ytdlp_results["failed"]
@@ -532,7 +540,7 @@ class VideoDownloaderPlus(BasicProcessor):
         :param dict url_dict: Dictionary to update with URL metadata
         :param bool skip_channels: Whether to skip known channels
         :param bool copy_if_existing: Whether to attempt to copy video from previous dataset if URL exists in library
-        :param DatasetVideoLibrary existing_video_library: Video library to check for existing videos if `copy_if_existing` is `True`
+        :param MediaArchiveLibrary existing_video_library: Video library to check for existing videos if `copy_if_existing` is `True`
         :param Path copy_output_path: Path to copy videos to if copied from library
         :return: None
         """
@@ -554,7 +562,6 @@ class VideoDownloaderPlus(BasicProcessor):
 
             # Initialize URL metadata
             url_dict[url]["success"] = False
-            url_dict[url]["retry"] = True
 
             # Skip known channels if not downloading channels
             if skip_channels and any([sub_url in url for sub_url in self.known_channels]):
@@ -570,49 +577,210 @@ class VideoDownloaderPlus(BasicProcessor):
 
     def _try_copy_from_library(self, url, urls_dict, vid_lib, results_path):
         """
-        Try to copy video from previously downloaded library
-        
+        Try to copy a video already fetched by a previous downloader run.
+
         :param str url: URL to check
         :param dict urls_dict: URLs dictionary to update
-        :param DatasetVideoLibrary vid_lib: Video library instance
+        :param MediaArchiveLibrary vid_lib: Video library instance
         :param Path results_path: Path to staging area
         :return dict: Result with 'copied', 'count', and 'skip' keys
         """
         result = {"copied": False, "count": 0, "skip": False}
-        
-        if url not in vid_lib.library:
+
+        hit = vid_lib.find(url)
+        if hit is None:
             return result
-            
-        previous_vid_metadata = vid_lib.library[url]
-        
-        if previous_vid_metadata.get('success', False):
-            # Use previous downloaded video
+
+        if hit.is_success and self._channel_has_more_videos(hit) \
+                and self._should_use_yt_dlp(url, self.parameters.get("also_indirect", "none")):
+            # a previous run stopped at its limit of videos for this URL, and
+            # this run allows more; download the URL again instead
+            self.dataset.log(f"Previously downloaded {len(hit.entries):,} video(s) of a channel or playlist with more; "
+                             f"this run allows {self.max_videos_per_url:,} per link, so downloading again: {url}")
+        elif hit.is_success:
+            # copy the previously downloaded file(s) instead of re-fetching, but
+            # no more than this run allows per URL
+            self._limit_to_videos_per_url(hit, url)
             try:
                 self.dataset.log(f"Copying previously downloaded video for url: {url}")
-                num_copied = self.copy_previous_video(previous_vid_metadata, results_path, vid_lib.previous_downloaders)
-                urls_dict[url] = previous_vid_metadata
+                num_copied = self.copy_previous_video(hit, results_path)
+                # keep this run's post_ids; fill in the download outcome
+                urls_dict[url].update(self._copied_url_fields(hit))
                 self.dataset.update_status("Copied previously downloaded video to current dataset.")
                 result["copied"] = True
                 result["count"] = num_copied
             except FailedToCopy as e:
                 self.dataset.log(f"{str(e)}; attempting to download again")
-        elif previous_vid_metadata.get("retry", True) is False:
-            # Check if the current run has a more inclusive yt-dlp setting than the previous attempt
-            # Inclusivity order: "none" < "yt_only" < "all"
-            indirect_levels = {"none": 0, "yt_only": 1, "all": 2}
-            previous_also_indirect = previous_vid_metadata.get("also_indirect", "none")
-            current_also_indirect = self.parameters.get("also_indirect", "none")
-            previous_level = indirect_levels.get(previous_also_indirect, 0)
-            current_level = indirect_levels.get(current_also_indirect, 0)
-            if current_level > previous_level:
-                # Current run has more inclusive yt-dlp setting; retry
-                self.dataset.log(f"Previously identified as not a video with also_indirect={previous_also_indirect}; retrying with also_indirect={current_also_indirect}: {url}")
+        elif "not_a_video" in hit.reasons:
+            # a previous run established this URL is not a video, so normally
+            # don't retry. But that conclusion only holds for the kinds of URL
+            # that run was allowed to hand to yt-dlp: if this run is allowed
+            # more, the URL deserves another try.
+            if self._widens_indirect_downloads(hit):
+                self.dataset.log(f"Previously identified as not a video, but this run allows yt-dlp more "
+                                 f"URLs than the run that decided that; trying again: {url}")
             else:
-                urls_dict[url] = previous_vid_metadata
+                urls_dict[url]["success"] = False
+                urls_dict[url]["reason"] = "not_a_video"
                 self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
                 result["skip"] = True
-            
+
         return result
+
+    # How much of the web yt-dlp is allowed to be pointed at, least to most.
+    # A run can only reach URLs a lower setting would have skipped.
+    INDIRECT_DOWNLOAD_LEVELS = {"none": 0, "yt_only": 1, "all": 2}
+
+    def _widens_indirect_downloads(self, hit):
+        """
+        Does this run allow yt-dlp more URLs than every run that decided this URL
+        was not a video?
+
+        The datasets those runs produced store the parameters they ran with, so
+        their settings are read back from there rather than from the archive's
+        metadata. A dataset created before this setting existed reads as the
+        lowest level, so it is retried rather than wrongly skipped.
+
+        :param MediaLibraryHit hit:  failure hit for the URL
+        :return bool:  True if this run is more permissive than all of them
+        """
+        levels = self.INDIRECT_DOWNLOAD_LEVELS
+        current = levels.get(self.parameters.get("also_indirect", "none"), 0)
+        previous = max(
+            (levels.get(dataset.parameters.get("also_indirect", "none"), 0)
+             for dataset in hit.datasets_for_reason("not_a_video")),
+            default=0
+        )
+        return current > previous
+
+    @staticmethod
+    def _playlist_position(item):
+        """
+        Where a video was in the channel or playlist it was downloaded from
+
+        yt-dlp records this as `playlist_index`; videos without it (e.g. not
+        from a playlist) sort last, in the order they were recorded.
+
+        :param dict item:  Metadata entry of the video
+        :return int|float:
+        """
+        try:
+            return int((item.get("extra") or {}).get("playlist_index"))
+        except (TypeError, ValueError):
+            return float("inf")
+
+    @staticmethod
+    def _playlist_size(extra):
+        """
+        How many videos yt-dlp said the channel or playlist holds
+
+        It records this as `playlist_count` and, for some extractors, as
+        `n_entries`, and writes a null for either when it does not know. A
+        count of zero is a count, so the two cannot be chosen between with
+        `or`.
+
+        :param dict extra:  Per-file data of a metadata entry
+        :return int|None:  Number of videos, or None if yt-dlp did not know
+        """
+        for field in ("playlist_count", "n_entries"):
+            size = extra.get(field)
+            if size is None:
+                continue
+            try:
+                return int(size)
+            except (TypeError, ValueError):
+                # not a number; the other field may still be usable
+                continue
+        return None
+
+    def _channel_has_more_videos(self, hit):
+        """
+        Could this run get more videos from a URL than a previous run did?
+
+        A previous run may have stopped at its limit of videos per URL, e.g.
+        one video of a channel. yt-dlp records which channel or playlist a
+        video came from and how many videos it holds; if it holds more than
+        were downloaded, and this run allows more, the URL is worth
+        downloading again. Where yt-dlp did not know how many videos the
+        playlist holds, the previous run counts as stopped if it got as many
+        videos as its own limit allowed.
+
+        :param MediaLibraryHit hit:  Successful library hit for the URL
+        :return bool:
+        """
+        downloaded = len(hit.entries)
+        if self.max_videos_per_url <= downloaded:
+            return False
+
+        # a file can be recorded for more than one URL, so these entries do not
+        # all have to come from the same playlist. Take the largest size any of
+        # them reports: that is the most videos this URL is known to lead to,
+        # and guessing high only costs a download that could have been a copy.
+        from_a_playlist = False
+        available = None
+        for _, item in hit.entries:
+            extra = item.get("extra") or {}
+            if not any(field in extra for field in ("playlist_count", "n_entries", "playlist_index")):
+                # not from a channel or playlist
+                continue
+            from_a_playlist = True
+            size = self._playlist_size(extra)
+            if size is not None:
+                available = size if available is None else max(available, size)
+
+        if not from_a_playlist:
+            return False
+        if available is not None:
+            return available > downloaded
+
+        # playlist of unknown size: did the previous run reach its limit?
+        previous_dataset = hit.metadata.dataset if hit.metadata else None
+        if previous_dataset is None:
+            return False
+        try:
+            previous_limit = max(1, int(previous_dataset.parameters.get("channel_videos") or 0))
+        except (TypeError, ValueError):
+            return False
+        return downloaded >= previous_limit
+
+    def _limit_to_videos_per_url(self, hit, url):
+        """
+        Copy no more videos of a URL than this run allows
+
+        A previous run may have been allowed more videos per URL. Keep the
+        first ones, in the order of the channel or playlist they came from.
+
+        :param MediaLibraryHit hit:  Successful library hit; its entries are
+          shortened in place
+        :param str url:  The URL, for the log
+        """
+        if len(hit.entries) <= self.max_videos_per_url:
+            return
+
+        self.dataset.log(f"Copying {self.max_videos_per_url:,} of {len(hit.entries):,} previously downloaded videos, "
+                         f"as this run allows {self.max_videos_per_url:,} per link: {url}")
+        hit.entries = sorted(hit.entries, key=lambda entry: self._playlist_position(entry[1]))[:self.max_videos_per_url]
+
+    @staticmethod
+    def _copied_url_fields(hit):
+        """
+        Build the `urls_dict` fields for a URL whose file(s) were copied from
+        a previous archive, from a successful `MediaLibraryHit`.
+        """
+        files = []
+        downloader = None
+        for filename, item in hit.entries:
+            extra = dict(item.get("extra") or {})
+            # `downloader` lived at URL level in the working dict, not per file
+            downloader = downloader or extra.pop("downloader", None)
+            # the earlier archive's other URLs came from the posts of its own
+            # dataset; this archive records the URLs of this dataset's posts
+            extra.pop("other_urls", None)
+            files.append({"filename": filename, "success": True, "metadata": extra})
+        fields = {"success": True, "files": files}
+        if downloader:
+            fields["downloader"] = downloader
+        return fields
 
     def _process_direct_downloads(self, url_list, urls_dict, results_path, max_video_size,
                                    also_indirect, amount, last_domains, ignore_not_video):
@@ -649,7 +817,7 @@ class VideoDownloaderPlus(BasicProcessor):
             for _, response in self.iterate_proxied_requests(
                 request_urls,
                 preserve_order=True,
-                headers={"User-Agent": self.DIRECT_DOWNLOAD_UA},
+                headers={"User-Agent": self.DIRECT_DOWNLOAD_UA, **self.source_dataset.get_media_request_headers()},
                 stream=True,
                 timeout=20,
             ):
@@ -666,11 +834,12 @@ class VideoDownloaderPlus(BasicProcessor):
 
                 # Process the response
                 download_result = self._handle_direct_download_response(
-                    url, response, urls_dict, results_path, max_video_size,
-                    also_indirect, domain, last_domains, ignore_not_video
+                    url, response, urls_dict, results_path, max_video_size, also_indirect
                 )
                 
                 # Update counters based on result
+                stop_action = None
+                stop_reason = None
                 if download_result["success"]:
                     results["processed"] += 1
                     results["not_a_video_consecutive"] = 0
@@ -692,17 +861,26 @@ class VideoDownloaderPlus(BasicProcessor):
                     results["processed"] += 1
                     results["not_a_video_consecutive"] += 1
                     results["not_a_video_total"] += 1
+                    stop_action = self._handle_non_video_stop(
+                        results["not_a_video_consecutive"], domain, last_domains, ignore_not_video
+                    )
+                    stop_reason = "no-videos"
                 elif download_result["error"]:
                     results["processed"] += 1
                     results["failed"] += 1
-                    if download_result.get("timeout"):
+                    # timeouts and refusals suggest the website is not letting us download (anymore)
+                    if download_result["timeout"] or download_result["denied"]:
                         results["consecutive_errors"] += 1
+                        # the non-direct videos setting plays no part in direct downloads, so the message should
+                        # not suggest changing it
+                        stop_action = self._handle_consecutive_error_stop(results["consecutive_errors"])
+                        stop_reason = "errors"
                 
                 # Check stop conditions
-                if download_result.get("stop_action"):
+                if stop_action:
                     self.flush_proxied_requests()
                     results["stop_processing"] = True
-                    results["stop_reason"] = download_result.get("stop_reason", "errors")
+                    results["stop_reason"] = stop_reason
                     break
                     
                 # Check download limit (counter already updated above)
@@ -726,8 +904,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
         return results
 
-    def _handle_direct_download_response(self, url, response, urls_dict, results_path, max_video_size,
-                                          also_indirect, domain, last_domains, ignore_not_video):
+    def _handle_direct_download_response(self, url, response, urls_dict, results_path, max_video_size, also_indirect):
         """
         Handle a single direct download response
         
@@ -737,9 +914,6 @@ class VideoDownloaderPlus(BasicProcessor):
         :param Path results_path: Path to staging area
         :param int max_video_size: Maximum video size in MB
         :param str also_indirect: Whether to use yt-dlp for indirect links
-        :param str domain: Domain of the URL
-        :param list last_domains: List of last domains processed
-        :param bool ignore_not_video: Whether to ignore "not a video" errors
         :return dict: Result dictionary with success, error, fallback flags
         """
         result = {
@@ -748,8 +922,7 @@ class VideoDownloaderPlus(BasicProcessor):
             "not_a_video": False,
             "fallback_to_ytdlp": False,
             "timeout": False,
-            "stop_action": None,
-            "stop_reason": None
+            "denied": False,
         }
         
         self.videos_downloaded_from_url = set()
@@ -760,15 +933,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 self.dataset.log(f"Request Error: {error_context}")
                 urls_dict[url]["error"] = str(error_context)
                 result["error"] = True
-                
-                if isinstance(error_context, requests.exceptions.Timeout):
-                    result["timeout"] = True
-                    action = self._handle_consecutive_error_stop(
-                        result.get("consecutive_errors", 0) + 1, also_indirect
-                    )
-                    if action:
-                        result["stop_action"] = action
-                        result["stop_reason"] = "errors"
+                result["timeout"] = isinstance(error_context, requests.exceptions.Timeout)
                 return result
 
             filename, proxy_used = self._write_direct_response(url, response, results_path, max_video_size)
@@ -784,36 +949,27 @@ class VideoDownloaderPlus(BasicProcessor):
             
         except VideoStreamUnavailable as e:
             if self._should_use_yt_dlp(url, also_indirect):
+                self.dataset.log(f"{e}; trying again with yt-dlp")
                 result["fallback_to_ytdlp"] = True
+            elif isinstance(e, DownloadDenied):
+                # the link may well lead to a video, but the website would not hand it over (e.g. because the link
+                # has expired or we are being blocked), so this is a failed download rather than "not a video"; it
+                # can be tried again later
+                self.dataset.log(f"Request Error: {str(e)}")
+                urls_dict[url]["error"] = str(e)
+                result["error"] = True
+                result["denied"] = True
             else:
                 self.dataset.log(f"NotVideoLinkError: {str(e)}")
                 urls_dict[url]["error"] = str(e)
-                urls_dict[url]["retry"] = False
-                urls_dict[url]["also_indirect"] = also_indirect
+                urls_dict[url]["reason"] = "not_a_video"
                 result["not_a_video"] = True
-                
-                if last_domains.count(domain) >= 2:
-                    time.sleep(5)
-                    
-                action = self._handle_non_video_stop(1, domain, last_domains, ignore_not_video)
-                if action:
-                    result["stop_action"] = action
-                    result["stop_reason"] = "no-videos"
                     
         except NotAVideo as e:
             self.dataset.log(f"Request Error: {str(e)}")
             urls_dict[url]["error"] = str(e)
-            urls_dict[url]["retry"] = False
-            urls_dict[url]["also_indirect"] = also_indirect
+            urls_dict[url]["reason"] = "not_a_video"
             result["not_a_video"] = True
-            
-            if last_domains.count(domain) >= 2:
-                time.sleep(5)
-                
-            action = self._handle_non_video_stop(1, domain, last_domains, ignore_not_video)
-            if action:
-                result["stop_action"] = action
-                result["stop_reason"] = "no-videos"
                 
         except (FilesizeException, FailedDownload) as e:
             self.dataset.log(f"Request Error: {str(e)}")
@@ -842,18 +998,17 @@ class VideoDownloaderPlus(BasicProcessor):
 
         return result
 
-    def _process_ytdlp_downloads(self, url_list, urls_dict, ydl_opts, results_path, 
-                                  amount, also_indirect, yt_dlp_archive_map, consecutive_errors):
+    def _process_ytdlp_downloads(self, url_list, urls_dict, ydl_opts, results_path,
+                                  amount, also_indirect, consecutive_errors):
         """
         Process downloads using YT-DLP fallback
-        
+
         :param list url_list: List of URLs to download with YT-DLP
         :param dict urls_dict: URLs dictionary to update
         :param dict ydl_opts: YT-DLP options
         :param Path results_path: Path to staging area
         :param int amount: Maximum number of videos to download
         :param str also_indirect: Whether indirect downloads are allowed
-        :param dict yt_dlp_archive_map: Map of archive keys to file metadata
         :param int consecutive_errors: Current consecutive error count
         :return dict: Results dictionary with counters
         """
@@ -872,35 +1027,44 @@ class VideoDownloaderPlus(BasicProcessor):
                 continue
 
             self.videos_downloaded_from_url = set()
-            ydl_opts["outtmpl"] = str(results_path) + '/' + re.sub(r"[^0-9a-z]+", "_", url.lower())[:100] + '_%(autonumber)s.%(ext)s'
+            # the slug is cut to 100 characters, so two long URLs can share
+            # it; and `autonumber` restarts per URL because a YoutubeDL is made
+            # per URL, so it cannot tell them apart either
+            url_slug = self.staging_filenames.reserve(re.sub(r"[^0-9a-z]+", "_", url.lower())[:100])
+            ydl_opts["outtmpl"] = str(results_path) + '/' + url_slug + '_%(autonumber)s.%(ext)s'
             
-            ytdlp_result = self._download_single_ytdlp(url, ydl_opts, urls_dict, yt_dlp_archive_map)
+            ytdlp_result = self._download_single_ytdlp(url, ydl_opts, urls_dict)
             
             results["processed"] += 1
             
             if ytdlp_result["success"]:
+                consecutive_errors = 0
                 urls_dict[url]["success"] = True
                 num_files = len(urls_dict[url].get("files", []))
                 self.downloaded_videos += num_files
                 self._update_download_status()
             else:
+                # the reason, if yt-dlp gave one, is logged where it happened; this makes each failure explicit
+                self.dataset.log(f"Could not download {url} with yt-dlp")
                 results["failed"] += 1
-                if ytdlp_result.get("should_stop"):
-                    break
-                    
+                if ytdlp_result["site_error"]:
+                    consecutive_errors += 1
+                    if self._handle_consecutive_error_stop(consecutive_errors, also_indirect):
+                        break
+
         return results
 
-    def _download_single_ytdlp(self, url, ydl_opts, urls_dict, yt_dlp_archive_map):
+    def _download_single_ytdlp(self, url, ydl_opts, urls_dict):
         """
         Download a single URL using YT-DLP
-        
+
         :param str url: URL to download
         :param dict ydl_opts: YT-DLP options
         :param dict urls_dict: URLs dictionary to update
-        :param dict yt_dlp_archive_map: Map of archive keys to file metadata
-        :return dict: Result dictionary with success flag
+        :return dict: Result dictionary with a `success` flag, and a `site_error` flag for failures that suggest the
+        website is not letting us download
         """
-        result = {"success": False, "should_stop": False}
+        result = {"success": False, "site_error": False}
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             self.url_files = {}
@@ -911,7 +1075,7 @@ class VideoDownloaderPlus(BasicProcessor):
             try:
                 ydl.extract_info(url)
                 
-            except MaxVideosDownloaded:
+            except MaxDownloadsReached:
                 self.dataset.log("Max videos for URL reached.")
                 
             except ExistingVideoReached:
@@ -922,12 +1086,16 @@ class VideoDownloaderPlus(BasicProcessor):
                         info2 = ydl2.extract_info(url, download=False)
                         if info2:
                             archive_key = info2.get('extractor') + info2.get('id')
-                            if archive_key in yt_dlp_archive_map:
-                                self.url_files[info2.get('_filename', {})] = yt_dlp_archive_map[archive_key]
+                            if archive_key in self.yt_dlp_archive_map:
+                                self.url_files[info2.get('_filename', {})] = self.yt_dlp_archive_map[archive_key]
                             else:
-                                message = f"Video identified, but unable to identify which video from {url}"
+                                # yt-dlp's own archive file says this video was already downloaded,
+                                # but we have no record of which file that was (e.g. the earlier
+                                # download failed during post-processing after yt-dlp logged it as done)
+                                message = f"Video already downloaded according to yt-dlp, but the downloaded file could not be found for: {url}"
+                                urls_dict[url]['error'] = message
                                 self.dataset.log(message)
-                                self.log.warning(message)
+                                self.log.warning(f"{message} ({self.dataset.key})")
                 except Exception as e:
                     self.dataset.log(f"Error retrieving existing video info: {str(e)}")
                     
@@ -946,6 +1114,8 @@ class VideoDownloaderPlus(BasicProcessor):
                     
                 urls_dict[url]['error'] = message
                 self.dataset.log(message)
+                # a format that is not available or a live video is down to the 4CAT settings, not the website
+                result["site_error"] = not isinstance(e, LiveVideoException) and "Requested format is not available" not in error_str
                 return result
                 
             except Exception as e:
@@ -956,11 +1126,6 @@ class VideoDownloaderPlus(BasicProcessor):
         # Store results
         urls_dict[url]["downloader"] = "yt_dlp"
         urls_dict[url]['files'] = list(self.url_files.values())
-        
-        for file in self.url_files.values():
-            archive_key = file.get('metadata', {}).get('extractor', '') + file.get('metadata', {}).get('id', '')
-            if archive_key:
-                yt_dlp_archive_map[archive_key] = file
 
         # Check if download was successful
         if self.last_dl_status.get('status') == 'finished' and self.last_post_process_status.get('status') == 'finished':
@@ -969,16 +1134,48 @@ class VideoDownloaderPlus(BasicProcessor):
         return result
 
     def _save_metadata(self, urls_dict, results_path):
-        """Save metadata to JSON file"""
+        """Save metadata to .metadata.json in the staging area."""
         self.dataset.update_status("Updating and saving metadata")
-        metadata = {
-            url: {
-                "from_dataset": self.source_dataset.key,
-                **sets_to_lists(data)
-            } for url, data in urls_dict.items()
-        }
-        with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
-            json.dump(metadata, outfile)
+        # A preset may run this downloader on a stand-in dataset it built itself.
+        # Where that stand-in carries the original items' IDs, the preset names
+        # the original dataset here, so the metadata credits the dataset a
+        # researcher would recognise instead of the stand-in.
+        from_dataset = self.parameters.get("_from_dataset") or self.source_dataset.key
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type, from_dataset=from_dataset
+        )
+        for url, data in urls_dict.items():
+            data = sets_to_lists(data)
+            post_ids = list(data.get("post_ids", []))
+            files = data.get("files") or []
+            had_successful_file = False
+            for file in files:
+                if not isinstance(file, dict):
+                    continue
+                filename = file.get("filename")
+                if not filename or not file.get("success", True):
+                    continue
+                extra = dict(file.get("metadata") or {})
+                if data.get("downloader"):
+                    extra["downloader"] = data["downloader"]
+                # merge=True: one file can belong to several URLs, e.g. when
+                # yt-dlp recognises a video it already downloaded for an earlier
+                # URL, or the same video appears twice in a playlist. Every URL's
+                # posts must stay connected to the file; the URLs after the first
+                # are listed in the file's extra["other_urls"].
+                metadata.add_item(filename, post_ids=post_ids, url=url,
+                                  extra=extra, merge=True)
+                had_successful_file = True
+
+            if not had_successful_file:
+                metadata.add_failure(
+                    post_ids=post_ids,
+                    reason=data.get("reason") or "error",
+                    reason_description=data.get("error", "") or "",
+                    url=url,
+                )
+
+        metadata.write(results_path)
 
     def _log_statistics(self, total_urls):
         """Log comprehensive download statistics"""
@@ -997,11 +1194,38 @@ class VideoDownloaderPlus(BasicProcessor):
         self.dataset.log(f"Success rate (of processed URLs): {(self.downloaded_videos + self.copied_videos)}/{self.processed_urls} ({100*(self.downloaded_videos + self.copied_videos)/self.processed_urls if self.processed_urls > 0 else 0:.1f}%)")
         self.dataset.log("=" * 60)
 
+    def _remove_unfinished_downloads(self, results_path):
+        """
+        Remove the files yt-dlp leaves behind for downloads that did not finish
+
+        yt-dlp downloads to a `.part` file (or `.part-Frag` pieces, with a
+        `.ytdl` file to resume from) and only gives it its real name once the
+        download is complete. If a download breaks off, these stay behind;
+        they are not videos, so they should not end up in the archive.
+
+        :param Path results_path:  Staging area with the downloaded files
+        :return list:  Names of the removed files
+        """
+        unfinished = [file for file in results_path.iterdir() if file.is_file() and (
+            file.name.endswith((".part", ".ytdl")) or ".part-Frag" in file.name)]
+
+        for file in unfinished:
+            file.unlink()
+
+        if unfinished:
+            self.dataset.log(f"Removed {len(unfinished):,} file(s) of downloads that did not finish: "
+                             f"{', '.join(sorted(file.name for file in unfinished))}")
+
+        return [file.name for file in unfinished]
+
     def _finish_processing(self, results_path, total_urls):
         """Finish processing and create result archive"""
+        self._remove_unfinished_downloads(results_path)
         self.dataset.update_status("Writing downloaded videos to zip archive")
-        self.write_archive_and_finish(results_path, self.downloaded_videos + self.copied_videos, finish=False)
-        
+        # videos copied from earlier downloads are in the archive too
+        num_videos = self.downloaded_videos + self.copied_videos
+        self.write_archive_and_finish(results_path, num_videos, finish=False)
+
         status_msg = f"Downloaded {self.downloaded_videos} videos"
         if self.copied_videos > 0:
             status_msg += f"; {self.copied_videos} videos copied from previous downloads"
@@ -1014,16 +1238,14 @@ class VideoDownloaderPlus(BasicProcessor):
         
         if self.warning_message:
             self.dataset.update_status(status_msg)
-            self.dataset.finish_with_warning(self.downloaded_videos, f"Incomplete: {self.warning_message}")
+            self.dataset.finish_with_warning(num_videos, f"Incomplete: {self.warning_message}")
         else:
             self.dataset.update_status(status_msg, is_final=True)
-            self.dataset.finish(self.downloaded_videos)
+            self.dataset.finish(num_videos)
 
     def yt_dlp_monitor(self, d):
         """Can be used to gather information from yt-dlp while downloading"""
         self.last_dl_status = d
-        if len(self.videos_downloaded_from_url) != 0 and len(self.videos_downloaded_from_url) >= self.max_videos_per_url:
-            raise MaxVideosDownloaded('Max videos for URL reached.')
         if self.interrupted:
             raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
@@ -1031,12 +1253,23 @@ class VideoDownloaderPlus(BasicProcessor):
         """Can be used to gather information from yt-dlp while post processing the downloads"""
         self.last_post_process_status = d
         if d['status'] == 'finished':
-            self.videos_downloaded_from_url.add(d.get('info_dict',{}).get('_filename', {}))
-            self.url_files[d.get('info_dict',{}).get('_filename', {})] = {
-                "filename": Path(d.get('info_dict').get('_filename')).name,
-                "metadata": d.get('info_dict'),
+            info_dict = d.get('info_dict', {})
+            self.videos_downloaded_from_url.add(info_dict.get('_filename', {}))
+            file = {
+                "filename": Path(info_dict.get('_filename')).name,
+                "metadata": info_dict,
                 "success": True
             }
+            self.url_files[info_dict.get('_filename', {})] = file
+            # yt-dlp named this itself, so claim it before anything else does
+            self.staging_filenames.claim(file["filename"])
+
+            # Record this in the archive map immediately, so a later video that yt-dlp recognises
+            # as already-downloaded can still be matched to the file that was written for it,
+            # even if this download goes on to fail during post-processing.
+            archive_key = info_dict.get('extractor', '') + info_dict.get('id', '')
+            if archive_key and self.yt_dlp_archive_map is not None:
+                self.yt_dlp_archive_map[archive_key] = file
         if self.interrupted:
             raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
@@ -1058,7 +1291,7 @@ class VideoDownloaderPlus(BasicProcessor):
             max_video_size = 0
             
         if response.status_code == 403:
-            raise VideoStreamUnavailable(f"Website denied download request (Code 403): {original_url}")
+            raise DownloadDenied(f"Website denied download request (Code 403): {original_url}")
         elif 400 <= response.status_code < 500:
             raise FailedDownload(f"Website denied download request (Code {response.status_code} / Reason {response.reason}): {original_url}")
         if response.status_code != 200:
@@ -1078,7 +1311,7 @@ class VideoDownloaderPlus(BasicProcessor):
         if extension not in ["mp4", "mp3"]:
             self.dataset.log(f"DEBUG: Odd extension type {extension}; Notify 4CAT maintainers if video. Content-Type for url {original_url}: {content_type}")
 
-        unique_filename = url_to_filename(original_url, staging_area=results_path, default_ext="." + extension)
+        unique_filename = self.staging_filenames.reserve_for_url(original_url, default_ext="." + extension)
         save_location = results_path.joinpath(unique_filename)
 
         if max_video_size != 0:
@@ -1148,12 +1381,13 @@ class VideoDownloaderPlus(BasicProcessor):
         self.dataset.update_status(message)
         return message 
 
-    def _handle_consecutive_error_stop(self, consecutive_errors, also_indirect):
+    def _handle_consecutive_error_stop(self, consecutive_errors, also_indirect="none"):
         """Handle stopping condition for too many consecutive errors"""
         if consecutive_errors < 5:
             return None
             
-        if also_indirect != "none":
+        # in a preset (e.g. for TikTok or Weibo), the non-direct videos setting is not the user's to change
+        if also_indirect != "none" and not self.is_running_in_preset:
             message = f"Downloaded {self.downloaded_videos} videos. Errors {consecutive_errors} consecutive times; try deselecting the non-direct videos setting"
         else:
             message = f"Downloaded {self.downloaded_videos} videos. Errors {consecutive_errors} consecutive times; check logs to ensure video URLs are working links and you are not being blocked."
@@ -1177,6 +1411,10 @@ class VideoDownloaderPlus(BasicProcessor):
         # Fallback URLs; if a URL failed, this URL can be used as a backup
         _fallback_urls = {}
         _fallback_column = self.parameters.get("_ytdlp_fallback_column", None)
+        # Whether items without a video link are tried with yt-dlp, using their fallback URL. That is right when every
+        # item has a video (e.g. TikTok, once its image posts are left out), but not when an item without a video link
+        # simply has no video (e.g. Weibo)
+        _fallback_without_video_link = self.parameters.get("_ytdlp_fallback_without_video_link", True)
 
         columns = self.parameters.get("columns")
         if type(columns) is str:
@@ -1201,10 +1439,15 @@ class VideoDownloaderPlus(BasicProcessor):
                 video_links = self.identify_video_urls_in_string(value)
                 return set(video_links), bool(video_links)
 
-            # Fallback URLs should be *known* single (post) URL columns, but may be blank
+            # Fallback URLs should be *known* single (post) URL columns, but may be blank. Use the URL as it is:
+            # searching the value for URLs, as for the other columns, can cut a URL short (e.g. at a dot in a
+            # TikTok username, so that only the profile URL is left)
             _fallback_value = post.get(_fallback_column, None)
-            _fallback_url_links, has_fallback_links = _parse_and_collect_video_urls(_fallback_value)
-            fallback_url = _fallback_url_links.pop() if _fallback_url_links else None
+            _fallback_url_links = [
+                link for link in split_urls(str(_fallback_value)) if link.startswith(("http://", "https://"))
+            ] if _fallback_value else []
+            has_fallback_links = bool(_fallback_url_links)
+            fallback_url = _fallback_url_links[0] if _fallback_url_links else None
 
             for column in columns:
                 value = post.get(column)
@@ -1223,7 +1466,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             }
                     else:
                         urls[item_url]['post_ids'].add(post.get('id'))
-            elif has_fallback_links:
+            elif has_fallback_links and _fallback_without_video_link:
                 # Fallback queue only; no video URLs found in main columns, but fallback column has a URL that can be used
                 if fallback_url not in urls:
                     _fallback_urls[fallback_url] = {
@@ -1239,154 +1482,96 @@ class VideoDownloaderPlus(BasicProcessor):
 
     def identify_video_urls_in_string(self, text):
         """Search string of text for URLs that may contain video links"""
-        split_comma = self.parameters.get("split-comma", True)
-        if split_comma:
-            texts = text.split(",")
-        else:
-            texts = [text]
+        return urls_in_text(text)
 
-        urls = set()
-        for string in texts:
-            urls |= set([url for url in urls_from_text(string)])
-        return list(urls)
+    def copy_previous_video(self, hit, staging_area):
+        """
+        Copy the file(s) of a previously downloaded video into the current
+        staging area.
 
-    def copy_previous_video(self, previous_vid_metadata, staging_area, previous_downloaders):
-        """Copy existing video to new staging area"""
-        num_copied = 0
-        dataset_key = previous_vid_metadata.get("file_dataset_key")
-        dataset = [dataset for dataset in previous_downloaders if dataset.key == dataset_key]
+        Several URLs can lead to the same earlier file (e.g. a short and a
+        long link to one video). A file that was already copied for another
+        URL in this run is not copied or counted again.
 
-        if "files" in previous_vid_metadata:
-            files = previous_vid_metadata.get('files')
-        elif "filename" in previous_vid_metadata:
-            files = [{"filename": previous_vid_metadata.get("filename"), "success": True}]
-        else:
-            raise FailedToCopy("Unable to read video metadata")
+        :param MediaLibraryHit hit:  a successful library lookup; its
+            `metadata.dataset` locates the source archive and `entries`
+            lists the files to copy.
+        :param Path staging_area:  where to extract the files to.
+        :return int:  number of files newly copied.
+        """
+        source_dataset = hit.metadata.dataset
+        if source_dataset is None:
+            raise FailedToCopy("Previous metadata is not bound to a dataset")
 
-        if not files:
+        filenames = [filename for filename, _ in hit.entries]
+        if not filenames:
             raise FailedToCopy("No file found in metadata")
 
-        if not dataset:
-            raise FailedToCopy(f"Dataset with key {dataset_key} not found")
-        else:
-            dataset = dataset[0]
+        num_copied = 0
+        with zipfile.ZipFile(source_dataset.get_results_path(), "r") as archive_file:
+            archive_contents = set(archive_file.namelist())
 
-        with zipfile.ZipFile(dataset.get_results_path(), "r") as archive_file:
-            archive_contents = sorted(archive_file.namelist())
+            # check every file before copying any, so that a URL is never left
+            # with only some of its files copied
+            to_copy = []
+            for filename in filenames:
+                if filename not in archive_contents:
+                    raise FailedToCopy(f"Previously downloaded video {filename} not found")
+                copied_from = self.files_copied_from_library.get(filename)
+                if copied_from == source_dataset.key:
+                    self.dataset.log(f"Previously downloaded video {filename} was already copied for another URL")
+                    continue
+                if copied_from is not None:
+                    # a file of the same name from a different earlier dataset
+                    # may be a different video; copying it would overwrite the
+                    # one already copied
+                    raise FailedToCopy(f"A video named {filename} was already copied from dataset {copied_from}")
+                to_copy.append(filename)
 
-            for file in files:
-                if file.get("filename") not in archive_contents:
-                    raise FailedToCopy(f"Previously downloaded video {file.get('filename')} not found")
-
-                self.dataset.log(f"Copying previously downloaded video {file.get('filename')} to new staging area")
-                archive_file.extract(file.get("filename"), staging_area)
+            for filename in to_copy:
+                self.dataset.log(f"Copying previously downloaded video {filename} to new staging area")
+                archive_file.extract(filename, staging_area)
+                self.files_copied_from_library[filename] = source_dataset.key
+                # keeps a later download from overwriting the copy
+                self.staging_filenames.claim(filename)
                 num_copied += 1
 
         return num_copied
 
-    @staticmethod
-    def map_metadata(url, data):
-        """Iterator to yield modified metadata for CSV"""
+    YT_DLP_EXTRACTED_FIELDS = (
+        "title", "artist", "description", "view_count", "like_count",
+        "repost_count", "comment_count", "uploader", "creator", "uploader_id",
+    )
+
+    @classmethod
+    def map_metadata(cls, filename, item):
+        """Yield CSV row(s) for a successful items[filename] entry."""
+        extra = item.get("extra") or {}
         row = {
-            "url": url,
-            "number_of_posts_with_url": len(data.get("post_ids", [])),
-            "post_ids": ", ".join(data.get("post_ids", [])),
-            "downloader": data.get("downloader", ""),
-            "download_successful": data.get('success', "")
+            "url": item.get("url", ""),
+            "number_of_posts_with_url": len(item.get("post_ids", [])),
+            "post_ids": ", ".join(item.get("post_ids", [])),
+            "downloader": extra.get("downloader", ""),
+            "download_successful": True,
+            "filename": filename,
         }
+        for field in cls.YT_DLP_EXTRACTED_FIELDS:
+            row[f"extracted_{field}"] = extra.get(field, "N/A")
+        row["error"] = "N/A"
+        yield row
 
-        for file in data.get("files", [{}]):
-            row["filename"] = file.get("filename", "N/A")
-            yt_dlp_data = file.get("metadata", {})
-            for common_column in ["title", "artist", "description", "view_count", "like_count", "repost_count", "comment_count", "uploader", "creator", "uploader_id"]:
-                if yt_dlp_data:
-                    row[f"extracted_{common_column}"] = yt_dlp_data.get(common_column)
-                else:
-                    row[f"extracted_{common_column}"] = "N/A"
-            row["error"] = data.get("error", "N/A")
-            yield row
-
-
-class DatasetVideoLibrary:
-    """
-    Library for managing video downloads across multiple processors
-    """
-    def __init__(self, current_dataset, modules):
-        self.modules = modules
-        self.current_dataset = current_dataset
-        self.previous_downloaders = self.collect_previous_downloaders()
-        self.current_dataset.log(f"Previously video downloaders: {[downloader.key for downloader in self.previous_downloaders]}")
-
-        metadata_files = self.collect_all_metadata_files()
-
-        # Build library
-        library = {}
-        for metadata_file in metadata_files:
-            for url, data in metadata_file[1].items():
-                if data.get("success", False):
-                    # Always overwrite for success
-                    library[url] = {
-                        **data,
-                        "file_dataset_key": metadata_file[0]
-                    }
-                elif url not in library:
-                    # Do not overwrite failures, but do add if missing
-                    library[url] = {
-                        **data,
-                        "file_dataset_key": metadata_file[0]
-                    }
-
-        self.current_dataset.log(f"Total URLs previously seen: {len(library)}")
-        self.library = library
-
-    def collect_previous_downloaders(self):
-        """
-        Check for other video-downloader processors run on the dataset and create library for reference
-        """
-        # NOTE: this only checks parent dataset, not full ancestry (e.g. other filters with video downloaders)
-        parent_dataset = self.current_dataset.get_parent()
-        # Note: exclude current dataset
-        previous_downloaders = [child for child in parent_dataset.get_children() if 
-                              (child.type in ["video-downloader"] and child.key != self.current_dataset.key)]
-
-        # Check to see if filtered dataset
-        if "copied_from" in parent_dataset.parameters and parent_dataset.is_top_dataset():
-            try:
-                original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db, modules=self.modules)
-                previous_downloaders += [child for child in original_dataset.top_parent().get_children() if
-                                         (child.type in ["video-downloader"] and child.key != self.current_dataset.key)]
-            except DataSetException:
-                # parent dataset no longer exists!
-                pass
-
-        return previous_downloaders
-
-    def collect_metadata_file(self, dataset, staging_area):
-        """Collect metadata from a dataset's video archive"""
-        source_file = dataset.get_results_path()
-        if not source_file.exists():
-            return None
-
-        with zipfile.ZipFile(dataset.get_results_path(), "r") as archive_file:
-            archive_contents = sorted(archive_file.namelist())
-            if '.metadata.json' not in archive_contents:
-                return None
-
-            archive_file.extract(".metadata.json", staging_area)
-
-            with open(staging_area.joinpath(".metadata.json")) as file:
-                return json.load(file)
-
-    def collect_all_metadata_files(self):
-        """Collect all metadata files from previous downloaders"""
-        metadata_staging_area = self.current_dataset.get_staging_area()
-
-        metadata_files = [(downloader.key, self.collect_metadata_file(downloader, metadata_staging_area)) 
-                         for downloader in self.previous_downloaders]
-        metadata_files = [file for file in metadata_files if file[1] is not None]
-        self.current_dataset.log(f"Metadata files collected: {len(metadata_files)}; with {[len(urls[1]) for urls in metadata_files]}")
-
-        # Delete staging area
-        shutil.rmtree(metadata_staging_area)
-
-        return metadata_files
+    @classmethod
+    def map_failure_metadata(cls, failure):
+        """Yield CSV row(s) for a failures[] entry."""
+        row = {
+            "url": failure.get("url", ""),
+            "number_of_posts_with_url": len(failure.get("post_ids", [])),
+            "post_ids": ", ".join(failure.get("post_ids", [])),
+            "downloader": "",
+            "download_successful": False,
+            "filename": "",
+        }
+        for field in cls.YT_DLP_EXTRACTED_FIELDS:
+            row[f"extracted_{field}"] = "N/A"
+        row["error"] = failure.get("reason_description") or failure.get("reason") or "N/A"
+        yield row

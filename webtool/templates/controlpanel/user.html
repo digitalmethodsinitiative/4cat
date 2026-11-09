@@ -21,11 +21,18 @@
                             </button>
                         </form>
                     </li>
-                    {% if not user.password %}
-                        <li><a href="{{ url_for("user.reset_password") }}?token={{ user.register_token }}"
-                               class="button-like"><i class="fa fa-link" aria-hidden="true"></i> Password (re)set
-                            link</a></li>
-                    {% endif %}
+                    <li>
+                        <form class="inline" action="{{ url_for("admin.create_reset_link") }}" method="POST">
+                            <input type="hidden" name="name" value="{{ user.name }}">
+                            <button class="tooltip-trigger" aria-controls="tooltip-reset-link"><i class="fa fa-link"
+                                    aria-hidden="true"></i> Password reset link
+                            </button>
+                        </form>
+                        <p role="tooltip" id="tooltip-reset-link">Shows a new link through which the user can set a
+                            password, for you to pass on. Their current password keeps working until they do. Any
+                            earlier link stops working.</p>
+                    </li>
+                    {% if can_email %}
                     <li>
                         <a href="{{ url_for("admin.add_user") }}?force=1&amp;format=html&amp;email={{ user.name }}"
                            class="button-like confirm-first tooltip-trigger" aria-controls="tooltip-resend-mail"
@@ -35,6 +42,7 @@
                         <p role="tooltip" id="tooltip-resend-mail">Warning: this resets the user's password &
                             re-generates their reset token</p>
                     </li>
+                    {% endif %}
 
                 {% if __user_config("privileges.admin.can_manage_settings") %}
                     <li><a href="{{ url_for("admin.manipulate_settings") }}?tag=user:{{ user.name }}"
@@ -59,7 +67,15 @@
                 {% endfor %}
                 <div class="form-element{% if "name" in incomplete %} missing{% endif %}">
                     <label for="user-name">Name (e-mail)</label>
+                    {% if mode == "edit" %}
+                    <div>
+                        <input type="text" id="user-name" value="{{ user.name }}" disabled>
+                        <button class="tooltip-trigger" aria-controls="tooltip-name-label" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-name-label" class="force-width">The name cannot be changed. This user's datasets, settings and API access are linked to it.</p>
+                    </div>
+                    {% else %}
                     <input type="text" name="name" id="user-name" value="{{ user.name }}">
+                    {% endif %}
                 </div>
                 <div class="form-element{% if "tags" in incomplete %} missing{% endif %}">
                     <label for="user-tags">Tags</label>
@@ -77,7 +93,11 @@
                 {% endif %}
                 <div class="form-element">
                     <label for="user-deactivated">Is deactivated?</label>
-                    <input type="checkbox"{% if user.is_deactivated %} checked="checked"{% endif %} id="user-deactivated" name="is_deactivated">
+                    <div>
+                        <input type="checkbox"{% if user.is_deactivated %} checked="checked"{% endif %} id="user-deactivated" name="is_deactivated">
+                        <button class="tooltip-trigger" aria-controls="tooltip-deactivated-label" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-deactivated-label" class="force-width">A deactivated user cannot use 4CAT. If they are logged in, they are logged out the next time they load a page, and they cannot log in again. Requests with their API access tokens are refused too. Their datasets and other data are kept, and datasets that are already queued or running are not stopped. Untick this to reactivate them.</p>
+                    </div>
                 </div>
                 <div class="form-element">
                     <label for="user-autodelete">Delete after</label>

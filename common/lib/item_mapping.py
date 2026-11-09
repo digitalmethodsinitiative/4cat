@@ -10,6 +10,25 @@ class MissingMappedField:
 
     Used if e.g. a metric is missing in the underlying data object, and
     processors might want to know this instead of using a default value
+
+    A field is missing when the source data holds no value for it. An absent
+    key always means that: the source told us nothing about the field, so
+    there is nothing to record. A value of zero, an empty string or false is a
+    real value and belongs in the dataset as it is - a post with no likes and
+    a post whose like count was never sent are different things, and only the
+    second one is missing.
+
+    A value of null sits between the two and cannot be decided here. It may
+    mean the source has no value for the field, or it may mean the value
+    genuinely is nothing: in one and the same platform response, a null author
+    can mean the page left the author out, while a null location means the post
+    has no location. Only the method mapping a particular platform's data can
+    tell those apart, so each `map_item` decides what a null means for each of
+    its own fields.
+
+    The value processors fall back on when they do not handle missing data is
+    the `default` given here, so pick one that cannot be mistaken for a real
+    value. For a count that means -1 rather than 0.
     """
 
     def __init__(self, default):
@@ -20,6 +39,32 @@ class MissingMappedField:
         processor decides otherwise.
         """
         self.value = default
+
+
+def value_or_missing(source, key, default):
+    """
+    Read a field from source data, marking it missing if the key is not there
+
+    An absent key means the source told us nothing about this field, so there
+    is no value to record. Everything the source did send is returned as it
+    is, including zero, an empty string, false and null.
+
+    Null is deliberately left alone: whether it means "no value was
+    collected" or "the value is nothing" depends on the field, so the calling
+    `map_item` has to decide. Where a platform answers that the same way for
+    most of its fields, say so once in that datasource rather than repeating
+    the check.
+
+    :param dict source:  Data to read the field from
+    :param str key:  Name of the field to read
+    :param default:  Value processors should fall back on if the field turns
+      out to be missing; pick one that cannot pass for a real value
+    :return:  The field's value, or a MissingMappedField if the key is absent
+    """
+    if key not in source:
+        return MissingMappedField(default)
+
+    return source[key]
 
 
 class MappedItem:
@@ -56,7 +101,7 @@ class MappedItem:
                 if type(value) is MissingMappedField:
                     data[field] = value.value
 
-        return self.data
+        return data
 
     def get_message(self):
         """

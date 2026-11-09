@@ -16,34 +16,37 @@ def ui_module():
         pass
     exc_mod.QueryParametersException = QueryParametersException
 
-    # register minimal module tree so imports inside user_input succeed
-    sys.modules["common"] = types.ModuleType("common")
-    sys.modules["common.lib"] = types.ModuleType("common.lib")
-    sys.modules["common.lib.exceptions"] = exc_mod
+    # register minimal module tree so imports inside user_input succeed; the
+    # stand-ins are removed again once this module's tests are done, so that
+    # tests in other modules get the real packages
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setitem(sys.modules, "common", types.ModuleType("common"))
+        monkeypatch.setitem(sys.modules, "common.lib", types.ModuleType("common.lib"))
+        monkeypatch.setitem(sys.modules, "common.lib.exceptions", exc_mod)
 
-    # stub dateutil.parser.parse
-    sys.modules["dateutil"] = types.ModuleType("dateutil")
-    dateutil_parser = types.ModuleType("dateutil.parser")
-    dateutil_parser.parse = lambda s: None
-    sys.modules["dateutil.parser"] = dateutil_parser
+        # stub dateutil.parser.parse
+        monkeypatch.setitem(sys.modules, "dateutil", types.ModuleType("dateutil"))
+        dateutil_parser = types.ModuleType("dateutil.parser")
+        dateutil_parser.parse = lambda s: None
+        monkeypatch.setitem(sys.modules, "dateutil.parser", dateutil_parser)
 
-    # stub werkzeug.datastructures.ImmutableMultiDict
-    wz = types.ModuleType("werkzeug")
-    wz_ds = types.ModuleType("werkzeug.datastructures")
-    class ImmutableMultiDict:
-        pass
-    wz_ds.ImmutableMultiDict = ImmutableMultiDict
-    sys.modules["werkzeug"] = wz
-    sys.modules["werkzeug.datastructures"] = wz_ds
+        # stub werkzeug.datastructures.ImmutableMultiDict
+        wz = types.ModuleType("werkzeug")
+        wz_ds = types.ModuleType("werkzeug.datastructures")
+        class ImmutableMultiDict:
+            pass
+        wz_ds.ImmutableMultiDict = ImmutableMultiDict
+        monkeypatch.setitem(sys.modules, "werkzeug", wz)
+        monkeypatch.setitem(sys.modules, "werkzeug.datastructures", wz_ds)
 
-    spec = importlib.util.spec_from_file_location(
-        "user_input",
-        "common/lib/user_input.py",
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+        spec = importlib.util.spec_from_file_location(
+            "user_input",
+            "common/lib/user_input.py",
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
 
-    return module.UserInput, module.RequirementsNotMetException
+        yield module.UserInput, module.RequirementsNotMetException
 
 
 @pytest.mark.parametrize("req,other,expected", [

@@ -63,15 +63,8 @@ if not args.no_version_check:
 # the config manager can be run properly
 from common.config_manager import ConfigManager  # noqa: E402
 from common.lib.helpers import call_api  # noqa: E402
-# ---------------------------------------------
-#     Check validity of configuration file
-# (could be expanded to check for other values)
-# ---------------------------------------------
+
 config = ConfigManager()
-if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "REPLACE_THIS":
-    print(
-        "You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
-    sys.exit(1)
 
 # ---------------------------------------------
 #   Running as a daemon is only supported on
@@ -267,14 +260,19 @@ elif command == "status":
             sys.exit(0)
 
         print("\n     Active workers:\n-------------------------")
-        api_response = call_api("workers")
+        api_response = call_api("worker-status")
         if api_response["status"] == "success":
             active_workers = api_response["response"]
-            active_workers = {worker: active_workers[worker] for worker in
-                            sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if
-                            active_workers[worker] > 0}
-            for worker in active_workers:
-                print("%s: %i" % (worker, active_workers[worker]))
+            for worker in sorted(active_workers["running"], key=lambda x: x["type"]):
+                print(f"- {worker['type']}", end="")
+
+                if worker["remote_id"]:
+                    print(f" on {worker['remote_id']}", end="")
+
+                if worker["code"]["location"]:
+                    print(f" (in {worker['code']['location'][0]['path']}:{worker['code']['location'][0]['line']})", end="")
+
+                print("\n")
 
             print("\n")
         else:

@@ -24,13 +24,37 @@ def synchronized_method(func):
 
     return wrapper
 
+
+def remove_proxy_credentials(proxy_url):
+    """
+    Remove the username and password from a proxy URL
+
+    Proxy URLs can contain a username and password, as in
+    `http://user:password@host:port`. Processors may write the proxy they
+    were given to dataset logs or results that users can see, and the backend
+    log may be forwarded elsewhere (e.g. to Slack), so use this on any proxy
+    URL that is passed on to processors or written to a log.
+
+    :param str|None proxy_url:  Proxy URL
+    :return str|None:  The same URL, without anything before the last `@`
+    """
+    if not proxy_url:
+        return proxy_url
+
+    scheme, separator, rest = proxy_url.partition("://")
+    if not separator:
+        scheme, rest = "", proxy_url
+
+    return scheme + separator + rest.rpartition("@")[2]
+
 class FailedProxiedRequest:
     """
     A delegated request that has failed for whatever reason
 
     The failure context (usually the exception) is stored in the `context`
     property. We also keep track of the proxy URL that serviced the request so
-    downstream consumers can make informed retry decisions.
+    downstream consumers can make informed retry decisions. Any username and
+    password are removed from that URL.
     """
 
     context = None
@@ -38,7 +62,7 @@ class FailedProxiedRequest:
 
     def __init__(self, context=None, proxy_url=None):
         self.context = context
-        self.proxy_url = proxy_url
+        self.proxy_url = remove_proxy_credentials(proxy_url)
 
 
 class NoProxiesAvailableError(Exception):
@@ -175,7 +199,7 @@ class SophisticatedFuturesProxy:
                     and request.timestamp_finished < time.time() - self.COOLOFF
                 ):
                     self.log.debug(
-                        f"Releasing proxy {self.proxy_url} for host name {hostname}"
+                        f"Releasing proxy {remove_proxy_credentials(self.proxy_url)} for host name {hostname}"
                     )
                     self.hostnames[hostname].running.remove(request)
 
@@ -214,7 +238,7 @@ class SophisticatedFuturesProxy:
             request.timestamp_finished = 0
             self.hostnames[hostname].running.append(request)
             self.log.debug(
-                f"Claiming proxy {self.proxy_url} for host name {hostname} ({len(self.hostnames[hostname].running)} of {self.MAX_CONCURRENT_PER_HOST} for host)"
+                f"Claiming proxy {remove_proxy_credentials(self.proxy_url)} for host name {hostname} ({len(self.hostnames[hostname].running)} of {self.MAX_CONCURRENT_PER_HOST} for host)"
             )
             return self
         else:
@@ -465,11 +489,11 @@ class DelegatedRequestHandler:
                     if proxy_url in self.proxy_health:
                         del self.proxy_health[proxy_url]
                     self.proxies_pending_removal.discard(proxy_url)
-                    self.log.info(f"Removed proxy {proxy_url} (no longer in config)")
+                    self.log.info(f"Removed proxy {remove_proxy_credentials(proxy_url)} (no longer in config)")
                 else:
                     # Has active requests - mark for removal but don't delete yet
                     self.proxies_pending_removal.add(proxy_url)
-                    self.log.warning(f"Proxy {proxy_url} marked for removal (has active requests, will not accept new requests)")
+                    self.log.warning(f"Proxy {remove_proxy_credentials(proxy_url)} marked for removal (has active requests, will not accept new requests)")
         
         # Update settings for existing proxies
         for proxy_url in proxies_to_keep:
@@ -484,7 +508,7 @@ class DelegatedRequestHandler:
         # Add new proxies
         for proxy_url in proxies_to_add:
             self._add_proxy_to_pool(proxy_url)
-            self.log.info(f"Added new proxy {proxy_url}")
+            self.log.info(f"Added new proxy {remove_proxy_credentials(proxy_url)}")
         
         if proxies_to_add or proxies_to_remove:
             self.log.info(f"Proxy pool updated: {len(self.proxy_pool)} total proxies "
@@ -635,15 +659,16 @@ class DelegatedRequestHandler:
                             if proxy_url in self.proxy_health:
                                 del self.proxy_health[proxy_url]
                             self.proxies_pending_removal.discard(proxy_url)
-                            self.log.info(f"Removed proxy {proxy_url} (completed all active requests)")
+                            self.log.info(f"Removed proxy {remove_proxy_credentials(proxy_url)} (completed all active requests)")
                     try:
                         response = url_metadata.proxied.request.result()
                         # annotate the response so processors can see which
-                        # proxy (if any) handled the request
+                        # proxy (if any) handled the request, without its
+                        # username and password
                         setattr(
                             response,
                             "_4cat_proxy",
-                            url_metadata.proxied.proxy.proxy_url,
+                            remove_proxy_credentials(url_metadata.proxied.proxy.proxy_url),
                         )
                         url_metadata.proxied.result = response
 
@@ -654,7 +679,7 @@ class DelegatedRequestHandler:
                         probe_succeeded = url_metadata.proxied.proxy.probe()
                         if probe_succeeded:
                             self.log.debug(
-                                f"Proxy {proxy_url} returned a proxy error for {url}, "
+                                f"Proxy {remove_proxy_credentials(proxy_url)} returned a proxy error for {url}, "
                                 f"but health probe to {url_metadata.proxied.proxy.healthcheck_url} succeeded; "
                                 f"passing original error back to requester"
                             )
@@ -667,7 +692,7 @@ class DelegatedRequestHandler:
                             if proxy_url not in self.proxy_warnings_logged:
                                 self.proxy_warnings_logged.add(proxy_url)
                                 self.log.warning(
-                                    f"Proxy {proxy_url} marked as unhealthy due to connection failure and failed health probe "
+                                    f"Proxy {remove_proxy_credentials(proxy_url)} marked as unhealthy due to connection failure and failed health probe "
                                     f"({url_metadata.proxied.proxy.healthcheck_url}): {str(e)}"
                                 )
 

@@ -3,12 +3,14 @@ View .metadata.json
 
 Designed to work with any processor that has a 'map_metadata' method
 """
-import json
-import zipfile
+import csv
 
 from backend.lib.processor import BasicProcessor, ProcessorDescription
+from common.lib.archive_metadata import normalize_post_id
 from common.lib.compatibility import Compatibility
-from common.lib.outputs import Table
+from common.lib.dataset import DataSet
+from common.lib.exceptions import DataSetException, MetadataException, ProcessorInterruptedException
+from common.lib.helpers import remove_nuls
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -21,21 +23,33 @@ class ViewMetadata(BasicProcessor):
 	"""
 	Metadata Viewer
 
-	Reformats the .metadata.json file and calculates some basic analytics
+	Reformats the .metadata.json file of a media archive and, where possible,
+	adds the data of the dataset items each media file was downloaded from.
 	"""
 	type = "metadata-viewer"  # job type ID
 	description = ProcessorDescription(
 		title="Extract media metadata",
 		tags=["conversion"],
-		description="Read the .metadata.json file produced by an image or video downloader and turn it into a flat table, with one row per downloaded item. Optionally include items whose download failed.",
+		description="Reformats the .metadata.json file produced by a media downloader and turn it into a flat table, with one row per downloaded item. Optionally include items whose download failed.",
 		icon="circle-info",
 	)
 	extension = "csv"  # extension of result file, used internally and in UI
-	# a derived table
-	output = Table()
+	
+	# Archives made by these processors contain a .metadata.json file. Also used
+	# when looking for the dataset the media came from, because a media archive
+	# can be made from another media archive (e.g. by filtering out duplicates).
+	media_archive_prefixes = {"video-downloader", "image-downloader"}
 
 	# Allow on downloaded media datasets
-	compatibility = Compatibility(type_prefixes={"video-downloader", "image-downloader"})
+	compatibility = Compatibility(type_prefixes=media_archive_prefixes)
+
+	# The columns read from the metadata file get this prefix, so that they
+	# cannot collide with the columns of the dataset the media came from.
+	media_prefix = "media_"
+
+	# Says whether a row could be traced back to an item in that dataset. Only
+	# written when there is a dataset to combine the metadata with.
+	matched_column = "media_source_matched"
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -49,6 +63,14 @@ class ViewMetadata(BasicProcessor):
 		:return dict:   Options for this processor
 		"""
 		return {
+			"join_source": {
+				"type": UserInput.OPTION_TOGGLE,
+				"help": "Add data of the items the media came from",
+				"default": True,
+				"tooltip": "If enabled, each media file is combined with the item(s) it was downloaded from, so "
+						   "that for example the text of a post is shown next to the image found in it. Media "
+						   "files that cannot be traced back to an item are still included, with empty columns."
+			},
 			"include_failed": {
 				"type": UserInput.OPTION_TOGGLE,
 				"help": "Included failed datapoints",
@@ -59,46 +81,413 @@ class ViewMetadata(BasicProcessor):
 
 	def process(self):
 		"""
-		Grabs .metadata.json and reformats
+		Read .metadata.json from the parent archive and reformat as CSV using the
+		parent producer's `map_metadata` / `map_failure_metadata` hooks, adding
+		the data of the dataset the media was downloaded from where that dataset
+		can still be found.
 		"""
 		self.dataset.update_status("Collecting .metadata.json file")
-		with zipfile.ZipFile(self.source_file, "r") as archive_file:
-			archive_contents = sorted(archive_file.namelist())
-			if '.metadata.json' not in archive_contents:
-				self.dataset.finish_with_error("Unable to identify metadata file")
-				return
+		try:
+			metadata = self.source_dataset.read_media_metadata()
+		except FileNotFoundError:
+			self.dataset.finish_with_error("Unable to identify metadata file")
+			return
+		except MetadataException as e:
+			self.dataset.finish_with_error(f"Unable to read metadata: {e}")
+			return
 
-			staging_area = self.dataset.get_staging_area()
-			archive_file.extract(".metadata.json", staging_area)
-
-			with open(staging_area.joinpath(".metadata.json")) as file:
-				metadata_file = json.load(file)
-
-		parent_processor = self.dataset.get_parent().get_own_processor()
-		if parent_processor is None or not hasattr(parent_processor, "map_metadata"):
-			if parent_processor is not None:
-				self.log.warning(f"Metadata formatter processor cannot run on {parent_processor.type}; map_metadata method not implemented")
+		producer = self.source_dataset.get_own_processor()
+		if producer is None or not hasattr(producer, "map_metadata"):
+			if producer is not None:
+				self.log.warning(f"Metadata formatter processor cannot run on {producer.type}; map_metadata method not implemented")
 			self.dataset.finish_with_error("Cannot reformat metadata for this dataset")
 			return
-		self.dataset.log(f"Collecting metadata created by {parent_processor.type}")
+		self.dataset.log(f"Collecting metadata created by {producer.type}")
 
-		include_failed = self.parameters.get("include_failed", False)
-		rows = []
-		num_posts = 0
-		with self.dataset.get_results_path().open("w", encoding="utf-8", newline=""):
-			for key, value in metadata_file.items():
-				if not include_failed and not value.get("success", True):
-					continue
-
-				# Metadata may contain more than one row/item per key, value pair
-				for item in parent_processor.map_metadata(key, value):
-					rows.append(item)
-					num_posts += 1
-
-		# Finish up
-		self.dataset.update_status(f"Read metadata for {num_posts:,} item(s).")
-	
-		if rows:
-			self.write_csv_items_and_finish(rows)
-		else:
+		# read the metadata file into rows, and note which items they refer to
+		media_rows, wanted_ids = self.collect_media_rows(metadata, producer)
+		if not media_rows:
 			return self.dataset.finish_with_error("No valid metadata could be read from the dataset.")
+
+		# find the dataset the media was downloaded from, if there is one left
+		source_dataset, source_columns = None, []
+		if self.parameters.get("join_source", True) and wanted_ids:
+			source_dataset, source_columns = self.choose_source_dataset(metadata, wanted_ids)
+
+		self.write_rows(media_rows, source_dataset, source_columns)
+
+	def collect_media_rows(self, metadata, producer):
+		"""
+		Turn the metadata file into rows
+
+		The processor that made the archive decides what the rows look like, via
+		its `map_metadata` and `map_failure_metadata` methods. Their columns are
+		prefixed here so that they cannot collide with those of the dataset the
+		media came from.
+
+		:param MediaArchiveMetadata metadata:  The archive's metadata
+		:param producer:  Processor class that made the archive
+		:return tuple:  A list of (row, item IDs) tuples, and the set of all
+		  item IDs those rows refer to
+		"""
+		media_rows = []
+		wanted_ids = set()
+
+		def add(rows, entry):
+			# a download that produced no file still records the items it was
+			# for, so failures can be traced back to an item as well. Post IDs
+			# are already normalised to non-blank strings when the metadata is
+			# read, so media with no traceable item (e.g. Instagram ads) simply
+			# has an empty list here rather than a placeholder id.
+			post_ids = list(dict.fromkeys(entry.get("post_ids", [])))
+			for row in rows:
+				media_rows.append(({self.media_prefix + column: cell for column, cell in row.items()}, post_ids))
+				wanted_ids.update(post_ids)
+
+		for filename, item in metadata.iter_entries():
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while reading metadata file")
+			add(producer.map_metadata(filename, item), item)
+
+		map_failure = getattr(producer, "map_failure_metadata", None)
+		if self.parameters.get("include_failed", False) and map_failure is not None:
+			for failure in metadata.iter_failures():
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while reading metadata file")
+				add(map_failure(failure), failure)
+
+		return media_rows, wanted_ids
+
+	def choose_source_dataset(self, metadata, wanted_ids):
+		"""
+		Find the dataset to read the items the media was downloaded from
+
+		More than one dataset can look like the right one to use, so each is
+		tried in turn and the first that actually holds some of the media's
+		items is used. If none of them do, the best guess's columns are still
+		returned, so the result has them and the mismatch is reported rather
+		than passing silently - but with no dataset to read, there being
+		nothing in it to find.
+
+		:param MediaArchiveMetadata metadata:  The archive's metadata
+		:param set wanted_ids:  IDs of the items the media refers to
+		:return tuple:  The dataset to read the items from, or None if none of
+		  them holds any of them, and the columns to add
+		"""
+		fallback_columns = []
+		for candidate, found_via in self.find_origin_datasets(metadata):
+			columns = candidate.get_columns()
+			if not columns:
+				# e.g. an archive, or an NDJSON file whose items cannot be read
+				# as columns: there is nothing to add from this one
+				self.dataset.log(f"Dataset {candidate.key} ({found_via}) has no readable columns; skipping it")
+				continue
+
+			self.dataset.update_status(f"Looking for the media's items in '{candidate.get_label()}'")
+			if self.holds_any_item(candidate, wanted_ids):
+				self.dataset.update_status(f"Combining metadata with dataset '{candidate.get_label()}'")
+				self.dataset.log(f"Adding data from dataset {candidate.key} ({found_via})")
+				return candidate, columns
+
+			self.dataset.log(f"Dataset {candidate.key} ({found_via}) has none of the items the media refers to")
+			if not fallback_columns:
+				fallback_columns = columns
+
+		if not fallback_columns:
+			self.dataset.log("Could not find the dataset the media was downloaded from; writing metadata only")
+		return None, fallback_columns
+
+	def holds_any_item(self, dataset, wanted_ids):
+		"""
+		Does this dataset hold any of the items the media refers to?
+
+		Stops at the first one found, so choosing between candidates usually
+		costs next to nothing; only a dataset that holds none of them is read
+		in full. Annotations are not fetched, as only the IDs are read.
+
+		:param DataSet dataset:  Dataset to look in
+		:param set wanted_ids:  IDs of the items the media refers to
+		:return bool:
+		"""
+		items_read = 0
+		for item in dataset.iterate_items(self, get_annotations=False):
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while looking for the media's items")
+			items_read += 1
+
+			if any(post_id in wanted_ids for post_id in self.item_ids(item)):
+				return True
+
+			if items_read % 500 == 0:
+				self.dataset.update_status(f"Looked for the media's items in {items_read:,} of "
+										   f"{dataset.num_rows:,} item(s) of '{dataset.get_label()}'")
+
+		return False
+
+	def find_origin_datasets(self, metadata):
+		"""
+		Find the datasets the media in this archive may have been downloaded from
+
+		The metadata file records the key of that dataset, which is normally the
+		right one, but it can name a helper dataset that a preset built for the
+		downloader rather than the dataset a researcher would recognise. As a
+		second option, walk up the chain of parent datasets, skipping any that
+		are media archives themselves - an archive can be made from another
+		archive, for example by filtering out duplicate images.
+
+		:param MediaArchiveMetadata metadata:  The archive's metadata
+		:return list:  (dataset, how it was found) tuples, best guess first
+		"""
+		candidates = []
+
+		if metadata.from_dataset:
+			try:
+				recorded = DataSet(key=metadata.from_dataset, db=self.db, modules=self.modules)
+				if recorded.is_finished() and recorded.num_rows:
+					candidates.append((recorded, "recorded in the metadata file"))
+			except DataSetException:
+				# deleted since the media was downloaded
+				pass
+
+		parent = self.source_dataset.get_parent()
+		while parent is not None and self.is_media_archive(parent):
+			parent = parent.get_parent()
+		if parent is not None and parent.num_rows and parent.key not in [c.key for c, _ in candidates]:
+			candidates.append((parent, "found by walking up the chain of parent datasets"))
+
+		return candidates
+
+	def write_matched_rows(self, writer, media_rows, source_dataset, source_column_map,
+						   matched_column, matched_rows):
+		"""
+		Write a row for every media file that can be traced back to an item
+
+		The source dataset is read once and each row is written as soon as the
+		item it needs comes past, so that nothing is held but an index of which
+		rows want which item. Holding the items themselves instead would cost
+		their every column, for as many items as the archive has files.
+
+		:param writer:  CSV writer to write the rows to
+		:param list media_rows:  Rows as returned by `collect_media_rows`
+		:param DataSet source_dataset:  Dataset to read the items from
+		:param dict source_column_map:  Source dataset column name to the
+		  column it is written as
+		:param str matched_column:  Name of the column saying a row was traced
+		:param set matched_rows:  Filled in with the indexes of the rows written
+		:return int:  Number of rows written
+		"""
+		# which rows each item is needed for; a media file used by several items
+		# becomes one row per item, so nothing has to be merged into one cell
+		rows_per_item = {}
+		for row_index, (_, post_ids) in enumerate(media_rows):
+			for post_id in post_ids:
+				rows_per_item.setdefault(post_id, []).append(row_index)
+
+		num_rows = 0
+		seen_ids = set()
+		items_read = 0
+		for item in source_dataset.iterate_items(self):
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while reading source dataset")
+			items_read += 1
+
+			for post_id in self.item_ids(item):
+				if post_id not in rows_per_item or post_id in seen_ids:
+					# not referred to by any media file, or an item ID that
+					# occurs more than once in the dataset
+					continue
+				seen_ids.add(post_id)
+
+				item_columns = {written_as: item.get(column, "")
+								for column, written_as in source_column_map.items()}
+				for row_index in rows_per_item[post_id]:
+					writer.writerow(remove_nuls({
+						**media_rows[row_index][0],
+						matched_column: True,
+						**item_columns,
+					}))
+					matched_rows.add(row_index)
+					num_rows += 1
+
+			if len(seen_ids) == len(rows_per_item):
+				# every item the media refers to has been found
+				break
+
+			if items_read % 500 == 0:
+				self.dataset.update_status(f"Looked for media in {items_read:,} of "
+										   f"{source_dataset.num_rows:,} item(s)")
+
+		if len(seen_ids) < len(rows_per_item):
+			self.log_unread_items(source_dataset, items_read)
+
+		return num_rows
+
+	def log_unread_items(self, dataset, items_read):
+		"""
+		Report how many of a dataset's items could not be read
+
+		When some media could not be traced and the whole dataset was read,
+		items the datasource could not read back (e.g. Instagram ads, which its
+		map_item rejects) are the likely reason: they are skipped on read, so
+		the media pointing at them has nothing to match. Say so, so a partial
+		join is not mistaken for missing or corrupt metadata.
+
+		:param DataSet dataset:  Dataset that was read
+		:param int items_read:  How many of its items could be read
+		"""
+		unread = dataset.num_rows - items_read
+		if unread > 0:
+			self.dataset.log(
+				f"{unread:,} of {dataset.num_rows:,} item(s) in '{dataset.get_label()}' could not be read "
+				f"and were skipped (e.g. items a datasource cannot map, such as ads); media "
+				f"downloaded from them cannot be traced back and is left unmatched."
+			)
+
+	def write_rows(self, media_rows, source_dataset, source_columns):
+		"""
+		Write the result file and finish the dataset
+
+		A media file used by several items becomes one row per item, so that
+		nothing has to be merged into one cell. One that cannot be traced back to
+		an item still gets a row, with the source columns left empty.
+
+		:param list media_rows:  Rows as returned by `collect_media_rows`
+		:param source_dataset:  Dataset to read the items from, or `None` if
+		  there is none to combine the metadata with
+		:param list source_columns:  Columns to add from the source dataset
+		"""
+		fieldnames, source_column_map, matched_column = self.build_fieldnames(media_rows, source_columns)
+		num_rows = 0
+		matched_rows = set()
+
+		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+			writer = csv.DictWriter(outfile, fieldnames=fieldnames, restval="", extrasaction="ignore")
+			writer.writeheader()
+
+			if source_dataset is not None:
+				num_rows += self.write_matched_rows(writer, media_rows, source_dataset,
+													source_column_map, matched_column, matched_rows)
+
+			# media that could not be traced back to an item still gets a row,
+			# with the columns of the source dataset left empty
+			for row_index, (row, _) in enumerate(media_rows):
+				if row_index in matched_rows:
+					continue
+				if source_columns:
+					row = {**row, matched_column: False}
+				writer.writerow(remove_nuls(row))
+				num_rows += 1
+
+		total = len(media_rows)
+		matched = len(matched_rows)
+		if source_columns:
+			self.dataset.log(f"Traced {matched:,} of {total:,} media file(s) back to an item")
+
+		self.dataset.update_status(f"Read metadata for {num_rows:,} item(s).")
+
+		# When combining with a source dataset, any media that could not be traced
+		# back to an item is worth flagging: the row is still written, but its
+		# source columns are empty. This is a warning rather than an error - the
+		# result is usable - and the front end shows it to the user as such.
+		if source_columns and matched < total:
+			unmatched = total - matched
+			if not matched:
+				warning = f"None of the {total:,} media file(s) could be traced back to an item in the dataset, "
+			else:
+				warning = f"{unmatched:,} of {total:,} media file(s) could not be traced back to an item in the dataset, "
+			warning += "so their added columns are empty (e.g. ads or other unsupported items)."
+			self.dataset.finish_with_warning(num_rows, warning)
+		else:
+			self.dataset.finish(num_rows)
+
+	def build_fieldnames(self, media_rows, source_columns):
+		"""
+		Work out the columns of the result file
+
+		All columns are collected up front because rows do not all have the same
+		ones: a media file that could not be traced back to an item has no
+		columns from the source dataset, and some processors write a column only
+		for the media files it applies to.
+
+		:param list media_rows:  Rows as returned by `collect_media_rows`
+		:param list source_columns:  Columns of the dataset the media came from,
+		  or an empty list if there is none to combine the metadata with
+		:return tuple:  Column names in the order they are written, a map of
+		  source dataset column name to the column it is written as, and the
+		  name the matched flag is written as
+		"""
+		fieldnames = []
+		taken = set()
+
+		def claim(column, fallback):
+			"""
+			Add `column`, or a free variation on `fallback` if it is taken
+
+			Every column needs a name of its own. Two columns sharing one name
+			collide twice over: a row is a dict, so one value silently
+			overwrites the other before anything is written, and
+			`csv.DictWriter` does not object to the repeated fieldname either -
+			it writes whichever value survived under both of them.
+			"""
+			if column in taken:
+				column = fallback
+				suffix = 2
+				while column in taken:
+					column = f"{fallback}_{suffix}"
+					suffix += 1
+			taken.add(column)
+			fieldnames.append(column)
+			return column
+
+		# the producer decides these, and they are already prefixed, so they
+		# only have to be deduplicated across rows
+		for row, _ in media_rows:
+			for column in row:
+				if column not in taken:
+					taken.add(column)
+					fieldnames.append(column)
+
+		if not source_columns:
+			return fieldnames, {}, self.matched_column
+
+		# a producer is free to write a column that prefixes to this one
+		matched_column = claim(self.matched_column, f"{self.matched_column}_flag")
+
+		source_column_map = {}
+		for column in source_columns:
+			# the source dataset may have a column by the same name as one of
+			# the metadata columns; rename it rather than overwrite that one
+			written_as = claim(column, f"source_{column}")
+			if written_as != column:
+				self.dataset.log(f"Source dataset column '{column}' written as '{written_as}' to avoid a clash "
+								 f"with another column of the same name")
+			source_column_map[column] = written_as
+
+		return fieldnames, source_column_map, matched_column
+
+	@classmethod
+	def is_media_archive(cls, module):
+		"""
+		Is this dataset an archive of downloaded media files?
+
+		:param module:  Dataset or processor to check
+		:return bool:
+		"""
+		return any(module.type.startswith(prefix) for prefix in cls.media_archive_prefixes)
+
+	@staticmethod
+	def item_ids(item):
+		"""
+		Get the IDs a dataset item can be referred to by
+
+		Media downloaders record the `id` of the item a file was found in, or
+		the values of its `ids` column for datasets that combine several
+		original items into one row.
+
+		:param item:  Mapped dataset item
+		:return list:  Item IDs, as text
+		"""
+		if "ids" in item:
+			return [normalize_post_id(item_id) for item_id in str(item.get("ids", "")).split(",")]
+
+		return [normalize_post_id(item.get("id"))]

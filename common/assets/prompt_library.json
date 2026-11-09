@@ -506,5 +506,29 @@
     "authors": "OpenAI (2023)",
     "paper": "https://help.openai.com/en/articles/6654000-best-practices-for-prompt-engineering-with-openai-api",
     "location_of_input": "replace"
+  },
+  {
+    "name": "political party affiliation",
+    "label": "party",
+    "prompt": [
+      "You will be given a set of Twitter posts from different <country> politicians, sent during the two months preceding the <year> <country> election, that is, between <date>, and <date>. Your task is to use your knowledge of <country> politics to make an educated guess on whether the poster is a <party1> or <party2>. Respond either ‘<party1>’ or ‘<party2>’. If the message does not have enough information for an educated guess, just make your best guess.",
+      "",
+      "Post: [body]"
+    ],
+    "authors": "Törnberg (2024)",
+    "paper": "https://journals.sagepub.com/doi/10.1177/08944393241286471",
+    "location_of_input": "replace"
+  },
+  {
+    "name": "Narrative and stance",
+    "label": "narrative",
+    "prompt": [
+      "You are a narratologist tasked with mapping out five narratives of the provided text and categorizing the text about the Russia–Ukraine war. Please output a labeled list with two items: (1) the narrative in English (summarized within 20 words) and (2) the stance of the narrative (pro-Russian, pro-Ukraine, or neutral). Below are some examples of the potential coded languages of pro-Russian, pro-Ukraine, and neutral narratives for your reference: (1) Pro-Russian refers to Ukraine soldiers as 乌纳 (UkNazi) or 乌贼 (squid); (2) Pro-Ukraine criticizes Russian army with sarcasm 菜鹅 (Veggie Goose/Weak Russian Army), 晋军 (Jin Dynasty/Putin’s Army), 晋凉 (Cold Putin/Putin is over), 鹅 粉 (Fans of the Goose/Fans of Putin); and (3) Neutral provides factual updates and describes battlefield developments without assigning blame.",
+      "",
+      "Text: [body]"
+    ],
+    "authors": "Rogers & Zhang (2024)",
+    "paper": "https://journals.sagepub.com/doi/10.1177/20563051241254379",
+    "location_of_input": "replace"
   }
 ]

@@ -333,16 +333,33 @@ export const query = {
         }
 
         let keys = [];
+        let shown_status = {};
         queued.each(function () {
-            keys.push($(this).attr('data-dataset-key'));
+            let key = $(this).attr('data-dataset-key');
+            keys.push(key);
+
+            // Tell the server which status this entry shows, so it only builds
+            // new HTML when the status has changed. Always reget long statuses
+            // (like before).
+            let status = $(this).attr('data-status');
+            if (status !== undefined && status.length <= 200) {
+                shown_status[key] = status;
+            }
         });
 
         $.get({
             url: getRelativeURL('api/check-processors/'),
-            data: {subqueries: JSON.stringify(keys)},
+            data: {subqueries: JSON.stringify(keys), shown_status: JSON.stringify(shown_status)},
             success: function (json) {
                 json.forEach(child => {
                     let target = $('body #child-' + child.key);
+
+                    if (child.unchanged) {
+                        // Same status as before, but the progress may have moved
+                        applyProgress(target.children('.processor-result-indicator'), child.progress);
+                        return;
+                    }
+
                     let update = $(child.html);
                     update.attr('aria-expanded', target.attr('aria-expanded'));
 

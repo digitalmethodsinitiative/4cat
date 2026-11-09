@@ -28,13 +28,13 @@ config_definition = {
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
         "default": ["ninegag", "bsky", "douban", "douyin", "imgur", "upload", "instagram", "import_4cat", "linkedin", "media-import",
-                    "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab"],
+                    "telegram", "tiktok", "twitter", "tiktok-comments", "truthsocial", "gab", "weibo", "weibo-comments"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
     "datasources.expiration": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "bsky": {"enabled": True, "allow_optout": False, "timeout": 0}, "dmi-tcat": {"enabled": False, "allow_optout": False, "timeout": 0}, "dmi-tcatv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "import_4cat": {"enabled": True, "allow_optout": False, "timeout": 0},"gab": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "media-import": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": True, "allow_optout": False, "timeout": 0}, "truthsocial": {"enabled": True, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
+        "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "bsky": {"enabled": True, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "import_4cat": {"enabled": True, "allow_optout": False, "timeout": 0},"gab": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "media-import": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": True, "allow_optout": False, "timeout": 0}, "truthsocial": {"enabled": True, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
         "help": "Data source-specific expiration",
         "tooltip": "Allows setting expiration settings per datasource. Configured by proxy via the 'data sources' "
                    "setting.",
@@ -115,6 +115,14 @@ config_definition = {
         "default": False,
         "help": "Can view private datasets",
         "tooltip": "Controls whether users can see the datasets made private by their owners."
+    },
+    "privileges.can_make_dataset_public": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Can make datasets public",
+        "tooltip": "Controls whether users can share their datasets with everyone on this 4CAT server. If this is "
+                   "off, datasets are always created as private and users cannot change that afterwards. Making an "
+                   "already public dataset private is always allowed."
     },
     "privileges.can_create_api_token": {
         "type": UserInput.OPTION_TOGGLE,
@@ -268,14 +276,24 @@ config_definition = {
         "tooltip": "Sphinx is used for full-text search for collected datasources (e.g., 4chan, 8kun, 8chan) and requires additional setup (see 4CAT wiki on GitHub).",
         "global": True
     },
-    # proxy stuff
+    # proxy stuff; one request queue is shared by the whole backend, so these
+    # cannot differ per user tag
+    "proxies.intro": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Some 4CAT processors fetch many files or pages from sites (e.g. 'Download images' and 'Download videos'). "
+                    "These requests wait in a queue that follows the rules below. By default, requests are made directly from this "
+                    "server, but you can also configure a list of proxy servers to use as well or instead of `__localhost__`. The "
+                    "limits below apply to each proxy (including localhost/this server). **Note:** some changes only take effect "
+                    "after restarting 4CAT."
+        },
     "proxies.urls": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": ["__localhost__"],
         "help": "Proxy URLs",
         "tooltip": "A JSON Array of full proxy URLs. Include any proxy login details in the URL itself (e.g. "
                    "http://username:password@proxy:port). There is one special value, '__localhost__'; this means a " 
-                   "direct request, without using a proxy."
+                   "direct request, without using a proxy.",
+        "global": True
     },
     "proxies.cooloff": {
         "type": UserInput.OPTION_TEXT,
@@ -283,15 +301,17 @@ config_definition = {
         "help": "Cool-off time",
         "tooltip": "After a request has finished, do not use the proxy again for this many seconds.",
         "default": 0.1,
-        "min": 0.0
+        "min": 0.0,
+        "global": True
     },
     "proxies.concurrent-overall": {
         "type": UserInput.OPTION_TEXT,
         "coerce_type": int,
-        "default": 1,
+        "default": 4,
         "min": 1,
         "help": "Max concurrent requests (overall)",
-        "tooltip": "Per proxy, this many requests can run concurrently overall."
+        "tooltip": "Per proxy, this many requests can run concurrently overall.",
+        "global": True
     },
     "proxies.concurrent-host": {
         "type": UserInput.OPTION_TEXT,
@@ -300,20 +320,23 @@ config_definition = {
         "min": 1,
         "help": "Max concurrent requests (per host)",
         "tooltip": "Per proxy, this many requests can run concurrently per host. Should be lower than or equal to the "
-                   "overall limit."
+                   "overall limit.",
+        "global": True
     },
     "proxies.allow-localhost-fallback": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
         "help": "Fall back to localhost",
-        "tooltip": "If all proxies are down, allow falling back to direct requests (i.e., no proxy)."
+        "tooltip": "If all proxies are down, allow falling back to direct requests (i.e., no proxy).",
+        "global": True
     },
     "proxies.healthcheck-url": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
         "help": "Proxy health check URL",
         "tooltip": "Known-good URL used to validate whether a proxy is actually down when a proxied request fails. "
-                   "Leave empty to auto-use this 4CAT frontend's /robots.txt URL based on Flask host and scheme."
+                   "Leave empty to auto-use this 4CAT frontend's /robots.txt URL based on Flask host and scheme.",
+        "global": True
     },
     "proxies.healthcheck-timeout": {
         "type": UserInput.OPTION_TEXT,
@@ -321,7 +344,8 @@ config_definition = {
         "default": 5,
         "min": 0.1,
         "help": "Proxy health check timeout",
-        "tooltip": "Timeout in seconds for the proxy health check request."
+        "tooltip": "Timeout in seconds for the proxy health check request.",
+        "global": True
     },
     # logging
     "logging.slack.level": {
@@ -519,8 +543,8 @@ config_definition = {
     "api.youtube.key": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
-        "help": "YouTube API Key",
-        "tooltip": "The developer key from your API console"
+        "help": "YouTube API key",
+        "tooltip": "Can be created on https://developers.google.com/youtube/v3"
     },
     # service manager
     # this is a service that 4CAT can connect to to run e.g. ML models
@@ -656,13 +680,6 @@ config_definition = {
         "help": "4CAT home page",
         "default": "about"
     },
-    "ui.offer_anonymisation": {
-        "type": UserInput.OPTION_TOGGLE,
-        "help": "Offer anonymisation options",
-        "default": True,
-        "tooltip": "Offer users the option to anonymise their datasets at the time of creation. It is strongly "
-                   "recommended to leave this enabled."
-    },
     "ui.advertise_install": {
         "type": UserInput.OPTION_TOGGLE,
         "help": "Advertise local 4CAT",
@@ -695,14 +712,11 @@ config_definition = {
     "ui.offer_hashing": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
-        "help": "Offer pseudonymisation",
-        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
-    },
-    "ui.offer_private": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Offer create as private",
-        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
+        "help": "Offer pseudonymisation and anonymisation",
+        "tooltip": "Adds a control to the 'Create dataset' page where people choose what happens to author details: "
+                   "replace them with a hash, replace them with 'REDACTED', or leave them as they are. It is strongly "
+                   "recommended to leave this enabled. Turning it off does not stop people hiding author details "
+                   "afterwards with the 'Pseudonymise or anonymise' processor."
     },
     "ui.option_email": {
         "type": UserInput.OPTION_CHOICE,

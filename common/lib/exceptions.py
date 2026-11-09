@@ -162,3 +162,9 @@ class MediaSignatureException(FourcatException):
     Raise in media processors when the media cannot be read
     """
     pass
+
+class MetadataException(FourcatException):
+    """
+    Raise when there is an issue with metadata
+    """
+    pass

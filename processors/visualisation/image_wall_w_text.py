@@ -3,7 +3,6 @@ Create an image wall with text captions
 """
 import io
 import base64
-import json
 import math
 import textwrap
 
@@ -17,7 +16,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor, ProcessorDescription
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, MetadataException
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Render
 
@@ -111,26 +110,29 @@ class ImageTextWallGenerator(BasicProcessor):
         """
         Identify dataset types that are compatible with this processor
         """
+        if source_dataset is None:
+            return None, None
+
         # Datasets that have both images and captions
         # TODO: after metadata merge: text from metadata
         if source_dataset.type in ImageTextWallGenerator.combined_dataset:
             # This dataset has both images and captions
             return source_dataset, source_dataset
 
-        # Datasets that have separate images and captions
-        if source_dataset is None or source_dataset.get_parent() is None:
-            return None, None
-        
+        # Datasets that have separate images and captions: the captions come
+        # from one of the caption processors, run on a dataset with images.
+        # Check the type first, because looking up the parent queries the
+        # database and this runs for every dataset shown on a result page
         # TODO: add additional caption datasets, allow column selection for text dataset (need filename column + text column)
-        elif any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in
-                  ImageTextWallGenerator.caption_datasets]):
-            text_dataset = source_dataset
-            image_dataset = source_dataset.get_parent()
-            if not any([image_dataset.type.startswith(dataset_prefix) for dataset_prefix in
-                        ImageTextWallGenerator.image_datasets] + [image_dataset.get_media_type() == "image"]):
-                # Not a compatible dataset
-                return None, None
-        else:
+        if not any([source_dataset.type.startswith(dataset_prefix) for dataset_prefix in
+                    ImageTextWallGenerator.caption_datasets]):
+            return None, None
+
+        text_dataset = source_dataset
+        image_dataset = source_dataset.get_parent()
+        if image_dataset is None or not any([image_dataset.type.startswith(dataset_prefix) for dataset_prefix in
+                                             ImageTextWallGenerator.image_datasets] + [image_dataset.get_media_type() == "image"]):
+            # Not a compatible dataset
             return None, None
 
         return image_dataset, text_dataset
@@ -163,21 +165,19 @@ class ImageTextWallGenerator(BasicProcessor):
         max_text_len = 0
         filename_to_text_mapping = {}
         if text_dataset.type in ImageTextWallGenerator.combined_dataset:
-            # For datasets with both images and text, use .metadata.json
-            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file)
-            if metadata_file is None:
+            # For datasets with both images and text (Stable Diffusion output),
+            # the prompt is stored as item.extra.prompt in the archive metadata.
+            try:
+                metadata = text_dataset.read_media_metadata()
+            except (FileNotFoundError, MetadataException):
                 self.dataset.finish_with_error("No metadata file found")
                 return
-            with metadata_file.open() as f:
-                metadata = json.load(f)
-            for item in metadata.values():
+            for filename, item in metadata.iter_entries():
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while collecting text")
-                if "filename" in item:
-                    # "image-downloader-stable-diffusion" datasets
-                    image_text = item.get("prompt", "")
-                    max_text_len = max(max_text_len, len(image_text))
-                    filename_to_text_mapping[item["filename"]] = image_text
+                image_text = (item.get("extra") or {}).get("prompt", "")
+                max_text_len = max(max_text_len, len(image_text))
+                filename_to_text_mapping[filename] = image_text
         elif text_dataset.type == "llm-prompter":
             # llm-prompter store filename as "id" and text as "output"
             for item in text_dataset.iterate_items(self):

@@ -236,8 +236,11 @@ class WorkerManager:
 		for queue_id, worker in self.iterate_active_workers():
 			if worker.job.data["id"] == job.data["id"]:
 				# first cancel any interruptable postgres queries for this job's worker
-				while True:
-					active_queries = self.queue.get_all_jobs("cancel-pg-query", remote_id=worker.db.appname, restrict_claimable=False)
+				# a worker that has not connected to the database yet (it is still
+				# starting up, or failed to connect) has no queries to cancel
+				worker_db = getattr(worker, "db", None)
+				while worker_db:
+					active_queries = self.queue.get_all_jobs("cancel-pg-query", remote_id=worker_db.appname, restrict_claimable=False)
 					if not active_queries:
 						# all cancellation jobs have been run
 						break

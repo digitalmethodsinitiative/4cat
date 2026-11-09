@@ -1,0 +1,31 @@
+/** ---------------------
+ *      Note for posts whose pictures or videos were not downloaded.
+ *      Colours are left to the page, so this fits light and dark themes;
+ *      data source themes can change them.
+ * --------------------- */
+
+.media-placeholder {
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.media-placeholder-cover {
+    display: block;
+    max-width: 100%;
+    max-height: 480px;
+    border-radius: 8px;
+}
+
+.media-placeholder-note {
+    margin-top: 6px;
+    opacity: 0.8;
+}
+
+/* without a cover image, the note is shown in a box of its own */
+.media-placeholder:not(.with-cover) .media-placeholder-note {
+    margin-top: 0;
+    padding: 24px 16px;
+    border-radius: 8px;
+    background-color: rgba(128, 128, 128, 0.15);
+    text-align: center;
+}

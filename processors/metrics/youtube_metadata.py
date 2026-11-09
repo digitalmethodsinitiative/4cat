@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from backend.lib.processor import BasicProcessor, ProcessorDescription
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, urls_in_text
 from common.lib.compatibility import Compatibility
 from common.lib.outputs import Table
 
@@ -64,15 +64,6 @@ class YouTubeMetadata(BasicProcessor):
 
 	client = None
 
-	config = {
-		"api.youtube.key": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "YouTube API key",
-			"tooltip": "Can be created on https://developers.google.com/youtube/v3"
-		}
-	}
-
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:
 
@@ -82,8 +73,9 @@ class YouTubeMetadata(BasicProcessor):
 				"help": "Columns with YouTube URLs",
 				"default": "url",
 				"inline": True,
-				"tooltip": "These should be valid YouTube URLs. Separate by comma. "
-						   "Use the Extract URLs processor if you need to extract URLs from text columns."
+				"tooltip": "These should contain YouTube URLs starting with http:// or https://, either on their own, "
+						   "as a list separated by commas, or in a text. Use the Extract URLs processor first if "
+						   "your links do not start with http:// or https://."
 			},
 			"save_annotations": {
 				"type": UserInput.OPTION_ANNOTATIONS,
@@ -188,13 +180,7 @@ class YouTubeMetadata(BasicProcessor):
 				if not data or not isinstance(data, str):
 					continue
 
-				# Split by URL by default
-				urls = data.split(",")
-
-				for url in urls:
-
-					# Get rid of unwanted (often trailing) characters
-					url = re.sub(r"[(),|]", "", url.strip())
+				for url in urls_in_text(data):
 
 					# Skip if not a YouTube URL
 					if "youtu.be" not in url and "youtube" not in url:

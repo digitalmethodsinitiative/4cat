@@ -9,7 +9,7 @@ from urllib.parse import urlparse, parse_qs
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
-from common.lib.helpers import normalize_url_encoding
+from common.lib.helpers import readable_url
 from common.lib.outputs import Datasource
 
 
@@ -85,7 +85,7 @@ class SearchTikTok(Search):
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url")) if metadata.get("source_platform_url") else "",
+            "collected_from_url": readable_url(metadata.get("source_platform_url")) if metadata.get("source_platform_url") else "",
             "id": post["id"],
             "thread_id": post["id"],
             "author": user_nickname,
@@ -98,6 +98,7 @@ class SearchTikTok(Search):
             "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
             "timestamp": datetime.utcfromtimestamp(int(post["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
             "unix_timestamp": int(post["createTime"]),
+            "is_image_post": "yes" if post.get("imagePost") else "no",
             "is_duet": "yes" if (post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False) else "no",
             "is_ad": "yes" if post.get("isAd", False) else "no",
             "is_paid_partnership": "yes" if post.get("adAuthorization") else "no",
