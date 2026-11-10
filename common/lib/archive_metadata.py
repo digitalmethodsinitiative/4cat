@@ -778,7 +778,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 
 		The processor that made an archive can define its own `map_metadata`,
 		with columns that suit its data; this is used for archives whose
-		processor does not have a custom implementation. Same columns as the 
+		processor does not have a custom implementation. Same columns as the
 		downloaders use, plus the simple values from `extra`.
 		"""
 		row = {
@@ -806,20 +806,29 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		}
 		yield cls._add_simple_values(row, failure.get("extra"))
 
-	@staticmethod
-	def _add_simple_values(row: dict, extra: Optional[dict]) -> dict:
+	# Values in `extra` that are about 4CAT's own download rather than the
+	# media, and should not end up in a file a researcher downloads and
+	# shares. Also drops `_`-prefixed keys, which are private to the producer.
+	# Creating a `map_metadata` function that maps the metadata to a more
+	# user-friendly format and overrides this backup.
+	PRIVATE_EXTRA_KEYS = frozenset({"cookies", "filepath"})
+
+	@classmethod
+	def _add_simple_values(cls, row: dict, extra: Optional[dict]) -> dict:
 		"""
 		Add the values of `extra` that fit in one cell to a row.
 
 		Text, numbers and true/false are added as they are, and lists of
 		those are joined with commas. Nested data, such as a full yt-dlp
-		dump, is left out. A key the row already has keeps its value.
+		dump, is left out, as are the values that say something about the
+		download rather than about the media. A key the row already has keeps
+		its value.
 		"""
 		def is_simple(value):
 			return value is None or isinstance(value, (str, int, float, bool))
 
 		for key, value in (extra or {}).items():
-			if key in row:
+			if key in row or key in cls.PRIVATE_EXTRA_KEYS or key.startswith("_"):
 				continue
 			if is_simple(value):
 				row[key] = value
