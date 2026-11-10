@@ -809,8 +809,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 	# Values in `extra` that are about 4CAT's own download rather than the
 	# media, and should not end up in a file a researcher downloads and
 	# shares. Also drops `_`-prefixed keys, which are private to the producer.
-	# Creating a `map_metadata` function that maps the metadata to a more
-	# user-friendly format and overrides this backup.
+	# This only applies to the rows made here: a processor that defines its own
+	# `map_metadata` picks its columns itself and is not filtered this way.
 	PRIVATE_EXTRA_KEYS = frozenset({"cookies", "filepath"})
 
 	@classmethod

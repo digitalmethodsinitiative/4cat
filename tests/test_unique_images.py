@@ -93,6 +93,31 @@ def test_the_kept_image_does_not_list_its_own_url_among_the_others(tmp_path):
     assert "http://host/a.jpg" not in kept.get("extra", {}).get("other_urls", [])
 
 
+def test_the_kept_image_keeps_its_own_url_whatever_order_the_metadata_lists(tmp_path):
+    """
+    The metadata file does not list the kept image before its duplicates.
+
+    Which image is kept depends on the order the archive is read in, not on the
+    order the metadata was written in, so the entry for a duplicate can come
+    first. The first entry written for a file decides its `url`, so reading
+    them in the order they happen to be in would make the duplicate's URL the
+    URL of the image that is kept, and demote the real one to an 'other' URL.
+    """
+    written = run_filter(
+        tmp_path,
+        # a.jpg is read first, so it is the image that is kept
+        {"a.jpg": b"same", "b.jpg": b"same"},
+        # but b.jpg, the duplicate, is the first one the metadata describes
+        [("b.jpg", ["2"], "http://host/b.jpg", None),
+         ("a.jpg", ["1"], "http://host/a.jpg", None)],
+    )
+
+    kept = written.get_entry("a.jpg")
+    assert kept["url"] == "http://host/a.jpg"
+    assert kept["extra"]["other_urls"] == ["http://host/b.jpg"]
+    assert sorted(kept["post_ids"]) == ["1", "2"]
+
+
 def test_images_that_are_not_duplicates_are_all_kept(tmp_path):
     written = run_filter(
         tmp_path,
