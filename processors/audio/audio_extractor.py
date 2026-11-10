@@ -134,7 +134,7 @@ class AudioExtractor(BasicProcessor):
             video_item = source_metadata.get_entry(item.file.name) if source_metadata else None
             post_ids = video_item.get("post_ids", []) if video_item else []
             source_url = video_item.get("url") if video_item else None
-            extra = dict(video_item.get("extra") or {}) if video_item else {}
+            extra = {"video_filename": item.file.name}
 
             # the name is this video's alone, so the file can only have been
             # written by the run above
