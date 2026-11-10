@@ -10,7 +10,7 @@ import zipfile
 
 import pytest
 
-from common.lib.archive_metadata import MediaArchiveMetadata, PostIdMap, normalize_post_id
+from common.lib.archive_metadata import MediaArchiveMetadata, PostIdMap, is_support_file, normalize_post_id
 from common.lib.exceptions import MetadataException
 
 CURRENT_SCHEMA_VERSION = MediaArchiveMetadata.SCHEMA_VERSION
@@ -869,3 +869,64 @@ def test_legacy_only_copied_entries_still_give_a_source_dataset():
 								  "files": [{"filename": "2.mp4", "success": True}]},
 	})
 	assert m.from_dataset == "earlier_source"
+
+
+@pytest.mark.parametrize("filename, expected", [
+	(".metadata.json", True),
+	(".token_metadata.json", True),
+	(".model_metadata.json", True),
+	("video_archive", True),
+	("video_1/ffmpeg_error.log", True),
+	("frames/.metadata.json", True),
+	("image.jpg", False),
+	("video.mp4", False),
+	("results.json", False),
+	(".DS_Store", False),
+])
+def test_is_support_file(filename, expected):
+	"""Metadata, yt-dlp's video list and logs are support files; media is not."""
+	assert is_support_file(filename) is expected
+def test_default_rows_show_the_simple_values_of_extra():
+	"""What a producer recorded about a file is shown, one value per column."""
+	m = MediaArchiveMetadata()
+	m.add_item("a.mp4", post_ids=["1"], url="https://example.com/a",
+			   extra={"title": "A video", "view_count": 12, "artists": ["x", "y"],
+					  "formats": [{"id": "1"}]})
+	row = next(MediaArchiveMetadata.map_metadata("a.mp4", m.get_entry("a.mp4")))
+
+	assert row["title"] == "A video"
+	assert row["view_count"] == 12
+	assert row["artists"] == "x, y"
+	# a list of records does not fit in a cell
+	assert "formats" not in row
+
+
+def test_default_rows_leave_out_what_belongs_to_the_download():
+	"""
+	A video downloader stores everything yt-dlp reported, which includes the
+	cookies 4CAT sent with its request and the folder the file was written to
+	while it was downloading. Those say nothing about the video and should not
+	end up in a file a researcher downloads and shares.
+	"""
+	m = MediaArchiveMetadata()
+	m.add_item("a.mp4", post_ids=["1"], extra={
+		"title": "A video",
+		"cookies": "sessionid=secret",
+		"filepath": "/usr/src/app/data/video-downloader-abc123zip-staging/a.mp4",
+		"__finaldir": "/usr/src/app/data/video-downloader-abc123zip-staging",
+		"_filename": "/usr/src/app/data/video-downloader-abc123zip-staging/a.mp4",
+	})
+	row = next(MediaArchiveMetadata.map_metadata("a.mp4", m.get_entry("a.mp4")))
+
+	assert row["title"] == "A video"
+	for left_out in ("cookies", "filepath", "__finaldir", "_filename"):
+		assert left_out not in row
+
+
+def test_default_failure_rows_leave_out_what_belongs_to_the_download():
+	m = MediaArchiveMetadata()
+	m.add_failure(post_ids=["1"], reason="error", extra={"cookies": "sessionid=secret", "attempt": 2})
+	row = next(MediaArchiveMetadata.map_failure_metadata(m.failures[0]))
+
+	assert row["attempt"] == 2
+	assert "cookies" not in row

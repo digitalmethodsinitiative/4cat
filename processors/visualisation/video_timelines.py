@@ -15,7 +15,7 @@ from ural import is_url
 from backend.lib.processor import BasicProcessor
 from common.lib.archive_metadata import normalize_post_id
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import DataSetNotFoundException, ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import DataSetNotFoundException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
 from common.lib.dataset import DataSet
@@ -68,10 +68,7 @@ class VideoTimelines(BasicProcessor):
         }
 
     def process(self):
-        try:
-            metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            metadata = None
+        metadata = self.get_media_metadata()
         base_height = self.parameters.get("height", 100)
         fontsize = 12
 
@@ -80,6 +77,7 @@ class VideoTimelines(BasicProcessor):
         offset_y = -base_height
         timeline = None
         iterator = self.source_dataset.iterate_items(self)
+        item = None
         looping = True
         timelines = []
         timeline_widths = {}
@@ -105,10 +103,9 @@ class VideoTimelines(BasicProcessor):
                 # this means that at the end of the iterator we complete one
                 # final iteration in which we finish things up (see below)
                 looping = False
-
-            # skip the metadata file (already read via read_media_metadata)
-            if item.file.name == ".metadata.json":
-                continue
+                if item is None:
+                    # the archive holds no files to make timelines from
+                    break
 
             # skip if file is a real file but not an image
             if looping and item.file.suffix not in (".jpeg", ".jpg", ".png", ".gif"):
@@ -199,7 +196,7 @@ class VideoTimelines(BasicProcessor):
         some data source-specific pathways.
 
         :param MediaArchiveMetadata metadata:  Loaded archive metadata.
-        :return dict:  Filename -> label mapping
+        :return dict:  Name of the folder a video's frames are in -> label
         """
         if not metadata:
             return {}
@@ -210,13 +207,16 @@ class VideoTimelines(BasicProcessor):
         from_dataset = metadata.from_dataset
 
         for filename, item in metadata.iter_entries():
-            basename = filename.rsplit(".", 1)[0]
-            mapping_ids[basename] = item.get("post_ids", [])
-            if from_dataset:
-                mapping_dataset.setdefault(from_dataset, []).append(basename)
-            labels[basename] = basename
+            # a video's frames are in a folder named after the video file
+            stem = filename.rsplit(".", 1)[0]
+            # Match folders previously saved with only stem.
+            for folder in dict.fromkeys((filename, stem)):
+                mapping_ids.setdefault(folder, item.get("post_ids", []))
+                labels.setdefault(folder, stem)
+                if from_dataset:
+                    mapping_dataset.setdefault(from_dataset, []).append(folder)
 
-        for dataset, urls in mapping_dataset.items():
+        for dataset, folders in mapping_dataset.items():
             try:
                 video_dataset = DataSet(key=dataset, db=self.db, modules=self.modules)
             except DataSetNotFoundException:
@@ -240,11 +240,16 @@ class VideoTimelines(BasicProcessor):
             else:
                 mapper = lambda item: item.get("id")  # noqa: E731
 
+            # which folders hold the frames of each item's video
+            folders_by_post_id = {}
+            for folder in folders:
+                for post_id in mapping_ids[folder]:
+                    folders_by_post_id.setdefault(post_id, []).append(folder)
+
             # There may not be a "nearest" source e.g. Media Imports
             if source_dataset is not None:
                 for item in source_dataset.iterate_items(self):
-                    for filename in urls:
-                        if normalize_post_id(item["id"]) in mapping_ids[filename]:
-                            labels[filename] = mapper(item)
+                    for folder in folders_by_post_id.get(normalize_post_id(item["id"]), []):
+                        labels[folder] = mapper(item)
 
         return labels

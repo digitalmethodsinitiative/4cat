@@ -141,9 +141,6 @@ class TfIdf(BasicProcessor):
 
 		# Go through all archived token sets and generate collocations for each
 		for token_file in self.source_dataset.iterate_items(self):
-			if token_file.file.name == '.token_metadata.json':
-				# Skip metadata
-				continue
 			# Get the date
 			date_string = token_file.file.stem
 			dates.append(date_string)

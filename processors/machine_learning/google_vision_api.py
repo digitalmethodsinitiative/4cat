@@ -11,7 +11,7 @@ from pathlib import Path
 from common.lib.helpers import UserInput, convert_to_int
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -119,11 +119,8 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         done = 0
 
         # Load the metadata file so we can attach source post IDs to annotations.
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-            img_metadata = source_metadata.filename_to_post_ids()
-        except (FileNotFoundError, MetadataException):
-            img_metadata = {}
+        source_metadata = self.get_media_metadata()
+        img_metadata = source_metadata.filename_to_post_ids() if source_metadata is not None else {}
 
         # Loop through images
         for image in self.source_dataset.iterate_items():
@@ -134,8 +131,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             self.dataset.update_progress(done / total)
 
             if image.file.name.startswith(".") or image.file.suffix in (".json", ".log"):
-                if image.file.name != ".metadata.json":
-                    self.dataset.log(f"Skipping file {image.file.name}, probably not an image.")
+                self.dataset.log(f"Skipping file {image.file.name}, probably not an image.")
                 continue
 
             try:

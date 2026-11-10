@@ -11,7 +11,7 @@ import os
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException, DsmConnectionError
 from common.lib.helpers import UserInput, hash_to_md5
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem
 from common.lib.compatibility import Compatibility
 
@@ -196,10 +196,8 @@ class ImageTextDetector(BasicProcessor):
         dmi_service_manager.process_results(output_dir)
 
         # Load the metadata from the archive
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            source_metadata = None
+        source_metadata = self.get_media_metadata()
+        if source_metadata is None:
             self.dataset.update_status("No metadata file found")
 
         # Check if we need to collect data for updating the original dataset

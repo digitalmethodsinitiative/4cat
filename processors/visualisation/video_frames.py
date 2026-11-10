@@ -92,25 +92,27 @@ class VideoFrames(BasicProcessor):
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
-		# a folder of frames per video. Two videos can share a stem (e.g. clip.mp4
-		# and clip.webm), and with one folder between them the second video's
-		# frames overwrite the first's, since both are numbered from the start.
+		# a folder of frames per video, named after the video file. The
+		# extension is part of it: clip.mp4 and clip.webm are two videos, and
+		# the metadata records each by its file name.
 		frame_folders = UniqueFilenames(output_directory)
 
 		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
+
+		# Copy the videos' metadata, so frames can be traced back to the items
+		# the videos were downloaded for
+		try:
+			self.extract_archived_file_by_name(".metadata.json", self.source_dataset.get_results_path(), output_directory)
+		except FileNotFoundError:
+			pass
 
 		self.dataset.update_status("Extracting video frames")
 		for i, video in enumerate(self.source_dataset.iterate_items(self)):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
-			# Check for 4CAT's metadata JSON and copy it
-			if video.file.name == '.metadata.json':
-				shutil.copy(video.file, output_directory)
-				continue
-
-			vid_name = frame_folders.reserve(video.file.stem)
+			vid_name = frame_folders.reserve(video.file.name)
 			video_dir = output_directory.joinpath(vid_name)
 			video_dir.mkdir()
 

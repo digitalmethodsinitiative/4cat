@@ -16,7 +16,7 @@ from jsonschema.exceptions import ValidationError, SchemaError
 from datetime import datetime, timedelta
 
 from common.lib.item_mapping import MappedItem
-from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict, urls_in_text
 from common.lib.llm.adapter import LLMAdapter
 from backend.lib.processor import BasicProcessor
@@ -518,11 +518,12 @@ class LLMPrompter(BasicProcessor):
                 # Load metadata to map filenames back to original post IDs for annotations.
                 filename_to_post_ids = {}
                 if save_annotations:
-                    try:
-                        filename_to_post_ids = self.source_dataset.read_media_metadata().filename_to_post_ids()
-                    except (FileNotFoundError, MetadataException) as e:
-                        self.dataset.log(f"Could not load .metadata.json for annotation mapping: {e}. "
-                                         f"Annotations will use filenames as item IDs.")
+                    source_metadata = self.get_media_metadata()
+                    if source_metadata is not None:
+                        filename_to_post_ids = source_metadata.filename_to_post_ids()
+                    else:
+                        self.dataset.log("No usable .metadata.json found for annotation mapping. "
+                                         "Annotations will use filenames as item IDs.")
 
                 for item in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=True, get_annotations=False):
 

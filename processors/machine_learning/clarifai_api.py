@@ -9,7 +9,6 @@ from clarifai_grpc.grpc.api.status import status_code_pb2
 from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 
 from common.lib.helpers import UserInput, convert_to_int
-from common.lib.exceptions import MetadataException
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 
@@ -135,17 +134,14 @@ class ClarifaiAPIFetcher(BasicProcessor):
         buffer = {}
         batch_size = 16
 
-        num_images = self.source_dataset.num_rows - 1  # .metadata.json
+        num_images = self.source_dataset.num_rows
         total_annotations = (num_images if limit == 0 else min(limit, num_images)) * len(models)
         errors = 0
         processed = 0
         annotated = 0
 
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-            filename_to_post_ids = source_metadata.filename_to_post_ids()
-        except (FileNotFoundError, MetadataException):
-            filename_to_post_ids = {}
+        source_metadata = self.get_media_metadata()
+        filename_to_post_ids = source_metadata.filename_to_post_ids() if source_metadata is not None else {}
 
         # send batched requests per model
         for model_id in models:

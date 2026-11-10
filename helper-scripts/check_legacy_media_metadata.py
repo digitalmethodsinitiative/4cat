@@ -42,16 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 
-from common.lib.archive_metadata import MediaArchiveMetadata
-
-try:
-	from common.lib.archive_metadata import is_support_file
-except ImportError:
-	# versions of 4CAT before support files were defined in one place
-	def is_support_file(filename):
-		name = filename.split("/")[-1]
-		return name in (".metadata.json", ".token_metadata.json", ".model_metadata.json", "video_archive") \
-			or name.endswith(".log")
+from common.lib.archive_metadata import MediaArchiveMetadata, is_support_file
 
 METADATA_FILENAME = ".metadata.json"
 

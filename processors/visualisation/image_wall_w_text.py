@@ -16,7 +16,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.compatibility import Compatibility
 
 __author__ = "Dale Wahl"
@@ -160,9 +160,8 @@ class ImageTextWallGenerator(BasicProcessor):
         if text_dataset.type in ImageTextWallGenerator.combined_dataset:
             # For datasets with both images and text (Stable Diffusion output),
             # the prompt is stored as item.extra.prompt in the archive metadata.
-            try:
-                metadata = text_dataset.read_media_metadata()
-            except (FileNotFoundError, MetadataException):
+            metadata = self.get_media_metadata(text_dataset)
+            if metadata is None:
                 self.dataset.finish_with_error("No metadata file found")
                 return
             for filename, item in metadata.iter_entries():
@@ -212,11 +211,6 @@ class ImageTextWallGenerator(BasicProcessor):
         self.dataset.update_status("Creating Image wall")
         self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
         for image in image_dataset.iterate_items(self, immediately_delete=False):
-            if image.file.name in [".metadata.json"]:
-                if convert_to_int(self.parameters.get("amount"), 100) == 0:
-                    max_images = max_images - 1
-                continue
-
             # Check image loads prior to any modifications to canvas space
             try:
                 frame = Image.open(str(image.file))

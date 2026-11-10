@@ -10,8 +10,9 @@ from pathlib import Path
 import oslex
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import is_support_file
 from common.lib.compatibility import Compatibility, is_executable
-from common.lib.exceptions import ProcessorInterruptedException, MetadataException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UniqueFilenames
 
 __author__ = "Dale Wahl"
@@ -67,7 +68,7 @@ class AudioExtractor(BasicProcessor):
         # Prepare staging areas for videos and video tracking
         output_dir = self.dataset.get_staging_area()
 
-        # Estimate how many actual video files we will attempt, excluding archive metadata.
+        # Estimate how many actual video files we will attempt, excluding metadata and the like.
         total_possible_videos = self.source_dataset.num_rows
         source_archive = self.source_dataset.get_results_path()
         if source_archive.exists() and source_archive.suffix.lower() == ".zip":
@@ -75,8 +76,7 @@ class AudioExtractor(BasicProcessor):
                 total_possible_videos = sum(
                     1
                     for archived_file in archive_file.infolist()
-                    if not archived_file.is_dir()
-                    and Path(archived_file.filename).name not in (".metadata.json", "video_archive")
+                    if not archived_file.is_dir() and not is_support_file(archived_file.filename)
                 )
 
         if max_files != 0:
@@ -84,10 +84,7 @@ class AudioExtractor(BasicProcessor):
 
         # Read the source video archive's metadata so each extracted audio
         # file can carry its video's provenance (source posts, URL).
-        try:
-            source_metadata = self.source_dataset.read_media_metadata()
-        except (FileNotFoundError, MetadataException):
-            source_metadata = None
+        source_metadata = self.get_media_metadata()
 
         # Build our own metadata describing the audio files we produce,
         # rather than passing the (video-keyed) source metadata through.
@@ -106,14 +103,6 @@ class AudioExtractor(BasicProcessor):
         for item in self.source_dataset.iterate_items(processor=self, get_annotations=False):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while determining image wall order")
-
-            # the source archive's metadata describes videos; we write our
-            # own (audio-keyed) metadata below, so skip the original
-            if item.file.name == '.metadata.json':
-                continue
-            elif item.file.name == "video_archive":
-                # yt-dlp's list of what it downloaded; not a video
-                continue
 
             if max_files != 0 and processed_videos >= max_files:
                 break
@@ -145,7 +134,7 @@ class AudioExtractor(BasicProcessor):
             video_item = source_metadata.get_entry(item.file.name) if source_metadata else None
             post_ids = video_item.get("post_ids", []) if video_item else []
             source_url = video_item.get("url") if video_item else None
-            extra = dict(video_item.get("extra") or {}) if video_item else {}
+            extra = {"video_filename": item.file.name}
 
             # the name is this video's alone, so the file can only have been
             # written by the run above
