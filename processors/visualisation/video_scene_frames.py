@@ -14,7 +14,7 @@ from packaging import version
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.user_input import UserInput
-from common.lib.helpers import get_ffmpeg_version
+from common.lib.helpers import get_ffmpeg_version, UniqueFilenames
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -124,14 +124,19 @@ class VideoSceneFrames(BasicProcessor):
         except FileNotFoundError:
             pass
 
+        # a folder of frames per video, named after the video file. The
+        # extension is part of it: clip.mp4 and clip.webm are two videos, and
+        # the metadata records each by its file name.
+        scene_folders = UniqueFilenames(staging_area)
+
         for video in video_dataset.iterate_items(self):
             if video.file.name not in scenes:
                 continue
 
             self.dataset.log(f"Video {video.file.name} has {len(scenes[video.file.name]):,} scenes")
 
-            video_folder = staging_area.joinpath(video.file.stem)
-            video_folder.mkdir(exist_ok=True)
+            video_folder = staging_area.joinpath(scene_folders.reserve(video.file.name))
+            video_folder.mkdir()
 
             ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
             fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
