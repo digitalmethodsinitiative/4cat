@@ -118,9 +118,9 @@ class UniqueImageFilter(BasicProcessor):
                 if filename not in kept_file:
                     continue
                 extra = dict(item.get("extra") or {})
-                other_urls = extra.pop("other_urls", [])
                 extra["hash"] = inverse_hashmap[kept_file[filename]]
                 extra["hash_type"] = hash_type
+                # merging adds the duplicate's posts and URLs to the kept image
                 new_metadata.add_item(
                     kept_file[filename],
                     post_ids=item.get("post_ids", []),
@@ -128,10 +128,6 @@ class UniqueImageFilter(BasicProcessor):
                     extra=extra,
                     merge=True,
                 )
-                # adding these one by one keeps the other URLs of both the
-                # kept image and its duplicates
-                for other_url in other_urls:
-                    new_metadata.add_item(kept_file[filename], post_ids=[], url=other_url, merge=True)
         else:
             for h, filename in hash_map.items():
                 new_metadata.add_item(
