@@ -10,6 +10,7 @@ import oslex
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UniqueFilenames
 from common.lib.user_input import UserInput
 from processors.visualisation.download_videos import VideoDownloaderPlus
 
@@ -91,6 +92,11 @@ class VideoFrames(BasicProcessor):
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
+		# a folder of frames per video. Two videos can share a stem (e.g. clip.mp4
+		# and clip.webm), and with one folder between them the second video's
+		# frames overwrite the first's, since both are numbered from the start.
+		frame_folders = UniqueFilenames(output_directory)
+
 		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
 
@@ -106,9 +112,9 @@ class VideoFrames(BasicProcessor):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
-			vid_name = video.file.stem
+			vid_name = frame_folders.reserve(video.file.stem)
 			video_dir = output_directory.joinpath(vid_name)
-			video_dir.mkdir(exist_ok=True)
+			video_dir.mkdir()
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),

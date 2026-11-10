@@ -508,12 +508,8 @@ def queue_dataset():
 	if request.form.to_dict().get("email-complete", False):
 		sanitised_query["email-complete"] = request.form.to_dict().get("email-user", False)
 
-	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
-	# users who are not allowed to make datasets public never get the checkbox, and always get a private dataset
-	if not g.config.get("privileges.can_make_dataset_public"):
-		is_private = True
-	else:
-		is_private = bool(request.form.get("make-private", True))
+	# private, unless the user may make datasets public and has asked for that
+	is_private = not (g.config.get("privileges.can_make_dataset_public") and request.form.get("make-public"))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
 
@@ -1346,23 +1342,42 @@ def check_processor():
 
 	:request-param str subqueries:  A JSON-encoded list of dataset keys to get
 	                                the status of
+	:request-param str ?shown_status:  A JSON-encoded object with, for each
+	                                   dataset key, the status text the page
+	                                   currently shows for it. A dataset that
+	                                   is not finished and still has that
+	                                   status is returned without new HTML.
 	:return: A list of dataset data, with each dataset an item with a `key`,
-	        whether it had `finished`, a `html` snippet containing details, and
-	        a `url` at which the result may be downloaded when finished.
+	        whether it had `finished`, its `progress` as a percentage, a `html`
+	        snippet containing details, and a `url` at which the result may be
+	        downloaded when finished. For a dataset whose status is still the
+	        one given in `shown_status`, the item only has its `key`,
+	        `finished`, `progress`, and `unchanged` set to true.
 
 	:return-schema:{type=array,items={type=object,properties={
 		key={type=string},
 		finished={type=boolean},
+		unchanged={type=boolean},
+		progress={type=integer},
 		html={type=string},
 		url={type=string}
 	}}}
 
-	:return-error 406:  If the list of subqueries could not be parsed.
+	:return-error 406:  If the list of subqueries or the shown statuses could
+	not be parsed.
 	"""
 	try:
 		keys = json.loads(request.args.get("subqueries"))
 	except (TypeError, json.decoder.JSONDecodeError):
 		return error(406, error="Unexpected format for child dataset key list.")
+
+	try:
+		shown_status = json.loads(request.args.get("shown_status", "{}"))
+	except json.decoder.JSONDecodeError:
+		shown_status = None
+
+	if not isinstance(shown_status, dict):
+		return error(406, error="Unexpected format for shown statuses.")
 
 	children = []
 
@@ -1400,6 +1415,19 @@ def check_processor():
 			g.log.warning(f"Parent of dataset {dataset.key} not found; cannot render child view. Skipping...")
 			continue
 
+		if not dataset.is_finished() and dataset.get_status() == shown_status.get(dataset.key):
+			# While a dataset is not finished, its entry on the page only
+			# looks different when its status changes, so the page can keep
+			# what it has. This avoids checking and building options of every 
+			# processor that can be run next.
+			children.append({
+				"key": dataset.key,
+				"finished": False,
+				"unchanged": True,
+				"progress": round(dataset.get_progress() * 100),
+			})
+			continue
+
 		parent = genealogy[-2]
 		top_parent = genealogy[0]
 
@@ -1407,6 +1435,7 @@ def check_processor():
 			children.append({
 				"key": dataset.key,
 				"finished": dataset.is_finished(),
+				"unchanged": False,
 				"progress": round(dataset.get_progress() * 100),
 				"html": render_template("components/result-child.html", child=dataset, dataset=parent,
                                         query=dataset.get_genealogy()[0], parent_key=top_parent.key,

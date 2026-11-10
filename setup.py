@@ -25,7 +25,7 @@ core_packages = {
 	"langchain_openai",
 	"langchain_mistralai",
 	"langchain_deepseek",
-	"markdown2==2.4.2",
+	"markdown2==2.5.5",
 	"natsort",
 	"oslex",
 	"packaging",

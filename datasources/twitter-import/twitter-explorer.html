@@ -30,7 +30,7 @@
 			{% if media_url %}
 			<div class="media-container">
 				{% for url in media_url.split(",") %}
-					<a href="{{ url }}" target="_blank"><img src="{{ url }}"></a>
+					<a href="{{ url | web_url }}" target="_blank"><img src="{{ url }}"></a>
 				{% endfor %}
 			</div>
 			{% endif %}
@@ -61,7 +61,7 @@
 				{% if media_url %}
 				<div class="media-container">
 					{% for url in media_url.split(",") %}
-						<a href="{{ url }}" target="_blank"><img src="{{ url }}"></a>
+						<a href="{{ url | web_url }}" target="_blank"><img src="{{ url }}"></a>
 					{% endfor %}
 				</div>
 				{% endif %}

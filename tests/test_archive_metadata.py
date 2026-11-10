@@ -10,7 +10,7 @@ import zipfile
 
 import pytest
 
-from common.lib.archive_metadata import MediaArchiveMetadata, is_support_file
+from common.lib.archive_metadata import MediaArchiveMetadata, PostIdMap, is_support_file, normalize_post_id
 from common.lib.exceptions import MetadataException
 
 CURRENT_SCHEMA_VERSION = MediaArchiveMetadata.SCHEMA_VERSION
@@ -303,6 +303,144 @@ def test_post_ids_for():
 	assert m.post_ids_for("missing.jpg") == []
 
 
+@pytest.mark.parametrize("given, expected", [
+	("p1", "p1"),
+	(42, "42"),
+	(1.0, "1.0"),
+	("  p1  ", "p1"),
+	(None, ""),
+	("", ""),
+	("   ", ""),
+])
+def test_normalize_post_id(given, expected):
+	"""
+	Consumers compare a dataset item's own `id` against the post IDs in a
+	metadata file. Neither side is guaranteed to be text - a datasource or an
+	extension may map an `id` as a number - so both go through this.
+	"""
+	assert normalize_post_id(given) == expected
+
+
+def test_normalize_post_id_is_the_rule_stored_ids_follow():
+	"""
+	An ID put through `normalize_post_id` matches the stored form of the same
+	ID, whichever type it was given as.
+	"""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[1234, " 5678 "])
+	stored = m.get_entry("a.jpg")["post_ids"]
+	assert normalize_post_id(1234) in stored
+	assert normalize_post_id("1234") in stored
+	assert normalize_post_id(5678) in stored
+
+
+def test_post_id_map_looks_up_by_any_type():
+	"""
+	A consumer keys a map by the post IDs from a metadata file (text) but looks
+	items up by a dataset item's own `id`, which its datasource may have mapped
+	as a number. Both go through `normalize_post_id`, so either finds the entry.
+	"""
+	m = PostIdMap()
+	m["1234"] = ["a.jpg"]
+	m[5678] = ["b.jpg"]
+
+	for key in ("1234", 1234, " 1234 "):
+		assert key in m
+		assert m[key] == ["a.jpg"]
+		assert m.get(key) == ["a.jpg"]
+	for key in ("5678", 5678):
+		assert key in m
+		assert m[key] == ["b.jpg"]
+
+	# keys read back out are the normalized text form
+	assert sorted(m.keys()) == ["1234", "5678"]
+	assert len(m) == 2
+
+
+def test_post_id_map_normalizes_in_every_dict_method():
+	"""
+	`get`, `setdefault`, `pop`, `update`, `in` and `del` all have to agree, or
+	a consumer using one of them is still comparing a number against text.
+	"""
+	m = PostIdMap({42: ["a.jpg"]})
+	assert "42" in m
+
+	# setdefault is how consumers build these maps
+	m.setdefault(42, []).append("b.jpg")
+	assert m["42"] == ["a.jpg", "b.jpg"]
+	m.setdefault(99, []).append("c.jpg")
+	assert m["99"] == ["c.jpg"]
+
+	m.update({7: ["d.jpg"]})
+	assert m["7"] == ["d.jpg"]
+
+	assert m.pop(7) == ["d.jpg"]
+	assert 7 not in m
+
+	del m[99]
+	assert "99" not in m
+
+	assert m.get(12345, "fallback") == "fallback"
+
+
+def test_post_id_map_drops_blank_and_null_keys_to_one_key():
+	"""
+	Media with no traceable item records no ID; those all normalize to the
+	empty string rather than to several different unusable keys.
+	"""
+	m = PostIdMap()
+	m[None] = ["a.jpg"]
+	assert "" in m
+	assert m[None] == ["a.jpg"]
+	m["  "] = ["b.jpg"]
+	assert m[None] == ["b.jpg"]
+
+
+def test_post_id_to_filenames_inverts_the_entries():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[1, 2])
+	m.add_item("b.jpg", post_ids=[2, 3])
+
+	index = m.post_id_to_filenames()
+	# an item can have several files and a file several items
+	assert index[1] == ["a.jpg"]
+	assert index[2] == ["a.jpg", "b.jpg"]
+	assert index["3"] == ["b.jpg"]
+	assert 4 not in index
+
+	# the inverse of filename_to_post_ids
+	assert m.filename_to_post_ids() == {"a.jpg": ["1", "2"], "b.jpg": ["2", "3"]}
+
+
+def test_post_id_to_filenames_is_cached_but_not_stale():
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[1])
+
+	first = m.post_id_to_filenames()
+	# built once, so a consumer can look up every item of a dataset in turn
+	assert m.post_id_to_filenames() is first
+
+	# ... but a producer that adds a file afterwards must not see the old map
+	m.add_item("b.jpg", post_ids=[2])
+	second = m.post_id_to_filenames()
+	assert second is not first
+	assert second[2] == ["b.jpg"]
+
+	# merging more posts into an existing file also changes the mapping
+	m.add_item("b.jpg", post_ids=[3], merge=True)
+	assert m.post_id_to_filenames()[3] == ["b.jpg"]
+
+
+def test_post_id_to_filenames_ignores_failures():
+	"""Failures name no file, so they have nothing to map to."""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("a.jpg", post_ids=[1])
+	m.add_failure(post_ids=[2], reason="error")
+	index = m.post_id_to_filenames()
+	assert index[1] == ["a.jpg"]
+	assert 2 not in index
+
+
 def test_add_item_normalizes_post_ids():
 	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
 	m.add_item("a.jpg", post_ids="p1")          # bare string
@@ -400,6 +538,28 @@ def test_add_item_merge_lists_each_other_url_once():
 	entry = m.get_entry("v.mp4")
 	assert entry["post_ids"] == ["1", "2", "3", "4", "5", "6"]
 	assert entry["extra"]["other_urls"] == ["https://b.example/v", "https://c.example/v"]
+
+
+def test_add_item_merge_joins_the_other_urls_of_both_sides():
+	"""
+	Both sides of a merge list URLs that lead to this same file, so the lists
+	are joined. The image downloader hands over the URLs that redirected to a
+	file in `extra`, and both of its URLs resolve to the same final one - so
+	the URL argument adds nothing, and letting the entry's own list win would
+	drop every URL the second one knew about.
+	"""
+	m = MediaArchiveMetadata.new(processor_type="x", from_dataset="y")
+	m.add_item("photo.jpeg", post_ids=["1"], url="https://cdn.example/p",
+			   extra={"other_urls": ["https://a.example/p"]})
+	m.add_item("photo.jpeg", post_ids=["2"], url="https://cdn.example/p",
+			   extra={"other_urls": ["https://a.example/p", "https://b.example/p"]},
+			   merge=True)
+
+	entry = m.get_entry("photo.jpeg")
+	assert entry["post_ids"] == ["1", "2"]
+	assert entry["extra"]["other_urls"] == ["https://a.example/p", "https://b.example/p"]
+	# the entry's own URL is never one of its other URLs
+	assert entry["url"] == "https://cdn.example/p"
 
 
 def test_add_item_merge_fills_in_missing_url():
@@ -597,6 +757,118 @@ def test_v1_read_normalizes_integer_post_ids():
 	m._populate_from_raw(raw)
 	assert m.get_entry("a.jpg")["post_ids"] == ["1", "2"]
 	assert m.failures[0]["post_ids"] == ["3"]
+
+
+def test_read_survives_post_ids_that_cannot_be_read():
+	"""
+	An archive can come from another 4CAT or have been edited by hand, so
+	`post_ids` can hold anything. A JSON number with a decimal point decodes
+	to a float, which cannot be read as a list of IDs - and would not match an
+	item's id anyway. The entry is left without IDs rather than the read
+	raising something no consumer of the metadata catches.
+	"""
+	raw = {
+		"schema_version": 1,
+		"items": {"a.jpg": {"filename": "a.jpg", "post_ids": 1.5}},
+		"failures": [{"post_ids": 2.5, "reason": "error"}],
+	}
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(raw)
+	assert m.get_entry("a.jpg")["post_ids"] == []
+	assert m.failures[0]["post_ids"] == []
+	# and the result is still a file we can write back out
+	m.validate()
+
+
+def read_legacy(raw):
+	"""Read an old-format metadata file from a dict."""
+	m = MediaArchiveMetadata()
+	m._populate_from_raw(raw)
+	return m
+
+
+def test_legacy_screenshot_ids_are_post_ids():
+	"""Screenshot processors stored the item IDs as `ids`."""
+	m = read_legacy({
+		"https://example.com/": {"filename": "example.png", "ids": [0, 1], "error": ""},
+	})
+	item = m.get_entry("example.png")
+	assert item["post_ids"] == ["0", "1"]
+	assert "ids" not in item.get("extra", {})
+
+
+def test_legacy_post_ids_as_text_are_split():
+	"""Some processors stored the post IDs as one text, separated by commas."""
+	m = read_legacy({
+		"https://example.com/": {"filename": "example.png", "post_ids": "12, 15", "error": ""},
+	})
+	assert m.get_entry("example.png")["post_ids"] == ["12", "15"]
+
+
+def test_legacy_entry_without_flag_or_file_is_a_failure():
+	"""A failed screenshot named no file and had no `success` flag."""
+	m = read_legacy({
+		"https://example.com@20250814012946": {
+			"url": "https://example.com", "fail_url": "https://web.archive.org/web/2025/https://example.com",
+			"error": "Archive page not properly loaded",
+		},
+		"https://example.com@20250821112625": {
+			"url": "https://example.com", "filename": "shot.png", "error": "",
+		},
+	})
+	assert list(m.items) == ["shot.png"]
+	assert len(m.failures) == 1
+	failure = m.failures[0]
+	assert failure["url"] == "https://example.com"
+	assert failure["reason"] == "error"
+	assert failure["reason_description"] == "Archive page not properly loaded"
+	assert failure["extra"]["fail_url"] == "https://web.archive.org/web/2025/https://example.com"
+
+
+def test_legacy_entry_marked_successful_without_file_is_still_dropped():
+	m = read_legacy({"https://example.com/a.jpg": {"success": True, "post_ids": ["1"]}})
+	assert not m.items
+	assert not m.failures
+
+
+def test_legacy_original_key_is_kept_when_not_url_or_filename():
+	m = read_legacy({
+		# a local path as key: kept
+		"/mnt/images/abc.jpg": {"filename": None, "success": False, "post_ids": ["1"]},
+		# a URL and date as key: kept
+		"https://example.com@20250814012946": {"url": "https://example.com", "filename": "shot.png", "error": ""},
+		# the URL as key: nothing to keep
+		"https://example.com/b.jpg": {"filename": "b.jpg", "success": True, "post_ids": ["2"]},
+		# the file name as key: nothing to keep
+		"c.jpg": {"filename": "c.jpg", "success": True, "post_ids": ["3"]},
+	})
+	assert m.failures[0]["extra"]["original_key"] == "/mnt/images/abc.jpg"
+	assert m.get_entry("shot.png")["extra"]["original_key"] == "https://example.com@20250814012946"
+	assert "original_key" not in m.get_entry("b.jpg").get("extra", {})
+	assert "original_key" not in m.get_entry("c.jpg").get("extra", {})
+
+
+def test_legacy_copied_entries_do_not_decide_source_dataset():
+	"""The old video downloader copied entries with the source of an earlier archive."""
+	m = read_legacy({
+		"https://example.com/1": {"from_dataset": "this_source", "post_ids": ["1"], "success": True,
+								  "files": [{"filename": "1.mp4", "success": True}]},
+		"https://example.com/2": {"from_dataset": "earlier_source", "file_dataset_key": "earlier_archive",
+								  "post_ids": ["2"], "success": True,
+								  "files": [{"filename": "2.mp4", "success": True}]},
+	})
+	assert m.from_dataset == "this_source"
+	# the copy itself stays visible
+	assert m.get_entry("2.mp4")["extra"]["file_dataset_key"] == "earlier_archive"
+
+
+def test_legacy_only_copied_entries_still_give_a_source_dataset():
+	m = read_legacy({
+		"https://example.com/2": {"from_dataset": "earlier_source", "file_dataset_key": "earlier_archive",
+								  "post_ids": ["2"], "success": True,
+								  "files": [{"filename": "2.mp4", "success": True}]},
+	})
+	assert m.from_dataset == "earlier_source"
 
 
 @pytest.mark.parametrize("filename, expected", [

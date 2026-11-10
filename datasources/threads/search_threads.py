@@ -10,7 +10,7 @@ import re
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem
-from common.lib.helpers import normalize_url_encoding
+from common.lib.helpers import readable_url
 
 
 class SearchThreads(Search):
@@ -64,7 +64,7 @@ class SearchThreads(Search):
                 link_thumbnail = linked_url
 
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": post["code"],
             "thread_id": post["code"],
             "url": f"https://www.threads.com/@{post['user']['username']}/post/{post['code']}",

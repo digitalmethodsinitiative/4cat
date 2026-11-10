@@ -22,8 +22,10 @@ from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api, hash_to_md5, convert_to_float
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
+from common.lib.archive_metadata import MediaArchiveMetadata, PostIdMap, normalize_post_id
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
-                                   MapItemException, MappedItemIncompleteException, AnnotationException)
+                                   MapItemException, MappedItemIncompleteException, AnnotationException,
+                                   MetadataException)
 
 
 class StatusType(Enum):
@@ -55,6 +57,7 @@ class DataSet(FourcatModule):
 
     _children = None
     available_processors = None
+    _available_processors_config = None # last known config for available_processors, so we can check if it needs to be refreshed
     _genealogy = None
     preset_parent = None
     parameters = None
@@ -122,7 +125,7 @@ class DataSet(FourcatModule):
         # Ensure mutable attributes are set in __init__ as they are unique to each DataSet
         self.data = {}
         self.parameters = {}
-        self.available_processors = {}
+        self.available_processors = None
         self._genealogy = None
         self.disposable_files = []
         self.modules = modules
@@ -2138,6 +2141,20 @@ class DataSet(FourcatModule):
 
         return self.modules.processors.get(processor_type)
 
+    def get_media_request_headers(self):
+        """
+        Get extra headers to send when downloading images or videos linked in
+        this dataset
+
+        These come from the data source the data was collected with, which is
+        found via the top dataset, since this dataset may itself be made from
+        that data (e.g. by a processor).
+
+        :return dict:  Headers; empty if the data source needs none
+        """
+        data_source = self.top_parent().get_own_processor()
+        return dict(getattr(data_source, "media_request_headers", {}))
+
     def get_producer_processor(self):
         """
         Get the processor class that actually produced this dataset.
@@ -2192,16 +2209,19 @@ class DataSet(FourcatModule):
         :param ConfigManager|None config:  Configuration reader to determine
         compatibility through. This may not be the same reader the dataset was
         instantiated with, e.g. when checking whether some other user should
-        be able to run processors on this dataset.
+        be able to run processors on this dataset. The result is saved and
+        reused for later calls with the same reader.
         :param bool exclude_hidden:  Exclude processors that should not be
         displayed in the UI? If `False`, all processors are returned.
 
         :return dict:  Available processors, `name => properties` mapping
         """
         # The cache always holds the full list, hidden processors included, so
-        # that every call can apply its own exclude_hidden to it
+        # that every call can apply its own exclude_hidden to it. It is None
+        # until the list has been worked out; an empty list is a valid result.
+        # Also cache the config used since the available processors may depend on it.
         # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-        if not self.available_processors:
+        if self.available_processors is None or config is not self._available_processors_config:
             processors = self.get_compatible_processors(config=config)
 
             for analysis in self.get_children(update=True):
@@ -2213,6 +2233,7 @@ class DataSet(FourcatModule):
                     del processors[analysis.type]
 
             self.available_processors = processors
+            self._available_processors_config = config
 
         return {
             processor_type: processor
@@ -2427,8 +2448,6 @@ class DataSet(FourcatModule):
         :param list item_ids:   A list of item IDs to limit the filename retrieval to.
         returns dict: item_id as key and a list of tuples (child dataset key -> filename) as items
         """
-        from common.lib.exceptions import MetadataException
-
         children = self.get_children()
         if not children:
             return {}
@@ -2441,9 +2460,12 @@ class DataSet(FourcatModule):
             if ("video-downloader" in p.type or "image-downloader" in p.type) and p.data.get("num_rows", 0) > 0 and p.is_finished()
         ]
 
-        media_map = {}
+        # keyed by post ID, so that the caller can look an item up by its own
+        # `id` whichever way its datasource mapped it
+        media_map = PostIdMap()
         seen_files = set()
-        item_ids = [str(i_id) for i_id in item_ids]
+        # the IDs to filter on come from the caller, not from the metadata
+        item_ids = {normalize_post_id(i_id) for i_id in item_ids}
 
         for media_dataset in media_datasets:
             try:
@@ -2452,7 +2474,8 @@ class DataSet(FourcatModule):
                 continue
 
             for filename, entry in metadata.iter_entries():
-                post_ids = [str(p_id) for p_id in entry.get("post_ids", [])]
+                # the metadata class stores these as text already
+                post_ids = entry.get("post_ids", [])
                 if not post_ids:
                     continue
                 if item_ids and not any(p_id in item_ids for p_id in post_ids):
@@ -2495,7 +2518,6 @@ class DataSet(FourcatModule):
         `MetadataException` if the dataset is unfinished or the file is
         malformed.
         """
-        from common.lib.archive_metadata import MediaArchiveMetadata
         return MediaArchiveMetadata.read(self, filename=filename)
 
     def new_media_metadata(self, from_dataset, processor_type, filename=".metadata.json"):
@@ -2507,7 +2529,6 @@ class DataSet(FourcatModule):
             being downloaded from (this is generally not the same as `self`).
         :param str processor_type:  type of the processor, used for metadata.
         """
-        from common.lib.archive_metadata import MediaArchiveMetadata
         return MediaArchiveMetadata.new(self, processor_type=processor_type,
                                         from_dataset=from_dataset, filename=filename)
 

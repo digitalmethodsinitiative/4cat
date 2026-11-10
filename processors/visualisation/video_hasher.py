@@ -17,6 +17,7 @@ from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.helpers import UniqueFilenames
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -188,6 +189,11 @@ class VideoHasher(BasicProcessor):
         video_metadata = self.get_media_metadata()
         total_possible_videos = max((min(self.source_dataset.num_rows, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
         processed_videos = 0
+        # the collage is named after the video, and two videos can share a stem
+        # (e.g. clip.mp4 and clip.webm): without a name of its own the second
+        # collage overwrites the first, and both videos' hashes then point at
+        # the same image
+        collage_filenames = UniqueFilenames(output_dir)
 
         self.dataset.update_status("Creating video hashes")
         for video in self.source_dataset.iterate_items(self, staging_area=staging_area):
@@ -216,8 +222,9 @@ class VideoHasher(BasicProcessor):
 
             video_hashes[video.file.name] = {'videohash': videohash}
 
-            shutil.copy(videohash.collage_path, output_dir.joinpath(video.file.stem + '.jpg'))
-            video_hashes[video.file.name]['video_collage_filename'] = video.file.stem + '.jpg'
+            collage_filename = collage_filenames.reserve(video.file.stem + '.jpg')
+            shutil.copy(videohash.collage_path, output_dir.joinpath(collage_filename))
+            video_hashes[video.file.name]['video_collage_filename'] = collage_filename
 
             processed_videos += 1
             self.dataset.update_status(

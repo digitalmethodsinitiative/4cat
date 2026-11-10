@@ -9,8 +9,11 @@ config) has to be started up.
 import zipfile
 from types import SimpleNamespace
 
+import pytest
+
 from common.lib.archive_metadata import MediaArchiveMetadata
-from common.lib.media_archive_library import MediaArchiveLibrary
+from common.lib.helpers import UniqueFilenames
+from common.lib.media_archive_library import MediaArchiveLibrary, MediaLibraryHit
 from processors.visualisation.download_videos import VideoDownloaderPlus
 
 
@@ -38,6 +41,8 @@ def make_downloader(parameters=None):
     downloader.source_dataset = SimpleNamespace(key="posts")
     downloader.parameters = parameters or {}
     downloader.files_copied_from_library = {}
+    downloader.staging_filenames = UniqueFilenames()
+    downloader.max_videos_per_url = (parameters or {}).get("channel_videos") or 1
     return downloader
 
 
@@ -196,3 +201,183 @@ def test_same_filename_from_a_different_earlier_download_is_not_copied_over(tmp_
     assert first["copied"] is True
     assert second["copied"] is False
     assert "files" not in urls["https://example.com/two"]
+
+
+# -- channels and playlists, when the number of videos per link changes --
+
+def earlier_channel_archive(tmp_path, key, positions, playlist_count=None, channel_videos=0):
+    """
+    An earlier download of a channel URL, holding the videos at the given
+    positions in that channel. yt-dlp records the position and, if it knows,
+    how many videos the channel holds.
+    """
+    folder = tmp_path / key
+    folder.mkdir()
+    zip_path = folder / "results.zip"
+    dataset = SimpleNamespace(key=key, parameters={"channel_videos": channel_videos},
+                              get_results_path=lambda: zip_path)
+    metadata = MediaArchiveMetadata(dataset)
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        for position in positions:
+            filename = f"channel_{position:05d}.mp4"
+            archive.writestr(filename, b"video bytes")
+            extra = {"downloader": "yt_dlp", "playlist_index": position}
+            if playlist_count is not None:
+                extra["playlist_count"] = playlist_count
+            metadata.add_item(filename, post_ids=["p1"], url="https://youtube.com/@channel", extra=extra)
+    return metadata
+
+
+def try_copy(tmp_path, metadata, parameters, staging_name="staging"):
+    staging = tmp_path / staging_name
+    staging.mkdir()
+    urls = {"https://youtube.com/@channel": {"post_ids": {"p9"}}}
+    downloader = make_downloader(parameters)
+    result = downloader._try_copy_from_library("https://youtube.com/@channel", urls,
+                                               MediaArchiveLibrary([metadata]), staging)
+    return result, sorted(file.name for file in staging.iterdir()), downloader
+
+
+def test_channel_is_downloaded_again_when_this_run_allows_more_videos(tmp_path):
+    """One of a channel's 630 videos was downloaded before; this run allows two."""
+    metadata = earlier_channel_archive(tmp_path, "earlier", [1], playlist_count=630)
+
+    result, copied, downloader = try_copy(tmp_path, metadata, {"channel_videos": 2, "also_indirect": "all"})
+
+    assert (result["copied"], result["skip"]) == (False, False)
+    assert copied == []
+    assert any("downloading again" in message for message in downloader.dataset.logs)
+
+
+def test_channel_is_copied_when_it_has_no_more_videos(tmp_path):
+    metadata = earlier_channel_archive(tmp_path, "earlier", [1, 2], playlist_count=2)
+
+    result, copied, _ = try_copy(tmp_path, metadata, {"channel_videos": 5, "also_indirect": "all"})
+
+    assert (result["copied"], result["count"]) == (True, 2)
+    assert copied == ["channel_00001.mp4", "channel_00002.mp4"]
+
+
+def test_channel_is_copied_when_this_run_cannot_use_yt_dlp_for_it(tmp_path):
+    """Downloading it again would fail, so the earlier video is better than nothing."""
+    metadata = earlier_channel_archive(tmp_path, "earlier", [1], playlist_count=630)
+
+    result, copied, _ = try_copy(tmp_path, metadata, {"channel_videos": 2, "also_indirect": "none"})
+
+    assert result["copied"] is True
+    assert copied == ["channel_00001.mp4"]
+
+
+def test_single_video_is_copied_whatever_the_number_of_videos_per_link(tmp_path):
+    library_metadata = earlier_video_archive(tmp_path, "earlier", ["https://youtube.com/watch?v=abc"])
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    urls = {"https://youtube.com/watch?v=abc": {"post_ids": {"p1"}}}
+    downloader = make_downloader({"channel_videos": 5, "also_indirect": "all"})
+
+    result = downloader._try_copy_from_library("https://youtube.com/watch?v=abc", urls,
+                                               MediaArchiveLibrary([library_metadata]), staging)
+
+    assert result["copied"] is True
+
+
+def test_playlist_of_unknown_size_uses_the_earlier_runs_limit(tmp_path):
+    """Without a playlist size, the earlier run counts as stopped if it got as many as it was allowed."""
+    stopped = earlier_channel_archive(tmp_path, "stopped", [1], channel_videos=0)
+    result, _, _ = try_copy(tmp_path, stopped, {"channel_videos": 2, "also_indirect": "all"}, "staging_a")
+    assert result["copied"] is False
+
+    not_stopped = earlier_channel_archive(tmp_path, "not_stopped", [1], channel_videos=3)
+    result, _, _ = try_copy(tmp_path, not_stopped, {"channel_videos": 5, "also_indirect": "all"}, "staging_b")
+    assert result["copied"] is True
+
+
+def channel_hit(entries, channel_videos=0):
+    """
+    A successful library hit for a channel URL, built directly so a single
+    entry's yt-dlp data can be varied without writing an archive.
+
+    :param list entries:  One `extra` dict per video the earlier run has
+    :param int channel_videos:  Videos per link the earlier run was allowed
+    """
+    dataset = SimpleNamespace(key="earlier", parameters={"channel_videos": channel_videos})
+    metadata = MediaArchiveMetadata(dataset)
+    return MediaLibraryHit(
+        is_success=True,
+        metadata=metadata,
+        entries=[(f"channel_{i:05d}.mp4", {"extra": extra}) for i, extra in enumerate(entries, 1)],
+    )
+
+
+@pytest.mark.parametrize("extra, expected", [
+    ({"playlist_count": 630}, 630),
+    ({"playlist_count": "630"}, 630),
+    # a count of zero is a count, not a missing value
+    ({"playlist_count": 0}, 0),
+    # yt-dlp writes a null when it does not know
+    ({"playlist_count": None}, None),
+    ({"playlist_count": None, "n_entries": 12}, 12),
+    ({"n_entries": 12}, 12),
+    # neither field says anything usable
+    ({"playlist_index": 3}, None),
+    ({"playlist_count": "not a number"}, None),
+    # junk in one field does not hide a usable value in the other
+    ({"playlist_count": "not a number", "n_entries": 12}, 12),
+])
+def test_playlist_size_is_read_from_either_field(extra, expected):
+    assert VideoDownloaderPlus._playlist_size(extra) == expected
+
+
+def test_a_playlist_that_holds_nothing_more_is_copied_not_downloaded_again():
+    """
+    A count of zero used to be read as "yt-dlp did not say", which sent the
+    decision to the earlier run's own limit and downloaded the URL again.
+    """
+    downloader = make_downloader({"channel_videos": 5})
+    hit = channel_hit([{"playlist_index": 1, "playlist_count": 0}])
+
+    assert downloader._channel_has_more_videos(hit) is False
+
+
+def test_the_largest_playlist_size_across_entries_decides():
+    """
+    One file can be recorded for several URLs, so a URL's entries can carry
+    data from different playlists. The first one must not decide on its own.
+    """
+    downloader = make_downloader({"channel_videos": 5})
+
+    # the entry that knows about more videos comes second
+    assert downloader._channel_has_more_videos(channel_hit([
+        {"playlist_index": 1, "playlist_count": 1},
+        {"playlist_index": 1, "playlist_count": 630},
+    ])) is True
+
+    # ... and the same the other way round
+    assert downloader._channel_has_more_videos(channel_hit([
+        {"playlist_index": 1, "playlist_count": 630},
+        {"playlist_index": 1, "playlist_count": 1},
+    ])) is True
+
+    # nothing reports more than was downloaded
+    assert downloader._channel_has_more_videos(channel_hit([
+        {"playlist_index": 1, "playlist_count": 2},
+        {"playlist_index": 2, "playlist_count": 1},
+    ])) is False
+
+
+def test_an_entry_without_playlist_data_does_not_hide_one_with_it():
+    """A plain video merged into the same URL should not end the search."""
+    downloader = make_downloader({"channel_videos": 5})
+    hit = channel_hit([{"downloader": "yt_dlp"}, {"playlist_index": 1, "playlist_count": 630}])
+
+    assert downloader._channel_has_more_videos(hit) is True
+
+
+def test_only_as_many_videos_as_this_run_allows_are_copied(tmp_path):
+    """An earlier run allowed three videos per link; this one allows one."""
+    metadata = earlier_channel_archive(tmp_path, "earlier", [3, 1, 2], playlist_count=630, channel_videos=3)
+
+    result, copied, _ = try_copy(tmp_path, metadata, {"channel_videos": 1, "also_indirect": "all"})
+
+    assert (result["copied"], result["count"]) == (True, 1)
+    assert copied == ["channel_00001.mp4"]

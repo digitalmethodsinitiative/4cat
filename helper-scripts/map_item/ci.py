@@ -90,14 +90,15 @@ def extract_llm_requirements(setup_py_source: str) -> list[str]:
 
 def _git_diff_names(before: str, after: str) -> list[str]:
     """
-    Names of datasource search files changed between two commits. Returns an
-    empty list (rather than raising) if git can't resolve the range — e.g. a
-    shallow clone that doesn't contain `before`. The caller treats "can't tell"
-    the same as "nothing changed".
+    Names of datasource search files changed between two commits, leaving out
+    deleted files: a datasource removed from 4CAT has nothing to translate.
+    Returns an empty list (rather than raising) if git can't resolve the range
+    — e.g. a shallow clone that doesn't contain `before`. The caller treats
+    "can't tell" the same as "nothing changed".
     """
     try:
         out = subprocess.check_output(
-            ["git", "diff", "--name-only", before, after, "--", _DATASOURCE_PATHSPEC],
+            ["git", "diff", "--name-only", "--diff-filter=d", before, after, "--", _DATASOURCE_PATHSPEC],
             text=True,
         )
     except (subprocess.CalledProcessError, OSError):
@@ -182,6 +183,33 @@ def _git_python_diff(before: str, after: str, python_file: str) -> str:
         return ""
 
 
+def _git_python_commits(before: str, after: str, python_file: str) -> list[tuple[str, str]]:
+    """
+    `(sha, subject)` of the commits in before..after that changed
+    `python_file`, oldest first; [] if the range can't resolve or git isn't
+    available. Merge commits are left out: when both sides of a `git pull`
+    changed the file, git lists the merge as well, and GitHub's page for it
+    shows changes that were already on master. The Python diff in the PR body
+    still covers everything the push changed.
+    """
+    try:
+        out = subprocess.check_output(
+            [
+                "git", "log", "--no-merges", "--reverse", "--format=%H%x09%s",
+                "{}..{}".format(before, after), "--", python_file,
+            ],
+            text=True,
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return []
+    commits = []
+    for line in out.splitlines():
+        sha, _, subject = line.partition("\t")
+        if sha:
+            commits.append((sha, subject))
+    return commits
+
+
 def _code_fence(content: str, lang: str = "") -> tuple[str, str]:
     """
     Return `(open, close)` markdown code-fence markers long enough that nothing
@@ -205,17 +233,21 @@ def build_pr_body(
     event_name: str,
     repo: str,
     python_diff: Optional[Callable[[str, str, str], str]] = None,
+    python_commits: Optional[Callable[[str, str, str], list[tuple[str, str]]]] = None,
 ) -> tuple[str, str]:
     """
-    Build the draft-PR `(title, body)` from a translation manifest. `python_diff`
-    is injectable for testing; it defaults to a real `git diff` and is only
-    invoked for `push` events.
+    Build the draft-PR `(title, body)` from a translation manifest.
+    `python_diff` and `python_commits` are injectable for testing; they default
+    to a real `git diff` / `git log` and are only invoked for `push` events.
     """
     if python_diff is None:
         python_diff = _git_python_diff
+    if python_commits is None:
+        python_commits = _git_python_commits
 
     model = manifest.get("model", "(unknown)")
     provider = manifest.get("provider", "ollama")
+    base_url = manifest.get("base_url")
     total_duration = manifest.get("total_duration_seconds")
     entries = manifest.get("entries", [])
 
@@ -230,6 +262,8 @@ def build_pr_body(
     lines.append("")
     lines.append("## Generation parameters")
     lines.append("- **Model:** `{}` (provider: `{}`)".format(model, provider))
+    if base_url:
+        lines.append("- **LLM server:** `{}`".format(base_url))
     if total_duration is not None:
         lines.append("- **Total LLM time:** {}s".format(total_duration))
     if is_bootstrap:
@@ -240,9 +274,11 @@ def build_pr_body(
     elif event_name == "workflow_dispatch":
         lines.append("- **Trigger:** manual `workflow_dispatch` for `{}`.".format(module))
     else:
+        # Link the whole push rather than its last commit: when that is a
+        # merge, GitHub's page for it shows changes that were already on master
         lines.append(
-            "- **Trigger:** push of [`{}`](https://github.com/{}/commit/{}) to 4CAT "
-            "master (module: `{}`).".format(short_sha, repo, after, module)
+            "- **Trigger:** push [`{}...{}`](https://github.com/{}/compare/{}...{}) to 4CAT "
+            "master (module: `{}`).".format(before[:7], short_sha, repo, before, after, module)
         )
     lines.append("")
 
@@ -309,9 +345,16 @@ def build_pr_body(
             lines.append("> " + entry["commentary"].replace("\n", "\n> "))
             lines.append("")
         if event_name == "push":
+            commits = python_commits(before, after, entry["python_file"])
             diff = python_diff(before, after, entry["python_file"])
         else:
+            commits = []
             diff = ""
+        if commits:
+            lines.append("**4CAT commits:**")
+            for sha, subject in commits:
+                lines.append("- [`{}`](https://github.com/{}/commit/{}) {}".format(sha[:7], repo, sha, subject))
+            lines.append("")
         if diff.strip():
             fence_open, fence_close = _code_fence(diff, "diff")
             lines.append("<details><summary>Python diff</summary>")

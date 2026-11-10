@@ -17,10 +17,16 @@ Output, in the current folder unless --out says otherwise:
 - <name>-details.json: examples of every finding, per archive
 - a summary on screen: by processor type, by year, and by finding
 
+The database connection and the data folder are read from config/config.ini
+in the 4CAT folder the script is run from. --data-folder overrides the data
+folder, e.g. when running from another copy of 4CAT than the one that made
+the datasets.
+
 Usage (from the 4CAT root folder, e.g. inside the backend container):
   python3 helper-scripts/check_legacy_media_metadata.py
   python3 helper-scripts/check_legacy_media_metadata.py -k <dataset key>
   python3 helper-scripts/check_legacy_media_metadata.py -f some_archive.zip
+  python3 helper-scripts/check_legacy_media_metadata.py --data-folder /mnt/4cat/data
 """
 import argparse
 import collections
@@ -28,6 +34,7 @@ import csv
 import datetime
 import json
 import os
+import re
 import sys
 import time
 import zipfile
@@ -42,7 +49,13 @@ METADATA_FILENAME = ".metadata.json"
 # What each finding means, in the report
 FINDINGS = {
 	"entry_not_a_record": "an entry is not a record (not a JSON object) and is dropped",
-	"entry_without_file_dropped": "a successful entry names no file and is dropped",
+	"entry_without_file_dropped": "an entry marked successful names no file and is dropped",
+	"unflagged_entry_as_failure": "an entry without a 'success' flag names no file, so it becomes a failure",
+	"ids_as_post_ids": "uses 'ids' (screenshot processors) for the post IDs",
+	"post_ids_as_text": "the post IDs are one text with commas, which is split",
+	"original_key_kept": "the entry's key is not its URL, file name or post ID, and is kept as 'original_key'",
+	"copied_entry_source_ignored": "an entry copied from an earlier archive names another source dataset; "
+								   "it is not used",
 	"file_not_a_record": "an item in a 'files' list is not a record and is dropped",
 	"file_without_filename_dropped": "an item in a 'files' list names no file and is dropped",
 	"single_post_id": "uses 'post_id' (one ID) instead of 'post_ids'",
@@ -73,7 +86,8 @@ FINDING_GROUPS = {
 		"merge_value_lost", "value_not_carried_over",
 	],
 	"Changed: read differently, nothing lost": [
-		"single_post_id", "no_post_ids", "numeric_post_ids", "url_taken_from_key", "source_dataset_renamed",
+		"unflagged_entry_as_failure", "ids_as_post_ids", "post_ids_as_text", "original_key_kept",
+		"copied_entry_source_ignored", "single_post_id", "no_post_ids", "numeric_post_ids", "url_taken_from_key", "source_dataset_renamed",
 		"failed_url_with_files", "retry_false_as_not_a_video", "failure_without_reason", "merged_entries",
 	],
 	"Archive does not match its metadata (with or without converting)": [
@@ -88,6 +102,8 @@ mode.add_argument("-k", "--key", help="Check one dataset, by key")
 mode.add_argument("-f", "--file", nargs="+", help="Check these zip files directly, without the database")
 cli.add_argument("-t", "--type", help="Only check datasets whose type starts with this, e.g. 'video-downloader'")
 cli.add_argument("-n", "--examples", type=int, default=3, help="Examples to keep per finding per archive (default 3)")
+cli.add_argument("-d", "--data-folder", help="Folder with the dataset files. Default: the data folder in "
+											 "config/config.ini")
 cli.add_argument("-o", "--out", help="Path and name for the report files, without extension. "
 									 "Default: ./legacy-metadata-report-<timestamp>")
 args = cli.parse_args()
@@ -169,11 +185,17 @@ def check_post_ids(findings, outer_key, entry):
 	if post_ids is None and "post_id" in entry:
 		findings.add("single_post_id", outer_key, entry["post_id"])
 		post_ids = [entry["post_id"]]
+	if post_ids is None and "ids" in entry:
+		findings.add("ids_as_post_ids", outer_key, entry["ids"])
+		post_ids = entry["ids"]
 
 	if post_ids is None:
 		findings.add("no_post_ids", outer_key)
 		return
 
+	if isinstance(post_ids, str) and "," in post_ids:
+		findings.add("post_ids_as_text", outer_key, post_ids)
+		post_ids = post_ids.split(",")
 	if isinstance(post_ids, (str, int)):
 		post_ids = [post_ids]
 
@@ -195,6 +217,7 @@ def check_legacy(raw, findings):
 	:param Findings findings:  Where to note findings
 	"""
 	source_datasets = set()
+	copied_sources = set()
 	extra_per_file = {}
 
 	def record_item(filename, outer_key, extra):
@@ -223,8 +246,24 @@ def check_legacy(raw, findings):
 		if entry.get("source_dataset") and not entry.get("from_dataset"):
 			findings.add("source_dataset_renamed", outer_key, entry["source_dataset"])
 		recorded_source = entry.get("from_dataset") or entry.get("source_dataset")
-		if recorded_source:
+		if recorded_source and entry.get("file_dataset_key"):
+			copied_sources.add(recorded_source)
+		elif recorded_source:
 			source_datasets.add(recorded_source)
+
+		# what the reader keeps as `original_key`
+		files = entry.get("files")
+		post_ids = entry.get("post_ids", entry.get("ids", [entry.get("post_id")]))
+		if isinstance(post_ids, str):
+			post_ids = post_ids.split(",")
+		known_values = {entry.get("url"), entry.get("filename")}
+		known_values |= {str(post_id).strip() for post_id in post_ids or [] if post_id is not None}
+		if isinstance(files, list):
+			known_values |= {file.get("filename") for file in files if isinstance(file, dict)}
+		if entry.get("url") is None and isinstance(outer_key, str) and outer_key.startswith(("http://", "https://")):
+			known_values.add(outer_key)
+		if outer_key not in known_values:
+			findings.add("original_key_kept", outer_key)
 
 		success = entry.get("success", True)
 		files = entry.get("files")
@@ -254,7 +293,13 @@ def check_legacy(raw, findings):
 			if files_recorded or success:
 				continue
 
-		if not success:
+		has_filename = entry.get("filename") and isinstance(entry["filename"], str)
+		if success and has_filename:
+			watch_extra(findings, outer_key, entry)
+			record_item(entry["filename"], outer_key, MediaArchiveMetadata._legacy_extra(entry))
+		elif not success or "success" not in entry:
+			if "success" not in entry:
+				findings.add("unflagged_entry_as_failure", outer_key, entry.get("error", ""))
 			if entry.get("reason") is None and entry.get("retry") is False:
 				findings.add("retry_false_as_not_a_video", outer_key)
 			elif not entry.get("reason"):
@@ -262,14 +307,13 @@ def check_legacy(raw, findings):
 			if entry.get("reason_description") and entry.get("error") \
 					and entry["reason_description"] != entry["error"]:
 				findings.add("error_dropped", outer_key, entry["error"])
-		elif entry.get("filename") and isinstance(entry["filename"], str):
-			watch_extra(findings, outer_key, entry)
-			record_item(entry["filename"], outer_key, MediaArchiveMetadata._legacy_extra(entry))
 		else:
 			findings.add("entry_without_file_dropped", outer_key, json.dumps(entry, default=str)[:200])
 
 	if len(source_datasets) > 1:
 		findings.add("several_source_datasets", "", ", ".join(sorted(map(str, source_datasets))))
+	for copied_source in sorted(map(str, copied_sources - source_datasets)):
+		findings.add("copied_entry_source_ignored", "", copied_source)
 
 
 def check_archive(path, max_examples):
@@ -374,7 +418,12 @@ def get_datasets():
 	logger = Logger(log_path=log_path, output=False)
 	database = Database(logger=logger, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD,
 						host=config.DB_HOST, port=config.DB_PORT, appname="check-legacy-metadata")
-	data_folder = config.get("PATH_DATA")
+	data_folder = Path(args.data_folder) if args.data_folder else Path(config.get("PATH_DATA"))
+	print(f"Database:    {config.DB_NAME} on {config.DB_HOST}:{config.DB_PORT} (as {config.DB_USER})")
+	print(f"Data folder: {data_folder}")
+	if not data_folder.is_dir():
+		print("The data folder does not exist; use --data-folder to say where the dataset files are.")
+		sys.exit(1)
 
 	columns = "key, type, timestamp, result_file, is_finished, software_version, num_rows"
 	if args.key:
@@ -406,6 +455,7 @@ by_year = collections.defaultdict(collections.Counter)
 finding_archives = collections.Counter()
 finding_types = collections.defaultdict(set)
 finding_total = collections.Counter()
+made_by_other = collections.Counter()
 
 for index, (dataset, path) in enumerate(datasets):
 	if index and index % 250 == 0:
@@ -417,6 +467,15 @@ for index, (dataset, path) in enumerate(datasets):
 	year = created[:4] or "unknown"
 	dataset_type = dataset["type"] or "unknown"
 	findings = result["findings"]
+
+	# the file name says which processor made the archive; a filtered copy
+	# keeps the type of the dataset it was filtered from, and its metadata.
+	# Searches and imports name the file after their query, and presets use
+	# the file of the processor they run, so those are not counted
+	made_by = re.sub(r"-[0-9a-f]{32}\.zip$", "", Path(str(dataset["result_file"])).name)
+	if dataset["type"] and made_by != dataset_type and not dataset_type.endswith(("-search", "-import")) \
+			and dataset_type != f"preset-{made_by}":
+		made_by_other[(dataset_type, made_by)] += 1
 
 	by_status[result["status"]] += 1
 	by_type[dataset_type][result["status"]] += 1
@@ -431,6 +490,7 @@ for index, (dataset, path) in enumerate(datasets):
 	rows.append({
 		"key": dataset["key"],
 		"type": dataset_type,
+		"made_by": made_by,
 		"created": created,
 		"finished": dataset["is_finished"],
 		"software_version": dataset["software_version"],
@@ -449,6 +509,7 @@ for index, (dataset, path) in enumerate(datasets):
 	if findings and (findings.counts or result["note"]):
 		details[dataset["key"] or dataset["result_file"]] = {
 			"type": dataset_type,
+			"made_by": made_by,
 			"created": created,
 			"software_version": dataset["software_version"],
 			"status": result["status"],
@@ -483,6 +544,13 @@ for status, count in by_status.most_common():
 
 print_table("By processor type:", by_type)
 print_table("By year the dataset was made:", by_year)
+
+print("\nArchives made by another processor than their type (e.g. filtered copies, which keep the metadata of "
+	  "the dataset they were filtered from, so files missing from them are expected):")
+if not made_by_other:
+	print("  none")
+for (dataset_type, made_by), count in sorted(made_by_other.items()):
+	print(f"  {count:,}  type {dataset_type}, made by {made_by}")
 
 print("\nFindings in old-format archives (archives / times / processor types):")
 if not finding_archives:

@@ -21,6 +21,7 @@ format).
 import json
 import os
 import zipfile
+from collections import UserDict
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -51,6 +52,52 @@ def is_support_file(filename: str) -> bool:
 	"""
 	name = filename.split("/")[-1]
 	return name in SUPPORT_FILENAMES or name.endswith(".log")
+
+
+def normalize_post_id(post_id) -> str:
+	"""
+	The text form a post ID is stored and compared as.
+
+	Item IDs reach 4CAT as text, as numbers, or not at all, and datasources
+	and processors from extensions are free to do the same, so neither the
+	IDs in a metadata file nor the `id` of a dataset item can be assumed to
+	be text already. Both sides of a comparison go through this, so that the
+	number 1234 and the text "1234" are the same ID.
+
+	:param post_id:  ID as a datasource, processor or metadata file gives it
+	:return str:  the ID as text, or an empty string if there is none
+	"""
+	return "" if post_id is None else str(post_id).strip()
+
+
+class PostIdMap(UserDict):
+	"""
+	A dict keyed by post ID, which treats IDs as text.
+
+	Use this for any map from post ID to something else, instead of a plain
+	dict. Storing and looking up a key both put it through
+	`normalize_post_id`, so the number 1234 and the text "1234" are the same
+	key and a consumer never has to coerce an item's `id` itself. That has to
+	happen somewhere: metadata files store post IDs as text, while a dataset
+	item's `id` is whatever its datasource mapped it as, and the same dataset
+	gives numbers when read from NDJSON and text when read from CSV.
+
+	`get`, `setdefault`, `pop`, `update` and `in` all run through the four
+	methods below, so they are all safe. Keys read back out (`keys()`,
+	iteration) are the normalized text form.
+	"""
+
+	def __setitem__(self, key, value):
+		super().__setitem__(normalize_post_id(key), value)
+
+	def __getitem__(self, key):
+		return super().__getitem__(normalize_post_id(key))
+
+	def __contains__(self, key):
+		return super().__contains__(normalize_post_id(key))
+
+	def __delitem__(self, key):
+		super().__delitem__(normalize_post_id(key))
 
 
 class ArchiveMetadataFile:
@@ -267,6 +314,10 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		self.items: dict = {}
 		self.failures: list = []
 
+		# `post_id_to_filenames` walks every item, so it is built once on
+		# demand; `add_item` drops it again
+		self._post_id_index: Optional[PostIdMap] = None
+
 	# -- constructors --
 
 	@classmethod
@@ -342,22 +393,37 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		Translate pre-v1 metadata to v1.
 
 		Old format is a flat dict keyed by URL (image/video) or filename
-		(Telegram). Each entry has a `success` flag; failed entries become
-		`failures[]`, successful entries become `items[filename]`. The video
+		(Telegram), or by something else (e.g. a local file path, or a URL and
+		a date for web archive screenshots). Each entry has a `success` flag;
+		failed entries become `failures[]`, successful entries become
+		`items[filename]`. Screenshot processors wrote no `success` flag; an
+		entry of theirs that names no file is a failure too. The video
 		downloader's nested `files[]` list explodes to one item per file, and
 		a file listed under several URLs gets the post IDs of all of them.
 		All producer-specific data is carried across into `extra` (items) or
 		the failure dict (failures) so the migration loses nothing — see
 		`_legacy_extra`.
 		"""
+		# the source dataset named by entries that the old video downloader
+		# copied from an earlier archive; only used if no other entry names one
+		copied_source = None
+
 		for outer_key, entry in raw.items():
 			if not isinstance(entry, dict):
 				# malformed; should not exist
 				continue
 
+			# post IDs were stored as a list, as a single `post_id`, as `ids`
+			# (screenshot processors), or as one text with commas
 			post_ids = entry.get("post_ids")
 			if post_ids is None and "post_id" in entry:
 				post_ids = [entry["post_id"]]
+			if post_ids is None and "ids" in entry:
+				post_ids = entry["ids"]
+				# now a first-class field, so not kept in `extra` as well
+				entry = {key: value for key, value in entry.items() if key != "ids"}
+			if isinstance(post_ids, str) and "," in post_ids:
+				post_ids = post_ids.split(",")
 			post_ids = self._normalize_post_ids(post_ids)
 
 			url = entry.get("url")
@@ -366,10 +432,22 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					outer_key.startswith("http://") or outer_key.startswith("https://")):
 				url = outer_key
 
+			# keep the entry's key if it is not its URL, file name or post ID,
+			# e.g. a local file path, so it is still known what was downloaded
+			files = entry.get("files")
+			known_values = {url, entry.get("filename"), *post_ids}
+			if isinstance(files, list):
+				known_values |= {file.get("filename") for file in files if isinstance(file, dict)}
+			original_key = {"original_key": outer_key} if outer_key not in known_values else {}
+
 			# existing `from_dataset` is correct if exists; video downloads
 			# from early 2023 called it `source_dataset`
 			recorded_source = entry.get("from_dataset") or entry.get("source_dataset")
-			if recorded_source:
+			if recorded_source and entry.get("file_dataset_key"):
+				# copied from an earlier archive by the old video downloader,
+				# with that archive's source dataset, which can be another one
+				copied_source = copied_source or recorded_source
+			elif recorded_source:
 				self.from_dataset = recorded_source
 
 			success = entry.get("success", True)
@@ -380,7 +458,6 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			# downloaded for an earlier URL, or stopped part-way through a
 			# playlist. Those files are in the archive, so each one is recorded;
 			# the URL itself only counts as a failure if it has no file at all.
-			files = entry.get("files")
 			if isinstance(files, list) and files:
 				files_recorded = False
 				for file in files:
@@ -394,7 +471,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 							post_ids, url,
 							file.get("reason"),
 							file.get("reason_description") or file.get("error"),
-							entry, file,
+							entry, file, original_key,
 						))
 						files_recorded = True
 						continue
@@ -403,12 +480,18 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					# the same file can be listed under more than one URL;
 					# merge so the posts of every URL stay connected to it
 					self.add_item(file_filename, post_ids=post_ids, url=url,
-								  extra=self._legacy_extra(entry, file), merge=True)
+								  extra=self._legacy_extra(entry, file, original_key), merge=True)
 					files_recorded = True
 				if files_recorded or success:
 					continue
 
-			if not success:
+			has_filename = entry.get("filename") and isinstance(entry["filename"], str)
+			if success and has_filename:
+				self.add_item(entry["filename"], post_ids=post_ids, url=url,
+							  extra=self._legacy_extra(entry, original_key), merge=True)
+			elif not success or "success" not in entry:
+				# without a `success` flag (screenshot processors), an entry
+				# that names no file can only be a failure
 				reason = entry.get("reason")
 				if reason is None and entry.get("retry") is False:
 					# the old video downloader marked URLs that turned out not
@@ -418,12 +501,12 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					post_ids, url,
 					reason,
 					entry.get("reason_description") or entry.get("error"),
-					entry,
+					entry, original_key,
 				))
-			elif entry.get("filename") and isinstance(entry["filename"], str):
-				self.add_item(entry["filename"], post_ids=post_ids, url=url,
-							  extra=self._legacy_extra(entry), merge=True)
-			# else: malformed-but-tolerated; drop
+			# else: marked successful but names no file; malformed, dropped
+
+		if self.from_dataset is None and copied_source:
+			self.from_dataset = copied_source
 
 	# Legacy entry keys promoted to first-class v1 fields, or pure structure;
 	# every other key is producer data and is preserved under `extra`.
@@ -488,6 +571,29 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			item["extra"] = extra
 		return item
 
+	@staticmethod
+	def _add_other_urls(entry: dict, urls) -> None:
+		"""
+		Record more URLs that lead to an entry's file, in `extra["other_urls"]`.
+
+		The entry's own `url` and any URL it already lists are left out, and
+		nothing is added to an entry that gains no URL by it, so an entry that
+		is only ever reached one way keeps no `extra` of its own.
+
+		:param dict entry:  Item or failure to add the URLs to
+		:param urls:  URLs that lead to the same file
+		"""
+		new_urls = [url for url in urls if url and url != entry.get("url")]
+		if not new_urls:
+			return
+
+		entry_extra = entry.setdefault("extra", {})
+		other_urls = list(entry_extra.get("other_urls", []))
+		for url in new_urls:
+			if url not in other_urls:
+				other_urls.append(url)
+		entry_extra["other_urls"] = other_urls
+
 	# -- mutation --
 
 	def add_item(self, filename: str, *, post_ids,
@@ -518,23 +624,27 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		if replace and merge:
 			raise MetadataException("add_item: use either 'replace' or 'merge', not both.")
 
+		# both paths below change which items a post ID points at
+		self._post_id_index = None
+
 		existing = self.items.get(filename)
 		if existing is not None and merge:
 			known_ids = existing.setdefault("post_ids", [])
 			for post_id in self._normalize_post_ids(post_ids):
 				if post_id not in known_ids:
 					known_ids.append(post_id)
+			if url is not None and existing.get("url") is None:
+				existing["url"] = url
 			if extra:
+				# the entry keeps its own value where both sides have a key,
+				# except for `other_urls`: both sides are listing URLs that
+				# lead to this same file, so the two lists are joined instead
+				# of one of them being dropped
+				incoming_other_urls = extra.get("other_urls") or []
 				existing["extra"] = {**extra, **existing.get("extra", {})}
+				self._add_other_urls(existing, incoming_other_urls)
 			if url is not None:
-				if existing.get("url") is None:
-					existing["url"] = url
-				elif url != existing["url"]:
-					entry_extra = existing.setdefault("extra", {})
-					other_urls = list(entry_extra.get("other_urls", []))
-					if url not in other_urls:
-						other_urls.append(url)
-					entry_extra["other_urls"] = other_urls
+				self._add_other_urls(existing, [url])
 			return
 
 		if existing is not None and not replace:
@@ -576,11 +686,20 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			return []
 		if isinstance(post_ids, (str, int)):
 			post_ids = [post_ids]
+		try:
+			post_ids = list(post_ids)
+		except TypeError:
+			# an archive can come from another 4CAT or have been edited by
+			# hand, so this can hold anything. A value that cannot be read as
+			# a list of IDs leaves the entry without IDs; raising here would
+			# escape the errors every consumer of the metadata catches and
+			# fail the whole processor over one unreadable entry.
+			return []
 		# coerce to stripped strings, dropping null and blank ids rather than
 		# keeping them as the text "None" or "": some media (e.g. Instagram ads)
 		# records no usable id, and a fabricated id would only mislead anything
 		# that later matches on it.
-		return [str(p).strip() for p in post_ids if p is not None and str(p).strip()]
+		return [post_id for post_id in map(normalize_post_id, post_ids) if post_id]
 
 	@classmethod
 	def _normalize_entry_post_ids(cls, entry):
@@ -613,6 +732,26 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		and walks nested `files[]` lists.
 		"""
 		return {fn: list(entry.get("post_ids", [])) for fn, entry in self.items.items()}
+
+	def post_id_to_filenames(self) -> PostIdMap:
+		"""
+		Return a `{post_id: [filename, ...]}` map of the successful entries.
+
+		The inverse of `filename_to_post_ids`: an item can have several files
+		and a file can belong to several items. Looking an ID up in the result
+		compares it as text, so an `id` its datasource mapped as a number
+		still finds its files — see `PostIdMap`.
+
+		Built once and kept, so a consumer can look up every item of a
+		dataset in turn without walking the archive each time.
+		"""
+		if self._post_id_index is None:
+			index = PostIdMap()
+			for filename, entry in self.items.items():
+				for post_id in entry.get("post_ids", []):
+					index.setdefault(post_id, []).append(filename)
+			self._post_id_index = index
+		return self._post_id_index
 
 	def post_ids_for(self, filename: str) -> list:
 		"""

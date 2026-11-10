@@ -248,32 +248,71 @@ def test_build_fieldnames_unions_rows_and_appends_source_columns(tmp_path):
         ({"media_url": "b", "media_error": "timed out"}, []),  # a column only some rows have
     ]
 
-    fieldnames, source_map = processor.build_fieldnames(media_rows, ["id", "body"])
+    fieldnames, source_map, matched_column = processor.build_fieldnames(media_rows, ["id", "body"])
 
     assert fieldnames == ["media_url", "media_filename", "media_error",
                           "media_source_matched", "id", "body"]
     assert source_map == {"id": "id", "body": "body"}
+    assert matched_column == "media_source_matched"
 
 
 def test_build_fieldnames_without_source_dataset(tmp_path):
     processor, _ = make_processor(tmp_path)
-    fieldnames, source_map = processor.build_fieldnames([({"media_url": "a"}, [])], [])
+    fieldnames, source_map, matched_column = processor.build_fieldnames([({"media_url": "a"}, [])], [])
 
     # nothing to combine with, so no column saying whether a row was traced back
     assert fieldnames == ["media_url"]
     assert source_map == {}
+    assert matched_column == "media_source_matched"
 
 
 def test_build_fieldnames_renames_clashing_source_column(tmp_path):
     processor, _ = make_processor(tmp_path)
     media_rows = [({"media_url": "a", "media_filename": "1.jpg"}, [])]
 
-    fieldnames, source_map = processor.build_fieldnames(media_rows, ["id", "media_filename"])
+    fieldnames, source_map, _ = processor.build_fieldnames(media_rows, ["id", "media_filename"])
 
     assert fieldnames == ["media_url", "media_filename", "media_source_matched", "id",
                           "source_media_filename"]
     # the renamed column must still be filled from the original column name
     assert source_map == {"id": "id", "media_filename": "source_media_filename"}
+
+
+def test_build_fieldnames_renames_the_matched_flag_if_a_producer_took_it(tmp_path):
+    """
+    The flag column is `media_` + `source_matched`, so a producer writing a
+    `source_matched` column of its own lands on exactly that name. Writing both
+    would give the CSV two columns of the same name, after which the header no
+    longer lines up with the rows.
+    """
+    processor, _ = make_processor(tmp_path)
+    media_rows = [({"media_url": "a", "media_source_matched": "producer's own"}, [])]
+
+    fieldnames, _, matched_column = processor.build_fieldnames(media_rows, ["id"])
+
+    assert len(fieldnames) == len(set(fieldnames))
+    # the producer keeps the name it chose; the flag moves out of the way
+    assert fieldnames == ["media_url", "media_source_matched", "media_source_matched_flag", "id"]
+    assert matched_column == "media_source_matched_flag"
+
+
+def test_build_fieldnames_keeps_renaming_until_the_name_is_free(tmp_path):
+    """
+    A source dataset can hold both `media_filename` and `source_media_filename`,
+    so renaming the first to the second is not enough on its own.
+    """
+    processor, _ = make_processor(tmp_path)
+    media_rows = [({"media_filename": "1.jpg"}, [])]
+
+    fieldnames, source_map, _ = processor.build_fieldnames(
+        media_rows, ["media_filename", "source_media_filename"]
+    )
+
+    assert len(fieldnames) == len(set(fieldnames))
+    assert source_map == {
+        "media_filename": "source_media_filename",
+        "source_media_filename": "source_source_media_filename",
+    }
 
 
 # -- finding the dataset the media came from --
@@ -332,10 +371,20 @@ def test_find_origin_datasets_does_not_repeat_one_dataset(tmp_path, monkeypatch)
     assert len(processor.find_origin_datasets(metadata)) == 1
 
 
-def test_collect_source_data_falls_back_when_recorded_dataset_has_no_items(tmp_path):
+class ListWriter:
+    """Collects the rows a csv.DictWriter would have written."""
+
+    def __init__(self):
+        self.rows = []
+
+    def writerow(self, row):
+        self.rows.append(row)
+
+
+def test_choose_source_dataset_falls_back_when_recorded_dataset_has_no_items(tmp_path):
     """
     The recorded dataset can be a helper a preset built, whose items are not the
-    ones the media refers to. When it accounts for nothing, the next candidate is
+    ones the media refers to. When it holds none of them, the next candidate is
     tried rather than reporting an empty join.
     """
     processor, output = make_processor(tmp_path)
@@ -346,39 +395,40 @@ def test_collect_source_data_falls_back_when_recorded_dataset_has_no_items(tmp_p
     processor.find_origin_datasets = lambda _: [(helper, "recorded in the metadata file"),
                                                 (posts, "found by walking up")]
 
-    columns, items = processor.collect_source_data(None, {"p1"})
+    dataset, columns = processor.choose_source_dataset(None, {"p1"})
 
+    assert dataset is posts
     assert columns == ["id", "body"]
-    assert items == {"p1": {"id": "p1", "body": "first"}}
     assert any("has none of the items" in message for message in output.logs)
 
 
-def test_collect_source_data_keeps_columns_when_nothing_matches(tmp_path):
+def test_choose_source_dataset_keeps_columns_when_nothing_matches(tmp_path):
     """
-    If no candidate accounts for any media, the best guess is still used so the
-    result carries its columns and the mismatch gets reported.
+    If no candidate holds any of the media's items, the best guess's columns are
+    still used so the result carries them and the mismatch gets reported - but
+    no dataset is returned, there being nothing in it to find.
     """
     processor, _ = make_processor(tmp_path)
     helper = FakeDataset(key="helper", num_rows=1, columns=["id", "video_url"],
                          items=[{"id": "unrelated", "video_url": "http://a"}])
     processor.find_origin_datasets = lambda _: [(helper, "recorded in the metadata file")]
 
-    columns, items = processor.collect_source_data(None, {"p1"})
+    dataset, columns = processor.choose_source_dataset(None, {"p1"})
 
+    assert dataset is None
     assert columns == ["id", "video_url"]
-    assert items == {}
 
 
-def test_collect_source_data_skips_unreadable_dataset(tmp_path):
+def test_choose_source_dataset_skips_unreadable_dataset(tmp_path):
     processor, output = make_processor(tmp_path)
     archive = FakeDataset(key="zip", num_rows=3, columns=[])  # no readable columns
     processor.find_origin_datasets = lambda _: [(archive, "recorded in the metadata file")]
 
-    assert processor.collect_source_data(None, {"p1"}) == ([], {})
+    assert processor.choose_source_dataset(None, {"p1"}) == (None, [])
     assert any("no readable columns" in message for message in output.logs)
 
 
-def test_collect_source_items_reports_unmappable_source_items(tmp_path):
+def test_write_matched_rows_reports_unmappable_source_items(tmp_path):
     """
     A dataset can have more rows than it yields when some items cannot be mapped
     (e.g. Instagram ads). If that leaves media untraced, the gap is reported so
@@ -389,24 +439,64 @@ def test_collect_source_items_reports_unmappable_source_items(tmp_path):
     dataset = FakeDataset(key="posts", num_rows=5, columns=["id", "body"],
                           items=[{"id": "p1", "body": "a"}, {"id": "p2", "body": "b"},
                                  {"id": "p3", "body": "c"}])
+    media_rows = [({"media_filename": "1.jpg"}, ["p1"]),
+                  ({"media_filename": "2.jpg"}, ["p2"]),
+                  ({"media_filename": "3.jpg"}, ["gone"])]
+    writer, matched_rows = ListWriter(), set()
 
-    found = processor.collect_source_items(dataset, ["id", "body"], {"p1", "p2", "gone"})
+    written = processor.write_matched_rows(writer, media_rows, dataset,
+                                          {"id": "id", "body": "body"},
+                                          "media_source_matched", matched_rows)
 
-    assert set(found) == {"p1", "p2"}
+    assert written == 2
+    assert matched_rows == {0, 1}
     assert any("could not be read" in message and "2 of 5" in message for message in output.logs)
 
 
-def test_collect_source_items_silent_when_all_media_traced(tmp_path):
+def test_write_matched_rows_silent_when_all_media_traced(tmp_path):
     """No report when every item the media refers to was found, even if the
     dataset also holds unrelated rows that were never reached."""
     processor, output = make_processor(tmp_path)
     dataset = FakeDataset(key="posts", num_rows=9, columns=["id", "body"],
                           items=[{"id": "p1", "body": "a"}, {"id": "p2", "body": "b"}])
+    media_rows = [({"media_filename": "1.jpg"}, ["p1"]),
+                  ({"media_filename": "2.jpg"}, ["p2"])]
+    writer, matched_rows = ListWriter(), set()
 
-    found = processor.collect_source_items(dataset, ["id", "body"], {"p1", "p2"})
+    written = processor.write_matched_rows(writer, media_rows, dataset,
+                                          {"id": "id", "body": "body"},
+                                          "media_source_matched", matched_rows)
 
-    assert set(found) == {"p1", "p2"}
+    assert written == 2
     assert not any("could not be read" in message for message in output.logs)
+
+
+def test_write_matched_rows_stops_once_every_item_is_found(tmp_path):
+    """
+    The source dataset can be far larger than the archive, so reading it stops
+    as soon as the last item the media refers to has come past, rather than
+    collecting the whole thing first.
+    """
+    processor, _ = make_processor(tmp_path)
+    read = []
+
+    class CountingDataset(FakeDataset):
+        def iterate_items(self, processor=None, **kwargs):
+            for item in self._items:
+                read.append(item["id"])
+                yield dict(item)
+
+    dataset = CountingDataset(key="posts", num_rows=4, columns=["id"],
+                              items=[{"id": "p1"}, {"id": "p2"}, {"id": "p3"}, {"id": "p4"}])
+    media_rows = [({"media_filename": "1.jpg"}, ["p2"])]
+    writer, matched_rows = ListWriter(), set()
+
+    processor.write_matched_rows(writer, media_rows, dataset, {"id": "id"},
+                                 "media_source_matched", matched_rows)
+
+    # p2 is the only item wanted, so p3 and p4 are never read
+    assert read == ["p1", "p2"]
+    assert len(writer.rows) == 1
 
 
 # -- the whole thing --
