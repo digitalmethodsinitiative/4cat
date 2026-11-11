@@ -1,5 +1,6 @@
 import itertools
 import threading
+import hashlib
 import pickle
 import time
 import json
@@ -15,6 +16,9 @@ from common.lib.config_definition import config_definition
 
 import configparser
 import os
+
+# Errors that mean memcache cannot be used right now
+MEMCACHE_ERRORS = (SystemError, ValueError, MemcacheError, ConnectionError, OSError)
 
 class CacheMiss:
     """
@@ -39,6 +43,13 @@ class ConfigManager(BaseConfigReader):
     # Thread-local storage for a singleton memcache client per thread.
     # Prevents creating a new TCP connection per request in threaded/gunicorn contexts.
     _memcache_tls = threading.local()
+
+    # Cached values expire after this many seconds. (Stops a value that could not be
+    # removed from memcache from being read forever by other 4CAT processes.)
+    memcache_expire = 600
+    # Once memcache could not be reached, it is not used again until 4CAT restarts
+    _memcache_down = False
+    _memcache_down_lock = threading.Lock()
 
     def __init__(self, db=None):
         # ensure core settings (including database config) are loaded
@@ -184,7 +195,13 @@ class ConfigManager(BaseConfigReader):
 
         The config reader can optionally use Memcache to keep fetched values in
         memory.
+
+        :return MemcacheClient|None:  The client, or `None` if memcache is not
+        configured or could not be reached
         """
+        if ConfigManager._memcache_down:
+            return None
+
         # Reuse per-thread client if already initialised.
         existing = getattr(self._memcache_tls, "client", None)
         if existing:
@@ -193,20 +210,60 @@ class ConfigManager(BaseConfigReader):
         server = self.get("MEMCACHE_SERVER")
         if server:
             try:
-                memcache = MemcacheClient(server, serde=serde.pickle_serde, key_prefix=b"4cat-config")
+                memcache = MemcacheClient(server, serde=serde.pickle_serde, key_prefix=b"4cat-config",
+                                          connect_timeout=1, timeout=1)
                 # do one test fetch to test if connection is valid
                 memcache.set("4cat-init-dummy", time.time())
-                memcache.init_thread_id = threading.get_ident()
                 self._memcache_tls.client = memcache
                 return memcache
-            except (SystemError, ValueError, MemcacheError, ConnectionError, OSError):
-                # we have no access to the logger here so we simply pass
-                # later we can detect elsewhere that a memcache address is
-                # configured but no connection is there - then we can log
-                # config reader still works without memcache
-                pass
+            except MEMCACHE_ERRORS as e:
+                self._memcache_failed(e)
 
         return None
+
+    def _memcache_command(self, command, *args, failed=None, **kwargs):
+        """
+        Run a command on memcache, if it can be used
+
+        Memcache only makes reading settings faster, so an error there must not
+        stop 4CAT: the caller reads from the database instead. A failed command 
+        is tried once more with a new connection via pymemcache. If that fails too, 
+        memcache is not used again until 4CAT restarts. In that process at least.
+
+        :param str command:  Name of the client method to run
+        :param failed:  What to return if memcache cannot be used
+        :return:  What the command returns, or `failed`
+        """
+        error = None
+        for _ in range(2):
+            memcache = self.get_memcache()
+            if not memcache:
+                # memcache not available (either not configured or down)
+                return failed
+
+            try:
+                return getattr(memcache, command)(*args, **kwargs)
+            except MEMCACHE_ERRORS as e:
+                error = e
+
+        self._memcache_failed(error)
+        return failed
+
+    def _memcache_failed(self, error):
+        """
+        Stop using memcache after it could not be reached
+
+        :param Exception error:  The error memcache ran into
+        """
+        with ConfigManager._memcache_down_lock:
+            was_up = not ConfigManager._memcache_down
+            ConfigManager._memcache_down = True
+
+        if was_up and self.logger:
+            self.logger.warning(f"Memcache cannot be reached ({error!r}). This 4CAT process reads settings from "
+                                f"the database instead until 4CAT is restarted. Restart 4CAT once memcache works "
+                                f"again; until then, settings changed here can take up to "
+                                f"{self.memcache_expire // 60} minutes to apply elsewhere in 4CAT.")
 
     def close_memcache(self):
         """Close and dispose this thread's memcache client.
@@ -288,7 +345,7 @@ class ConfigManager(BaseConfigReader):
 
         return settings
 
-    def get_all(self, is_json=False, user=None, tags=None, with_core=True, memcache=None):
+    def get_all(self, is_json=False, user=None, tags=None, with_core=True):
         """
         Get all known settings
 
@@ -304,16 +361,15 @@ class ConfigManager(BaseConfigReader):
         with the given tag, and returns that if one exists. First matching tag
         wins.
         :param bool with_core:  Also include core (i.e. config.ini) settings
-        :param MemcacheClient memcache:  Memcache client. If `None`, a thread-local client will be used.
 
         :return dict: Setting value, as a dictionary with setting names as keys
         and setting values as values.
         """
         for setting in self.get_all_setting_names(with_core=with_core):
-            yield setting, self.get(setting, None, is_json, user, tags, memcache)
+            yield setting, self.get(setting, None, is_json, user, tags)
 
 
-    def get(self, attribute_name, default=None, is_json=False, user=None, tags=None, memcache=None):
+    def get(self, attribute_name, default=None, is_json=False, user=None, tags=None):
         """
         Get a setting's value from the database
 
@@ -329,7 +385,6 @@ class ConfigManager(BaseConfigReader):
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
-    :param MemcacheClient memcache:  Memcache client. If `None`, a thread-local client will be used.
 
         :return:  Setting value, or the provided fallback, or `None`.
         """
@@ -353,7 +408,7 @@ class ConfigManager(BaseConfigReader):
         # interacts badly with get_all()
         if tags:
             tags = tags.copy()
-        tags = self.get_active_tags(user, tags, memcache)
+        tags = self.get_active_tags(user, tags)
 
         # global settings are only ever stored with the global (empty) tag via
         # set(), so there can be no valid tag-specific overrides for them.
@@ -367,21 +422,10 @@ class ConfigManager(BaseConfigReader):
         # end to fall back to the global value if no specific one exists.
         tags.append("")
 
-        # Obtain thread-local memcache client if not explicitly given.
-        if not memcache:
-            memcache = self.get_memcache()
-
         # first check if we have all the values in memcache, in which case we
         # do not need a database query
-        if memcache:
-            if threading.get_ident() != memcache.init_thread_id:
-                raise RuntimeError("Thread-unsafe use of memcache! Please make sure you are using a configuration "
-                                   "wrapper to read with a thread-local memcache connection.")
-
-            cached_values = {tag: memcache.get(self._get_memcache_id(attribute_name, tag), default=CacheMiss) for tag in tags}
-
-        else:
-            cached_values = {t: CacheMiss for t in tags}
+        cached_values = {tag: self._memcache_command("get", self._get_memcache_id(attribute_name, tag),
+                                                     default=CacheMiss, failed=CacheMiss) for tag in tags}
 
         # for the tags we could not get from memcache, run a database query
         # (and save to cache if possible)
@@ -392,9 +436,9 @@ class ConfigManager(BaseConfigReader):
             replacements = (attribute_name, tuple(missing_tags))
             queried_settings = {setting["tag"]: setting["value"] for setting in self.db.fetchall(query, replacements)}
 
-            if memcache:
-                for tag, value in queried_settings.items():
-                    memcache.set(self._get_memcache_id(attribute_name, tag), value)
+            for tag, value in queried_settings.items():
+                self._memcache_command("set", self._get_memcache_id(attribute_name, tag), value,
+                                       expire=self.memcache_expire)
 
             cached_values.update(queried_settings)
 
@@ -406,13 +450,13 @@ class ConfigManager(BaseConfigReader):
         # replace the magic value with a CacheMiss in the dict that will be
         # parsed
         unconfigured_magic = "__unconfigured__"
-        if memcache:
-            for tag in [t for t in cached_values if cached_values[t] is CacheMiss]:
-                # should this be more magic?
-                memcache.set(self._get_memcache_id(attribute_name, tag), unconfigured_magic)
+        for tag in [t for t in cached_values if cached_values[t] is CacheMiss]:
+            # should this be more magic?
+            self._memcache_command("set", self._get_memcache_id(attribute_name, tag), unconfigured_magic,
+                                   expire=self.memcache_expire)
 
-            for tag in [t for t in cached_values if cached_values[t] == unconfigured_magic]:
-                cached_values[tag] = CacheMiss
+        for tag in [t for t in cached_values if cached_values[t] == unconfigured_magic]:
+            cached_values[tag] = CacheMiss
 
         # now we may still have some CacheMisses in the values dict, if there
         # was no setting in the database with that tag. So, find the first
@@ -437,7 +481,7 @@ class ConfigManager(BaseConfigReader):
 
         return value
 
-    def get_active_tags(self, user=None, tags=None, memcache=None):
+    def get_active_tags(self, user=None, tags=None):
         """
         Get active tags for given user/tag list
 
@@ -450,7 +494,6 @@ class ConfigManager(BaseConfigReader):
         provided, the method checks if a special value for the setting exists
         with the given tag, and returns that if one exists. First matching tag
         wins.
-    :param MemcacheClient memcache:  Memcache client. If `None`, a thread-local client will be used.
         :return list:  List of tags
         """
         # be flexible about the input types here
@@ -466,19 +509,13 @@ class ConfigManager(BaseConfigReader):
         # that user's tags (including the 'special' user: tag) and add them
         # to the list
         if user:
-            user_tags = CacheMiss
-            
-            if not memcache:
-                memcache = self.get_memcache()
-                
-            if memcache:
-                memcache_id = f"_usertags-{user}"
-                user_tags = memcache.get(memcache_id, default=CacheMiss)
+            memcache_id = self._memcache_key(f"_usertags-{user}")
+            user_tags = self._memcache_command("get", memcache_id, default=CacheMiss, failed=CacheMiss)
 
             if user_tags is CacheMiss:
                 user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
-                if user_tags and memcache:
-                    memcache.set(memcache_id, user_tags)
+                if user_tags:
+                    self._memcache_command("set", memcache_id, user_tags, expire=self.memcache_expire)
 
             if user_tags:
                 try:
@@ -491,7 +528,7 @@ class ConfigManager(BaseConfigReader):
 
         return tags
 
-    def set(self, attribute_name, value, is_json=False, tag="", overwrite_existing=True, memcache=None):
+    def set(self, attribute_name, value, is_json=False, tag="", overwrite_existing=True):
         """
         Insert OR set value for a setting
 
@@ -504,7 +541,6 @@ class ConfigManager(BaseConfigReader):
                           be serialised into a JSON string
         :param bool overwrite_existing: True will overwrite existing setting, False will do nothing if setting exists
         :param str tag:  Tag to write setting for
-    :param MemcacheClient memcache:  Memcache client. If `None`, a thread-local client will be used.
 
         :return int: number of updated rows
         """
@@ -532,13 +568,8 @@ class ConfigManager(BaseConfigReader):
         updated_rows = self.db.cursor.rowcount
         self.db.log.debug(f"Updated setting for {attribute_name}: {value} (tag: {tag})")
 
-        if not memcache:
-            memcache = self.get_memcache()
-
-        if memcache:
-            # invalidate any cached value for this setting
-            memcache_id = self._get_memcache_id(attribute_name, tag)
-            memcache.delete(memcache_id)
+        # invalidate any cached value for this setting
+        self._memcache_command("delete", self._get_memcache_id(attribute_name, tag), noreply=False)
 
         return updated_rows
 
@@ -552,9 +583,7 @@ class ConfigManager(BaseConfigReader):
         """
         self.db.delete("settings", where={"name": attribute_name, "tag": tag})
         updated_rows = self.db.cursor.rowcount
-        client = self.get_memcache()
-        if client:
-            client.delete(self._get_memcache_id(attribute_name, tag))
+        self._memcache_command("delete", self._get_memcache_id(attribute_name, tag), noreply=False)
         return updated_rows
 
     def clear_cache(self):
@@ -563,10 +592,7 @@ class ConfigManager(BaseConfigReader):
 
         Called when the backend restarts - helps start with a blank slate.
         """
-        client = self.get_memcache()
-        if not client:
-            return
-        client.flush_all()
+        self._memcache_command("flush_all", noreply=False)
 
     def uncache_user_tags(self, users):
         """
@@ -578,11 +604,8 @@ class ConfigManager(BaseConfigReader):
 
         :param list users:  List of users, as usernames or User objects
         """
-        client = self.get_memcache()
-        if client:
-            for user in users:
-                user = self._normalise_user(user)
-                client.delete(f"_usertags-{user}")
+        keys = [self._memcache_key(f"_usertags-{self._normalise_user(user)}") for user in users]
+        self._memcache_command("delete_many", keys, noreply=False)
 
     def _normalise_user(self, user):
         """
@@ -634,7 +657,25 @@ class ConfigManager(BaseConfigReader):
         if tag_bit:
             memcache_id += f"-{'-'.join(tag_bit)}"
 
-        return memcache_id.encode("ascii")
+        return self._memcache_key(memcache_id)
+
+    @staticmethod
+    def _memcache_key(key):
+        """
+        Make a key that memcache accepts
+
+        Memcache keys must be short and cannot contain spaces or non-ASCII 
+        characters (pymemcache). Keys contain user names, which can contain 
+        anything, so we check and hash if necessary.
+
+        :param str key:
+        :return str:
+        """
+        # check key short and only plain English letters, digits and punctuation (no spaces)
+        if key.isascii() and key.isprintable() and " " not in key and len(key) <= 200:
+            return key
+        # or hash the key
+        return "hash-" + hashlib.sha256(key.encode()).hexdigest()
 
     def __getattr__(self, attr):
         """
