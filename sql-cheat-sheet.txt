@@ -1,0 +1,58 @@
+# Get posts
+sudo su - postgres
+psql --dbname=fourcat
+COPY ( SELECT * FROM posts_4chan INNER JOIN threads_4chan ON threads_4chan.id = posts_4chan.thread_id WHERE threads_4chan.board = 'pol' AND posts_4chan.timestamp > 1569888000 and posts_4chan.timestamp < 1577836800 LIMIT 10) TO '/mnt/bigstorage/psql_files/pol_comments_late2019.csv' WITH HEADER CSV DELIMITER ',';
+
+# Get posts and compress
+psql -d fourcat -c "COPY (SELECT * FROM posts_4chan WHERE board='pol' AND (lower(body) LIKE '%reddit%' OR lower(subject) LIKE '%reddit%') TO stdout WITH HEADER CSV DELIMITER ',';" | gzip > /mnt/bigstorage/psql_files/pol_mentions_reddit_2021-07-05.csv.gz
+
+# Get posts with flag
+COPY (SELECT posts_4chan.id, posts_4chan.thread_id, posts_4chan.timestamp AS unix_timestamp, to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM-DD') AS timestamp, posts_4chan.author, posts_4chan.subject, posts_4chan.body, posts_4chan.country_code FROM posts_4chan INNER JOIN threads_4chan ON threads_4chan.id = posts_4chan.thread_id 	  WHERE threads_4chan.board = 'pol' AND posts_4chan.timestamp > 1547856000 AND posts_4chan.country_code = 'US') TO '/mnt/bigstorage/psql_files/pol_comments_us-flag.csv' WITH HEADER CSV DELIMITER ',';
+
+COPY (SELECT * FROM posts_4chan WHERE board = 'pol' AND thread_id > ) TO '/home/sal-phd/psql_files/pol-dump_2022-01-09_2022-03-09.csv' WITH HEADER CSV DELIMITER ',';
+
+# Get post counts per month
+sudo su - postgres
+psql --dbname=fourcat
+COPY ( SELECT to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM') AS month_string, count(*) AS count FROM posts_4chan WHERE board = 'board' GROUP BY month_string ) TO '/mnt/bigstorage/psql_files/filename.csv' WITH HEADER CSV DELIMITER ',';
+
+# Get post counts per day
+sudo su - postgres
+psql --dbname=fourcat
+COPY ( SELECT to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM-DD') AS day_string, count(*) AS count FROM posts_4chan WHERE board = 'board' GROUP BY day_string ) TO '/mnt/bigstorage/psql_files/filename.csv' WITH HEADER CSV DELIMITER ',';
+
+# Get posts per thread
+sudo su - postgres
+psql --dbname=fourcat
+COPY ( SELECT *, to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM-DD') AS timestamp FROM posts_4chan WHERE board = 'board' AND thread_id IN (value1, value2, ...) ) TO '/mnt/bigstorage/psql_files/filename.csv' WITH HEADER CSV DELIMITER ',';
+
+# String search
+COPY ( SELECT to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM-DD') AS day_string, count(*) AS count FROM posts_4chan INNER JOIN threads_4chan ON threads_4chan.id = posts_4chan.thread_id WHERE lower(posts_4chan.body) LIKE '%redpill%' threads_4chan.board = 'pol' GROUP BY day_string ) TO '/mnt/bigstorage/psql_files/count_per_month.csv' WITH HEADER CSV DELIMITER ',';
+
+sudo su - postgres
+psql --dbname=fourcat
+COPY ( SELECT to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM-DD') AS date_string, count(*) AS count FROM posts_4chan INNER JOIN threads_4chan ON threads_4chan.id = posts_4chan.thread_id WHERE lower(posts_4chan.body) LIKE '*pepe*' AND threads_4chan.board = 'pol' GROUP BY date_string ) TO '/mnt/bigstorage/psql_files/pepe_count_per_month.csv' WITH HEADER CSV DELIMITER ',';
+
+# Get post counts per month (only OP)
+sudo su - postgres
+psql --dbname=fourcat
+COPY ( SELECT to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM') AS month_string, count(*) AS count FROM posts_4chan INNER JOIN threads_4chan ON threads_4chan.id = posts_4chan.id WHERE threads_4chan.board = 'pol' GROUP BY month_string ) TO '/mnt/bigstorage/psql_files/count_per_month_op_only.csv' WITH HEADER CSV DELIMITER ',';
+
+SELECT * FROM posts WHERE thread_id IN (SELECT DISTINCT thread_id FROM posts WHERE subject ILIKE '%/chug/%');
+
+# Make psql dump
+sudo su - postgres
+cd /
+usr/pgsql-9.5/bin/pg_dump -t table_name --format=tar db_name > mnt/bigstorage/8ch_dump.sql
+OR
+usr/pgsql-9.5/bin/pg_dump -t table_name db_name | gzip > mnt/bigstorage/psql_files/dump.gz
+
+# Import psql dump (Windows)
+C:\Program Files\PostgreSQL\10\bin\psql.exe -U db_name -d table_name -f "C:/directory/database.db"
+
+# Kill process
+kill -9 $(cat backend/4cat.pid)
+
+
+
+COPY ( SELECT * FROM posts_4chan WHERE board = 'pol' AND thread_id IN (SELECT * FROM value1, value2, ...) ) TO '/mnt/bigstorage/psql_files/filename.csv' WITH HEADER CSV DELIMITER ',';

@@ -111,7 +111,15 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <span class="property-badge">{{ model.supported_media_types | join(", ") }}</span>
+                                    {% if model.supported_media_types %}
+                                        {% for supported_media_type in model.supported_media_types %}
+                                            <span class="property-badge">{{ supported_media_type }}</span>
+                                        {% endfor %}
+                                    {% elif model.model_card %}
+                                        <a href="{{ model.model_card }}" target="_blank">
+                                            <span class="property-badge">See model card</span>
+                                        </a>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if servers[model.server].type == "ollama" %}

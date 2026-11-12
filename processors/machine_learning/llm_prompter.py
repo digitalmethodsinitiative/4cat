@@ -19,6 +19,7 @@ from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict, urls_in_text
 from common.lib.llm.adapter import LLMAdapter
+from common.lib.llm.llm_client import get_model_library, resolve_model
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 
@@ -77,22 +78,18 @@ class LLMPrompter(BasicProcessor):
             return f"llm-local[{dataset.parameters.get('model').split('://')[1].split('/')[0]}]"
 
     @classmethod
-    def get_model_library(cls, config):
-        available_models = config.get("llm.available_models", {})
-        enabled_model_ids = config.get("llm.enabled_models", [])
-        servers = config.get("llm.servers", {})
-        if not config.get("llm.access"):
-            enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
+    def get_model_library(cls, config, task="generate"):
+        """
+        Get the models this processor can offer, grouped by server.
 
-        models_option = {}
-        for key, value in {k: v for k, v in available_models.items() if k in enabled_model_ids}.items():
-            server = servers[value["server"]]
-            if server["name"] not in models_option:
-                models_option[server["name"]] = {}
+        Generative models only: an embedding model returns a vector, not text,
+        so offering one here would only produce a run that fails at invoke time.
 
-            models_option[server["name"]][key] = value["name"]
-
-        return models_option
+        :param config:  4CAT config reader
+        :param str task:  Task the model must support.
+        :return dict:  `{server name: {model ID: model display name}}`
+        """
+        return get_model_library(config, task=task)
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -385,15 +382,11 @@ class LLMPrompter(BasicProcessor):
 
         # load model and server metadata
         chosen_model_id = self.parameters.get("model")
-        available_models = {k: v for k, v in self.config.get("llm.available_models").items() if k in self.config.get("llm.enabled_models")}
-        if chosen_model_id not in available_models:
-            return self.dataset.finish_with_error(f"Model {chosen_model_id} not supported")
-
-        model = available_models[chosen_model_id]
-        server = self.config.get("llm.servers").get(model["server"])
-
-        if not server:
-            return self.dataset.finish_with_error(f"Model server for {chosen_model_id} not currently available.")
+        # the same lookup the option list uses, so that a model the user may no
+        # longer pick is not run for them either
+        model, server, error = resolve_model(self.config, chosen_model_id)
+        if error:
+            return self.dataset.finish_with_error(error)
 
         if server["type"] == "thirdparty" and not api_key:
             return self.dataset.finish_with_error(f"No API key provided for model {chosen_model_id}")
