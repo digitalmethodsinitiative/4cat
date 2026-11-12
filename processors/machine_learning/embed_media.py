@@ -270,21 +270,19 @@ class EmbedMedia(BasicProcessor):
         with path.open("rb") as infile:
             return base64.b64encode(infile.read()).decode("utf-8")
 
-    def load_post_id_map(self) -> dict:
+    def load_media_metadata(self):
         """
-        Map each media filename to the posts it was downloaded for.
+        The archive's metadata, which says which posts each file came from.
 
-        Read straight from the source archive rather than the staging area: the
-        staging area is filled lazily as items are iterated, so the metadata is
-        not reliably there before the first file is handled - and annotations
-        are written as we go.
-
-        :return dict:  `{filename: [post ID, ...]}`
+        :return MediaArchiveMetadata|None:  The metadata, or `None` if the
+          archive has none that can be used
         """
         metadata = self.get_media_metadata()
-        post_ids = metadata.filename_to_post_ids() if metadata else {}
-        self.dataset.log(f"Found post IDs for {len(post_ids):,} {self.media_label_plural} in .metadata.json")
-        return post_ids
+        if metadata:
+            self.dataset.log(f"Found post IDs for {len(metadata):,} {self.media_label_plural} in the archive "
+                             f"metadata")
+
+        return metadata
 
     def process(self):
         """
@@ -312,7 +310,7 @@ class EmbedMedia(BasicProcessor):
         save_annotations = self.parameters.get("save_annotations", False)
         # always, not only for annotations: the posts behind each file are what
         # later steps (clustering annotations, plotting by a post's date) need
-        post_id_map = self.load_post_id_map()
+        media_metadata = self.load_media_metadata()
         annotations = []
 
         embedded = 0
@@ -340,6 +338,13 @@ class EmbedMedia(BasicProcessor):
                 if not media_path or media_path.name == ".metadata.json":
                     # the archive carries its metadata alongside the media files
                     continue
+
+                # get file names either as full path or just file name (parent processors varyingly store media in
+                # subfolders)
+                try:
+                    member = media_path.relative_to(staging_area).as_posix()
+                except ValueError:
+                    member = media_path.name
 
                 reason = self.skip_reason(media_path)
                 if reason:
@@ -388,13 +393,13 @@ class EmbedMedia(BasicProcessor):
                 if vector:
                     # the filename is a hash, so carry the posts it came from into
                     # the result: makes it easier for child processors to reach .metadata.json
-                    post_ids = post_id_map.get(media_path.name, [])
+                    post_ids = media_metadata.post_ids_for(member) if media_metadata else []
 
                     time_created = int(time.time())
                     outfile.write(json.dumps({
                         "id": media_path.stem,
                         "text": media_path.name,
-                        "filename": media_path.name,
+                        "filename": member,
                         "post_ids": post_ids,
                         "embedding": vector,
                         "dimensions": len(vector),
@@ -441,7 +446,7 @@ class EmbedMedia(BasicProcessor):
             self.dataset.finish_with_error(stopped or f"No {self.media_label_plural} could be embedded.")
             return
 
-        if save_annotations and not post_id_map:
+        if save_annotations and not media_metadata:
             self.dataset.log("No annotations were written: the archive has no .metadata.json linking files to posts.")
 
         status = f"Embedded {embedded:,} {self.media_label_plural} ({total_sent / 1024 / 1024:.1f} MB sent in total)"

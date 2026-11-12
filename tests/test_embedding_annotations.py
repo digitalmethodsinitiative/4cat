@@ -77,23 +77,28 @@ def make_processor(cls, tmp_path, metadata):
 # --------------------------------------------------------------------------- #
 # resolving media files to the posts they came from
 
-def test_post_id_map_links_filenames_to_posts(tmp_path):
+def test_the_metadata_links_filenames_to_posts(tmp_path):
     """
-    A media archive is keyed by source URL; the filename is a hash. Annotating
-    the hash would attach the value to an item that does not exist.
+    A media file's name is a hash, so annotating it would attach the value to
+    an item that does not exist. The archive's metadata says which posts it
+    came from.
     """
     processor = make_processor(EmbedVideos, tmp_path, {
         "https://example.test/a": {"post_ids": ["p1", "p2"], "files": [{"filename": "abc123.mp4"}]},
         "https://example.test/b": {"post_ids": ["p3"], "files": [{"filename": "def456.mp4"}]},
     })
 
-    assert processor.load_post_id_map() == {"abc123.mp4": ["p1", "p2"], "def456.mp4": ["p3"]}
+    metadata = processor.load_media_metadata()
+    assert metadata.post_ids_for("abc123.mp4") == ["p1", "p2"]
+    assert metadata.post_ids_for("def456.mp4") == ["p3"]
+    # a file the metadata does not know about has no posts, and does not raise
+    assert metadata.post_ids_for("never-downloaded.mp4") == []
 
 
-def test_post_id_map_handles_several_files_per_post(tmp_path):
+def test_several_files_from_one_post_each_get_an_entry(tmp_path):
     """
     One download can write a video and a thumbnail. Each is its own file, so
-    each gets its own entry - keyed by name rather than by stem, which would
+    each is asked for separately - by name rather than by stem, which would
     have let the second quietly replace the first.
     """
     processor = make_processor(EmbedVideos, tmp_path, {
@@ -103,34 +108,35 @@ def test_post_id_map_handles_several_files_per_post(tmp_path):
         },
     })
 
-    mapping = processor.load_post_id_map()
-    assert mapping == {"abc.mp4": ["p1"], "abc.jpg": ["p1"]}
+    metadata = processor.load_media_metadata()
+    assert metadata.post_ids_for("abc.mp4") == ["p1"]
+    assert metadata.post_ids_for("abc.jpg") == ["p1"]
 
 
-def test_post_id_map_survives_a_missing_or_broken_metadata_file(tmp_path):
-    """An archive without metadata must not stop the run, only the annotations."""
-    assert make_processor(EmbedImages, tmp_path, None).load_post_id_map() == {}
-
-    processor = make_processor(EmbedImages, tmp_path, {})
-    assert processor.load_post_id_map() == {}
+def test_a_missing_or_broken_metadata_file_only_costs_the_annotations(tmp_path):
+    """An archive without metadata must not stop the run."""
+    assert not make_processor(EmbedImages, tmp_path, None).load_media_metadata()
+    assert not make_processor(EmbedImages, tmp_path, {}).load_media_metadata()
 
 
-def test_post_id_map_ignores_entries_without_files(tmp_path):
+def test_entries_without_files_are_not_items(tmp_path):
     """A failed download leaves an entry behind with no files written."""
     processor = make_processor(EmbedImages, tmp_path, {
         "https://example.test/ok": {"post_ids": ["p1"], "files": [{"filename": "ok.jpg"}]},
         "https://example.test/failed": {"post_ids": ["p2"], "success": False},
     })
 
-    assert processor.load_post_id_map() == {"ok.jpg": ["p1"]}
+    metadata = processor.load_media_metadata()
+    assert list(metadata.filename_to_post_ids()) == ["ok.jpg"]
+    assert [failure["post_ids"] for failure in metadata.iter_failures()] == [["p2"]]
 
 
-def test_post_id_map_without_a_source_archive(tmp_path):
-    """Nothing to read is an empty map, not a failure."""
+def test_no_source_archive_is_not_a_failure(tmp_path):
+    """Nothing to read means no post IDs, not an error."""
     processor = EmbedImages.__new__(EmbedImages)
     processor.dataset = Recorder()
     processor.source_dataset = ArchiveDataset(tmp_path / "never-written.zip")
-    assert processor.load_post_id_map() == {}
+    assert processor.load_media_metadata() is None
 
 
 # --------------------------------------------------------------------------- #

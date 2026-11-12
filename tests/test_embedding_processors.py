@@ -955,9 +955,11 @@ def test_a_sheet_can_be_packed_from_video_frames(tmp_path):
     assert dataset.error is None, dataset.error
 
     sprite = MediaSprite.read_sprite(dataset)
-    assert set(sprite["tiles"]) == {"clip1_scene_1.jpeg", "clip1_scene_2.jpeg", "clip2_scene_1.jpeg"}
-    # the member path is kept, so a link can reach the file in its folder
-    assert sprite["files"]["clip2_scene_1.jpeg"] == "clip2/clip2_scene_1.jpeg"
+    # by their path inside the archive, which is how an embedding of a frame
+    # names it too, so the two line up without a folder being guessed at
+    assert set(sprite["tiles"]) == {"clip1/clip1_scene_1.jpeg", "clip1/clip1_scene_2.jpeg",
+                                    "clip2/clip2_scene_1.jpeg"}
+    assert sprite["files"]["clip2/clip2_scene_1.jpeg"] == "clip2/clip2_scene_1.jpeg"
     # named after themselves, so the link points into the frames archive
     assert sprite["linked"] == "sceneskey"
 
@@ -979,12 +981,14 @@ def test_a_thumbnail_sheet_links_one_level_further_up(tmp_path):
     assert sprite["linked"] == "mediakey"
 
 
-def test_frames_with_repeating_names_are_left_out_and_reported(tmp_path):
+def test_frames_numbered_alike_in_different_folders_get_a_tile_each(tmp_path):
     """
     The frame processor numbers frames per video, so every video has a
-    video_frame_0000001.jpeg. A plot looks a tile up by name, so keeping one of
-    them would draw the wrong picture for the others.
+    video_frame_0000001.jpeg. Keyed by their folder as well they stay apart,
+    where a bare name would have given one of them the other's picture.
     """
+    from processors.visualisation.media_sprite import MediaSprite
+
     archive = make_picture_archive(tmp_path, {
         "clip1/video_frame_0000001.jpeg": (640, 480),
         "clip1/video_frame_0000002.jpeg": (640, 480),
@@ -992,10 +996,13 @@ def test_frames_with_repeating_names_are_left_out_and_reported(tmp_path):
     }, name="numbered")
 
     dataset = pack_sheet(tmp_path, archive, name="numberedsheet")
-    assert dataset.num_rows == 2
-    # the user is told rather than quietly given a sheet with the wrong
-    # picture in it; the wording is free to change, the fact is not
-    assert dataset.warning and "left out" in dataset.warning
+    assert dataset.num_rows == 3
+    assert dataset.warning is None
+
+    tiles = MediaSprite.read_sprite(dataset)["tiles"]
+    assert set(tiles) == {"clip1/video_frame_0000001.jpeg", "clip1/video_frame_0000002.jpeg",
+                          "clip2/video_frame_0000001.jpeg"}
+    assert len(set(tiles.values())) == 3
 
 
 def test_tiles_are_reduced_but_never_enlarged(tmp_path):

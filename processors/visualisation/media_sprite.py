@@ -102,7 +102,7 @@ class MediaSprite(BasicProcessor):
                 unreadable += 1
                 continue
 
-            tiles.append((sources.get(member, path.name), member, thumbnail))
+            tiles.append((sources.get(member, member), member, thumbnail))
 
         if not tiles:
             self.dataset.finish_with_error("None of the pictures could be read, so there is no sheet to make.")
