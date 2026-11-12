@@ -15,9 +15,7 @@ __email__ = "4cat@oilab.eu"
 
 class EmbedAudio(EmbedMedia):
     """
-    Send each audio file to a multimodal embedding model and store the vector it
-    returns, so recordings can be compared, mapped and searched by how they
-    sound.
+    Transform audio files into embeddings.
     """
     type = "audio-embeddings"  # job type ID
     category = "Audio"  # category

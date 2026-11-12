@@ -29,16 +29,13 @@ class GenerateTextEmbeddings(BasicProcessor):
     title = "Generate text embeddings"  # title displayed in UI
     description = ("Generate a numerical representation (an 'embedding') of the text of each item using an LLM embedding "
                    "model. Embeddings can be used to e.g. map, cluster, and retrieve similar kinds of texts. Requires "
-                   "an embedding model to be installed on this server.")
+                   "an embedding model to be reachable on this server.")
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     compatibility = Compatibility(extensions={"csv", "ndjson"})
 
-    #: Hard-coded label the embeddings are written back under, when saved as
-    #: annotations. Not user-editable: a vector is only meaningful next to the
-    #: model that produced it, so a free-form label invites mismatched columns.
     annotation_label = "text embedding"
-    #: How many annotations to buffer before writing them to the database
+
     annotation_batch_size = 100
 
     references = [

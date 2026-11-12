@@ -1,5 +1,5 @@
 """
-Rank dataset items by how close their embedding is to a given text.
+Rank dataset items by how close their embedding is to a given text (embedding).
 """
 import csv
 

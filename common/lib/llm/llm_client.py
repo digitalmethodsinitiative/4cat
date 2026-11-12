@@ -68,12 +68,7 @@ class LLMServerClient:
         self._headers = {"Content-Type": "application/json"}
 
         if self.auth_type:
-            # The setting asks for a header *name*, but "Authorization: Bearer"
-            # is the natural thing to type and is what people paste from curl
-            # examples. As a header name that is malformed - requests raises
-            # InvalidHeader, which surfaces as "server unavailable" and sends
-            # people hunting for a network problem. So accept both spellings:
-            # anything after a colon is treated as a prefix on the value.
+            # Accept both "Authorization: Bearer" and just the bearer
             header_name, _, value_prefix = self.auth_type.partition(":")
             header_name = header_name.strip()
             value_prefix = value_prefix.strip()
@@ -154,10 +149,9 @@ class LLMServerClient:
         Derive the tasks a model can be used for from its metadata.
 
         Most servers do not report this. An OpenAI-compatible `/v1/models` lists
-        an id and nothing else, so there is no capability field to read. The
-        fallback is therefore the model's own name: an id containing "embed"
-        (Qwen3-VL-Embedding, mxbai-embed-large, nomic-embed-text) reads as an
-        embedder, anything else as generative.
+        an id and nothing else, so there is no capability field to read. So use the
+        model name as an imperfect fallback: if it contains "embed", it's an embedder;
+        otherwise, it's generative.
 
         # todo: check if there's a more rigid way of separating later.
 
@@ -167,8 +161,7 @@ class LLMServerClient:
         try:
             model_id = str(self.get_model_id(meta) or "")
         except (KeyError, TypeError):
-            # nothing to go on; assume generative, which is how every server
-            # behaved before embedding support existed
+            # nothing to go on so assume generative
             return ["generate"]
 
         return ["embed"] if "embed" in model_id.lower() else ["generate"]
@@ -192,8 +185,7 @@ class LLMServerClient:
         Embed one or more inputs, returning one vector per input.
 
         Deliberately *not* routed through `LLMAdapter`/LangChain. LangChain's
-        embedding interface is text-only, so it
-        cannot handle multimodal embeddings.
+        embedding interface is text-only, so it cannot handle multimodal embeddings.
 
         A client that cannot embed media must raise an exception when `media` is given
         rather than embedding the text alone.

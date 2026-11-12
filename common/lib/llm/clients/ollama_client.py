@@ -67,7 +67,7 @@ class OllamaClient(LLMServerClient):
 
         _cap_map = {
             "completion": "text",
-            "embedding": "text",
+            "embedding": "embed",  # there are multimodal embeddings in Ollama now, so we don't know what input type..
             "vision": "image",
             "audio": "audio",
         }
@@ -96,10 +96,9 @@ class OllamaClient(LLMServerClient):
         """
         Read a model's capability list.
 
-        Ollama reports capabilities in two places: nested under `metadata` for
-        the `/api/show` response `list_models()` attaches, and inline on the
-        `/api/tags` entry itself. Prefer the former and fall back to the latter,
-        so a model whose `/api/show` request failed is still classified.
+        Ollama shows capabilities in two places: under `metadata` for
+        the `/api/show` response that `list_models()` attaches, or inline on the
+        `/api/tags` entry itself.
 
         :param dict meta:  Model metadata, or `None`.
         :returns list[str]:  Ollama capability strings, or `[]` if unknown.
@@ -125,9 +124,7 @@ class OllamaClient(LLMServerClient):
         if "embedding" in capabilities:
             tasks.append("embed")
 
-        # An unreachable or partial /api/show leaves nothing to go on. Assume
-        # generation, matching the base class, rather than hiding the model
-        # from every processor at once.
+        # If we can't tell, assume the model generates.
         return tasks if tasks else ["generate"]
 
     def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300,
@@ -135,14 +132,12 @@ class OllamaClient(LLMServerClient):
         """
         Embed inputs via Ollama's `/api/embed` endpoint.
 
-        The endpoint takes a list and returns one vector per entry, so a caller
-        that batches its inputs gets one round-trip per batch rather than one
-        per item.
+        The endpoint takes a list and returns one vector per entry so we can batch calls!
 
         An entry is either a plain string, or an object carrying any of `text`,
         `image` and `audio`. Two limits:
 
-        * video is not yet supported (can be approximated with video frame + audio).
+        * video is not yet supported (can be approximated with video frame + audio).  todo: update when this changes
         * `image` and `audio` are single values, so one entry holds at most one
           of each. Several frames cannot be fused into one vector this way.
 

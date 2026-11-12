@@ -81,7 +81,9 @@ class OpenAICompatibleClient(LLMServerClient):
         """
         Embed via the server's OpenAI-compatible `/v1/embeddings` endpoint.
 
-        Two request shapes, because the OpenAI only handles text embeddings for now:
+        Two request shapes because the OpenAI only handles text embeddings for now
+        (and hasn't released a multimodal embedding model yet)
+        todo: keep track of when this changes
 
         * text only -> `{"input": [...]}`, the standard batched form, one vector
           per input.
@@ -130,7 +132,7 @@ class OpenAICompatibleClient(LLMServerClient):
             # Ollama, this API fuses a whole content array into a single vector
             user_content = [self._media_content_part(part) for part in self.as_descriptors(item_media)]
 
-            # an instruction steers the embedding; any other text is embedded along with the media
+            # an instruction is like a system prompt, other text should be part of the embedded content
             if text and text_as_instruction:
                 messages.append({"role": "system", "content": [{"type": "text", "text": text}]})
             elif text:
