@@ -99,10 +99,10 @@ class AudioExtractor(BasicProcessor):
         # then be given the same .wav name. Track and ensure uniqueness.
         audio_filenames = UniqueFilenames(output_dir)
 
-        self.dataset.update_status("Extracting video audio")
+        self.dataset.update_status("Extracting audio from video")
         for item in self.source_dataset.iterate_items(processor=self, get_annotations=False):
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while determining image wall order")
+                raise ProcessorInterruptedException("Interrupted while extracting audio from video")
 
             if max_files != 0 and processed_videos >= max_files:
                 break

@@ -100,12 +100,13 @@ class VideoFrames(BasicProcessor):
 		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
 
-		# Copy the videos' metadata, so frames can be traced back to the items
-		# the videos were downloaded for
-		try:
-			self.extract_archived_file_by_name(".metadata.json", self.source_dataset.get_results_path(), output_directory)
-		except FileNotFoundError:
-			pass
+		# create metadata file so frames can be traced back to original videos/posts
+		source_metadata = self.get_media_metadata()
+		metadata = self.dataset.new_media_metadata(
+			processor_type=self.type,
+			from_dataset=((source_metadata.from_dataset if source_metadata else None)
+						  or self.source_dataset.key),
+		)
 
 		self.dataset.update_status("Extracting video frames")
 		for i, video in enumerate(self.source_dataset.iterate_items(self)):
@@ -157,6 +158,24 @@ class VideoFrames(BasicProcessor):
 				self.dataset.update_status(
 					"Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
 
+			# every frame of a video stands for the items that video did
+			video_item = source_metadata.get_entry(video.file.name) if source_metadata else None
+			post_ids = video_item.get("post_ids", []) if video_item else []
+			source_url = video_item.get("url") if video_item else None
+
+			frames = sorted(video_dir.glob("*.jpeg"))
+			for frame in frames:
+				metadata.add_item(f"{vid_name}/{frame.name}", post_ids=post_ids, url=source_url,
+								  extra={"video_filename": video.file.name})
+
+			if not frames:
+				# ffmpeg can fail, but let's keep the items stay traceable
+				metadata.add_failure(
+					post_ids=post_ids, url=source_url, reason="no_frames_extracted",
+					reason_description=(f"ffmpeg exited with code {result.returncode}" if result.returncode
+										else "ffmpeg reported no error but wrote no frames"),
+					extra={"video_filename": video.file.name})
+
 			self.dataset.update_progress(i / total_possible_videos)
 
 		# Finish up
@@ -165,6 +184,8 @@ class VideoFrames(BasicProcessor):
 		if not processed_videos:
 			self.dataset.finish_with_error("Unable to extract frames from any videos")
 			return
+
+		metadata.write(output_directory)
 
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)

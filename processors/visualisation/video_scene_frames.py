@@ -117,12 +117,14 @@ class VideoSceneFrames(BasicProcessor):
         processed_frames = 0
         num_scenes = self.source_dataset.num_rows
 
-        # Copy the videos' metadata, so frames can be traced back to the items
-        # the videos were downloaded for
-        try:
-            self.extract_archived_file_by_name(".metadata.json", video_dataset.get_results_path(), staging_area)
-        except FileNotFoundError:
-            pass
+
+        # create metadata file so frames can be traced back to original videos/posts
+        source_metadata = self.get_media_metadata(video_dataset)
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type,
+            from_dataset=((source_metadata.from_dataset if source_metadata else None)
+                          or video_dataset.key),
+        )
 
         # a folder of frames per video, named after the video file. The
         # extension is part of it: clip.mp4 and clip.webm are two videos, and
@@ -179,14 +181,33 @@ class VideoSceneFrames(BasicProcessor):
 
                 errors += 1
 
+            # every frame stands for the items the video did, and says which
+            # scene it was taken from
+            video_item = source_metadata.get_entry(video.file.name) if source_metadata else None
+            post_ids = video_item.get("post_ids", []) if video_item else []
+            source_url = video_item.get("url") if video_item else None
+
             # the default filenames can be improved - use scene ID instead of frame #
+            captured = 0
             for i in range(0, len(scenes[video.file.name])):
                 frame_file = video_folder.joinpath(f"{video.file.stem}_frame_{i+1}.jpeg")
                 if not frame_file.exists():
                     # don't fail on rename if anything above with ffmpeg crashed
                     continue
 
-                frame_file.rename(frame_file.with_stem(f"{video.file.stem}_scene_{frame_scenes[i]['scene']}"))
+                scene_frame = frame_file.rename(
+                    frame_file.with_stem(f"{video.file.stem}_scene_{frame_scenes[i]['scene']}"))
+                metadata.add_item(f"{vid_name}/{scene_frame.name}", post_ids=post_ids, url=source_url,
+                                  extra={"video_filename": video.file.name,
+                                         "scene": frame_scenes[i]["scene"]})
+                captured += 1
+
+            if not captured:
+                metadata.add_failure(
+                    post_ids=post_ids, url=source_url, reason="no_frames_extracted",
+                    reason_description=(f"ffmpeg exited with code {result.returncode}" if result.returncode
+                                        else "ffmpeg reported no error but wrote no frames"),
+                    extra={"video_filename": video.file.name})
 
             processed_frames += len(scenes[video.file.name])
 
@@ -196,6 +217,8 @@ class VideoSceneFrames(BasicProcessor):
         # Finish up
         # We've created a directory and folder structure here as opposed to a single folder with single files as
         # expected by self.write_archive_and_finish() so we use make_archive instead
+        metadata.write(staging_area)
+
         from shutil import make_archive
         make_archive(self.dataset.get_results_path().with_suffix(''), "zip", staging_area)
 
