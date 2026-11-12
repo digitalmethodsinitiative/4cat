@@ -3,132 +3,185 @@
     "model": "gpt-6-astra",
     "name": "[OpenAI] GPT-6 Astra",
     "model_card": "https://developers.openai.com/api/docs/models/gpt-6-astra",
-    "provider": "openai"
+    "provider": "openai",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "gpt-6.1.sol",
     "name": "[OpenAI] GPT-6.1 Sol",
     "model_card": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
-    "provider": "openai"
+    "provider": "openai",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "gpt-6.1-terra",
-    "name": "[OpenAI] GPT-5.6 Terra",
+    "name": "[OpenAI] GPT-6.1 Terra",
     "model_card": "https://platform.openai.com/docs/models/gpt-6.1-terra",
-    "provider": "openai"
+    "provider": "openai",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "gpt-6-luna",
     "name": "[OpenAI] GPT-6 Luna",
     "model_card": "https://platform.openai.com/docs/models/gpt-6-luna",
-    "provider": "openai"
+    "provider": "openai",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "gemini-4-carbon",
     "name": "[Google] Gemini 4 Carbon",
     "model_card": "https://aistudio.google.com/docs/models/gemini-4-carbon",
-    "provider": "google"
+    "provider": "google",
+    "supported_media_types": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ]
   },
   {
     "model": "gemini-4-argon",
     "name": "[Google] Gemini 4 Argon",
     "model_card": "https://aistudio.google.com/docs/models/gemini-4-argon",
-    "provider": "google"
+    "provider": "google",
+    "supported_media_types": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ]
   },
   {
     "model": "gemini-3.8-flash",
     "name": "[Google] Gemini 3.8 Flash",
     "model_card": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
-    "provider": "google"
+    "provider": "google",
+    "supported_media_types": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ]
   },
   {
     "model": "gemini-3.5-flash-lite-preview",
     "name": "[Google] Gemini 3.5 Flash Lite",
     "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-5-flash-lite",
-    "provider": "google"
+    "provider": "google",
+    "supported_media_types": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ]
   },
   {
     "model": "claude-fable-5-2",
     "name": "[Anthropic] Claude Fable 5.2",
     "model_card": "https://www.anthropic.com/claude/fable",
-    "provider": "anthropic"
+    "provider": "anthropic",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "claude-opus-5-5",
     "name": "[Anthropic] Claude Opus 5.5",
     "model_card": "https://www.anthropic.com/claude/opus",
-    "provider": "anthropic"
+    "provider": "anthropic",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "claude-sonnet-5-5",
     "name": "[Anthropic] Claude Sonnet 5.5",
     "model_card": "https://www.anthropic.com/claude/sonnet",
-    "provider": "anthropic"
+    "provider": "anthropic",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "claude-5-5-haiku",
+    "model": "claude-haiku-5-5",
     "name": "[Anthropic] Claude 5.5 Haiku (latest)",
     "model_card": "https://www.anthropic.com/claude/haiku",
-    "provider": "anthropic"
+    "provider": "anthropic",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "mistral-large-4",
     "name": "[Mistral] Mistral Large 4",
     "model_card": "https://docs.mistral.ai/models/mistral-large-4",
-    "provider": "mistral"
-  },
-  {
-    "model": "magistral-small-2509",
-    "name": "[Mistral] Magistral Small 1.2 (25.09)",
-    "model_card": "https://docs.mistral.ai/models/magistral-small-1-2-25-09",
-    "provider": "mistral"
-  },
-  {
-    "model": "magistral-medium-2509",
-    "name": "[Mistral] Magistral Medium 1.2 (25.09)",
-    "model_card": "https://docs.mistral.ai/models/magistral-medium-1-2-25-09",
-    "provider": "mistral"
+    "provider": "mistral",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "mistral-small-2603",
     "name": "[Mistral] Mistral Small 4",
     "model_card": "https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03",
-    "provider": "mistral"
-  },
-  {
-    "model": "mistral-medium-3-5",
-    "name": "[Mistral] Mistral Medium 3.5",
-    "model_card": "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04",
-    "provider": "mistral"
-  },
-  {
-    "model": "open-mistral-nemo-2407",
-    "name": "[Mistral] Mistral Nemo 12B",
-    "model_card": "https://docs.mistral.ai/models/mistral-nemo-12b-24-07",
-    "provider": "mistral"
+    "provider": "mistral",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "deepseek-v4-pro",
     "name": "[DeepSeek] DeepSeek V4 Pro",
     "model_card": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro",
-    "provider": "deepseek"
+    "provider": "deepseek",
+    "supported_media_types": [
+      "text"
+    ]
   },
   {
     "model": "deepseek-v4-flash",
     "name": "[DeepSeek] DeepSeek V4 Flash",
     "model_card": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash",
-    "provider": "deepseek"
+    "provider": "deepseek",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "deepseek-chat",
     "name": "[DeepSeek] DeepSeek latest (non-reasoning)",
     "model_card": "https://api-docs.deepseek.com/quick_start/pricing",
-    "provider": "deepseek"
+    "provider": "deepseek",
+    "supported_media_types": [
+      "text"
+    ]
   },
   {
     "model": "deepseek-reasoner",
     "name": "[DeepSeek] DeepSeek latest (reasoning)",
     "model_card": "https://api-docs.deepseek.com/quick_start/pricing",
-    "provider": "deepseek"
+    "provider": "deepseek",
+    "supported_media_types": [
+      "text"
+    ]
   }
 ]
