@@ -14,7 +14,7 @@ from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from processors.machine_learning.embed_media import read_post_id_map
-from processors.visualisation.media_thumbnails import MediaThumbnails
+from processors.visualisation.media_sprite import MediaSprite
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -37,9 +37,6 @@ TIME_COLUMN = re.compile(r"time|date|created|published", re.IGNORECASE)
 
 # Most tick labels drawn along an axis
 MAX_TICKS = 6
-
-# Most steps walked up the chain of parent datasets
-MAX_ANCESTRY = 25
 
 # Smallest and largest size factor for 'Size by', relative to a normal dot or
 # thumbnail
@@ -160,56 +157,30 @@ class EmbeddingMap(BasicProcessor):
         return options
 
     @staticmethod
-    def sources_of(dataset):
+    def lineage(dataset) -> list:
         """
-        Yield the datasets an embedding set was derived from, nearest first.
+        Get the reversed genealogy of a dataset.
 
-        :param dataset:  The embeddings dataset
-        :return:  Generator of ancestors, nearest first
+        :param dataset:  The dataset a plot would run on, or `None`
+        :return list:  The dataset and its ancestors, nearest first, or `[]`
         """
+        if not dataset:
+            return []
+
         try:
-            for _ in range(MAX_ANCESTRY):
-                dataset = dataset.get_parent() if dataset else None
-                if not dataset:
-                    return
-                yield dataset
+            return list(reversed(dataset.get_genealogy()))
         except DataSetException:
-            return
-
-    @staticmethod
-    def ancestry(dataset):
-        """
-        Yield a dataset and its ancestors, up to and including the embeddings.
-
-        Bounded, so a broken parent chain (or a stand-in object whose parent is
-        always another stand-in) cannot loop forever.
-
-        :param dataset:  The dataset a plot would run on
-        :return:  Generator of datasets, nearest first
-        """
-        try:
-            for _ in range(MAX_ANCESTRY):
-                if not dataset:
-                    return
-                yield dataset
-                if dataset.type in EMBEDDING_TYPES:
-                    return
-                dataset = dataset.get_parent()
-        except DataSetException:
-            return
+            return [dataset]
 
     @classmethod
     def get_embeddings_dataset(cls, dataset):
         """
         Get the dataset the embeddings were made in.
 
-        Walks up past later steps - a reduction, a clustering - so thumbnails
-        and media links are found wherever in the chain a plot runs.
-
         :param dataset:  The dataset a plot would run on
         :return DataSet|None:  The embeddings, or `None` if there are none
         """
-        for ancestor in cls.ancestry(dataset):
+        for ancestor in cls.lineage(dataset):
             if ancestor.type in EMBEDDING_TYPES:
                 return ancestor
         return None
@@ -217,7 +188,7 @@ class EmbeddingMap(BasicProcessor):
     @classmethod
     def has_clusters(cls, dataset) -> bool:
         """
-        Whether the items a plot would run on carry a cluster.
+        Whether the dataset embeddings have clusters.
 
         That is the case when the dataset is, or was made from, clustered
         embeddings.
@@ -225,7 +196,15 @@ class EmbeddingMap(BasicProcessor):
         :param dataset:  The dataset a plot would run on
         :return bool:  Whether the items carry a cluster
         """
-        return any(ancestor.type == CLUSTERED_EMBEDDINGS for ancestor in cls.ancestry(dataset))
+        # anything above the embeddings cannot be a clustering, so stopping
+        # there costs nothing and keeps this to the steps a plot is made of
+        for ancestor in cls.lineage(dataset):
+            if ancestor.type == CLUSTERED_EMBEDDINGS:
+                return True
+            if ancestor.type in EMBEDDING_TYPES:
+                break
+
+        return False
 
     @staticmethod
     def cluster_colours(clusters: list) -> dict:
@@ -308,9 +287,8 @@ class EmbeddingMap(BasicProcessor):
                 "help": "Size scale",
                 "options": {"log": "Logarithmic", "linear": "Linear"},
                 "default": "log",
-                "tooltip": "Counts like views are very skewed: on a linear scale one viral item is huge and nearly "
-                           "everything else is the smallest size. A logarithmic scale keeps differences between "
-                           "ordinary items visible.",
+                "tooltip": "Counts like views are often skewed. A logarithmic scale can help to make differences "
+                           "between 'normal' counts visible.",
                 "requires": "size_column",
             },
         }
@@ -642,7 +620,7 @@ class EmbeddingMap(BasicProcessor):
         """
         return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    def media_link_base(self, sprite_dataset=None) -> str | None:
+    def media_link_base(self, archive_key=None) -> str | None:
         """
         URL prefix that serves one file out of the media archive.
 
@@ -654,22 +632,23 @@ class EmbeddingMap(BasicProcessor):
         Absolute when the instance knows its own hostname, so a downloaded map
         still resolves; root-relative otherwise, which works inside 4CAT itself.
 
+        :param str archive_key:  Dataset holding the files the tiles name, as
+          a sheet records it; without one, the archive the embeddings came from
         :return str|None:  Prefix to append a filename to, or `None` when there
           is no archive to link into.
         """
-        # the archive is the parent of the embeddings, which are the parent of
-        # the reduced embeddings this map is made from
-        embeddings = self.get_embeddings_dataset(self.source_dataset)
-        # follow the sheet when there is one: its tiles name files in the
-        # archive it was made from, which for audio embeddings is the videos
-        # rather than the audio pulled out of them
-        archive = sprite_dataset.get_parent() if sprite_dataset else None
-        if not archive:
+        # a sheet records which dataset its tile names belong to, which is not
+        # always the one it was packed from: thumbnails are named after the
+        # media above them, while frames are named after themselves
+        if not archive_key:
+            embeddings = self.get_embeddings_dataset(self.source_dataset)
             archive = embeddings.get_parent() if embeddings else None
-        if not archive:
+            archive_key = archive.key if archive else None
+
+        if not archive_key:
             return None
 
-        path = f"/download/{archive.key}/?zip_member="
+        path = f"/download/{archive_key}/?zip_member="
         server_name = self.config.get("flask.server_name")
         if not server_name:
             return path
@@ -680,31 +659,16 @@ class EmbeddingMap(BasicProcessor):
     @classmethod
     def find_sprite_datasets(cls, parent_dataset) -> dict:
         """
-        Find sprite sheets made from the same media as these embeddings.
+        Sprite sheets that can be used on this plot.
 
-        :param parent_dataset:  The reduced embeddings the map would run on
-        :return dict:  `{dataset key: label}`, empty when there are none.
+        :param parent_dataset:  The reduced embeddings the plot would run on
+        :return dict:  `{sheet key: label}`, empty when there are none
         """
         embeddings = cls.get_embeddings_dataset(parent_dataset)
         if not embeddings or embeddings.type not in MEDIA_EMBEDDINGS:
             return {}
 
-        sprites = {}
-        for archive in cls.sources_of(embeddings):
-            for sibling in archive.get_children():
-                if sibling.type != MediaThumbnails.type or not sibling.is_finished():
-                    continue
-
-                size = sibling.parameters.get("thumbnail_size", "?")
-                sprites[sibling.key] = f"{size}px, {sibling.num_rows:,} thumbnails"
-
-            if sprites:
-                # the nearest ancestor that has any wins: a sheet made from the
-                # videos is what an audio embedding should show, and looking
-                # further up would only find media these items did not come from
-                break
-
-        return sprites
+        return MediaSprite.find_for(embeddings)
 
     def process(self):
         """
@@ -781,7 +745,7 @@ class EmbeddingMap(BasicProcessor):
             self.dataset.log("Not drawing thumbnails: the sprite sheet dataset no longer exists.")
             return None
 
-        sprite = MediaThumbnails.read_sprite(sprite_dataset)
+        sprite = MediaSprite.read_sprite(sprite_dataset)
         if not sprite:
             self.dataset.log("Not drawing thumbnails: the sprite sheet could not be read.")
             return None
@@ -799,12 +763,8 @@ class EmbeddingMap(BasicProcessor):
             "tile": sprite["tile"],
             "cols": sprite["cols"],
             "tiles": tiles,
-            # the names the *sheet* knows, so a click opens the video a frame
-            # was taken from rather than the audio extracted out of it. Only
-            # files the sheet covers get one, so a click never opens something
-            # the map is not showing.
             "files": sources,
-            "base": self.media_link_base(sprite_dataset) or "",
+            "base": self.media_link_base(sprite.get("linked")) or "",
         }
 
     @staticmethod

@@ -183,6 +183,10 @@ class Collector:
 class Source:
     """Stands in for the dataset a processor reads from."""
 
+    def read_media_metadata(self, filename=None):
+        # no metadata file: what get_media_metadata() turns into None
+        raise FileNotFoundError("no metadata in this stand-in")
+
     def __init__(self, items, parameters=None, parent=None, dataset_type="reduce-embeddings"):
         self.items, self.parameters, self._parent = items, parameters or {}, parent
         self.type = dataset_type
@@ -193,6 +197,15 @@ class Source:
 
     def get_parent(self):
         return self._parent
+
+    def get_genealogy(self):
+        """As DataSet does it: oldest first, ending with this dataset."""
+        chain, dataset, seen = [], self, set()
+        while dataset is not None and id(dataset) not in seen:
+            seen.add(id(dataset))
+            chain.insert(0, dataset)
+            dataset = dataset.get_parent()
+        return chain
 
     def iterate_items(self, processor=None, **kwargs):
         return iter(self.items)
@@ -351,10 +364,19 @@ class FakeDataset:
         self.num_rows = rows
         self.key = name
         self._finished, self._parent, self._children = finished, parent, list(children)
-        self.error, self.logs, self.statuses = None, [], []
+        self.error, self.warning, self.logs, self.statuses = None, None, [], []
 
     def get_results_path(self):
         return self.path
+
+    def read_media_metadata(self, filename=None):
+        raise FileNotFoundError("no metadata in this stand-in")
+
+    def new_media_metadata(self, from_dataset, processor_type, filename=".metadata.json"):
+        from common.lib.archive_metadata import MediaArchiveMetadata
+        self.data = getattr(self, "data", {})
+        return MediaArchiveMetadata.new(self, processor_type=processor_type,
+                                        from_dataset=from_dataset, filename=filename)
 
     def get_staging_area(self):
         staging = self.path.parent / f"staging-{self.key}"
@@ -366,6 +388,15 @@ class FakeDataset:
 
     def get_parent(self):
         return self._parent
+
+    def get_genealogy(self):
+        """As DataSet does it: oldest first, ending with this dataset."""
+        chain, dataset, seen = [], self, set()
+        while dataset is not None and id(dataset) not in seen:
+            seen.add(id(dataset))
+            chain.insert(0, dataset)
+            dataset = dataset._parent
+        return chain
 
     def get_children(self):
         return self._children
@@ -392,7 +423,8 @@ class FakeDataset:
         self.error = error
 
     def finish_with_warning(self, rows, warning):
-        self.num_rows, self.error = rows, None
+        # the warning is what a caller wanted said, so keep it readable
+        self.num_rows, self.error, self.warning = rows, None, warning
 
 
 def make_sprite(tmp_path, names, size=32, name="sprite", parameters=None, posts=None):
@@ -436,6 +468,7 @@ def make_sprite(tmp_path, names, size=32, name="sprite", parameters=None, posts=
 
     class Source:
         num_rows = len(items)
+        key = "sourcekey"
 
         def iterate_items(self, processor=None, **kwargs):
             return iter(items)
@@ -445,6 +478,17 @@ def make_sprite(tmp_path, names, size=32, name="sprite", parameters=None, posts=
 
         def top_parent(self):
             return Original()
+
+        def is_finished(self):
+            return True
+
+        def get_results_folder_path(self):
+            return tmp_path / "no-results-folder"
+
+        def read_media_metadata(self, filename=None):
+            # the real thing, so the thumbnails carry real provenance
+            from common.lib.archive_metadata import MediaArchiveMetadata
+            return MediaArchiveMetadata.read(self, filename=filename)
 
     class Config:
         def get(self, key, default=None):
@@ -458,17 +502,89 @@ def make_sprite(tmp_path, names, size=32, name="sprite", parameters=None, posts=
     return processor.dataset
 
 
+def make_sheet(tmp_path, thumbnails, name=None, **parameters):
+    """
+    Pack a thumbnails dataset into a sprite sheet, the second step.
+
+    :param thumbnails:  A finished `media-thumbnails` dataset
+    :return:  The `media-sprite` dataset
+    """
+    import zipfile
+    from common.lib.archive_metadata import MediaArchiveMetadata, is_support_file
+    from processors.visualisation.media_sprite import MediaSprite
+
+    archive_path = thumbnails.get_results_path()
+
+    class Item:
+        def __init__(self, file):
+            self.file = file
+
+    class Source:
+        key = "thumbkey"
+
+        def get_results_path(self):
+            return archive_path
+
+        def get_parent(self):
+            # no archive above this fixture, so a sheet of it records none
+            return None
+
+        def is_finished(self):
+            return True
+
+        def get_results_folder_path(self):
+            return tmp_path / "no-results-folder"
+
+        def read_media_metadata(self, filename=None):
+            return MediaArchiveMetadata.read(self, filename=filename)
+
+        @property
+        def num_rows(self):
+            with zipfile.ZipFile(archive_path) as archive:
+                return len(archive.namelist())
+
+        def iterate_items(self, processor=None, staging_area=None, immediately_delete=True, **kwargs):
+            # as DataSet does it: support files are skipped
+            with zipfile.ZipFile(archive_path) as archive:
+                for member in sorted(archive.namelist()):
+                    if is_support_file(member):
+                        continue
+                    archive.extract(member, staging_area)
+                    yield Item(staging_area / member)
+
+    processor = MediaSprite.__new__(MediaSprite)
+    processor.dataset = FakeDataset(tmp_path, name=name or f"sheet-{thumbnails.key}", parent=thumbnails)
+    processor.source_dataset, processor.interrupted = Source(), False
+    processor.parameters = parameters
+    processor.process()
+    return processor.dataset
+
+
+def sheet_pair(tmp_path, name, size=48, rows=9, finished=True):
+    """
+    A thumbnails dataset with a sprite sheet beneath it.
+
+    The map looks for a sheet two levels below the media archive, because
+    thumbnails are a media archive of their own and the sheet is made from them.
+    """
+    sheet = FakeDataset(tmp_path, name=name, dataset_type="media-sprite", rows=rows, finished=finished)
+    thumbnails = FakeDataset(tmp_path, name=f"thumbs-{name}", parameters={"thumbnail_size": size},
+                             children=[sheet])
+    sheet._parent = thumbnails
+    return thumbnails, sheet
+
+
 def test_thumbnails_are_packed_and_keyed_by_filename(tmp_path):
     """
     Keyed by name, not position: a map may cap or filter its items, and
     positional tiles would then line up with the wrong pictures.
     """
-    from processors.visualisation.media_thumbnails import MediaThumbnails
+    from processors.visualisation.media_sprite import MediaSprite
 
-    dataset = make_sprite(tmp_path, ["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"], size=32)
-    assert dataset.error is None and dataset.num_rows == 5
+    thumbnails = make_sprite(tmp_path, ["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"], size=32)
+    assert thumbnails.error is None and thumbnails.num_rows == 5
 
-    sprite = MediaThumbnails.read_sprite(dataset)
+    sprite = MediaSprite.read_sprite(make_sheet(tmp_path, thumbnails))
     assert sprite["tile"] == 32
     assert set(sprite["tiles"]) == {"a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"}
     assert sorted(sprite["tiles"].values()) == [0, 1, 2, 3, 4]
@@ -479,10 +595,10 @@ def test_sprite_sheet_is_a_square_grid_of_square_tiles(tmp_path):
     import base64
     import io
     from PIL import Image
-    from processors.visualisation.media_thumbnails import MediaThumbnails
+    from processors.visualisation.media_sprite import MediaSprite
 
-    dataset = make_sprite(tmp_path, [f"f{i}.jpg" for i in range(7)], size=24, name="grid")
-    sprite = MediaThumbnails.read_sprite(dataset)
+    thumbnails = make_sprite(tmp_path, [f"f{i}.jpg" for i in range(7)], size=24, name="grid")
+    sprite = MediaSprite.read_sprite(make_sheet(tmp_path, thumbnails))
 
     sheet = Image.open(io.BytesIO(base64.b64decode(sprite["uri"].split(",", 1)[1])))
     assert sheet.width == sprite["cols"] * 24
@@ -490,20 +606,27 @@ def test_sprite_sheet_is_a_square_grid_of_square_tiles(tmp_path):
 
 
 def test_read_sprite_rejects_anything_that_is_not_one(tmp_path):
-    from processors.visualisation.media_thumbnails import MediaThumbnails
+    from processors.visualisation.media_sprite import MediaSprite
 
     missing = FakeDataset(tmp_path, name="missing")
-    assert MediaThumbnails.read_sprite(missing) is None
+    assert MediaSprite.read_sprite(missing) is None
 
     not_a_zip = FakeDataset(tmp_path, name="plain")
     not_a_zip.path.write_text("not a zip", encoding="utf-8")
-    assert MediaThumbnails.read_sprite(not_a_zip) is None
+    assert MediaSprite.read_sprite(not_a_zip) is None
 
     import zipfile
     wrong_contents = FakeDataset(tmp_path, name="wrong")
     with zipfile.ZipFile(wrong_contents.path, "w") as handle:
         handle.writestr("something.txt", "x")
-    assert MediaThumbnails.read_sprite(wrong_contents) is None
+    assert MediaSprite.read_sprite(wrong_contents) is None
+
+    # a sheet without a layout in its metadata is no use either
+    no_layout = FakeDataset(tmp_path, name="nolayout")
+    with zipfile.ZipFile(no_layout.path, "w") as handle:
+        handle.writestr("sprite.jpg", b"not really a jpeg")
+        handle.writestr(".metadata.json", '{"schema_version": 1, "items": {}}')
+    assert MediaSprite.read_sprite(no_layout) is None
 
 
 # --------------------------------------------------------------------------- #
@@ -541,11 +664,11 @@ def test_map_finds_sprites_beside_the_embeddings(tmp_path):
     """
     from processors.visualisation.embedding_map import EmbeddingMap
 
-    sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 48}, rows=120)
-    unfinished = FakeDataset(tmp_path, name="sprite2", parameters={"thumbnail_size": 96}, finished=False)
+    thumbnails, _ = sheet_pair(tmp_path, "sprite1", size=48, rows=120)
+    unfinished, _ = sheet_pair(tmp_path, "sprite2", size=96, finished=False)
     unrelated = FakeDataset(tmp_path, name="other", dataset_type="image-embeddings")
     archive = FakeDataset(tmp_path, name="archive", dataset_type="video-downloader",
-                          children=[sprite, unfinished, unrelated])
+                          children=[thumbnails, unfinished, unrelated])
     embeddings = FakeDataset(tmp_path, name="emb", dataset_type="video-embeddings", parent=archive)
     reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=embeddings)
 
@@ -558,8 +681,8 @@ def test_map_finds_sprites_beside_the_embeddings(tmp_path):
 def test_map_offers_no_sprites_for_non_media(tmp_path, dataset_type):
     from processors.visualisation.embedding_map import EmbeddingMap
 
-    sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 48}, rows=5)
-    archive = FakeDataset(tmp_path, name="archive", children=[sprite])
+    thumbnails, _ = sheet_pair(tmp_path, "sprite1", size=48, rows=5)
+    archive = FakeDataset(tmp_path, name="archive", children=[thumbnails])
     parent = FakeDataset(tmp_path, name="p", dataset_type=dataset_type, parent=archive)
     reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=parent)
 
@@ -570,8 +693,8 @@ def test_map_offers_no_sprites_for_non_media(tmp_path, dataset_type):
 def test_map_option_is_a_picker_when_sprites_exist(tmp_path):
     from processors.visualisation.embedding_map import EmbeddingMap
 
-    sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 48}, rows=9)
-    archive = FakeDataset(tmp_path, name="archive", children=[sprite])
+    thumbnails, _ = sheet_pair(tmp_path, "sprite1", size=48, rows=9)
+    archive = FakeDataset(tmp_path, name="archive", children=[thumbnails])
     embeddings = FakeDataset(tmp_path, name="emb", dataset_type="image-embeddings", parent=archive)
     reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=embeddings)
 
@@ -619,7 +742,8 @@ def map_reading_sprite(tmp_path, sprite_dataset, key="sprite"):
 def test_sprite_tiles_line_up_with_the_points(tmp_path, monkeypatch):
     from processors.visualisation import embedding_map as module
 
-    sprite_dataset = make_sprite(tmp_path, ["a.jpg", "b.jpg", "c.jpg"], size=16, name="line")
+    sprite_dataset = make_sheet(tmp_path, make_sprite(tmp_path, ["a.jpg", "b.jpg", "c.jpg"],
+                                                      size=16, name="line"))
     monkeypatch.setattr(module, "DataSet", lambda **kwargs: sprite_dataset)
 
     processor = map_reading_sprite(tmp_path, sprite_dataset)
@@ -643,7 +767,7 @@ def test_sprite_with_no_matching_items_falls_back_to_dots(tmp_path, monkeypatch)
     """The sheet may have been made from different media entirely."""
     from processors.visualisation import embedding_map as module
 
-    sprite_dataset = make_sprite(tmp_path, ["a.jpg"], size=16, name="mismatch")
+    sprite_dataset = make_sheet(tmp_path, make_sprite(tmp_path, ["a.jpg"], size=16, name="mismatch"))
     monkeypatch.setattr(module, "DataSet", lambda **kwargs: sprite_dataset)
 
     processor = map_reading_sprite(tmp_path, sprite_dataset)
@@ -654,31 +778,283 @@ def test_sprite_with_no_matching_items_falls_back_to_dots(tmp_path, monkeypatch)
 # --------------------------------------------------------------------------- #
 # individual thumbnails, so anything can use them - not just a tile blitter
 
-def test_each_thumbnail_is_also_saved_on_its_own(tmp_path):
+def test_the_thumbnail_archive_carries_its_own_metadata(tmp_path):
+    """
+    A processor producing a media archive writes the metadata for what it
+    produced, so that a consumer can get from a thumbnail back to its posts
+    without walking up the tree to the archive it came from.
+    """
+    import json
     import zipfile
-    from processors.visualisation.media_thumbnails import MediaThumbnails
 
-    dataset = make_sprite(tmp_path, ["a.jpg", "b.jpg", "c.jpg"], size=32, name="single")
+    dataset = make_sprite(tmp_path, ["a.jpg", "b.jpg"], size=24, name="withmeta",
+                          posts=[{"id": "p1", "file": "a.jpg"}, {"id": "p2", "file": "b.jpg"}])
+
     with zipfile.ZipFile(dataset.get_results_path()) as archive:
+        assert ".metadata.json" in archive.namelist()
+        raw = json.loads(archive.read(".metadata.json"))
+
+    assert raw["schema_version"] == 1
+    assert raw["processor_type"] == "media-thumbnails"
+    # a legacy source archive carries no from_dataset of its own, so this has
+    # to fall through to the archive that was read rather than staying None
+    assert raw["from_dataset"] == "sourcekey"
+
+    # keyed by the path inside this archive, with the file it came from recorded
+    items = raw["items"]
+    assert set(items) == {"thumbnails/a.jpg", "thumbnails/b.jpg"}, set(items)
+    by_source = {entry["extra"]["source_filename"]: entry for entry in items.values()}
+    assert by_source["a.jpg"]["post_ids"] == ["p1"]
+    assert by_source["b.jpg"]["post_ids"] == ["p2"]
+
+
+def test_a_file_that_yields_no_thumbnail_is_recorded_as_a_failure(tmp_path):
+    """Its posts stay traceable even though no thumbnail came out of it."""
+    import json
+    import zipfile
+
+    dataset = make_sprite(tmp_path, ["a.jpg", "b.jpg"], size=24, name="withfailure",
+                          posts=[{"id": "p1", "file": "a.jpg"}, {"id": "p2", "file": "b.jpg"},
+                                 {"id": "p3", "file": "broken.jpg"}])
+
+    # a file the metadata knows about, which Pillow cannot read
+    with zipfile.ZipFile(dataset.get_results_path()) as archive:
+        raw = json.loads(archive.read(".metadata.json"))
+
+    # only the two real images became items
+    assert len(raw["items"]) == 2
+    # the third post is not silently dropped: it has no thumbnail, and no
+    # failure either, because no such file was in the archive to try
+    assert all(entry["post_ids"] != ["p3"] for entry in raw["items"].values())
+
+
+def test_the_thumbnail_archive_holds_nothing_but_thumbnails(tmp_path):
+    """
+    The point of keeping the sheet out of it: anything that consumes a media
+    archive can consume this one, and would otherwise be handed the sheet as
+    though it were one more picture.
+    """
+    import zipfile
+    from processors.visualisation.media_sprite import MediaSprite
+
+    thumbnails = make_sprite(tmp_path, ["a.jpg", "b.jpg", "c.jpg"], size=32, name="single")
+    with zipfile.ZipFile(thumbnails.get_results_path()) as archive:
         members = archive.namelist()
 
-    assert "sprite.jpg" in members and "index.json" in members
-    assert len([m for m in members if m.startswith("thumbnails/")]) == 3
+    assert "sprite.jpg" not in members and "index.json" not in members
+    assert sorted(members) == [".metadata.json", "thumbnails/a.jpg", "thumbnails/b.jpg", "thumbnails/c.jpg"]
 
-    sprite = MediaThumbnails.read_sprite(dataset)
+    # the sheet names the thumbnails it packed, by the media they came from
+    sprite = MediaSprite.read_sprite(make_sheet(tmp_path, thumbnails))
     assert set(sprite["files"]) == {"a.jpg", "b.jpg", "c.jpg"}
+
+
+def make_picture_archive(tmp_path, members, name="pics", metadata=None):
+    """
+    An archive of pictures at chosen sizes, as a frame processor leaves one.
+
+    :param dict members:  `{path inside the archive: (width, height)}`
+    :param dict metadata:  Raw `.metadata.json` content, or None for the
+      video-keyed copy a frame processor makes
+    """
+    import io
+    import json
+    import zipfile
+    from PIL import Image
+
+    path = tmp_path / f"{name}.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        for member, (width, height) in members.items():
+            buffer = io.BytesIO()
+            Image.new("RGB", (width, height), (width % 255, 80, 160)).save(buffer, "JPEG")
+            archive.writestr(member, buffer.getvalue())
+
+        archive.writestr(".metadata.json", json.dumps(metadata if metadata is not None else {
+            "https://example.org/clip.mp4": {"success": True, "post_ids": ["p1"],
+                                             "files": [{"filename": "clip.mp4", "success": True}]},
+        }))
+
+    return path
+
+
+def pack_sheet(tmp_path, archive_path, key="sourcekey", parent_key=None, name="packed", **parameters):
+    """Run the sprite processor over an arbitrary picture archive."""
+    import zipfile
+    from common.lib.archive_metadata import MediaArchiveMetadata, is_support_file
+    from processors.visualisation.media_sprite import MediaSprite
+
+    class Item:
+        def __init__(self, file):
+            self.file = file
+
+    class Source:
+        type = "video-frames"
+
+        def __init__(self):
+            self.key = key
+
+        def get_results_path(self):
+            return archive_path
+
+        def is_finished(self):
+            return True
+
+        def get_results_folder_path(self):
+            return tmp_path / "no-results-folder"
+
+        def read_media_metadata(self, filename=None):
+            return MediaArchiveMetadata.read(self, filename=filename)
+
+        @property
+        def num_rows(self):
+            with zipfile.ZipFile(archive_path) as handle:
+                return len(handle.namelist())
+
+        def iterate_items(self, processor=None, staging_area=None, immediately_delete=True, **kwargs):
+            with zipfile.ZipFile(archive_path) as handle:
+                for member in sorted(handle.namelist()):
+                    if is_support_file(member):
+                        continue
+                    handle.extract(member, staging_area)
+                    yield Item(staging_area / member)
+
+        def get_parent(self):
+            if not parent_key:
+                return None
+
+            class Parent:
+                pass
+
+            parent = Parent()
+            parent.key = parent_key
+            return parent
+
+    processor = MediaSprite.__new__(MediaSprite)
+    processor.dataset = FakeDataset(tmp_path, name=name)
+    processor.source_dataset, processor.interrupted = Source(), False
+    processor.parameters = {"tile_size": 48, **parameters}
+    processor.process()
+    return processor.dataset
+
+
+def test_a_sheet_can_be_packed_from_video_frames(tmp_path):
+    """
+    Frames are embedded as themselves, so a plot of them knows them by their
+    own names - unlike thumbnails, which stand in for the media above them.
+    """
+    from processors.visualisation.media_sprite import MediaSprite
+
+    archive = make_picture_archive(tmp_path, {
+        "clip1/clip1_scene_1.jpeg": (320, 240),
+        "clip1/clip1_scene_2.jpeg": (320, 240),
+        "clip2/clip2_scene_1.jpeg": (320, 240),
+    }, name="scenes")
+
+    dataset = pack_sheet(tmp_path, archive, key="sceneskey", parent_key="videoskey", name="scenesheet")
+    assert dataset.error is None, dataset.error
+
+    sprite = MediaSprite.read_sprite(dataset)
+    assert set(sprite["tiles"]) == {"clip1_scene_1.jpeg", "clip1_scene_2.jpeg", "clip2_scene_1.jpeg"}
+    # the member path is kept, so a link can reach the file in its folder
+    assert sprite["files"]["clip2_scene_1.jpeg"] == "clip2/clip2_scene_1.jpeg"
+    # named after themselves, so the link points into the frames archive
+    assert sprite["linked"] == "sceneskey"
+
+
+def test_a_thumbnail_sheet_links_one_level_further_up(tmp_path):
+    """Its tiles are named after the media, which lives above the thumbnails."""
+    from common.lib.archive_metadata import MediaArchiveMetadata
+    from processors.visualisation.media_sprite import MediaSprite
+
+    metadata = MediaArchiveMetadata.new(processor_type="media-thumbnails", from_dataset="postskey")
+    metadata.add_item("thumbnails/a.jpg", post_ids=["p1"], extra={"source_filename": "a.mp4"})
+    archive = make_picture_archive(tmp_path, {"thumbnails/a.jpg": (48, 48)},
+                                   name="thumbs", metadata=metadata.to_dict())
+
+    dataset = pack_sheet(tmp_path, archive, key="thumbskey", parent_key="mediakey", name="thumbsheet")
+    sprite = MediaSprite.read_sprite(dataset)
+
+    assert set(sprite["tiles"]) == {"a.mp4"}
+    assert sprite["linked"] == "mediakey"
+
+
+def test_frames_with_repeating_names_are_left_out_and_reported(tmp_path):
+    """
+    The frame processor numbers frames per video, so every video has a
+    video_frame_0000001.jpeg. A plot looks a tile up by name, so keeping one of
+    them would draw the wrong picture for the others.
+    """
+    archive = make_picture_archive(tmp_path, {
+        "clip1/video_frame_0000001.jpeg": (640, 480),
+        "clip1/video_frame_0000002.jpeg": (640, 480),
+        "clip2/video_frame_0000001.jpeg": (640, 480),
+    }, name="numbered")
+
+    dataset = pack_sheet(tmp_path, archive, name="numberedsheet")
+    assert dataset.num_rows == 2
+    # the user is told rather than quietly given a sheet with the wrong
+    # picture in it; the wording is free to change, the fact is not
+    assert dataset.warning and "left out" in dataset.warning
+
+
+def test_tiles_are_reduced_but_never_enlarged(tmp_path):
+    from processors.visualisation.media_sprite import MediaSprite
+
+    big = make_picture_archive(tmp_path, {"a/one.jpeg": (640, 480), "a/two.jpeg": (640, 480)}, name="big")
+    reduced = MediaSprite.read_sprite(pack_sheet(tmp_path, big, name="bigsheet", tile_size=48))
+    assert reduced["tile"] == 48
+
+    small = make_picture_archive(tmp_path, {"a/one.jpeg": (20, 20), "a/two.jpeg": (20, 20)}, name="small")
+    dataset = pack_sheet(tmp_path, small, name="smallsheet", tile_size=48)
+    assert MediaSprite.read_sprite(dataset)["tile"] == 20
+    assert any("rather than 48px" in line for line in dataset.logs)
+
+
+def test_sheets_are_found_under_frames_as_well_as_thumbnails(tmp_path):
+    """
+    Discovery lives with the sheet, so a plot does not need a branch per way of
+    making one.
+    """
+    from processors.visualisation.media_sprite import MediaSprite
+
+    sheet = FakeDataset(tmp_path, name="framesheet", dataset_type="media-sprite",
+                        parameters={"tile_size": 64}, rows=7)
+    frames = FakeDataset(tmp_path, name="frames", dataset_type="video-scene-frames", children=[sheet])
+    archive = FakeDataset(tmp_path, name="archive", dataset_type="video-downloader", children=[frames])
+    embeddings = FakeDataset(tmp_path, name="emb", dataset_type="image-embeddings", parent=archive)
+
+    found = MediaSprite.find_for(embeddings)
+    assert list(found) == ["framesheet"]
+    # the sheet's own tile size, since frames have no thumbnail_size
+    assert "64px" in found["framesheet"] and "7" in found["framesheet"]
+
+
+def test_discovery_needs_a_dataset_to_start_from():
+    from processors.visualisation.media_sprite import MediaSprite
+
+    assert MediaSprite.find_for(None) == {}
+
+
+def test_the_sheet_archive_holds_only_the_sheet(tmp_path):
+    """Its layout rides in the metadata, which is a support file."""
+    import zipfile
+
+    sheet = make_sheet(tmp_path, make_sprite(tmp_path, ["a.jpg", "b.jpg"], size=24, name="sheetonly"))
+    with zipfile.ZipFile(sheet.get_results_path()) as archive:
+        assert sorted(archive.namelist()) == [".metadata.json", "sprite.jpg"]
 
 
 def test_individual_thumbnails_are_real_images(tmp_path):
     import io
     import zipfile
     from PIL import Image
-    from processors.visualisation.media_thumbnails import MediaThumbnails
+    from processors.visualisation.media_sprite import MediaSprite
 
-    dataset = make_sprite(tmp_path, ["a.jpg", "b.jpg"], size=24, name="real")
-    sprite = MediaThumbnails.read_sprite(dataset)
+    thumbnails = make_sprite(tmp_path, ["a.jpg", "b.jpg"], size=24, name="real")
+    sprite = MediaSprite.read_sprite(make_sheet(tmp_path, thumbnails))
 
-    with zipfile.ZipFile(dataset.get_results_path()) as archive:
+    # the sheet points at members of the thumbnail archive, not of its own
+    with zipfile.ZipFile(thumbnails.get_results_path()) as archive:
         for member in sprite["files"].values():
             image = Image.open(io.BytesIO(archive.read(member)))
             assert image.format == "JPEG" and image.size == (24, 24)
@@ -706,7 +1082,7 @@ def test_thumbnails_only_for_posts_at_or_above_threshold(tmp_path):
     all, since anything in it can be pulled out of a map that embeds it.
     """
     import zipfile
-    from processors.visualisation.media_thumbnails import MediaThumbnails
+    from processors.visualisation.media_sprite import MediaSprite
 
     posts = [
         {"id": "1", "likes": "5000", "file": "popular.jpg"},
@@ -720,7 +1096,7 @@ def test_thumbnails_only_for_posts_at_or_above_threshold(tmp_path):
                           parameters={"min_column": "likes", "min_value": 1000.0})
 
     assert dataset.error is None and dataset.num_rows == 2
-    sprite = MediaThumbnails.read_sprite(dataset)
+    sprite = MediaSprite.read_sprite(make_sheet(tmp_path, dataset))
     assert set(sprite["tiles"]) == {"popular.jpg", "exactly.jpg"}
 
     with zipfile.ZipFile(dataset.get_results_path()) as archive:
@@ -780,7 +1156,7 @@ def test_only_items_with_a_tile_get_a_link(tmp_path, monkeypatch):
     """A click should never open something the map is not showing."""
     from processors.visualisation import embedding_map as module
 
-    sprite_dataset = make_sprite(tmp_path, ["a.jpg"], size=16, name="linked")
+    sprite_dataset = make_sheet(tmp_path, make_sprite(tmp_path, ["a.jpg"], size=16, name="linked"))
     monkeypatch.setattr(module, "DataSet", lambda **kwargs: sprite_dataset)
 
     processor = map_reading_sprite(tmp_path, sprite_dataset)
@@ -1281,8 +1657,8 @@ def test_plots_look_past_the_clustering_for_thumbnails(tmp_path):
     """Thumbnails and media links hang off the archive, above the clustering."""
     from processors.visualisation.embedding_map import EmbeddingMap
 
-    sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 48}, rows=5)
-    archive = FakeDataset(tmp_path, name="archive", children=[sprite])
+    thumbnails, _ = sheet_pair(tmp_path, "sprite1", size=48, rows=5)
+    archive = FakeDataset(tmp_path, name="archive", children=[thumbnails])
     embeddings = FakeDataset(tmp_path, name="emb", dataset_type="image-embeddings", parent=archive)
     clustered = FakeDataset(tmp_path, name="clu", dataset_type="cluster-embeddings", parent=embeddings)
     reduced = FakeDataset(tmp_path, name="red", dataset_type="reduce-embeddings", parent=clustered)
@@ -2066,11 +2442,11 @@ def test_sprites_are_found_above_the_immediate_parent(tmp_path):
     """
     from processors.visualisation.embedding_map import EmbeddingMap
 
-    sprite = FakeDataset(tmp_path, name="sprite1", parameters={"thumbnail_size": 40}, rows=3)
+    thumbnails, _ = sheet_pair(tmp_path, "sprite1", size=40, rows=3)
     videos = FakeDataset(tmp_path, name="videos", dataset_type="video-downloader")
     audio = FakeDataset(tmp_path, name="audio", dataset_type="audio-extractor", parent=videos)
     embeddings = FakeDataset(tmp_path, name="emb", dataset_type="audio-embeddings", parent=audio)
-    videos._children = [sprite, audio]
+    videos._children = [thumbnails, audio]
     audio._children = [embeddings]
 
     assert list(EmbeddingMap.find_sprite_datasets(embeddings)) == ["sprite1"]
@@ -2080,13 +2456,13 @@ def test_the_nearest_ancestor_with_sheets_wins(tmp_path):
     """Looking further up would offer media these items did not come from."""
     from processors.visualisation.embedding_map import EmbeddingMap
 
-    far = FakeDataset(tmp_path, name="far-sprite", parameters={"thumbnail_size": 99}, rows=1)
+    far_thumbnails, _ = sheet_pair(tmp_path, "far-sprite", size=99, rows=1)
+    near_thumbnails, _ = sheet_pair(tmp_path, "near-sprite", size=40, rows=3)
     grandparent = FakeDataset(tmp_path, name="gp", dataset_type="video-downloader")
-    near = FakeDataset(tmp_path, name="near-sprite", parameters={"thumbnail_size": 40}, rows=3)
     parent = FakeDataset(tmp_path, name="p", dataset_type="audio-extractor", parent=grandparent)
     embeddings = FakeDataset(tmp_path, name="emb", dataset_type="audio-embeddings", parent=parent)
-    grandparent._children = [far, parent]
-    parent._children = [near, embeddings]
+    grandparent._children = [far_thumbnails, parent]
+    parent._children = [near_thumbnails, embeddings]
 
     assert list(EmbeddingMap.find_sprite_datasets(embeddings)) == ["near-sprite"]
 
@@ -2139,9 +2515,9 @@ class ClusterSource:
 
 def run_profile(tmp_path, clustered, posts, between=(), **parameters):
     """Describe the given clusters; return the processor."""
-    from processors.metrics.cluster_attributes import ClusterProfile
+    from processors.metrics.cluster_attributes import ClusterAttributes
 
-    processor = ClusterProfile.__new__(ClusterProfile)
+    processor = ClusterAttributes.__new__(ClusterAttributes)
     processor.parameters = {"columns": ["tag"], "top_values": 5, "split_values": True, **parameters}
     processor.dataset = FakeDataset(tmp_path, name="profile")
     processor.dataset.path = tmp_path / "profile.ndjson"
@@ -2193,7 +2569,7 @@ def test_the_baseline_row_covers_the_whole_dataset(tmp_path):
 
 def test_the_baseline_row_has_no_concentration(tmp_path):
     from common.lib.item_mapping import MissingMappedField
-    from processors.metrics.cluster_attributes import ClusterProfile
+    from processors.metrics.cluster_attributes import ClusterAttributes
 
     posts, clustered = tagged(4, "sport")
     for item in clustered:
@@ -2203,7 +2579,7 @@ def test_the_baseline_row_has_no_concentration(tmp_path):
     assert profile[0]["concentration"] == 0.8
     # the whole dataset is not one cluster, so it has nothing to report
     assert "concentration" not in profile["all"]
-    assert isinstance(ClusterProfile.map_item(profile["all"]).data["concentration"], MissingMappedField)
+    assert isinstance(ClusterAttributes.map_item(profile["all"]).data["concentration"], MissingMappedField)
 
 
 def test_membership_is_carried_over_as_a_median(tmp_path):
@@ -2306,22 +2682,22 @@ def test_columns_can_also_be_given_as_text(tmp_path):
 
 def test_the_column_option_is_filled_from_the_original_dataset():
     from common.lib.user_input import UserInput
-    from processors.metrics.cluster_attributes import ClusterProfile
+    from processors.metrics.cluster_attributes import ClusterAttributes
 
     posts = PostDataset([Item({"id": "1", "tag": "a", "author": "x"})])
-    option = ClusterProfile.get_options(parent_dataset=ClusterSource([], posts))["columns"]
+    option = ClusterAttributes.get_options(parent_dataset=ClusterSource([], posts))["columns"]
 
     assert option["type"] == UserInput.OPTION_MULTI
     assert option["inline"] is True
     assert set(option["options"]) == {"id", "tag", "author"}
 
     # nothing to read the columns from: a comma-separated field instead
-    assert ClusterProfile.get_options()["columns"]["type"] == UserInput.OPTION_TEXT
+    assert ClusterAttributes.get_options()["columns"]["type"] == UserInput.OPTION_TEXT
 
 
 def test_every_row_downloads_with_the_same_columns(tmp_path):
     """A ragged CSV would lose columns for whichever row is written first."""
-    from processors.metrics.cluster_attributes import ClusterProfile
+    from processors.metrics.cluster_attributes import ClusterAttributes
 
     posts_a, clustered_a = tagged(4, "sport", cluster=0)
     posts_b, clustered_b = tagged(2, "cooking", start=100, cluster=1)
@@ -2329,7 +2705,7 @@ def test_every_row_downloads_with_the_same_columns(tmp_path):
 
     profile = read_profile(run_profile(tmp_path, clustered_a + clustered_b, posts_a + posts_b,
                                        columns=["tag"]))
-    rows = [ClusterProfile.map_item(record).get_item_data() for record in profile.values()]
+    rows = [ClusterAttributes.map_item(record).get_item_data() for record in profile.values()]
 
     assert len({tuple(row) for row in rows}) == 1
     assert "top_tag" in rows[0]
@@ -2337,11 +2713,11 @@ def test_every_row_downloads_with_the_same_columns(tmp_path):
 
 
 def test_the_counted_values_read_as_shares(tmp_path):
-    from processors.metrics.cluster_attributes import ClusterProfile
+    from processors.metrics.cluster_attributes import ClusterAttributes
 
     posts = [Item({"id": "1", "tag": "a"}), Item({"id": "2", "tag": "a"}),
              Item({"id": "3", "tag": "b"}), Item({"id": "4", "tag": "b"})]
     clustered = [Item({"id": str(index), "cluster": 0}) for index in range(1, 5)]
 
     record = read_profile(run_profile(tmp_path, clustered, posts))[0]
-    assert ClusterProfile.map_item(record).get_item_data()["top_tag"] == "a (50%), b (50%)"
+    assert ClusterAttributes.map_item(record).get_item_data()["top_tag"] == "a (50%), b (50%)"

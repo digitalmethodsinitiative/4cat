@@ -1,10 +1,7 @@
 """
-Reduce every media file in a dataset to a thumbnail. Also make a sprite sheet.
+Reduce every media file in a dataset to a thumbnail.
 """
-import base64
 import io
-import json
-import math
 import shutil
 import zipfile
 
@@ -13,6 +10,7 @@ from pathlib import Path
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import is_support_file
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import DataSetException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -26,28 +24,31 @@ __email__ = "4cat@oilab.eu"
 # Files a thumbnail is decoded from with ffmpeg rather than opened with Pillow
 VIDEO_SUFFIXES = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v", ".mpg", ".mpeg"}
 
-# Name of sprite and lookup files
-SPRITE_NAME = "sprite.jpg"
-INDEX_NAME = "index.json"
-
 # Folder with thumbs
 THUMBNAIL_FOLDER = "thumbnails"
 
 
 class MediaThumbnails(BasicProcessor):
     """
-    Turn a collection of images or videos into thumbnails and a sprite sheet of thumbnails.
+    Turn a collection of images or videos into thumbnails.
+
+    The archive holds nothing but the thumbnails and the metadata describing
+    them, so that anything which consumes a media archive can consume this one.
+    Packing them into a sprite sheet is a separate step, `media-sprite`.
     """
     type = "media-thumbnails"  # job type ID
     category = "Visual"  # category
     title = "Generate thumbnails"  # title displayed in UI
-    description = ("Reduce every image or video frame to a small square thumbnail. Thumbnails are saved "
-                   "as separate files as well as a single image (a sprite sheet).")
+    description = ("Reduce every image or video frame to a small square thumbnail, each saved as its own file.")
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "image"  # media type of the dataset
 
+    # also allow video, which is a bit odd perhaps, but sometimes you just want the thumbnails in post-processors
+    # and don't want to also download images, which takes longer.
     compatibility = Compatibility(
         media_types={"image", "video"},
         type_prefixes={"image-downloader", "video-downloader"},
+        preferred_followups=["media-sprite", "image-embeddings"],
     )
 
     @classmethod
@@ -105,7 +106,7 @@ class MediaThumbnails(BasicProcessor):
 
     def process(self):
         """
-        Make a thumbnail per file and write to sprite sheet.
+        Make a thumbnail per file and write them all to one archive.
         """
         size = self.parameters.get("thumbnail_size", 48)
         limit = self.parameters.get("amount", 0)
@@ -125,8 +126,20 @@ class MediaThumbnails(BasicProcessor):
         ffprobe = shutil.which("ffprobe".join(ffmpeg.rsplit("ffmpeg", 1))) if ffmpeg else None
 
         staging_area = self.dataset.get_staging_area()
+
+        source_metadata = self.get_media_metadata()
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type,
+            from_dataset=((source_metadata.from_dataset if source_metadata else None)
+                          or self.source_dataset.key),
+        )
+
+        def provenance(source_name):
+            """The post IDs and URL the media file with this name came from."""
+            entry = source_metadata.get_entry(source_name) if source_metadata else None
+            return (entry.get("post_ids", []) if entry else []), (entry.get("url") if entry else None)
+
         thumbnails = []
-        index = {}
         processed = 0
         skipped = 0
         below_threshold = 0
@@ -141,8 +154,7 @@ class MediaThumbnails(BasicProcessor):
                 break
 
             media_path = item.file if hasattr(item, "file") else None
-            if not media_path or media_path.name == ".metadata.json":
-                # the archive carries its metadata alongside the media files
+            if not media_path:
                 continue
 
             if allowed is not None and media_path.stem not in allowed:
@@ -159,8 +171,14 @@ class MediaThumbnails(BasicProcessor):
             if is_video and not ffmpeg:
                 needed_ffmpeg += 1
                 skipped += 1
+                post_ids, url = provenance(media_path.name)
+                metadata.add_failure(post_ids=post_ids, url=url, reason="ffmpeg_unavailable",
+                                     reason_description="a video needs ffmpeg to take a frame from, and ffmpeg is "
+                                                        "not available",
+                                     extra={"source_filename": media_path.name})
                 continue
 
+            reason_description = "the file could not be read as an image or video"
             try:
                 thumbnail = self.make_thumbnail(media_path, size, is_video, ffmpeg, ffprobe)
             except ProcessorInterruptedException:
@@ -168,37 +186,24 @@ class MediaThumbnails(BasicProcessor):
             except Exception as e:
                 self.dataset.log(f"Skipping {media_path.name}: {e}")
                 thumbnail = None
+                reason_description = str(e)
 
             if thumbnail is None:
                 skipped += 1
+                post_ids, url = provenance(media_path.name)
+                metadata.add_failure(post_ids=post_ids, url=url, reason="thumbnail_failed",
+                                     reason_description=reason_description,
+                                     extra={"source_filename": media_path.name})
                 continue
 
-            index[media_path.name] = len(thumbnails)
             thumbnails.append((media_path.name, thumbnail))
 
         if not thumbnails:
             self.dataset.finish_with_error("None of the media files could be read, so there is nothing to show.")
             return
 
-        self.dataset.update_status(f"Merging {len(thumbnails):,} thumbnails into a sprite sheet")
-        columns = math.ceil(math.sqrt(len(thumbnails)))
-        rows = math.ceil(len(thumbnails) / columns)
-        sheet = Image.new("RGB", (columns * size, rows * size), (255, 255, 255))
-        for position, (_, thumbnail) in enumerate(thumbnails):
-            sheet.paste(thumbnail, ((position % columns) * size, (position // columns) * size))
-
-        buffer = io.BytesIO()
-        sheet.save(buffer, "JPEG", quality=70, optimize=True)
-
-        # one archive holding the sheet and the lookup: keyed by filename rather
-        # than position, so a processor that reads this can filter or reorder its
-        # own items without the tiles going out of step
+        self.dataset.update_status(f"Writing {len(thumbnails):,} thumbnails")
         with zipfile.ZipFile(self.dataset.get_results_path(), "w", zipfile.ZIP_DEFLATED) as archive:
-            archive.writestr(SPRITE_NAME, buffer.getvalue())
-
-            # each thumbnail on its own as well: a sprite sheet is only useful to
-            # something that can blit tiles, while a plain file is useful to
-            # anything
             files = {}
             for source_name, thumbnail in thumbnails:
                 member = f"{THUMBNAIL_FOLDER}/{self.thumbnail_name(source_name, files)}"
@@ -207,16 +212,19 @@ class MediaThumbnails(BasicProcessor):
                 archive.writestr(member, single.getvalue())
                 files[source_name] = member
 
-            archive.writestr(INDEX_NAME, json.dumps({
-                "tile_size": size,
-                "columns": columns,
-                "rows": rows,
-                "count": len(thumbnails),
-                "tiles": index,
-                "files": files,
-            }))
+                # keyed by the path inside this archive, as the schema expects.
+                # `source_filename` is what a sprite sheet made from this
+                # archive keys its tiles by, so it has to be recorded here
+                post_ids, url = provenance(source_name)
+                metadata.add_item(member, post_ids=post_ids, url=url,
+                                  extra={"source_filename": source_name})
 
-        status = f"Extracted {len(thumbnails):,} thumbnails at {size}px into a {columns}x{rows} sprite sheet"
+            # written to the staging area first, so that it is validated and
+            # fully on disk before it goes into the archive
+            metadata_file = metadata.write(staging_area)
+            archive.write(metadata_file, metadata_file.name)
+
+        status = f"Extracted {len(thumbnails):,} thumbnails at {size}px"
         if below_threshold:
             status += f", left out {below_threshold:,} files from posts with '{min_column}' below {min_value:g}"
         if needed_ffmpeg:
@@ -288,7 +296,7 @@ class MediaThumbnails(BasicProcessor):
         # the metadata also lists files that failed to download; only count
         # what is actually there, so progress adds up
         with zipfile.ZipFile(archive_path) as archive:
-            present = {Path(name).stem for name in archive.namelist() if name != ".metadata.json"}
+            present = {Path(name).stem for name in archive.namelist() if not is_support_file(name)}
 
         return {stem for stem, post_ids in post_id_map.items()
                 if stem in present and any(str(post_id) in passing for post_id in post_ids)}
@@ -359,39 +367,3 @@ class MediaThumbnails(BasicProcessor):
             return None
 
         return frame_path
-
-    @staticmethod
-    def read_sprite(dataset) -> dict | None:
-        """
-        Read a sprite sheet written by this processor.
-
-        Lives here rather than in the processors that use the thumbnail sprites to keep things central (e.g., embedding
-        map).
-
-        :param DataSet dataset:  A finished `media-thumbnails` dataset
-        :return dict|None:  `{uri, tile, cols, tiles, files}` where `tiles` maps
-          a source filename to its tile index and `files` to the individual
-          thumbnail inside this archive, or `None` if the archive is unusable.
-        """
-        path = dataset.get_results_path()
-        if not path.exists() or not zipfile.is_zipfile(path):
-            return None
-
-        try:
-            with zipfile.ZipFile(path) as archive:
-                names = archive.namelist()
-                if SPRITE_NAME not in names or INDEX_NAME not in names:
-                    return None
-
-                index = json.loads(archive.read(INDEX_NAME))
-                sprite = archive.read(SPRITE_NAME)
-        except (zipfile.BadZipFile, json.JSONDecodeError, KeyError, OSError):
-            return None
-
-        return {
-            "uri": "data:image/jpeg;base64," + base64.b64encode(sprite).decode("utf-8"),
-            "tile": index.get("tile_size"),
-            "cols": index.get("columns"),
-            "tiles": index.get("tiles", {}),
-            "files": index.get("files", {}),
-        }
