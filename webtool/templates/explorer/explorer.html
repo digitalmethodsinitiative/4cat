@@ -7,6 +7,8 @@
 
 <!-- standard CSS for item annotations -->
 <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer-annotation-generic.css')}}">
+<!-- standard CSS for the note on posts whose media was not downloaded -->
+<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer-media-placeholder.css')}}">
 
 <!-- Custom JavaScript for Explorer-specific functions -->
 <script type="module" src="{{url_for('static', filename='js/explorer.js')}}"></script>
@@ -19,7 +21,7 @@ let annotation_fields = {{ annotation_fields | tojson | safe }}
 
 // We're getting the dataset column names to make sure that
 // new annotation fields cannot overwrite these.
-let original_columns = {{ dataset.get_columns() | safe }}
+let original_columns = {{ dataset.get_columns() | tojson }}
 for (const a in annotation_fields) {
 	let annotation_label = annotation_fields[a]["label"]
 	if (original_columns.includes(annotation_label)) {

@@ -7,7 +7,7 @@
 		<div class="metadata">
 		{% if not pseudonymised %}
 			<!-- Possible external link, if not pseudonymised -->
-			<a href="{{ item.item_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
+			<a href="{{ item.item_url | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 			
 			<!-- Profile pic -->
 			{% if item["author_avatar_url"] %}

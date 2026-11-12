@@ -3,7 +3,7 @@
 		<div class="profile-picture">
             {% if item.replied_to_item %}
                 {% if not pseudonymised %}
-                    <a href="{{ item.replied_to_item }}" target="_blank">
+                    <a href="{{ item.replied_to_item | web_url }}" target="_blank">
                 {% endif %}
                     <div class="reply-to"></div>
                 {% if not pseudonymised %}
@@ -37,7 +37,7 @@
 			{% if media_url %}
 			<div class="media-container">
 				{% for url in media_url.split(",") %}
-					<a href="{{ url }}" target="_blank"><img src="{{ url }}"></a>
+					<a href="{{ url | web_url }}" target="_blank"><img src="{{ url }}"></a>
 				{% endfor %}
 			</div>
 			{% endif %}
@@ -68,7 +68,7 @@
 				{% if media_url %}
 				<div class="media-container">
 					{% for url in media_url.split(",") %}
-						<a href="{{ url }}" target="_blank"><img src="{{ url }}"></a>
+						<a href="{{ url | web_url }}" target="_blank"><img src="{{ url }}"></a>
 					{% endfor %}
 				</div>
 				{% endif %}
@@ -79,7 +79,7 @@
 				<span class="quote"><i class="fa-solid fa-retweet"></i> {{ item.get("quote_count") }}</span>
 				<span class="likes"><i class="fa-solid fa-heart"></i> {{ item.get("like_count") | numberify }}</span>
 				{% if not pseudonymised %}
-				<span class="external-url" title="Go to original item"><a href="{{ item.link }}" target="_blank"><i class="fas fa-external-link-alt"></i></a></span>
+				<span class="external-url" title="Go to original item"><a href="{{ item.link | web_url }}" target="_blank"><i class="fas fa-external-link-alt"></i></a></span>
 				{% endif %}
 			</div>
 		</div>

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from backend.lib.search import Search
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.lib.helpers import normalize_url_encoding
+from common.lib.helpers import readable_url
 
 
 def defined(data, key, default=None):
@@ -169,7 +169,7 @@ class SearchDouyin(Search):
                     (item.get("requestTime"), 1000),
                 )
                 video_url = stream_link(stream_data)
-                video_thumbnail = stream_data.get("video", {}).get("cover")
+                video_thumbnail = first_link(stream_data.get("cover"))
                 video_description = stream_data.get("title")
                 duration = "Unknown"
                 prevent_download = MissingMappedField("Unknown")
@@ -250,12 +250,14 @@ class SearchDouyin(Search):
                     (metadata.get("timestamp_collected"), 1000),
                 )
                 video_url = stream_link(stream_data)
-                video_thumbnail = stream_data.get("video", {}).get("cover")
+                video_thumbnail = first_link(stream_data.get("cover"))
                 video_description = stream_data.get("title")
                 duration = "Unknown"
 
                 # Author is stream owner
                 author = stream_data.get("owner")
+                # Some pages show a stream with only its title, cover and owner,
+                # and no stats at all
                 stats = stream_data.get("stats")
 
             else:
@@ -316,9 +318,20 @@ class SearchDouyin(Search):
             mix_info = defined(item, mix_info_key, {}) or {}
             mix_current_episode = defined(mix_info.get("statis", {}), "current_episode", "N/A")
 
-        # Stream Stats
-        count_total_streams_viewers = stats.get("total_user", "N/A")
-        count_current_stream_viewers = SearchDouyin.get_chinese_number(stats.get("user_count_str")) if "user_count_str" in stats else "N/A"
+        # Stream Stats; posts have no viewers
+        if subject == "Stream":
+            stream_stats = stats or {}
+            # Most streams only give their total viewers as text, e.g. "93.6万"
+            if "total_user" in stream_stats:
+                count_total_streams_viewers = stream_stats["total_user"]
+            elif "total_user_str" in stream_stats:
+                count_total_streams_viewers = SearchDouyin.get_chinese_number(stream_stats["total_user_str"])
+            else:
+                count_total_streams_viewers = MissingMappedField(-1)
+            count_current_stream_viewers = SearchDouyin.get_chinese_number(stream_stats["user_count_str"]) if "user_count_str" in stream_stats else MissingMappedField(-1)
+        else:
+            count_total_streams_viewers = "N/A"
+            count_current_stream_viewers = "N/A"
 
         # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
         displayed = True
@@ -346,7 +359,7 @@ class SearchDouyin(Search):
         part_of_collection = "yes" if mix_id_key in mix_info and collection_id != "N/A" else "no"
 
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(metadata.get("source_platform_url", "")),
+            "collected_from_url": readable_url(metadata.get("source_platform_url", "")),
             "id": item[aweme_id_key],
             "thread_id": item[group_id_key],
             "subject": subject,
@@ -405,7 +418,9 @@ class SearchDouyin(Search):
         elif type(num) is not str:
             return 0
 
-        if "万" in num:
+        if "亿" in num:
+            return float(re.sub(r"[^0-9.]", "", num)) * 100000000
+        elif "万" in num:
             return float(re.sub(r"[^0-9.]", "", num)) * 10000
         else:
             return int(re.sub(r"[^0-9.]", "", num))

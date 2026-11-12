@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 
 from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
-from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict
+from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict, urls_in_text
 from common.lib.llm.adapter import LLMAdapter
 from common.lib.llm.llm_client import get_model_library
 from backend.lib.processor import BasicProcessor
@@ -515,31 +515,12 @@ class LLMPrompter(BasicProcessor):
                 # Load metadata to map filenames back to original post IDs for annotations.
                 filename_to_post_ids = {}
                 if save_annotations:
-                    try:
-                        self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
-                        with open(staging_area.joinpath(".metadata.json")) as meta_file:
-                            archive_metadata = json.load(meta_file)
-                            for url, data in archive_metadata.items():
-                                if data.get("success") and data.get("post_ids"):
-                                    post_ids = [str(pid) for pid in data["post_ids"]]
-                                    # A single URL may map to one filename or multiple files (e.g. video + thumbnail)
-                                    filenames_for_url = []
-                                    if data.get("filename"):
-                                        filenames_for_url.append(data["filename"])
-                                    for file_entry in data.get("files", []):
-                                        if file_entry.get("success") and file_entry.get("filename"):
-                                            filenames_for_url.append(file_entry["filename"])
-                                    # Merge post_ids per filename; extend rather than overwrite so that
-                                    # multiple URLs pointing to the same file don't lose earlier post_ids.
-                                    for filename in filenames_for_url:
-                                        existing = filename_to_post_ids.setdefault(filename, [])
-                                        for post_id in post_ids:
-                                            if post_id not in existing:
-                                                existing.append(post_id)
-
-                    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
-                        self.dataset.log(f"Could not load .metadata.json for annotation mapping: {e}. "
-                                         f"Annotations will use filenames as item IDs.")
+                    source_metadata = self.get_media_metadata()
+                    if source_metadata is not None:
+                        filename_to_post_ids = source_metadata.filename_to_post_ids()
+                    else:
+                        self.dataset.log("No usable .metadata.json found for annotation mapping. "
+                                         "Annotations will use filenames as item IDs.")
 
                 for item in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=True, get_annotations=False):
 
@@ -770,7 +751,7 @@ class LLMPrompter(BasicProcessor):
                         else:
                             item_values[column_to_use] = item_value
 
-                    # Get media URL values; split links on comma.
+                    # Get media URL values; a column can hold one URL or a list of them.
                     media_urls = []
                     for media_column in media_columns:
                         media_url = item.get(media_column, [])
@@ -778,7 +759,7 @@ class LLMPrompter(BasicProcessor):
                             if isinstance(media_url, list):
                                 media_urls += media_url
                             else:
-                                media_urls += [url.strip() for url in media_url.split(",")]
+                                media_urls += urls_in_text(media_url)
 
                     # Skip with empty items
                     empty_items = True if not any(v for v in item_values.values()) and columns_to_use else False

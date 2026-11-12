@@ -118,8 +118,9 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         processed = 0
         done = 0
 
-        # Get the .metadata.json file if we're writing annotations so we can add them to specific rows.
-        img_metadata = []
+        # Load the metadata file so we can attach source post IDs to annotations.
+        source_metadata = self.get_media_metadata()
+        img_metadata = source_metadata.filename_to_post_ids() if source_metadata is not None else {}
 
         # Loop through images
         for image in self.source_dataset.iterate_items():
@@ -130,14 +131,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             self.dataset.update_progress(done / total)
 
             if image.file.name.startswith(".") or image.file.suffix in (".json", ".log"):
-
-                # Get the .metadata.json file so we can also save item IDs.
-                if image.file.name == ".metadata.json":
-                    img_metadata = json.load(image.file.open())
-                    if img_metadata:
-                        img_metadata = {v["filename"]: v.get("post_ids", []) for v in img_metadata.values()}
-                else:
-                    self.dataset.log(f"Skipping file {image.file.name}, probably not an image.")
+                self.dataset.log(f"Skipping file {image.file.name}, probably not an image.")
                 continue
 
             try:
@@ -151,7 +145,9 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
             annotations = {
                 "file_name": image.file.name,
-                "post_ids": img_metadata[image.file.name],
+                # images from an archive without metadata (e.g. an upload or
+                # video frames) have no posts to connect to
+                "post_ids": img_metadata.get(image.file.name, []),
                 **annotations}
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:

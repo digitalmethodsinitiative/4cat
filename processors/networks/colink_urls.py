@@ -10,7 +10,7 @@ import psutil
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, urls_in_text
 
 import networkx as nx
 
@@ -82,10 +82,8 @@ class URLCoLinker(BasicProcessor):
 			self.dataset.finish_with_error("Thread-level co-linking requires a 'thread_id' column in the dataset.")
 			return
 
-		# we use these to extract URLs and host names if needed
-		link_regex = re.compile(r"https?://[^\s\]()]+")
+		# we use this to get host names if needed
 		www_regex = re.compile(r"^www\.")
-		trailing_dot = re.compile(r"[.,)]$")
 
 		self.dataset.update_status("Reading source file")
 		update_on_item = max(10, int(self.source_dataset.num_rows / 100))
@@ -107,7 +105,7 @@ class URLCoLinker(BasicProcessor):
 			if not post["body"]:
 				continue
 
-			post_links = link_regex.findall(post["body"])
+			post_links = urls_in_text(post["body"])
 
 			# if the result has an explicit url per post, take that into
 			# account as well
@@ -121,10 +119,9 @@ class URLCoLinker(BasicProcessor):
 					# not a valid URL, e.g. "http://" without anything after the //
 					pass
 
-			# deduplicate, so repeated links within one posts don't inflate
-			post_links = [trailing_dot.sub("", link) for link in post_links]
 			# Encode the URLs, e.g. replace commas with '%2c', so it makes a nice gdf file
 			post_links = [link.replace(",", "%2c").replace("'", "").replace('"',"").replace("\\_","_") for link in post_links]
+			# deduplicate, so repeated links within one posts don't inflate
 			post_links = sorted(set(post_links))
 
 			# if we're looking at a post level, each post gets its own

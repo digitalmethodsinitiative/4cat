@@ -134,11 +134,14 @@ class ClarifaiAPIFetcher(BasicProcessor):
         buffer = {}
         batch_size = 16
 
-        num_images = self.source_dataset.num_rows - 1  # .metadata.json
+        num_images = self.source_dataset.num_rows
         total_annotations = (num_images if limit == 0 else min(limit, num_images)) * len(models)
         errors = 0
         processed = 0
         annotated = 0
+
+        source_metadata = self.get_media_metadata()
+        filename_to_post_ids = source_metadata.filename_to_post_ids() if source_metadata is not None else {}
 
         # send batched requests per model
         for model_id in models:
@@ -160,10 +163,6 @@ class ClarifaiAPIFetcher(BasicProcessor):
                     send_batch = True
 
                 if image:
-                    if image.file.name == ".metadata.json":
-                        # Metadata, we keep this for writing annotations
-                        image_metadata = json.load(image.file.open("r"))
-
                     if image.file.suffix in (".json", ".log"):
                         continue
 
@@ -225,8 +224,6 @@ class ClarifaiAPIFetcher(BasicProcessor):
         # Get original post IDs for annotations
         fourcat_annotations = []
         annotated = 0
-        if save_annotations:
-            filename_and_post_ids = {v["filename"]: v["post_ids"] for v in image_metadata.values()}
 
         # save the buffered results (we do this only now so we can also store
         # combined annotations)
@@ -247,7 +244,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
                 if save_annotations:
                     for label, confidence in all_annotations.items():
                         if confidence > annotation_threshold:
-                            for item_id in filename_and_post_ids[image]:
+                            for item_id in filename_to_post_ids.get(image, []):
                                 fourcat_annotations.append({
                                     "label": "clarifai_" + label,
                                     "value": confidence,

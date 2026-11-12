@@ -16,13 +16,16 @@ from pathlib import Path
 from natsort import natsorted
 
 from common.lib.annotation import Annotation
+from common.lib.archive_metadata import is_support_file
 from common.lib.job import Job, JobNotFoundException
 
 from common.lib.helpers import get_software_commit, NullAwareTextIOWrapper, convert_to_int, get_software_version, call_api, hash_to_md5, convert_to_float
 from common.lib.item_mapping import MappedItem, DatasetItem
 from common.lib.fourcat_module import FourcatModule
+from common.lib.archive_metadata import MediaArchiveMetadata, PostIdMap, normalize_post_id
 from common.lib.exceptions import (ProcessorInterruptedException, DataSetException, DataSetNotFoundException,
-                                   MapItemException, MappedItemIncompleteException, AnnotationException)
+                                   MapItemException, MappedItemIncompleteException, AnnotationException,
+                                   MetadataException)
 
 
 class StatusType(Enum):
@@ -54,6 +57,7 @@ class DataSet(FourcatModule):
 
     _children = None
     available_processors = None
+    _available_processors_config = None # last known config for available_processors, so we can check if it needs to be refreshed
     _genealogy = None
     preset_parent = None
     parameters = None
@@ -121,7 +125,7 @@ class DataSet(FourcatModule):
         # Ensure mutable attributes are set in __init__ as they are unique to each DataSet
         self.data = {}
         self.parameters = {}
-        self.available_processors = {}
+        self.available_processors = None
         self._genealogy = None
         self.disposable_files = []
         self.modules = modules
@@ -393,6 +397,7 @@ class DataSet(FourcatModule):
             staging_area=None,
             immediately_delete=True,
             filename_filter=None,
+            include_support_files=False,
             processor=None,
             offset=0,
             *args, **kwargs
@@ -406,6 +411,10 @@ class DataSet(FourcatModule):
 
         Files are temporarily unzipped and deleted after use.
 
+        Support files (metadata, logs, and the like; see `is_support_file()`)
+        are not items of the dataset and are skipped, unless
+        `include_support_files` is set or they are named in `filename_filter`.
+
         :param Path staging_area:  Where to store the files while they're
           being worked with. If omitted, a temporary folder is created and
           marked for deletion after all files have been yielded
@@ -413,10 +422,10 @@ class DataSet(FourcatModule):
           yielding; False keeps files until the staging_area is removed
         :param list filename_filter:  Whitelist of filenames to iterate. If
           empty, do not filter
+        :param bool include_support_files:  Also yield support files
         :param BasicProcessor processor:  A reference to the processor
           iterating the dataset.
-        :param int offset:  Skip this many files before yielding (warning: may
-          skip a metadata file too!)
+        :param int offset:  Skip this many files before yielding
         :return:  An iterator with a dictionary for each file, containing an
           `id`, a `path`, and all attributes of the `ZipInfo` object as keys
         """
@@ -458,6 +467,10 @@ class DataSet(FourcatModule):
             for archived_file in archive_contents:
 
                 if filename_filter and archived_file.filename not in filename_filter:
+                    continue
+
+                # a support file named in filename_filter is still yielded
+                if not include_support_files and not filename_filter and is_support_file(archived_file.filename):
                     continue
 
                 if archived_file.is_dir():
@@ -556,6 +569,10 @@ class DataSet(FourcatModule):
         :param list filename_filter:  Only used when iterating a file archive.
           Whitelist of filenames to iterate, others are skipped. If empty, do
           not filter.
+        :param bool include_support_files:  Only used when iterating a file
+          archive. Defaults to `False`, which skips files that are not items
+          of the dataset, such as metadata and log files. Read metadata with
+          e.g. `read_media_metadata()` instead.
         :return generator:  A generator that yields DatasetItems
         """
         unmapped_items = 0
@@ -1094,19 +1111,9 @@ class DataSet(FourcatModule):
         because logs can be useful for debugging even after a dataset is deleted. Hanging logs
         are automatically deleted by TempFileCleaner after a certain amount of time.
         """
-        # first, recursively delete children
-        children = self.db.fetchall(
-            "SELECT * FROM datasets WHERE key_parent = %s", (self.key,)
-        )
-        for child in children:
-            try:
-                child = DataSet(key=child["key"], db=self.db, modules=self.modules)
-                child.delete(commit=commit, delete_log=delete_log)
-            except DataSetException:
-                # dataset already deleted - race condition?
-                pass
-
-        # delete any queued jobs for this dataset
+        # first, stop any job for this dataset.
+        # a running processor can still create a follow-up dataset until it is told to stop, 
+        # and a child created after the lookup below would not be deleted
         try:
             job = Job.get_by_remote_ID(self.key, self.db, self.type)
             if job.is_claimed:
@@ -1126,6 +1133,18 @@ class DataSet(FourcatModule):
 
         except JobNotFoundException:
             pass
+
+        # then, recursively delete children
+        children = self.db.fetchall(
+            "SELECT * FROM datasets WHERE key_parent = %s", (self.key,)
+        )
+        for child in children:
+            try:
+                child = DataSet(key=child["key"], db=self.db, modules=self.modules)
+                child.delete(commit=commit, delete_log=delete_log)
+            except DataSetException:
+                # dataset already deleted - race condition?
+                pass
 
         # delete this dataset's own annotations
         self.db.delete("annotations", where={"dataset": self.key}, commit=commit)
@@ -1859,15 +1878,19 @@ class DataSet(FourcatModule):
         except AttributeError:
             processor_path = ""
 
+        version_data = {
+            "software_version": version[0],
+            "software_source": version[1],
+            "software_file": processor_path,
+        }
         updated = self.db.update(
             "datasets",
             where={"key": self.data["key"]},
-            data={
-                "software_version": version[0],
-                "software_source": version[1],
-                "software_file": processor_path,
-            },
+            data=version_data,
         )
+        # keep this object in step with the database, so code that runs later
+        # in the same processor (e.g. writing archive metadata) sees the version
+        self.data.update(version_data)
 
         return updated > 0
 
@@ -2118,6 +2141,20 @@ class DataSet(FourcatModule):
 
         return self.modules.processors.get(processor_type)
 
+    def get_media_request_headers(self):
+        """
+        Get extra headers to send when downloading images or videos linked in
+        this dataset
+
+        These come from the data source the data was collected with, which is
+        found via the top dataset, since this dataset may itself be made from
+        that data (e.g. by a processor).
+
+        :return dict:  Headers; empty if the data source needs none
+        """
+        data_source = self.top_parent().get_own_processor()
+        return dict(getattr(data_source, "media_request_headers", {}))
+
     def get_producer_processor(self):
         """
         Get the processor class that actually produced this dataset.
@@ -2172,16 +2209,19 @@ class DataSet(FourcatModule):
         :param ConfigManager|None config:  Configuration reader to determine
         compatibility through. This may not be the same reader the dataset was
         instantiated with, e.g. when checking whether some other user should
-        be able to run processors on this dataset.
+        be able to run processors on this dataset. The result is saved and
+        reused for later calls with the same reader.
         :param bool exclude_hidden:  Exclude processors that should not be
         displayed in the UI? If `False`, all processors are returned.
 
         :return dict:  Available processors, `name => properties` mapping
         """
         # The cache always holds the full list, hidden processors included, so
-        # that every call can apply its own exclude_hidden to it
+        # that every call can apply its own exclude_hidden to it. It is None
+        # until the list has been worked out; an empty list is a valid result.
+        # Also cache the config used since the available processors may depend on it.
         # TODO: could children also have been created? Possible bug, but I have not seen anything effected by this
-        if not self.available_processors:
+        if self.available_processors is None or config is not self._available_processors_config:
             processors = self.get_compatible_processors(config=config)
 
             for analysis in self.get_children(update=True):
@@ -2193,6 +2233,7 @@ class DataSet(FourcatModule):
                     del processors[analysis.type]
 
             self.available_processors = processors
+            self._available_processors_config = config
 
         return {
             processor_type: processor
@@ -2408,79 +2449,45 @@ class DataSet(FourcatModule):
         returns dict: item_id as key and a list of tuples (child dataset key -> filename) as items
         """
         children = self.get_children()
-
         if not children:
             return {}
 
         if item_ids is None:
             item_ids = []
 
-        media_map = {}
-
-        # Get children that are image/video downloaders
         media_datasets = [
             p for p in children
             if ("video-downloader" in p.type or "image-downloader" in p.type) and p.data.get("num_rows", 0) > 0 and p.is_finished()
         ]
 
-        # Loop through media datasets and create a map of dataset key -> filenames
-        # Skip files that were downloaded multiple times
+        # keyed by post ID, so that the caller can look an item up by its own
+        # `id` whichever way its datasource mapped it
+        media_map = PostIdMap()
         seen_files = set()
+        # the IDs to filter on come from the caller, not from the metadata
+        item_ids = {normalize_post_id(i_id) for i_id in item_ids}
 
         for media_dataset in media_datasets:
-            for item in media_dataset.iterate_items():
+            try:
+                metadata = media_dataset.read_media_metadata()
+            except (FileNotFoundError, MetadataException):
+                continue
 
-                if item.file.name == ".metadata.json":
-                    with item.file.open() as infile:
-                        metadata = json.load(infile)
+            for filename, entry in metadata.iter_entries():
+                # the metadata class stores these as text already
+                post_ids = entry.get("post_ids", [])
+                if not post_ids:
+                    continue
+                if item_ids and not any(p_id in item_ids for p_id in post_ids):
+                    continue
 
-                        for url_key, item_metadata in metadata.items():
-                            media_items = set()
-                            post_ids = item_metadata.get("post_ids", [])  # Required
-
-                            if not post_ids:
-                                continue
-
-                            # Make sure we're matching and passing strings
-                            post_ids = [str(p_id) for p_id in post_ids]
-                            item_ids = [str(i_id) for i_id in item_ids]
-
-                            # Skip items that are not in the requested item_ids
-                            if item_ids and not any(p_id in item_ids for p_id in post_ids):
-                                continue
-
-                            # Single file (images usually format like this)
-                            is_success = item_metadata.get("success", True)
-
-                            if is_success and "filename" in item_metadata:
-                                media_info = (media_dataset.key, item_metadata["filename"])
-                                media_items.add(media_info)
-
-                            # Multiple files (videos with the 'files' array)
-                            if item_metadata.get("files"):
-                                for file in item_metadata["files"]:
-                                    if file.get("success") and "filename" in file:
-                                        media_info = (media_dataset.key, file["filename"])
-                                        media_items.add(media_info)
-
-                            if not media_items:
-                                continue
-
-                            # Append to post_id list
-                            for post_id in post_ids:
-                                if post_id not in media_map:
-                                    media_map[post_id] = []
-
-                                for media_item in media_items:
-                                    if media_item not in media_map[post_id]:
-                                        # Don't add post_id -> filename couplings that we've already seen
-                                        media_ref = (post_id, media_item[1])
-                                        if media_ref not in seen_files:
-                                            media_map[post_id].append(media_item)
-                                        seen_files.add(media_ref)
-
-                    # break after .metadata.json
-                    break
+                media_info = (media_dataset.key, filename)
+                for post_id in post_ids:
+                    media_ref = (post_id, filename)
+                    if media_ref in seen_files:
+                        continue
+                    seen_files.add(media_ref)
+                    media_map.setdefault(post_id, []).append(media_info)
 
         return media_map
 
@@ -2499,6 +2506,31 @@ class DataSet(FourcatModule):
         # get 4CAT version (presumably to ensure export is compatible with import)
         metadata["current_4CAT_version"] = get_software_version()
         return metadata
+
+    def read_media_metadata(self, filename=".metadata.json"):
+        """
+        Load this dataset's media-archive `.metadata.json`.
+
+        Returns a `MediaArchiveMetadata` instance. Legacy formats are
+        normalized on load so callers always see the current schema.
+
+        Raises `FileNotFoundError` if no metadata file is present and
+        `MetadataException` if the dataset is unfinished or the file is
+        malformed.
+        """
+        return MediaArchiveMetadata.read(self, filename=filename)
+
+    def new_media_metadata(self, from_dataset, processor_type, filename=".metadata.json"):
+        """
+        Empty `MediaArchiveMetadata` container for a processor producing a
+        media archive for this dataset.
+
+        :param str from_dataset:  key of the *source* dataset whose posts are
+            being downloaded from (this is generally not the same as `self`).
+        :param str processor_type:  type of the processor, used for metadata.
+        """
+        return MediaArchiveMetadata.new(self, processor_type=processor_type,
+                                        from_dataset=from_dataset, filename=filename)
 
     def get_result_url(self):
         """

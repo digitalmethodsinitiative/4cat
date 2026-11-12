@@ -1,11 +1,9 @@
 """
 Extract most-used images from corpus
 """
-import re
-
 from collections import Counter, OrderedDict
 from backend.lib.processor import BasicProcessor
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, urls_in_text, looks_like_image_url
 from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
@@ -61,18 +59,6 @@ class TopImageCounter(BasicProcessor):
         all_links = []  # Used for overwrite
         save_annotations = self.parameters.get("save_annotations", False)
 
-        # Important: image link regex.
-        # Makes sure that it gets "http://site.com/img.jpg", but also
-        # more complicated ones like
-        # https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
-        img_link_regex = re.compile(
-            r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*", re.IGNORECASE)
-
-        # Imgur and gfycat links that do not end in an extension are also accepted.
-        # These can later be downloaded by adding an extension.
-        img_domain_regex = re.compile(r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[,']*",
-                                      re.IGNORECASE)
-
         self.dataset.update_status("Extracting image links from source file")
 
         img_links = list()
@@ -81,8 +67,9 @@ class TopImageCounter(BasicProcessor):
             post_img_links = set()  # set to only count images once per post
             for field, value in post.items():
                 if value and (field == "body" or "url" in field.lower() or "image" in field.lower()):
-                    post_img_links |= set(img_link_regex.findall(str(value)))
-                    post_img_links |= set(img_domain_regex.findall(str(value)))
+                    # these fields also hold links that are not images, such as a link to the post itself, so only
+                    # URLs that look like image links are counted
+                    post_img_links |= {url for url in urls_in_text(value) if looks_like_image_url(url)}
 
             # Always add to all_links, so we can easily add to the source file if needed.
             all_links.append((post['id'], post_img_links))

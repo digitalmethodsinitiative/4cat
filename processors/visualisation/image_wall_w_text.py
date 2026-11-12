@@ -3,7 +3,6 @@ Create an image wall with text captions
 """
 import io
 import base64
-import json
 import math
 import textwrap
 
@@ -159,21 +158,18 @@ class ImageTextWallGenerator(BasicProcessor):
         max_text_len = 0
         filename_to_text_mapping = {}
         if text_dataset.type in ImageTextWallGenerator.combined_dataset:
-            # For datasets with both images and text, use .metadata.json
-            metadata_file = self.extract_archived_file_by_name(".metadata.json", self.source_file)
-            if metadata_file is None:
+            # For datasets with both images and text (Stable Diffusion output),
+            # the prompt is stored as item.extra.prompt in the archive metadata.
+            metadata = self.get_media_metadata(text_dataset)
+            if metadata is None:
                 self.dataset.finish_with_error("No metadata file found")
                 return
-            with metadata_file.open() as f:
-                metadata = json.load(f)
-            for item in metadata.values():
+            for filename, item in metadata.iter_entries():
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while collecting text")
-                if "filename" in item:
-                    # "image-downloader-stable-diffusion" datasets
-                    image_text = item.get("prompt", "")
-                    max_text_len = max(max_text_len, len(image_text))
-                    filename_to_text_mapping[item["filename"]] = image_text
+                image_text = (item.get("extra") or {}).get("prompt", "")
+                max_text_len = max(max_text_len, len(image_text))
+                filename_to_text_mapping[filename] = image_text
         elif text_dataset.type == "llm-prompter":
             # llm-prompter store filename as "id" and text as "output"
             for item in text_dataset.iterate_items(self):
@@ -215,11 +211,6 @@ class ImageTextWallGenerator(BasicProcessor):
         self.dataset.update_status("Creating Image wall")
         self.dataset.log(f"Creating image wall with {max_images} images, size {base_height} and tile type {tile_type}")
         for image in image_dataset.iterate_items(self, immediately_delete=False):
-            if image.file.name in [".metadata.json"]:
-                if convert_to_int(self.parameters.get("amount"), 100) == 0:
-                    max_images = max_images - 1
-                continue
-
             # Check image loads prior to any modifications to canvas space
             try:
                 frame = Image.open(str(image.file))

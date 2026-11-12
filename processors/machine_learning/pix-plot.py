@@ -2,15 +2,16 @@
 Create an PixPlot of downloaded images
 """
 import shutil
-import json
+import html
 from datetime import datetime
 import csv
 import os
 from urllib.parse import unquote
 from werkzeug.utils import secure_filename
 
+from common.lib.archive_metadata import PostIdMap
 from common.lib.dmi_service_manager import DmiServiceManager, DsmOutOfMemory, DmiServiceManagerException
-from common.lib.helpers import UserInput, ellipsiate, urls_in_text
+from common.lib.helpers import UserInput, link_urls_in_text
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 
@@ -263,10 +264,9 @@ class PixPlotGenerator(BasicProcessor):
 
         """
         # Get image data
-        if not os.path.isfile(os.path.join(temp_path, '.metadata.json')):
-            # No metadata
+        source_metadata = self.get_media_metadata()
+        if source_metadata is None:
             return False
-
 
         top_dataset = self.dataset.top_parent()
         # Check that this is not already a top dataset
@@ -280,38 +280,29 @@ class PixPlotGenerator(BasicProcessor):
             # e.g., image dataset uploaded as zip and later filtered via unique_images
             return False
 
-        with open(os.path.join(temp_path, '.metadata.json')) as file:
-            image_data = json.load(file)
-
-        # Images can belong to multiple posts, so we must build this file as we go
+        # Images can belong to multiple posts, so we must build this file as we go.
+        # Keyed by archive filename so the post-loop below can look up images by
+        # post id without going through the originating URL.
         images = {}
-
-        # Reformat image_data to access by filename and begin metadata
-        post_id_image_dictionary = {}
+        post_id_image_dictionary = PostIdMap()
         successful_image_count = 0
-        for url, data in image_data.items():
-            # Check if image successfully downloaded for image
-            if data.get('success') and data.get('filename') is not None and data.get('post_ids'):
-                successful_image_count += 1
-                # if no filename, bad metadata; file was not actually downloaded, fixed in 9b603cd1ecdf97fd92c3e1c6200e4b6700dc1e37
-
-                # dmi_pix_plot API uses secure_filename while pixplot.py (in PixPlot library) uses clean_filename
-                filename = self.clean_filename(secure_filename(data.get('filename')))
-
-                for post_id in data.get('post_ids'):
-                    # Add key to post ID dictionary
-                    if post_id in post_id_image_dictionary.keys():
-                        post_id_image_dictionary[post_id].append(url)
-                    else:
-                        post_id_image_dictionary[post_id] = [url]
-
-                # Add to metadata
-                images[url] = {'filename': filename,
-                                    'permalink': url,
-                                    'description': '<b>Number of posts with this image:</b> ' + str(len(data.get('post_ids'))),
-                                    'tags': '',
-                                    'number_of_posts': 0,
-                                    }
+        for archive_filename, item in source_metadata.iter_entries():
+            post_ids = item.get("post_ids", [])
+            if not post_ids:
+                continue
+            successful_image_count += 1
+            # dmi_pix_plot API uses secure_filename while pixplot.py (in PixPlot library) uses clean_filename
+            filename = self.clean_filename(secure_filename(archive_filename))
+            url = item.get("url", "")
+            for post_id in post_ids:
+                post_id_image_dictionary.setdefault(post_id, []).append(archive_filename)
+            images[archive_filename] = {
+                'filename': filename,
+                'permalink': url,
+                'description': '<b>Number of posts with this image:</b> ' + str(len(post_ids)),
+                'tags': '',
+                'number_of_posts': 0,
+            }
 
         self.dataset.log(f"Metadata for {successful_image_count} images collected from {len(post_id_image_dictionary)} posts")
 
@@ -319,9 +310,10 @@ class PixPlotGenerator(BasicProcessor):
         posts_with_images = 0
         for post in self.dataset.top_parent().iterate_items(self):
             # Check if post contains one of the downloaded images
-            if post['id'] in post_id_image_dictionary.keys():
+            post_id = str(post['id'])
+            if post_id in post_id_image_dictionary:
                 posts_with_images += 1
-                for img_name in post_id_image_dictionary[post['id']]:
+                for img_name in post_id_image_dictionary[post_id]:
                     image = images[img_name]
 
                     # Update description
@@ -331,10 +323,10 @@ class PixPlotGenerator(BasicProcessor):
                     ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
                     for detail in ordered_descriptions:
                         if post.get(detail):
-                            image['description'] += '<p><span class="fieldname">' + detail + '</span>' + self.make_nice_link(post.get(detail)) + '</p>'
+                            image['description'] += '<p><span class="fieldname">' + html.escape(detail) + '</span>' + link_urls_in_text(post.get(detail), max_length=50, line_breaks=True) + '</p>'
                     for key, value in post.items():
                         if key not in ordered_descriptions:
-                            image['description'] += '<p><span class="fieldname">' + key + '</span> ' + self.make_nice_link(value) + '</p>'
+                            image['description'] += '<p><span class="fieldname">' + html.escape(str(key)) + '</span> ' + link_urls_in_text(value, max_length=50, line_breaks=True) + '</p>'
 
                     # Add tags or hashtags
                     if image['tags']:
@@ -381,6 +373,11 @@ class PixPlotGenerator(BasicProcessor):
             rows_written = 0
             for image in images.values():
                 rows_written += 1
+                # PixPlot shows the description after decoding its %-codes
+                # (with JavaScript's decodeURIComponent). Writing each % as
+                # %25 makes that give back exactly this HTML, and keeps a lone
+                # %, as in "50% off", from stopping the description showing
+                image['description'] = image['description'].replace('%', '%25')
                 writer.writerow(image)
 
         self.dataset.update_status("Metadata.csv created")
@@ -403,24 +400,3 @@ class PixPlotGenerator(BasicProcessor):
         for i in invalid_chars:
             s = s.replace(i, '')
         return s
-
-    def make_nice_link(self, content):
-        """
-        Add HTML links to text
-
-        Replaces URLs with a clickable link
-
-        :param str content:  Text to parse
-        :return str:  Parsed text
-        """
-        try:
-            content = str(content)
-        except ValueError:
-            return content
-
-        for link in urls_in_text(content):
-            link_text = ellipsiate(link, 50, True, "[&hellip;]")
-            content = content.replace(link,
-                                      f'<a href="{link.replace("<", "%3C").replace(">", "%3E").replace(chr(34), "%22")}" rel="external">{link_text}</a>')
-
-        return content

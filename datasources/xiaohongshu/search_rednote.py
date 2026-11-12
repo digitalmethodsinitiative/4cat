@@ -11,7 +11,7 @@ from datetime import datetime
 from backend.lib.search import Search
 from common.lib.exceptions import MapItemException
 from common.lib.item_mapping import MappedItem, MissingMappedField
-from common.lib.helpers import normalize_url_encoding
+from common.lib.helpers import readable_url
 
 
 class SearchRedNote(Search):
@@ -115,7 +115,7 @@ class SearchRedNote(Search):
 
         timestamp = item.get("time", None)
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(post.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item_id,
             "thread_id": item_id,
             "url": f"https://www.xiaohongshu.com/explore/{post['id']}{xsec_bit}",
@@ -189,7 +189,7 @@ class SearchRedNote(Search):
         author = note["user"]["nickname"] if "nickname" in note["user"] else note["user"]["nick_name"]
 
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item["id"],
             "thread_id": item["id"],
             "url": f"https://www.xiaohongshu.com/explore/{item['id']}{xsec_bit}",
@@ -221,7 +221,7 @@ class SearchRedNote(Search):
         :return MappedItem:
         """
         return MappedItem({
-            "collected_from_url": normalize_url_encoding(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
+            "collected_from_url": readable_url(item.get("__import_meta", {}).get("source_platform_url", "")),  # Zeeschuimer metadata
             "id": item["id"],
             "thread_id": item["id"],
             "url": f"https://www.xiaohongshu.com{item['url']}",

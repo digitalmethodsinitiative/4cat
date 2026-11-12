@@ -9,6 +9,7 @@ import datetime
 import smtplib
 import fnmatch
 import socket
+import html
 import oslex
 import copy
 import time
@@ -24,7 +25,7 @@ import io
 from pathlib import Path
 from collections.abc import MutableMapping
 from html.parser import HTMLParser
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, unquote, urlparse, urlunparse
 from dateutil import parser as dateutil_parser
 from calendar import monthrange
 from packaging import version
@@ -223,7 +224,12 @@ def get_software_commit(worker=None):
             raise ValueError()
         repository = origin.stdout.decode("utf-8").strip()
         if repository.endswith(".git"):
+            # the actual git repository is here, but we usually want the web URL
             repository = repository[:-4]
+
+        if repository.endswith("/"):
+            # normalise trailing slashes; remove
+            repository = repository[:-1]
 
     except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
         return ("", "")
@@ -1242,87 +1248,130 @@ def url_to_hash(url, remove_scheme=True, remove_www=True):
     """
     Convert a URL to a hash. Allows removing scheme and www prefix before hashing.
     
-    :param url: URL to hash
+    :param str url: URL to hash. A URL that urlparse cannot read is hashed from its text, so
+    that it still gets an ID of its own; anything that is not text raises a TypeError
     :param remove_scheme: If True, removes the scheme from URL before hashing
     :param remove_www: If True, removes the www. prefix from URL before hashing
     :return: Hash of the URL
     """
-    parsed_url = urlparse(url.lower())
-    if parsed_url:
+    if not isinstance(url, str):
+        # a hash of e.g. None would be impossible to tell apart from the hash of a real URL
+        raise TypeError(f"url_to_hash() needs a URL as text, got {type(url).__name__}")
+
+    try:
+        parsed_url = urlparse(url.lower())
+    except ValueError:
+        # urlparse refuses some URLs (e.g. with a square bracket in the domain)
+        normalized_url = url.lower().strip("/")
+        if remove_scheme:
+            normalized_url = re.sub(r"^[a-z][a-z0-9+.\-]*://", "", normalized_url)
+        if remove_www:
+            scheme_match = re.match(r"^[a-z][a-z0-9+.\-]*://", normalized_url)
+            scheme = scheme_match.group() if scheme_match else ""
+            normalized_url = scheme + re.sub(r"^www\.", "", normalized_url[len(scheme):])
+    else:
+        # urlparse worked, use its output
         if remove_scheme:
             parsed_url = parsed_url._replace(scheme="")
         if remove_www:
             netloc = re.sub(r"^www\.", "", parsed_url.netloc)
             parsed_url = parsed_url._replace(netloc=netloc)
-        
+
         # Hash the normalized URL directly
         normalized_url = urlunparse(parsed_url).strip("/")
-    else:
-        # Unable to parse URL; use regex normalization
-        normalized_url = url.lower().strip("/")
-        if remove_scheme:
-            normalized_url = re.sub(r"^https?://", "", normalized_url)
-        if remove_www:
-            if not remove_scheme:
-                scheme_match = re.match(r"^https?://", normalized_url)
-                if scheme_match:
-                    scheme = scheme_match.group()
-                    temp_url = re.sub(r"^https?://", "", normalized_url)
-                    normalized_url = scheme + re.sub(r"^www\.", "", temp_url)
-            else:
-                normalized_url = re.sub(r"^www\.", "", normalized_url)
 
     return hashlib.blake2b(normalized_url.encode("utf-8"), digest_size=24).hexdigest()
 
-def normalize_url_encoding(url):
+# Characters that readable_url percent-encodes. First, those a URL
+# cannot contain as they are: control characters, the space, and
+# " < > ^ ` { | }. The backslash is left alone, because browsers read it as "/"
+# in the path of a web address. Second, characters that would be invisible or
+# look like a space, including those that change the direction of the text
+# around them, which RFC 3987 (sections 2.2 and 4.1) asks to keep encoded. They
+# are listed one by one rather than looked up in Python's Unicode tables, so
+# that the JavaScript copy of the function in Zeeschuimer gives exactly the
+# same result.
+URL_ENCODED_CHARACTERS = re.compile(
+    r'[\x00-\x20"<>^`{|}\x7f'
+    r'\u0080-\u00a0\u00ad\u034f\u0600-\u0605\u061c\u06dd\u070f\u08e2\u115f\u1160\u1680\u17b4\u17b5\u180b-\u180f'
+    r'\u2000-\u200b\u200e\u200f\u2028-\u202f\u205f-\u206f\u2800\u3000\u3164\ue000-\uf8ff\ufdd0-\ufdef\ufeff\uffa0'
+    r'\ufff0-\uffff]'
+)
+
+
+def readable_url(url):
     """
-    Normalize URL encoding for display and linking
+    Make a URL readable without changing where it leads
 
-    Takes a URL that may or may not already be percent-encoded and returns
-    a properly encoded version suitable for both display and use as a link.
-    Only query parameters and fragments are encoded; the scheme, domain, and
-    path remain human-readable.
+    Datasources give URLs that may be percent-encoded, not encoded, or partly
+    encoded. This shows encoded text as the characters themselves, where that
+    does not change the URL.
+    
+    Idea: lossless data (result should refer to exact same resource), readable
+    (for our users), clickable (for our UI), stable (if a URL gets mapped and 
+    saved, running the function on it again should not change it), doesn't throw
+    errors (safe for our mappers), and explainable.
+    
+    For the explainable, I followed the conversion from URI to IRI in RFC 3987, 
+    section 3.2 that browsers use to show URLs in their address bar.
 
-    Examples:
-        - "https://example.com/search?q=hello world" → "https://example.com/search?q=hello%20world"
-        - "https%3A//example.com/search%3Fq%3Dhello" → "https://example.com/search?q=hello"
-        - "https://example.com/search?q=hello%20world" → "https://example.com/search?q=hello%20world"
+    Zeeschuimer has a JavaScript copy of this function (`readable_url`
+    in js/lib.js), which should give exactly the same result.
 
-    :param str url: URL to normalize (may be encoded or not)
-    :return str: Properly encoded URL, or empty string if invalid
+    Where this differs from RFC 3987, section 3.2, and why:
+
+    - Encoded ASCII always stays encoded to prevent breaking links that carry 
+      a signature over their exact text.
+    - If a run of escapes has any invalid UTF-8 in it, the whole run stays
+      encoded; the RFC decodes the valid parts. This keeps text in other
+      encodings (e.g. Chinese in GBK) from showing as the wrong characters,
+      and it is what JavaScript's decodeURIComponent does.
+    - Use a fixed list of characters to keep encoded (see above), so that 
+      the JavaScript copy gives the same result. RFC has a more general rule.
+    - The RFC expects a URL that is already encoded. Ours may not be, so
+      characters a URL cannot contain (such as spaces) are encoded,
+      whitespace around the URL and tabs and line breaks in it are removed,
+      and a "%" that does not start an escape is left as it is.
+    - 4CAT must deal with external and uploaded data; some URLs have been
+      saved with the whole URL encoded, like "https%3A%2F%2Fsite.com%2F" instead
+      of "https://site.com/". Decode them first (more than once if they were 
+      encoded more than once), because otherwise they can be neither read nor opened.
+
+    See URL_ENCODED_CHARACTERS for the characters that are always percent-encoded, 
+    even if they are valid UTF-8 above.
+
+    :param str url:  URL to make readable
+    :return str:  The URL, decoded where that is safe; an empty string if `url` is empty
     """
-    from urllib.parse import unquote, urlencode, parse_qs
-
     if not url:
         return ""
 
-    try:
-        # Unquote the entire URL first to normalize
-        decoded_url = unquote(url)
-        # Parse the URL into components
-        parsed = urlparse(decoded_url)
+    url = str(url)
 
-        # Re-encode the query string properly
-        if parsed.query:
-            query_params = parse_qs(parsed.query, keep_blank_values=True)
-            # Flatten single-value lists and encode
-            encoded_query = urlencode({k: v[0] if len(v) == 1 else v for k, v in query_params.items()})
-            # Reconstruct URL with encoded query
-            result = urlunparse((
-                parsed.scheme,
-                parsed.netloc,
-                parsed.path,
-                parsed.params,
-                encoded_query,
-                parsed.fragment
-            ))
-        else:
-            result = decoded_url
+    # Some external URLs have been saved with the whole URL encoded: "https%3A%2F%2Fsite.com"
+    # instead of "https://site.com", sometimes more than once. Undo that first,
+    # one layer at a time. This only decodes plain characters such as : / ? = %;
+    # the rest is decoded further down. A working URL never starts with
+    # "https%3A", so other URLs are not affected.
+    while re.match(r"[\x00-\x20]*https?%(25)*3A", url, re.IGNORECASE):
+        url = re.sub(r"%[0-7][0-9A-Fa-f]", lambda match: unquote(match.group()), url)
 
-        return result
-    except (ValueError, AttributeError):
-        # If URL parsing fails, return the original URL
-        return url
+    # like a browser does with a pasted URL, ignore spaces and control
+    # characters around it, and tabs and line breaks inside it
+    url = re.sub(r"^[\x00-\x20]+|[\x00-\x20]+$", "", url)
+    url = re.sub(r"[\t\n\r]", "", url)
+
+    # decode each run of escapes for bytes outside ASCII, if it is valid UTF-8
+    def decode(match):
+        try:
+            return unquote(match.group(), errors="strict")
+        except UnicodeDecodeError:
+            return match.group()
+
+    url = re.sub(r"(?:%[89A-Fa-f][0-9A-Fa-f])+", decode, url)
+
+    # encode what a URL cannot contain as it is, and what would be invisible
+    return URL_ENCODED_CHARACTERS.sub(lambda match: quote(match.group(), safe=""), url)
 
 def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
         """
@@ -1357,78 +1406,194 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         # remove some problematic characters
         base_filename = re.sub(r"[:~]", "", base_filename)
 
-        if existing_filenames is None:
-            existing_filenames = set()
-        if type(existing_filenames) is not set:
-            # Could force set() here, but likely would be forcing in a loop
-            raise TypeError("existing_filenames must be a set")
+        return deduplicate_filename(base_filename, staging_area=staging_area, max_bytes=max_bytes,
+                                    existing_filenames=existing_filenames,
+                                    fallback_name=default_name, fallback_ext=default_ext)
 
-        # Split base filename into name and extension
-        if '.' in base_filename:
-            name_part, ext_part = base_filename.rsplit('.', 1)
-            ext_part = '.' + ext_part
-        else:
-            name_part = base_filename
-            ext_part = ''
 
-        # Truncate base filename if it exceeds max_bytes
-        if len(base_filename.encode('utf-8')) > max_bytes:
-            # Reserve space for extension
+def deduplicate_filename(filename, staging_area=None, existing_filenames=None, max_bytes=255,
+                         fallback_name="file", fallback_ext="") -> str:
+    """
+    Make a filename unique within a directory
+
+    Returns `filename` unchanged if nothing has it yet, else the same name with
+    `-1`, `-2`, ... appended before the extension, truncating the name if the
+    result would exceed `max_bytes`. Takes a filename rather than a URL, so it
+    also serves names that are not derived from one - an audio file named after
+    its video, a folder of video frames - and names without an extension.
+
+    :param str filename:  The name to use if it is free
+    :param Path staging_area:  Directory to check for a file of this name; if
+      None, only `existing_filenames` is consulted
+    :param set existing_filenames:  Names already taken
+    :param int max_bytes:  Maximum number of bytes for the filename
+    :param str fallback_name:  Name to fall back on in the extreme case of an
+      extension that does not itself fit within `max_bytes`
+    :param str fallback_ext:  Extension to use in that same case
+    :return str:  A name nothing else has
+    """
+    if existing_filenames is None:
+        existing_filenames = set()
+    if type(existing_filenames) is not set:
+        # Could force set() here, but likely would be forcing in a loop
+        raise TypeError("existing_filenames must be a set")
+
+    # Split base filename into name and extension
+    if '.' in filename:
+        name_part, ext_part = filename.rsplit('.', 1)
+        ext_part = '.' + ext_part
+    else:
+        name_part = filename
+        ext_part = ''
+
+    # Truncate base filename if it exceeds max_bytes
+    if len(filename.encode('utf-8')) > max_bytes:
+        # Reserve space for extension
+        available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+        if available_bytes <= 0:
+            # If extension is too long, use minimal name
+            name_part = fallback_name
+            ext_part = fallback_ext
             available_bytes = max_bytes - len(ext_part.encode('utf-8'))
-            if available_bytes <= 0:
-                # If extension is too long, use minimal name
-                name_part = default_name
-                ext_part = default_ext
-                available_bytes = max_bytes - len(ext_part.encode('utf-8'))
-            
-            # Truncate name part to fit
-            name_bytes = name_part.encode('utf-8')
-            if len(name_bytes) > available_bytes:
-                # Truncate byte by byte to ensure valid UTF-8
-                while len(name_bytes) > available_bytes:
-                    name_part = name_part[:-1]
-                    name_bytes = name_part.encode('utf-8')
-            
-            base_filename = name_part + ext_part
 
-        filename = base_filename
+        # Truncate name part to fit
+        name_bytes = name_part.encode('utf-8')
+        if len(name_bytes) > available_bytes:
+            # Truncate byte by byte to ensure valid UTF-8
+            while len(name_bytes) > available_bytes:
+                name_part = name_part[:-1]
+                name_bytes = name_part.encode('utf-8')
 
-        if staging_area or existing_filenames:
-            # Ensure the filename is unique in the staging area
-            file_index = 1
+        filename = name_part + ext_part
 
-            file_path = staging_area.joinpath(filename) if staging_area else None
-            
-            # Loop while collision in-memory OR on disk (if staging_area given)
-            while (filename in existing_filenames) or (staging_area and file_path.exists()):
-                # Calculate space needed for index suffix
-                index_suffix = f"-{file_index}"
-                
-                # Check if filename with index would exceed max_bytes
-                test_filename = name_part + index_suffix + ext_part
-                if len(test_filename.encode('utf-8')) > max_bytes:
-                    # Need to truncate name_part to make room for index
-                    available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
-                    if available_bytes <= 0:
-                        # Extreme case - use minimal name
-                        truncated_name = "f"
-                    else:
-                        # Truncate name_part to fit
-                        truncated_name = name_part
-                        name_bytes = truncated_name.encode('utf-8')
-                        while len(name_bytes) > available_bytes:
-                            truncated_name = truncated_name[:-1]
-                            name_bytes = truncated_name.encode('utf-8')
-                    
-                    filename = truncated_name + index_suffix + ext_part
+    if staging_area or existing_filenames:
+        # Ensure the filename is unique in the staging area
+        file_index = 1
+
+        file_path = staging_area.joinpath(filename) if staging_area else None
+
+        # Loop while collision in-memory OR on disk (if staging_area given)
+        while (filename in existing_filenames) or (staging_area and file_path.exists()):
+            # Calculate space needed for index suffix
+            index_suffix = f"-{file_index}"
+
+            # Check if filename with index would exceed max_bytes
+            test_filename = name_part + index_suffix + ext_part
+            if len(test_filename.encode('utf-8')) > max_bytes:
+                # Need to truncate name_part to make room for index
+                available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
+                if available_bytes <= 0:
+                    # Extreme case - use minimal name
+                    truncated_name = "f"
                 else:
-                    filename = test_filename
-                
-                file_index += 1
-                if staging_area:
-                    file_path = staging_area.joinpath(filename)
+                    # Truncate name_part to fit
+                    truncated_name = name_part
+                    name_bytes = truncated_name.encode('utf-8')
+                    while len(name_bytes) > available_bytes:
+                        truncated_name = truncated_name[:-1]
+                        name_bytes = truncated_name.encode('utf-8')
 
+                filename = truncated_name + index_suffix + ext_part
+            else:
+                filename = test_filename
+
+            file_index += 1
+            if staging_area:
+                file_path = staging_area.joinpath(filename)
+
+    return filename
+
+
+class UniqueFilenames:
+    """
+    Hands out names that nothing else in a directory has taken
+
+    Processors that write a file per item have to make sure two items cannot
+    claim the same name, or the second write destroys the first file and
+    whatever the archive's metadata said about it. Doing that by hand means
+    passing a set of names around *and* remembering to add to it, and
+    forgetting either is the bug. This keeps the two together: every name it
+    returns is recorded as taken.
+
+    Files already in the directory are taken too: it is read on construction,
+    and every name handed out afterwards is checked against it as well. That
+    second check is what catches a file written by something that never asked
+    for a name - yt-dlp naming its own download, a video copied out of an
+    earlier archive - and it is the file system's own answer, so on Windows
+    and macOS it also catches a name that an existing file differs from only
+    in its capitals.
+
+    A name that has been reserved but not yet written exists only in this
+    object, so reserve a name before writing to it rather than relying on the
+    file being there.
+    """
+
+    def __init__(self, directory=None):
+        """
+        :param Path directory:  Directory the names are for. Files already in
+          it count as taken. May be None for a directory that does not exist
+          yet or when only this run's names matter.
+        """
+        self.directory = directory
+        self.taken = set()
+        if directory is not None and directory.is_dir():
+            self.taken = {item.name for item in directory.iterdir()}
+
+    def reserve(self, filename, **kwargs) -> str:
+        """
+        Reserve a name, adding `-1`, `-2`, ... if it is taken
+
+        :param str filename:  The name to use if it is free. May be a plain
+          name without an extension, e.g. for a folder.
+        :param kwargs:  Passed on to `deduplicate_filename`
+        :return str:  The name reserved, which is `filename` if it was free
+        """
+        filename = deduplicate_filename(filename, staging_area=self.directory,
+                                        existing_filenames=self.taken, **kwargs)
+        self.taken.add(filename)
         return filename
+
+    def reserve_for_url(self, url, **kwargs) -> str:
+        """
+        Reserve a name derived from a URL
+
+        :param str url:  URL the file is downloaded from
+        :param kwargs:  Passed on to `url_to_filename`, e.g. `default_ext`
+        :return str:  The name reserved
+        """
+        filename = url_to_filename(url, staging_area=self.directory,
+                                   existing_filenames=self.taken, **kwargs)
+        self.taken.add(filename)
+        return filename
+
+    def claim(self, filename) -> None:
+        """
+        Record a name that something else chose as taken
+
+        Not everything writing into the directory asks first: yt-dlp names its
+        own downloads, and a file copied out of an earlier archive keeps the
+        name it had there. Telling this about those names keeps them from being
+        handed out again.
+
+        :param str filename:  Name to record as taken
+        """
+        self.taken.add(filename)
+
+    def replace(self, current, filename, **kwargs) -> str:
+        """
+        Give up a reserved name and reserve another instead
+
+        For a file that has to be renamed after it was written, e.g. because
+        its extension turned out to be wrong. Frees `current` for anything
+        else, so the name is not left blocked.
+
+        :param str current:  Name to give up
+        :param str filename:  Name to use instead, if it is free
+        :param kwargs:  Passed on to `deduplicate_filename`
+        :return str:  The name reserved
+        """
+        self.taken.discard(current)
+        return self.reserve(filename, **kwargs)
 
 
 def split_urls(url_string, allowed_schemes=None):
@@ -1444,6 +1609,11 @@ def split_urls(url_string, allowed_schemes=None):
     """
     if allowed_schemes is None:
         allowed_schemes = ('http://', 'https://', 'ftp://', 'ftps://')
+    elif isinstance(allowed_schemes, str):
+        # a single scheme may be given as text; the check below needs a tuple of schemes
+        allowed_schemes = (allowed_schemes,)
+    # compare schemes in lower case; URLs are case sensitive though
+    allowed_schemes = tuple(scheme.lower() for scheme in allowed_schemes)
     potential_urls = []
     # Split the text by \n
     for line in url_string.split('\n'):
@@ -1453,7 +1623,7 @@ def split_urls(url_string, allowed_schemes=None):
         for part in parts:
             # Spaces before a scheme still mean a new URL starts (e.g. "url1, url2"). Other spaces are left
             # alone, as a URL may contain them if it was not encoded (e.g. "https://example.com/?q=a, b")
-            if part.lstrip().startswith(allowed_schemes):  # Other schemes exist
+            if part.lstrip().lower().startswith(allowed_schemes):  # Other schemes exist
                 # New URL start detected
                 if recombined_url:
                     # Already have a URL, add to list
@@ -1476,46 +1646,211 @@ def split_urls(url_string, allowed_schemes=None):
     return potential_urls
 
 
-def urls_in_text(text, split_commas=True, allowed_schemes=None):
+def urls_in_text(text):
     """
     Find the URLs in a text, in the order they appear and each only once.
 
     URLs are found with ural's `urls_from_text`, which leaves out punctuation that follows a URL (such as the full stop
-    at the end of a sentence) and skips e-mail addresses. Two of its mistakes are worked around here:
+    at the end of a sentence) and skips e-mail addresses. A list of URLs separated by commas, with or without a space
+    after each comma, gives each URL separately: a comma directly followed by "http://" or "https://" starts a new
+    URL, while other commas, such as those in `https://www.google.com/maps/@52.37,4.89,15z`, stay part of the URL.
 
-    - URLs with only a comma between them (`https://a.com/x,https://b.com/y`) come back from ural as one URL. The text
-      is first split with `split_urls`, so that a comma followed by a new URL starts a new one.
-    - A URL with "/@" followed by a name with a dot in it, such as `https://www.tiktok.com/@maria.bg2/video/123`, is
-      cut short by ural (`https://www.tiktok.com/@maria.bg`).
+    In ordinary text, a URL with a space in it cannot be told apart from a URL followed by more words, so a space
+    always ends a URL.
 
-    In ordinary text, a URL with a space in it cannot be told apart from a URL followed by more words. However, if 
-    split_commas=True, split_urls is used to separate URLs by commas and it will split a URL with a comma followed by
-    a space and a new URL (i.e. starting with a new scheme from allowed_schemes) into two URLs. See `split_urls` for details.
+    Two things ural (as of 1.6.2) does not handle are taken care of here. Each step below can go once ural handles it;
+    the tests in tests/test_urls_in_text.py will show when that is the case.
 
     :param str text:  Text to search
-    :param bool split_commas:  Whether a comma directly followed by a new URL separates two URLs. If not, such a comma
-    and the URL after it are kept as part of the URL before it, as ural does.
     :return list:  The URLs, exactly as they are written in the text
     """
     if not text:
         return []
 
-    pieces = split_urls(str(text), allowed_schemes=allowed_schemes) if split_commas else [str(text)]
     urls = []
-    for piece in pieces:
-        # ural reads an "@" as the end of a user name, as in https://user:password@example.com, even when the "@" comes
-        # later in the URL. It then takes the name after the "@" for the address of the website, and stops where that
-        # name no longer looks like one. To prevent this, each "@" that follows a "/" is swapped for a character that
-        # does not occur in the text, and swapped back in the URLs that are found.
-        stand_in = ""  # a "private use" character, which has no meaning of its own
-        while stand_in in piece:
-            stand_in = chr(ord(stand_in) + 1)
+    for url in ural.urls_from_text(str(text)):
+        # ural also returns the target of a Markdown link when that is not a URL, such as "foo" in
+        # "[https://a.com/x](foo)". Every URL it finds otherwise has "//" in it
+        if "//" not in url:
+            continue
 
-        for url in ural.urls_from_text(piece.replace("/@", "/" + stand_in)):
-            urls.append(url.replace(stand_in, "@"))
+        # ural leaves out one closing bracket after a URL that has no matching opening bracket, as in
+        # "(see https://a.com/x)", but not two, as in "(see (also https://a.com/x))", nor a "]" that follows a ")".
+        # All closing brackets at the end that have no opening bracket in the URL are left out; those that do, as in
+        # https://en.wikipedia.org/wiki/Foo_(bar), stay
+        for opening, closing in (("(", ")"), ("[", "]")):
+            while url.endswith(closing) and url.count(closing) > url.count(opening):
+                url = url[:-1]
+
+        urls.append(url)
 
     # the same URL can occur more than once
     return list(dict.fromkeys(urls))
+
+
+def is_web_url(url):
+    """
+    Check whether a URL is a web address, starting with http:// or https://
+
+    Only web addresses are safe to link to: a link to a URL such as
+    javascript:alert(1) runs code when it is clicked.
+
+    :param url:  URL to check; anything else is turned into text first
+    :return bool:  Whether the URL is a web address
+    """
+    return bool(re.match(r"https?://", str(url), re.IGNORECASE))
+
+
+def link_urls_in_text(text, max_length=0, line_breaks=False, other_links=None, new_tab=False):
+    """
+    Turn the URLs in a text into links, as safe HTML
+
+    The text is taken as plain text: all of it is escaped, so HTML in it is
+    shown as it is written instead of being used. Each web address (http://
+    or https://) that `urls_in_text` finds becomes a link to the URL exactly
+    as it is written, with the URL in readable form (see `readable_url`) as
+    the link text. Other kinds of URLs, such as javascript://, stay text.
+
+    Other things can become links too, such as hashtags and @-mentions: for
+    each kind, `other_links` gives a regular expression that finds them and
+    a function that gives the URL for what was found.
+
+    The text is gone through once, from start to end, and where two of the
+    URLs start at the same place, the longer one becomes the link. That way,
+    a URL that is the start of another one (https://x.com/someone and
+    https://x.com/someone/status/123) does not break the other one's link,
+    and a # or @ in a URL does not become a link of its own.
+
+    :param text:  Text to add links to; anything else is turned into text first
+    :param int max_length:  Shorten URLs in link texts that are longer than
+    this, keeping their start and end; 0 to never shorten them
+    :param bool line_breaks:  Show the line breaks in the text as `<br>`
+    :param dict other_links:  Other things to turn into links, as
+    `{regular expression: function}`, e.g. `{r"(?<!\\w)#\\w+": lambda tag:
+    "https://x.com/hashtag/" + tag[1:]}`
+    :param bool new_tab:  Make the links open in a new tab
+    :return str:  HTML
+    """
+    text = str(text)
+    target = ' target="_blank"' if new_tab else ""
+
+    # one pattern for everything that becomes a link, with each kind in a
+    # group of its own; None marks the group for URLs
+    patterns = []
+    url_for = []
+    urls = [url for url in urls_in_text(text) if is_web_url(url)]
+    if urls:
+        # with the longest URLs first, the longest one wins where several start at the same place
+        patterns.append("|".join(re.escape(url) for url in sorted(urls, key=len, reverse=True)))
+        url_for.append(None)
+
+    for pattern, make_url in (other_links or {}).items():
+        patterns.append(pattern)
+        url_for.append(make_url)
+
+    parts = []
+    position = 0
+    if patterns:
+        link_pattern = re.compile("|".join(f"(?P<kind{index}>{pattern})" for index, pattern in enumerate(patterns)))
+        for match in link_pattern.finditer(text):
+            found = match.group()
+            kind = next(index for index in range(len(patterns)) if match.group(f"kind{index}") is not None)
+            if url_for[kind] is None:
+                url = found
+                link_text = readable_url(found)
+                if max_length:
+                    link_text = ellipsiate(link_text, max_length, inside=True, ellipsis_str="[…]")
+            else:
+                url = url_for[kind](found)
+                link_text = found
+
+            parts.append(html.escape(text[position:match.start()]))
+            parts.append(f'<a href="{html.escape(url)}" rel="external"{target}>{html.escape(link_text)}</a>')
+            position = match.end()
+
+    parts.append(html.escape(text[position:]))
+    result = "".join(parts)
+
+    # links never contain line breaks, so these are all in the text between them
+    return result.replace("\n", "<br>\n") if line_breaks else result
+
+
+def link_urls_in_html(html_text, other_links=None, new_tab=False):
+    """
+    Turn the URLs in the text of safe HTML into links
+
+    Works like `link_urls_in_text`, for HTML that is safe already, such as
+    Markdown turned into HTML with the HTML in it escaped. Only the text
+    between the tags changes, and not the text of links it already has.
+
+    :param str html_text:  Safe HTML
+    :param dict other_links:  Other things to turn into links, as for `link_urls_in_text`
+    :param bool new_tab:  Make the new links open in a new tab
+    :return str:  HTML
+    """
+    # every odd part is a tag, every even part the text between tags
+    parts = re.split(r"(<[^>]*>)", str(html_text))
+    in_link = False
+    for index, part in enumerate(parts):
+        if index % 2:
+            if re.match(r"<a[\s>]", part, re.IGNORECASE):
+                in_link = True
+            elif re.match(r"</a\s*>", part, re.IGNORECASE):
+                in_link = False
+        elif part and not in_link:
+            # the text is escaped already; link_urls_in_text escapes it again
+            parts[index] = link_urls_in_text(html.unescape(part), other_links=other_links, new_tab=new_tab)
+
+    return "".join(parts)
+
+
+def holds_only_urls(text, urls):
+    """
+    Check whether a text consists of nothing but URLs
+
+    That is the case for a single URL or a list of URLs, separated by commas,
+    spaces or new lines, as opposed to ordinary text with URLs in it. Commas,
+    brackets and other punctuation around the URLs (such as a full stop that
+    `urls_in_text` left out of a URL) do not count as text; letters and digits
+    do.
+
+    :param str text:  Text to check
+    :param list urls:  The URLs in the text, as found by `urls_in_text`
+    :return bool:  Whether the text holds only URLs
+    """
+    if not urls:
+        return False
+
+    # longer URLs go first, as a URL may be the start of another one
+    leftover = str(text)
+    for url in sorted(urls, key=len, reverse=True):
+        leftover = leftover.replace(url, "")
+
+    # letters or digits, but not "_", which ural leaves out of the end of URLs
+    return not re.search(r"[^\W_]", leftover)
+
+
+def looks_like_image_url(url):
+    """
+    Check whether a URL looks like it links to an image
+
+    This is a guess based on the URL alone: it has an image file extension
+    after the host name, as in `http://site.com/img.jpg` or
+    `https://preview.redd.it/abc.gif?format=mp4`, or it is an Imgur or Gfycat
+    link, which can be downloaded as an image even without an extension.
+    Many image links have no extension at all (e.g.
+    `https://pbs.twimg.com/media/abc?format=jpg`); those are not recognised.
+
+    :param str url:  URL to check
+    :return bool:  Whether the URL looks like an image link
+    """
+    parsed = urlparse(str(url))
+    after_host = parsed.path + "?" + parsed.query if parsed.query else parsed.path
+    if re.search(r"\.(?:png|jpe?g|gifv?)", after_host, re.IGNORECASE):
+        return True
+
+    host = (parsed.hostname or "").removeprefix("www.")
+    return host in ("imgur.com", "gfycat.com")
 
 
 def folder_size(path='.'):
