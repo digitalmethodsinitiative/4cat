@@ -18,9 +18,10 @@ import time
 from datetime import datetime
 
 from backend.lib.processor import BasicProcessor
+from common.lib.embeddings import amount_option, items_to_read
 from common.lib.exceptions import LLMServerException, ProcessorInterruptedException, QueryParametersException
 from common.lib.item_mapping import MappedItem
-from common.lib.llm.llm_client import LLMServerClient, get_model_library
+from common.lib.llm.llm_client import LLMServerClient, get_model_library, resolve_model as resolve_llm_model
 from common.lib.user_input import UserInput
 
 __author__ = "Sal Hagen"
@@ -122,13 +123,9 @@ class EmbedMedia(BasicProcessor):
         options.update(cls.get_media_options(config))
 
         options["amount"] = {
-            "type": UserInput.OPTION_TEXT,
+            **amount_option(config, f"Each {cls.media_label} is a separate request, so this is slow for large "
+                                    f"datasets.", default=100),
             "help": f"No. of {cls.media_label_plural}",
-            "default": 100,
-            "min": 0,
-            "coerce_type": int,
-            "tooltip": f"Use '0' for all {cls.media_label_plural}. Each {cls.media_label} is a separate request, so "
-                       f"this is slow for large datasets.",
         }
         
         options["dimensions"] = {
@@ -235,20 +232,10 @@ class EmbedMedia(BasicProcessor):
           with an error explaining what.
         """
         model_id = self.parameters.get("model")
-        available_models = {
-            k: v for k, v in self.config.get("llm.available_models", {}).items()
-            if k in self.config.get("llm.enabled_models", [])
-        }
-
-        if model_id not in available_models:
-            self.dataset.finish_with_error(f"Embedding model '{model_id}' is no longer available. Ask an admin to "
-                                           f"enable it, or pick another model.")
-            return None
-
-        model = available_models[model_id]
-        server = self.config.get("llm.servers", {}).get(model["server"])
-        if not server:
-            self.dataset.finish_with_error(f"The LLM server for model '{model_id}' is no longer configured.")
+        #  make sure users can't run models they don't have access to
+        model, server, error = resolve_llm_model(self.config, model_id, task="embed")
+        if error:
+            self.dataset.finish_with_error(error)
             return None
 
         try:
@@ -301,8 +288,7 @@ class EmbedMedia(BasicProcessor):
 
         instruction = self.parameters.get("instruction", "").strip()
 
-        limit = self.parameters.get("amount", 100)
-        max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
+        max_processed = items_to_read(self.parameters, self.config, self.source_dataset.num_rows)
 
         staging_area = self.dataset.get_staging_area()
         output_path = staging_area.joinpath(self.working_filename)

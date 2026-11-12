@@ -23,7 +23,7 @@ class EmbedImages(EmbedMedia):
     title = "Generate image embeddings"  # title displayed in UI
     description = ("Generate a numerical representation (an 'embedding') of each image using a multimodal embedding "
                    "model. This allows images to be compared and clustered. Images are compressed before sending. "
-                   "Requires an embedding model that accepts images, such as Qwen3-VL-Embedding.")
+                   "Requires an embedding model that accepts images.")
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     media_label = "image"
@@ -91,12 +91,7 @@ class EmbedImages(EmbedMedia):
 
     def prepare_media(self, media_path, output_path) -> tuple:
         """
-        Re-encode an image smaller and return it as a base64 media descriptor.
-
-        Pixel size matters most: models scale images to a fixed resolution
-        anyway, so anything larger is bytes spent on nothing. Everything is
-        written out as JPEG - the model reads a bitmap, so a PNG's lossless
-        compression only costs transfer size.
+        Compress an image and return it as a base64 media descriptor.
 
         :param Path media_path:  Image to prepare
         :param Path output_path:  Where to write the re-encoded image

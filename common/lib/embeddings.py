@@ -36,12 +36,13 @@ def get_max_items(config) -> int:
         return 0
 
 
-def amount_option(config, tooltip: str) -> dict:
+def amount_option(config, tooltip: str, default: int = 0) -> dict:
     """
     The 'No. of items' option capped by admin setting. Follows the image visualisation processors.
 
     :param config:  Configuration reader, or `None`
     :param str tooltip:  Tooltip saying what a larger number costs
+    :param int default:  Number to start the option at
     :return dict:  Option definition
     """
     maximum = get_max_items(config)
@@ -49,7 +50,7 @@ def amount_option(config, tooltip: str) -> dict:
     option = {
         "type": UserInput.OPTION_TEXT,
         "help": "No. of items",
-        "default": 0,
+        "default": min(default, maximum) if (default and maximum) else default,
         "min": 0,
         "coerce_type": int,
         "tooltip": tooltip + (f" '0' uses all embeddings, up to the {maximum:,} this 4CAT allows."
@@ -93,26 +94,28 @@ def get_vector(item: dict) -> list:
     return vector or []
 
 
-def merge_batch(batch: list, rows: int, dimensions: int):
+def merge_batches(batches: list, rows: int, dimensions: int):
     """
-    Join the batch read into one array of exactly `rows` rows. Used to make sure
-    embeddings are not held in memory twice.
+    Join the batches read into one array of exactly `rows` rows. Used to make
+    sure embeddings are not held in memory twice.
 
-    :param list batch:  Batch of rows, in the order they were read
-    :param int rows:  Rows actually filled across all batch
+    :param list batches:  Batches of rows, in the order they were read
+    :param int rows:  Rows actually filled across all batches
     :param int dimensions:  Width of each row
     :return:  One float32 array of `rows` rows
     """
-    if len(batch) == 1:
+    if len(batches) == 1:
         # one batch is already the right width; copy only if it has a tail of
         # rows that were never filled, which the caller would otherwise hold on
         # to for as long as it keeps the matrix
-        return batch[0] if len(batch[0]) == rows else batch[0][:rows].copy()
+        return batches[0] if len(batches[0]) == rows else batches[0][:rows].copy()
 
     matrix = np.empty((rows, dimensions), dtype=np.float32)
     offset = 0
-    while batch:
-        batch = batch.pop(0)
+    while batches:
+        # each batch is released as soon as it is copied over, so the two never
+        # hold the embeddings at the same time
+        batch = batches.pop(0)
         taken = min(len(batch), rows - offset)
         matrix[offset:offset + taken] = batch[:taken]
         offset += taken
@@ -143,7 +146,7 @@ def read_embedding_matrix(dataset, limit: int, processor=None, accept=None, keep
       without `keep`)
     :raises ValueError:  If the embeddings are not all the same size
     """
-    batch, rows, dimensions = [], 0, None
+    batches, rows, dimensions = [], 0, None
     positions, kept = [], []
 
     for position, item in enumerate(dataset.iterate_items(processor, get_annotations=False)):
@@ -171,9 +174,9 @@ def read_embedding_matrix(dataset, limit: int, processor=None, accept=None, keep
         if rows % READ_BATCH == 0:
             # never more rows than are still wanted, so a nearly reached limit
             # does not allocate a whole batch for a handful of vectors
-            batch.append(np.empty((min(READ_BATCH, limit - rows), dimensions), dtype=np.float32))
+            batches.append(np.empty((min(READ_BATCH, limit - rows), dimensions), dtype=np.float32))
 
-        batch[-1][rows % READ_BATCH] = vector
+        batches[-1][rows % READ_BATCH] = vector
         rows += 1
         positions.append(position)
         if keep is not None:
@@ -185,7 +188,7 @@ def read_embedding_matrix(dataset, limit: int, processor=None, accept=None, keep
     if not rows:
         return np.empty((0, 0), dtype=np.float32), [], []
 
-    return merge_batch(batch, rows, dimensions), positions, kept
+    return merge_batches(batches, rows, dimensions), positions, kept
 
 
 def find_embedding(dataset, match, processor=None):
