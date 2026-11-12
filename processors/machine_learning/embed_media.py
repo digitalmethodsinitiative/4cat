@@ -1,14 +1,6 @@
 """
 Shared behaviour for processors that embed media files via a multimodal model.
 
-`EmbedVideos` and `EmbedImages` differ only in how a file is made smaller before
-it is sent; everything around that - resolving the model, walking the archive,
-batching, writing results - is identical, and lives here.
-
-This class is abstract (`prepare_media` has no implementation), so
-`ModuleCollector` skips it: `is_4cat_class()` ignores anything
-`inspect.isabstract()` reports, and also ignores classes whose `__module__` is
-not the file being scanned, which covers the subclass imports.
 """
 import abc
 import base64
@@ -32,8 +24,7 @@ __email__ = "4cat@oilab.eu"
 
 class EmbedMedia(BasicProcessor):
     """
-    Send each media file to a multimodal embedding model and store the vector it
-    returns, so the files can be compared, mapped and searched by content.
+    Tranform media files into embeddings via a multimodal embedding model.
     """
 
     media_label = "media file"

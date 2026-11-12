@@ -184,8 +184,8 @@ class LLMServerClient:
         """
         Embed one or more inputs, returning one vector per input.
 
-        Deliberately *not* routed through `LLMAdapter`/LangChain. LangChain's
-        embedding interface is text-only, so it cannot handle multimodal embeddings.
+        Not done through LangChain since it doesn't support multimodal embeddings.
+        # todo: keep tabs on if/when this changes
 
         A client that cannot embed media must raise an exception when `media` is given
         rather than embedding the text alone.
@@ -294,6 +294,47 @@ def supports_task(model: dict, task: str = "generate") -> bool:
     return task in model.get("supported_tasks", ["generate"])
 
 
+def get_available_models(config, task: str = "generate") -> dict:
+    """
+    Return which models are available to a particular user
+
+    :param config:  4CAT config reader (context-aware, so per-user `llm.access`
+      is respected)
+    :param str task:  Task the model must support - `"generate"` or `"embed"`.
+    :return dict:  `{model ID: model entry}`
+    """
+    available_models = config.get("llm.available_models", {})
+    enabled_model_ids = config.get("llm.enabled_models", [])
+    if not config.get("llm.access"):
+        enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
+
+    return {model_id: model for model_id, model in available_models.items()
+            if model_id in enabled_model_ids and supports_task(model, task)}
+
+
+def resolve_model(config, model_id: str, task: str = "generate") -> tuple:
+    """
+    Look up a model and its server, by the same rules the form offers them.
+
+    :param config:  4CAT config reader (context-aware)
+    :param str model_id:  ID of the model to look up
+    :param str task:  Task the model must support - `"generate"` or `"embed"`.
+    :return tuple:  `(model, server, None)`, or `(None, None, error message)`
+    """
+    models = get_available_models(config, task)
+
+    if model_id not in models:
+        return None, None, (f"The '{model_id}' model is not available. Ask an admin to enable it, or pick another "
+                            f"model.")
+
+    model = models[model_id]
+    server = config.get("llm.servers", {}).get(model["server"])
+    if not server:
+        return None, None, f"The LLM server for model '{model_id}' is no longer configured."
+
+    return model, server, None
+
+
 def get_model_library(config, task: str = "generate") -> dict:
     """
     Get the LLM models available for a given task, grouped by server.
@@ -304,18 +345,16 @@ def get_model_library(config, task: str = "generate") -> dict:
     :return dict:  `{server name: {model ID: model display name}}`, shaped for
       a `UserInput.OPTION_CHOICE` option.
     """
-    available_models = config.get("llm.available_models", {})
-    enabled_model_ids = config.get("llm.enabled_models", [])
     servers = config.get("llm.servers", {})
-    if not config.get("llm.access"):
-        enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
 
     models_option = {}
-    for key, value in {k: v for k, v in available_models.items() if k in enabled_model_ids}.items():
-        if not supports_task(value, task):
+    for key, value in get_available_models(config, task).items():
+        # a model whose server was removed cannot be offered; skipping it keeps
+        # the processor's options page working instead of raising a KeyError
+        server = servers.get(value["server"])
+        if not server:
             continue
 
-        server = servers[value["server"]]
         if server["name"] not in models_option:
             models_option[server["name"]] = {}
 
