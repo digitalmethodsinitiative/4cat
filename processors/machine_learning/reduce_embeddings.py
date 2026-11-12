@@ -5,7 +5,7 @@ import json
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.embeddings import read_embedding_matrix
+from common.lib.embeddings import EMBEDDING_QUEUE, amount_option, items_to_read, read_embedding_matrix
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException
 from common.lib.item_mapping import MappedItem, value_or_missing
 from common.lib.user_input import UserInput
@@ -15,9 +15,7 @@ __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
-#: t-SNE's default Barnes-Hut method only supports up to three dimensions; its
-#: exact method goes further but scales quadratically, which is not workable at
-#: the dataset sizes 4CAT deals with
+# t-SNE's default Barnes-Hut method only supports up to three dimensions
 TSNE_MAX_DIMENSIONS = 3
 
 
@@ -49,6 +47,19 @@ class ReduceEmbeddings(BasicProcessor):
         "[McInnes, Leland, John Healy, and James Melville. 2018. 'UMAP: Uniform Manifold Approximation and Projection "
         "for Dimension Reduction.' arXiv:1802.03426.](https://arxiv.org/abs/1802.03426)"
     ]
+
+    @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Shared queue for the processors that hold a full embedding matrix.
+
+        :param str remote_id:  Job item ID
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset to run job for
+        :return str:  Queue ID
+        """
+        return EMBEDDING_QUEUE
+
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
         """
@@ -116,14 +127,7 @@ class ReduceEmbeddings(BasicProcessor):
                            "dataset is too small.",
                 "requires": "algorithm==tsne",
             },
-            "amount": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "No. of items",
-                "default": 2000,
-                "min": 0,
-                "coerce_type": int,
-                "tooltip": "Use '0' for all items. Reduction slows down sharply on very large datasets.",
-            },
+            "amount": amount_option(config, "Reduction slows down sharply on very large datasets."),
         }
 
     @classmethod
@@ -195,8 +199,7 @@ class ReduceEmbeddings(BasicProcessor):
         with its coordinates. Holding the records themselves in between would
         keep every vector in memory a second time, as Python numbers.
         """
-        limit = self.parameters.get("amount", 2000)
-        max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
+        max_processed = items_to_read(self.parameters, self.config, self.source_dataset.num_rows)
         algorithm = self.parameters.get("algorithm", "umap")
         dimensions = self.parameters.get("dimensions", 2)
 

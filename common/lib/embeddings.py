@@ -14,10 +14,10 @@ STATUS_EVERY = 1000
 # Read embeddings in batches to avoid memory problems
 READ_BATCH = 8192
 
-MAX_ITEMS_SETTING = "embeddings.max_clustering_embeddings"
+MAX_EMBEDDINGS = "embeddings.max_embeddings"
 
 # processor queue
-MATRIX_QUEUE = "embedding_matrix"
+EMBEDDING_QUEUE = "embeddings"
 
 
 def get_max_items(config) -> int:
@@ -31,7 +31,7 @@ def get_max_items(config) -> int:
         return 0
 
     try:
-        return max(0, int(config.get(MAX_ITEMS_SETTING, 0) or 0))
+        return max(0, int(config.get(MAX_EMBEDDINGS, 0) or 0))
     except (TypeError, ValueError):
         return 0
 

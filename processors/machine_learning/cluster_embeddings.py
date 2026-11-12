@@ -11,7 +11,8 @@ import psutil
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.embeddings import normalise_in_place, read_embedding_matrix
+from common.lib.embeddings import (EMBEDDING_QUEUE, amount_option, items_to_read, normalise_in_place,
+                                   read_embedding_matrix)
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem, value_or_missing
 from common.lib.user_input import UserInput
@@ -84,6 +85,22 @@ class ClusterEmbeddings(BasicProcessor):
         "[scikit-learn: k-means](https://scikit-learn.org/stable/modules/clustering.html#k-means)",
         "[scikit-learn: silhouette score](https://scikit-learn.org/stable/modules/clustering.html#silhouette-coefficient)",
     ]
+
+    @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Shared queue for the processors that hold a full embedding matrix.
+
+        Each of these reads every vector of its dataset into memory at once, so
+        running several at the same time multiplies the largest thing 4CAT
+        allocates. One at a time instead.
+
+        :param str remote_id:  Job item ID
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset to run job for
+        :return str:  Queue ID
+        """
+        return EMBEDDING_QUEUE
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None) -> dict:
@@ -168,14 +185,7 @@ class ClusterEmbeddings(BasicProcessor):
                 "tooltip": "Check what is recommended for k-means/HBDSCAN and test with your data.",
                 "requires": "reduce_first==true",
             },
-            "amount": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "No. of items",
-                "default": 0,
-                "min": 0,
-                "coerce_type": int,
-                "tooltip": "Use '0' for all items. Clustering on a reduction slows down on very large datasets.",
-            },
+            "amount": amount_option(config, "Clustering on a reduction slows down on very large datasets."),
             "save_annotations": {
                 "type": UserInput.OPTION_ANNOTATIONS,
                 "options": {
@@ -196,8 +206,7 @@ class ClusterEmbeddings(BasicProcessor):
         with its cluster. Holding the records themselves in between would keep
         every vector in memory a second time, as Python numbers.
         """
-        limit = self.parameters.get("amount", 0)
-        max_processed = min(limit, self.source_dataset.num_rows) if limit else self.source_dataset.num_rows
+        max_processed = items_to_read(self.parameters, self.config, self.source_dataset.num_rows)
 
         self.dataset.update_status("Reading embeddings")
         try:

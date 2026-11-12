@@ -2259,6 +2259,82 @@ def test_normalising_happens_in_place():
     assert matrix[0].tolist() == pytest.approx([0.6, 0.8]) and matrix[1].tolist() == [0.0, 0.0]
 
 
+class CappedConfig:
+    """A config reader with only the embeddings ceiling set."""
+
+    def __init__(self, maximum):
+        self.maximum = maximum
+
+    def get(self, name, default=None):
+        return self.maximum if name == "embeddings.max_embeddings" else default
+
+
+def test_the_matrix_is_no_bigger_than_the_rows_it_holds():
+    from common.lib.embeddings import read_embedding_matrix
+
+    # a limit far above what the dataset holds: the matrix must not keep the
+    # difference, which it would if it were a view on an array of `limit` rows
+    records = [{"id": str(i), "embedding": [float(i), 1.0]} for i in range(5)]
+    matrix, positions, _ = read_embedding_matrix(embeddings_dataset(records), limit=100000)
+
+    assert matrix.shape == (5, 2) and len(positions) == 5
+    assert matrix.base is None, "the matrix keeps a larger array alive"
+
+
+def test_a_filtered_read_keeps_only_what_it_accepted():
+    from common.lib.embeddings import read_embedding_matrix
+
+    # the limit covers the whole dataset, but almost all of it is filtered out;
+    # what stays allocated should follow what was kept, not the limit
+    records = [{"id": str(i), "cluster": i % 50, "embedding": [float(i), 1.0]} for i in range(500)]
+    matrix, positions, _ = read_embedding_matrix(embeddings_dataset(records), limit=500,
+                                                 accept=lambda record: record["cluster"] == 0)
+
+    assert matrix.shape == (10, 2) and len(positions) == 10
+    assert matrix.base is None
+
+
+def test_vectors_read_across_several_blocks_keep_their_order(monkeypatch):
+    from common.lib import embeddings
+
+    monkeypatch.setattr(embeddings, "READ_BLOCK", 4)
+    records = [{"id": str(i), "embedding": [float(i), 1.0]} for i in range(10)]
+
+    matrix, positions, _ = embeddings.read_embedding_matrix(embeddings_dataset(records), limit=10)
+    assert matrix.shape == (10, 2) and positions == list(range(10))
+    assert matrix[:, 0].tolist() == [float(i) for i in range(10)]
+
+    # a limit that falls part-way into a block
+    matrix, positions, _ = embeddings.read_embedding_matrix(embeddings_dataset(records), limit=6)
+    assert matrix.shape == (6, 2) and matrix[:, 0].tolist() == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+    assert matrix.base is None
+
+
+def test_the_admin_setting_caps_how_many_embeddings_are_read():
+    from common.lib.embeddings import items_to_read
+
+    # '0' means every item, but never more than the server allows
+    assert items_to_read({"amount": 0}, CappedConfig(50), 1000) == 50
+    # what the user asked for, when that is less
+    assert items_to_read({"amount": 10}, CappedConfig(50), 1000) == 10
+    # never more than the dataset holds
+    assert items_to_read({"amount": 0}, CappedConfig(50), 20) == 20
+    # no ceiling set
+    assert items_to_read({"amount": 0}, CappedConfig(0), 1000) == 1000
+    assert items_to_read({"amount": 0}, None, 1000) == 1000
+
+
+def test_the_amount_option_carries_the_admin_ceiling():
+    from common.lib.embeddings import amount_option
+
+    option = amount_option(CappedConfig(2500), "Slows down on large datasets.")
+    assert option["default"] == 0 and option["max"] == 2500
+    assert "2,500" in option["tooltip"]
+
+    # without a ceiling the option has no maximum at all
+    assert "max" not in amount_option(CappedConfig(0), "Slows down on large datasets.")
+
+
 def test_clustering_writes_records_back_unchanged_but_for_the_cluster(tmp_path):
     items, _ = blobs(per_group=10, groups=2)
     for item in items:

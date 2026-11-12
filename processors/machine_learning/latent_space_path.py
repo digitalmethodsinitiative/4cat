@@ -9,7 +9,7 @@ import numpy as np
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.embeddings import STATUS_EVERY, get_vector, normalise_in_place
+from common.lib.embeddings import EMBEDDING_QUEUE, STATUS_EVERY, get_vector, normalise_in_place
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException
 from common.lib.user_input import UserInput
 
@@ -54,6 +54,18 @@ class LatentSpacePath(BasicProcessor):
 		"[Nearest neighbour algorithm (greedy path)](https://en.wikipedia.org/wiki/Nearest_neighbour_algorithm)",
 		"[Cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity)",
 	]
+
+	@classmethod
+	def get_queue_id(cls, remote_id, details, dataset) -> str:
+		"""
+		Shared queue for the processors that hold a full embedding matrix.
+
+		:param str remote_id:  Job item ID
+		:param dict details:  Job details
+		:param DataSet dataset:  Dataset to run job for
+		:return str:  Queue ID
+		"""
+		return EMBEDDING_QUEUE
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, config=None) -> dict:

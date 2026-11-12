@@ -6,7 +6,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from common.lib.embeddings import find_embedding, normalise_in_place, read_embedding_matrix
+from common.lib.embeddings import (EMBEDDING_QUEUE, amount_option, find_embedding, items_to_read, normalise_in_place,
+                                    read_embedding_matrix)
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from processors.machine_learning.embedding_similarity import embed_query
@@ -66,6 +67,18 @@ class EmbeddingStreams(EmbeddingMap):
     references = [
         "[Cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity)",
     ]
+
+    @classmethod
+    def get_queue_id(cls, remote_id, details, dataset) -> str:
+        """
+        Shared queue for the processors that hold a full embedding matrix.
+
+        :param str remote_id:  Job item ID
+        :param dict details:  Job details
+        :param DataSet dataset:  Dataset to run job for
+        :return str:  Queue ID
+        """
+        return EMBEDDING_QUEUE
 
     @classmethod
     def is_compatible_with(cls, module=None, config=None):
@@ -164,6 +177,8 @@ class EmbeddingStreams(EmbeddingMap):
                 "tooltip": "Shows a line representing the median distance per time window with a band from the 25th to "
                            "the 75th percentile.",
             },
+            "amount": amount_option(config, "Distances are measured between full embeddings, which are all held in "
+                                            "memory at once."),
         }
 
         if cls.has_clusters(parent_dataset):
@@ -344,8 +359,9 @@ class EmbeddingStreams(EmbeddingMap):
 
         self.dataset.update_status("Reading embeddings")
         try:
-            matrix, _, records = read_embedding_matrix(self.source_dataset, self.source_dataset.num_rows, self,
-                                                       accept=accept, keep=keep)
+            matrix, _, records = read_embedding_matrix(
+                self.source_dataset, items_to_read(parameters, self.config, self.source_dataset.num_rows), self,
+                accept=accept, keep=keep)
         except ValueError:
             self.dataset.finish_with_error("The parent dataset contains embeddings of different sizes, so they "
                                            "cannot be compared.")
