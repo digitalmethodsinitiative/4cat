@@ -1,71 +1,38 @@
 [
   {
-    "model": "gpt-5.6-sol",
-    "name": "[OpenAI] GPT-5.6 Sol",
-    "model_card": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+    "model": "gpt-6-astra",
+    "name": "[OpenAI] GPT-6 Astra",
+    "model_card": "https://developers.openai.com/api/docs/models/gpt-6-astra",
     "provider": "openai"
-  },{
-    "model": "gpt-5.6-terra",
+  },
+  {
+    "model": "gpt-6.1.sol",
+    "name": "[OpenAI] GPT-6.1 Sol",
+    "model_card": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    "provider": "openai"
+  },
+  {
+    "model": "gpt-6.1-terra",
     "name": "[OpenAI] GPT-5.6 Terra",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.6-terra",
-    "provider": "openai"
-  },{
-    "model": "gpt-5.6-luna",
-    "name": "[OpenAI] GPT-5.6 Luna",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.6-luna",
-    "provider": "openai"
-  },{
-    "model": "gpt-5.5",
-    "name": "[OpenAI] GPT-5.5",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.5",
+    "model_card": "https://platform.openai.com/docs/models/gpt-6.1-terra",
     "provider": "openai"
   },
   {
-    "model": "gpt-5.5",
-    "name": "[OpenAI] GPT-5.5",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.5",
+    "model": "gpt-6-luna",
+    "name": "[OpenAI] GPT-6 Luna",
+    "model_card": "https://platform.openai.com/docs/models/gpt-6-luna",
     "provider": "openai"
   },
   {
-    "model": "gpt-5.4",
-    "name": "[OpenAI] GPT-5.4",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.4",
-    "provider": "openai"
+    "model": "gemini-4-carbon",
+    "name": "[Google] Gemini 4 Carbon",
+    "model_card": "https://aistudio.google.com/docs/models/gemini-4-carbon",
+    "provider": "google"
   },
   {
-    "model": "gpt-5.4-mini",
-    "name": "[OpenAI] GPT-5.4 mini",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.4-mini",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-5.4-nano",
-    "name": "[OpenAI] GPT-5.4 nano",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.4-nano",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-5.5-pro",
-    "name": "[OpenAI] GPT-5.5 Pro",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.5-pro",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-5.4-pro",
-    "name": "[OpenAI] GPT-5.4 Pro",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.4-pro",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "name": "[OpenAI] GPT-4.1 mini",
-    "model_card": "https://platform.openai.com/docs/models/gpt-4.1-mini",
-    "provider": "openai"
-  },
-  {
-    "model": "gemini-3.1-pro-preview",
-    "name": "[Google] Gemini 3.1 Pro",
-    "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-pro",
+    "model": "gemini-4-argon",
+    "name": "[Google] Gemini 4 Argon",
+    "model_card": "https://aistudio.google.com/docs/models/gemini-4-argon",
     "provider": "google"
   },
   {
@@ -81,28 +48,34 @@
     "provider": "google"
   },
   {
-    "model": "claude-fable-5-1",
-    "name": "[Anthropic] Claude Fable 5.1",
+    "model": "claude-fable-5-2",
+    "name": "[Anthropic] Claude Fable 5.2",
     "model_card": "https://www.anthropic.com/claude/fable",
     "provider": "anthropic"
   },
   {
-    "model": "claude-opus-5",
-    "name": "[Anthropic] Claude Opus 5",
+    "model": "claude-opus-5-5",
+    "name": "[Anthropic] Claude Opus 5.5",
     "model_card": "https://www.anthropic.com/claude/opus",
     "provider": "anthropic"
   },
   {
-    "model": "claude-sonnet-5",
-    "name": "[Anthropic] Claude Sonnet 5 (latest)",
+    "model": "claude-sonnet-5-5",
+    "name": "[Anthropic] Claude Sonnet 5.5",
     "model_card": "https://www.anthropic.com/claude/sonnet",
     "provider": "anthropic"
   },
   {
-    "model": "claude-4-5-haiku",
-    "name": "[Anthropic] Claude 4.5 Haiku (latest)",
+    "model": "claude-5-5-haiku",
+    "name": "[Anthropic] Claude 5.5 Haiku (latest)",
     "model_card": "https://www.anthropic.com/claude/haiku",
     "provider": "anthropic"
+  },
+  {
+    "model": "mistral-large-4",
+    "name": "[Mistral] Mistral Large 4",
+    "model_card": "https://docs.mistral.ai/models/mistral-large-4",
+    "provider": "mistral"
   },
   {
     "model": "magistral-small-2509",
@@ -126,12 +99,6 @@
     "model": "mistral-medium-3-5",
     "name": "[Mistral] Mistral Medium 3.5",
     "model_card": "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04",
-    "provider": "mistral"
-  },
-  {
-    "model": "mistral-large-2512",
-    "name": "[Mistral] Mistral Large 3 (25.12)",
-    "model_card": "https://docs.mistral.ai/models/mistral-large-3-25-12",
     "provider": "mistral"
   },
   {
