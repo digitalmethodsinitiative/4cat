@@ -15,7 +15,6 @@ from common.lib.embeddings import normalise_in_place, read_embedding_matrix
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem, value_or_missing
 from common.lib.user_input import UserInput
-from processors.machine_learning.embed_media import read_post_id_map
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -277,9 +276,9 @@ class ClusterEmbeddings(BasicProcessor):
                 if post_ids is None:
                     if post_id_map is None:
                         archive = self.source_dataset.get_parent()
-                        post_id_map = read_post_id_map(archive.get_results_path() if archive else None,
-                                                       log=self.dataset.log)
-                    post_ids = post_id_map.get(str(record.get("id")), [])
+                        metadata = self.get_media_metadata(archive) if archive else None
+                        post_id_map = metadata.filename_to_post_ids() if metadata else {}
+                    post_ids = post_id_map.get(record.get("filename"), [])
                 if not post_ids:
                     unmatched += 1
 

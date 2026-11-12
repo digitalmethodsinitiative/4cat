@@ -10,7 +10,6 @@ from common.lib.compatibility import Compatibility
 from common.lib.exceptions import LLMServerException, ProcessorInterruptedException, QueryParametersException
 from common.lib.llm.llm_client import LLMServerClient
 from common.lib.user_input import UserInput
-from processors.machine_learning.embed_media import read_post_id_map
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -269,9 +268,10 @@ class EmbeddingSimilarity(BasicProcessor):
         if not parent:
             return {}
 
-        post_ids = read_post_id_map(parent.get_results_path(), log=self.dataset.log)
+        metadata = self.get_media_metadata(parent)
+        post_ids = metadata.filename_to_post_ids() if metadata else {}
         if post_ids:
-            self.dataset.log(f"Found post IDs for {len(post_ids):,} media files in .metadata.json")
+            self.dataset.log(f"Found post IDs for {len(post_ids):,} media files in the archive metadata")
 
         return post_ids
 
@@ -292,9 +292,13 @@ class EmbeddingSimilarity(BasicProcessor):
                 return [post_id.strip() for post_id in recorded.split(",") if post_id.strip()]
             return [post_id for post_id in recorded if post_id]
 
+        # a media file is named after its contents, so the archive says which
+        # posts it came from; a text embedding's own ID is already a post's
+        filename = item.get("filename")
+        if filename in post_id_map:
+            return [post_id for post_id in post_id_map[filename] if post_id]
+
         item_id = item.get("id")
-        if item_id in post_id_map:
-            return [post_id for post_id in post_id_map[item_id] if post_id]
 
         return [item_id] if item_id else []
 

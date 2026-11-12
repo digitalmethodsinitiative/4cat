@@ -12,7 +12,6 @@ from common.lib.compatibility import Compatibility
 from common.lib.embeddings import STATUS_EVERY, get_vector, normalise_in_place
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException
 from common.lib.user_input import UserInput
-from processors.machine_learning.embed_media import read_post_id_map
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -430,9 +429,9 @@ class LatentSpacePath(BasicProcessor):
 		if not post_ids:
 			if self.post_id_map is None:
 				archive = self.get_embeddings_dataset().get_parent()
-				self.post_id_map = read_post_id_map(archive.get_results_path() if archive else None,
-													log=self.dataset.log)
-			post_ids = self.post_id_map.get(str(record.get("id")), [])
+				metadata = self.get_media_metadata(archive) if archive else None
+				self.post_id_map = metadata.filename_to_post_ids() if metadata else {}
+			post_ids = self.post_id_map.get(record.get("filename"), [])
 
 		return [str(post_id) for post_id in post_ids if post_id]
 

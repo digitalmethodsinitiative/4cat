@@ -12,7 +12,6 @@ from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.item_mapping import MappedItem, value_or_missing
 from common.lib.user_input import UserInput
 from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
-from processors.machine_learning.embed_media import read_post_id_map
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -208,8 +207,10 @@ class ClusterAttributes(BasicProcessor):
             post_ids = ClusterEmbeddings.get_post_ids(record)
             if post_ids is None:
                 if post_id_map is None:
-                    post_id_map = read_post_id_map(self.archive_path(genealogy), log=self.dataset.log)
-                post_ids = post_id_map.get(str(record.get("id")), [])
+                    archive = self.archive_dataset(genealogy)
+                    metadata = self.get_media_metadata(archive) if archive else None
+                    post_id_map = metadata.filename_to_post_ids() if metadata else {}
+                post_ids = post_id_map.get(record.get("filename"), [])
 
             measure = measures.setdefault(cluster, {"items": 0, "concentration": None, "memberships": []})
             measure["items"] += 1
@@ -227,20 +228,19 @@ class ClusterAttributes(BasicProcessor):
         return members, measures, unmatched
 
     @staticmethod
-    def archive_path(genealogy: list):
+    def archive_dataset(genealogy: list):
         """
         The media archive among this dataset's ancestors, if there is one.
 
         Media embeddings made before post IDs were recorded in the embedding
-        itself need the archive's `.metadata.json` to be matched to posts.
+        itself need the archive's metadata to be matched to posts.
 
         :param list genealogy:  Dataset ancestry, oldest first
-        :return Path|None:  Path to the archive
+        :return DataSet|None:  The archive
         """
         for dataset in reversed(genealogy):
-            path = dataset.get_results_path()
-            if path.suffix.lower() == ".zip":
-                return path
+            if dataset.get_results_path().suffix.lower() == ".zip":
+                return dataset
 
         return None
 

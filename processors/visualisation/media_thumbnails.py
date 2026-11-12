@@ -14,7 +14,6 @@ from common.lib.archive_metadata import is_support_file
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import DataSetException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from processors.machine_learning.embed_media import read_post_id_map
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -157,7 +156,7 @@ class MediaThumbnails(BasicProcessor):
             if not media_path:
                 continue
 
-            if allowed is not None and media_path.stem not in allowed:
+            if allowed is not None and media_path.name not in allowed:
                 below_threshold += 1
                 continue
 
@@ -270,7 +269,8 @@ class MediaThumbnails(BasicProcessor):
           the archive
         """
         archive_path = self.source_dataset.get_results_path()
-        post_id_map = read_post_id_map(archive_path, log=self.dataset.log)
+        metadata = self.get_media_metadata()
+        post_id_map = metadata.filename_to_post_ids() if metadata else {}
         if not post_id_map:
             self.dataset.log("The archive does not say which posts its files came from, so none can be shown")
             return set()
@@ -296,10 +296,10 @@ class MediaThumbnails(BasicProcessor):
         # the metadata also lists files that failed to download; only count
         # what is actually there, so progress adds up
         with zipfile.ZipFile(archive_path) as archive:
-            present = {Path(name).stem for name in archive.namelist() if not is_support_file(name)}
+            present = {name for name in archive.namelist() if not is_support_file(name)}
 
-        return {stem for stem, post_ids in post_id_map.items()
-                if stem in present and any(str(post_id) in passing for post_id in post_ids)}
+        return {filename for filename, post_ids in post_id_map.items()
+                if filename in present and any(str(post_id) in passing for post_id in post_ids)}
 
     def make_thumbnail(self, path, size: int, is_video: bool, ffmpeg, ffprobe):
         """

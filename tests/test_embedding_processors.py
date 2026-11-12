@@ -370,7 +370,8 @@ class FakeDataset:
         return self.path
 
     def read_media_metadata(self, filename=None):
-        raise FileNotFoundError("no metadata in this stand-in")
+        from common.lib.archive_metadata import MediaArchiveMetadata
+        return MediaArchiveMetadata.read(self, filename=filename)
 
     def new_media_metadata(self, from_dataset, processor_type, filename=".metadata.json"):
         from common.lib.archive_metadata import MediaArchiveMetadata
@@ -1631,6 +1632,80 @@ def test_media_without_post_ids_is_matched_through_the_archive(tmp_path):
     assert any(f"{len(items) - 2} files could not be linked" in message for message in processor.dataset.logs)
 
 
+def write_archive_metadata(archive, metadata):
+    """Put a metadata file in a zip, raw dict or MediaArchiveMetadata alike."""
+    import json
+    import zipfile
+
+    raw = metadata.to_dict() if hasattr(metadata, "to_dict") else metadata
+    with zipfile.ZipFile(archive.path, "w") as handle:
+        handle.writestr(".metadata.json", json.dumps(raw))
+
+
+def test_media_is_matched_through_metadata_of_the_current_schema(tmp_path):
+    """
+    The reader used to parse only the pre-schema shape, so a v1 file - which is
+    what every archive written from now on has - yielded nothing at all, and
+    did so silently: no post IDs, no annotations, no links.
+    """
+    from common.lib.archive_metadata import MediaArchiveMetadata
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    items, _ = blobs(per_group=10, groups=2)
+    for item in items:
+        item.update({"filename": f"{item['id']}.jpg", "post_ids": []})
+
+    archive = FakeDataset(tmp_path, name="archive", dataset_type="image-downloader")
+    metadata = MediaArchiveMetadata.new(processor_type="image-downloader", from_dataset="postskey")
+    metadata.add_item("0.jpg", post_ids=["p0", "p0b"], url="https://example.com/0")
+    metadata.add_item("1.jpg", post_ids=["p1"], url="https://example.com/1")
+    write_archive_metadata(archive, metadata)
+
+    processor = ClusterEmbeddings.__new__(ClusterEmbeddings)
+    processor.parameters = {"algorithm": "kmeans", "n_clusters": 2, "reduce_first": False, "amount": 0,
+                            "save_annotations": ["cluster"]}
+    processor.dataset = FakeDataset(tmp_path, name="clustered")
+    processor.dataset.path = tmp_path / "clustered.ndjson"
+    processor.source_dataset, processor.interrupted = Source(items, parent=archive), False
+    processor.saved_annotations = []
+    processor.save_annotations = lambda annotations, **kwargs: processor.saved_annotations.extend(annotations)
+    processor.process()
+
+    assert [annotation["item_id"] for annotation in processor.saved_annotations] == ["p0", "p0b", "p1"]
+
+
+def test_files_that_differ_only_in_extension_stay_apart():
+    """
+    clip.mp4 and clip.webm are two files that share a stem. Keyed by name they
+    keep their own posts; keyed by stem one would have replaced the other.
+    """
+    from common.lib.archive_metadata import MediaArchiveMetadata
+
+    metadata = MediaArchiveMetadata.new(processor_type="video-downloader", from_dataset="postskey")
+    metadata.add_item("clip.mp4", post_ids=["p1"])
+    metadata.add_item("clip.webm", post_ids=["p2"])
+
+    assert metadata.filename_to_post_ids() == {"clip.mp4": ["p1"], "clip.webm": ["p2"]}
+
+
+def test_an_unreadable_archive_yields_no_metadata(tmp_path):
+    """
+    A damaged or metadata-less archive is normal - uploaded media has none -
+    so reading it comes back empty rather than raising.
+    """
+    from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
+
+    processor = ClusterEmbeddings.__new__(ClusterEmbeddings)
+    processor.dataset = FakeDataset(tmp_path, name="clustered")
+
+    missing = FakeDataset(tmp_path, name="gone", dataset_type="image-downloader")
+    assert processor.get_media_metadata(missing) is None
+
+    not_a_zip = FakeDataset(tmp_path, name="plain", dataset_type="image-downloader")
+    not_a_zip.path.write_text("not a zip", encoding="utf-8")
+    assert processor.get_media_metadata(not_a_zip) is None
+
+
 def test_clustered_embeddings_map_like_embeddings_plus_a_cluster():
     from processors.machine_learning.cluster_embeddings import ClusterEmbeddings
 
@@ -1818,6 +1893,10 @@ def run_media_embedder(tmp_path, monkeypatch, script):
 
         def iterate_items(self, processor=None, **kwargs):
             return iter(items)
+
+        def read_media_metadata(self, filename=None):
+            # an archive without metadata, which is normal for uploaded media
+            raise FileNotFoundError("no metadata in this stand-in")
 
     class Output(FakeDataset):
         def finish_with_warning(self, rows, warning):

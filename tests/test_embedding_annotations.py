@@ -39,10 +39,38 @@ def make_archive(tmp_path, metadata):
     return archive
 
 
+class ArchiveDataset:
+    """
+    Stands in for the media archive the metadata is read from.
+
+    Metadata is read from a dataset rather than from a path, so this offers the
+    part of the DataSet API that the reader uses. An archive that is missing,
+    damaged or carries no metadata raises from here, which is what the
+    processor turns into "no post IDs" rather than a failure.
+    """
+
+    def __init__(self, path, key="archivekey"):
+        self.path, self.key = path, key
+
+    def get_results_path(self):
+        return self.path
+
+    def is_finished(self):
+        return True
+
+    def get_results_folder_path(self):
+        return self.path.parent / "no-results-folder"
+
+    def read_media_metadata(self, filename=None):
+        from common.lib.archive_metadata import MediaArchiveMetadata
+        return MediaArchiveMetadata.read(self, filename=filename)
+
+
 def make_processor(cls, tmp_path, metadata):
     processor = cls.__new__(cls)
     processor.dataset = Recorder()
-    processor.source_file = make_archive(tmp_path, metadata)
+    processor.source_dataset = ArchiveDataset(make_archive(tmp_path, metadata))
+    processor.source_file = processor.source_dataset.get_results_path()
     return processor
 
 
@@ -59,11 +87,15 @@ def test_post_id_map_links_filenames_to_posts(tmp_path):
         "https://example.test/b": {"post_ids": ["p3"], "files": [{"filename": "def456.mp4"}]},
     })
 
-    assert processor.load_post_id_map() == {"abc123": ["p1", "p2"], "def456": ["p3"]}
+    assert processor.load_post_id_map() == {"abc123.mp4": ["p1", "p2"], "def456.mp4": ["p3"]}
 
 
 def test_post_id_map_handles_several_files_per_post(tmp_path):
-    """One download can write a video and a thumbnail; both map to the post."""
+    """
+    One download can write a video and a thumbnail. Each is its own file, so
+    each gets its own entry - keyed by name rather than by stem, which would
+    have let the second quietly replace the first.
+    """
     processor = make_processor(EmbedVideos, tmp_path, {
         "https://example.test/a": {
             "post_ids": ["p1"],
@@ -72,7 +104,7 @@ def test_post_id_map_handles_several_files_per_post(tmp_path):
     })
 
     mapping = processor.load_post_id_map()
-    assert mapping == {"abc": ["p1"]}
+    assert mapping == {"abc.mp4": ["p1"], "abc.jpg": ["p1"]}
 
 
 def test_post_id_map_survives_a_missing_or_broken_metadata_file(tmp_path):
@@ -90,13 +122,14 @@ def test_post_id_map_ignores_entries_without_files(tmp_path):
         "https://example.test/failed": {"post_ids": ["p2"], "success": False},
     })
 
-    assert processor.load_post_id_map() == {"ok": ["p1"]}
+    assert processor.load_post_id_map() == {"ok.jpg": ["p1"]}
 
 
 def test_post_id_map_without_a_source_archive(tmp_path):
+    """Nothing to read is an empty map, not a failure."""
     processor = EmbedImages.__new__(EmbedImages)
     processor.dataset = Recorder()
-    processor.source_file = None
+    processor.source_dataset = ArchiveDataset(tmp_path / "never-written.zip")
     assert processor.load_post_id_map() == {}
 
 
@@ -289,12 +322,13 @@ def test_post_ids_survive_the_round_trip_through_the_mapper():
     ({"id": "hash1", "post_ids": ["p1", "p2"]}, {}, ["p1", "p2"]),
     # recorded as the comma-separated string the mapper produces
     ({"id": "hash1", "post_ids": "p1, p2"}, {}, ["p1", "p2"]),
-    # not recorded: fall back to what the archive metadata says
-    ({"id": "hash2"}, {"hash2": ["p3"]}, ["p3"]),
-    # a text embedding: the item already is the post
+    # not recorded: fall back to what the archive metadata says, which keys
+    # its files by name
+    ({"id": "hash2", "filename": "hash2.mp4"}, {"hash2.mp4": ["p3"]}, ["p3"]),
+    # a text embedding has no file, and its own id already is the post
     ({"id": "post42"}, {}, ["post42"]),
     # media the metadata does not know: better its own id than nothing
-    ({"id": "hash9"}, {"hash1": ["p1"]}, ["hash9"]),
+    ({"id": "hash9", "filename": "hash9.mp4"}, {"hash1.mp4": ["p1"]}, ["hash9"]),
     # blanks must not become annotations on an empty item
     ({"id": "hash1", "post_ids": "p1, , p2"}, {}, ["p1", "p2"]),
     ({"id": None}, {}, []),
@@ -309,29 +343,21 @@ def test_similarity_reads_metadata_from_the_media_archive(tmp_path):
         "https://example.test/1": {"post_ids": ["p1", "p2"], "files": [{"filename": "hash1.mp4"}]},
     })
 
-    class Parent:
-        def get_results_path(self):
-            return archive
-
     class Source:
         def get_parent(self):
-            return Parent()
+            return ArchiveDataset(archive)
 
     processor = EmbeddingSimilarity.__new__(EmbeddingSimilarity)
     processor.dataset = Recorder()
     processor.source_dataset = Source()
 
-    assert processor.load_post_id_map() == {"hash1": ["p1", "p2"]}
+    assert processor.load_post_id_map() == {"hash1.mp4": ["p1", "p2"]}
 
 
 def test_similarity_on_a_text_parent_needs_no_metadata(tmp_path):
     """A text embedding's parent is a table, not an archive; that is not a failure."""
     table = tmp_path / "texts.csv"
     table.write_text("id,body\n1,hello\n", encoding="utf-8")
-
-    class Parent:
-        def get_results_path(self):
-            return table
 
     class Source:
         def __init__(self, parent):
@@ -343,7 +369,7 @@ def test_similarity_on_a_text_parent_needs_no_metadata(tmp_path):
     processor = EmbeddingSimilarity.__new__(EmbeddingSimilarity)
     processor.dataset = Recorder()
 
-    processor.source_dataset = Source(Parent())
+    processor.source_dataset = Source(ArchiveDataset(table))
     assert processor.load_post_id_map() == {}
 
     processor.source_dataset = Source(None)
@@ -375,6 +401,16 @@ def test_similarity_runs_on_clustered_embeddings(tmp_path, monkeypatch):
 
         def get_results_path(self):
             return self.path
+
+        def is_finished(self):
+            return True
+
+        def get_results_folder_path(self):
+            return tmp_path / "no-results-folder"
+
+        def read_media_metadata(self, filename=None):
+            from common.lib.archive_metadata import MediaArchiveMetadata
+            return MediaArchiveMetadata.read(self, filename=filename)
 
     archive = Node("video-downloader", path=archive_path)
     embeddings = Node("video-embeddings", parameters={"model": "vllm-test-model"}, parent=archive)

@@ -14,7 +14,6 @@ import abc
 import base64
 import json
 import time
-import zipfile
 
 from datetime import datetime
 
@@ -28,48 +27,6 @@ __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
-
-
-def read_post_id_map(archive_path, log=None) -> dict:
-    """
-    Map each media filename in an archive to the posts it was downloaded for.
-
-    A media archive's `.metadata.json` is keyed by source URL, and each entry
-    carries the `post_ids` it came from plus the `files` written for it. One
-    media file can belong to several posts, and its own filename is a hash
-    rather than a post ID, so anything annotating posts has to go through this.
-
-    Module-level rather than a method, because processors that merely *read* a
-    media embedding - and so never subclass `EmbedMedia` - need it too.
-
-    :param Path archive_path:  Archive to read the metadata from
-    :param callable log:  Optional logger for explaining a failed read
-    :return dict:  `{filename without extension: [post ID, ...]}`
-    """
-    post_ids = {}
-    if not archive_path or not zipfile.is_zipfile(archive_path):
-        return post_ids
-
-    try:
-        with zipfile.ZipFile(archive_path) as archive:
-            if ".metadata.json" not in archive.namelist():
-                return post_ids
-
-            metadata = json.loads(archive.read(".metadata.json"))
-    except (zipfile.BadZipFile, json.JSONDecodeError, KeyError, OSError) as e:
-        if log:
-            log(f"Could not read .metadata.json, post IDs are unavailable: {e}")
-        return post_ids
-
-    for entry in metadata.values():
-        if not isinstance(entry, dict):
-            continue
-        for file in entry.get("files", []):
-            filename = file.get("filename") if isinstance(file, dict) else None
-            if filename:
-                post_ids[".".join(filename.split(".")[:-1])] = entry.get("post_ids", [])
-
-    return post_ids
 
 
 class EmbedMedia(BasicProcessor):
@@ -322,9 +279,10 @@ class EmbedMedia(BasicProcessor):
         not reliably there before the first file is handled - and annotations
         are written as we go.
 
-        :return dict:  `{filename without extension: [post ID, ...]}`
+        :return dict:  `{filename: [post ID, ...]}`
         """
-        post_ids = read_post_id_map(self.source_file, log=self.dataset.log)
+        metadata = self.get_media_metadata()
+        post_ids = metadata.filename_to_post_ids() if metadata else {}
         self.dataset.log(f"Found post IDs for {len(post_ids):,} {self.media_label_plural} in .metadata.json")
         return post_ids
 
@@ -430,7 +388,7 @@ class EmbedMedia(BasicProcessor):
                 if vector:
                     # the filename is a hash, so carry the posts it came from into
                     # the result: makes it easier for child processors to reach .metadata.json
-                    post_ids = post_id_map.get(media_path.stem, [])
+                    post_ids = post_id_map.get(media_path.name, [])
 
                     time_created = int(time.time())
                     outfile.write(json.dumps({

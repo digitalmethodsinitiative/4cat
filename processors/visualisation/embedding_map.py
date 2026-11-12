@@ -13,7 +13,6 @@ from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import DataSetException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
-from processors.machine_learning.embed_media import read_post_id_map
 from processors.visualisation.media_sprite import MediaSprite
 
 __author__ = "Sal Hagen"
@@ -375,7 +374,9 @@ class EmbeddingMap(BasicProcessor):
         except DataSetException:
             archive = None
 
-        return read_post_id_map(archive.get_results_path() if archive else None, log=self.dataset.log)
+        metadata = self.get_media_metadata(archive) if archive else None
+
+        return metadata.filename_to_post_ids() if metadata else {}
 
     def link_posts(self, records: list) -> int:
         """
@@ -394,7 +395,7 @@ class EmbeddingMap(BasicProcessor):
             if "filename" in record and not record.get("post_ids"):
                 if post_id_map is None:
                     post_id_map = self.load_media_post_ids()
-                record["post_ids"] = post_id_map.get(str(record.get("id")), [])
+                record["post_ids"] = post_id_map.get(record.get("filename"), [])
 
             record["post_ids"] = self.get_post_ids(record)
             if not record["post_ids"]:
