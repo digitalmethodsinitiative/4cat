@@ -23,8 +23,8 @@ def run_filter(tmp_path, images, metadata_entries):
     """
     Filter an image archive and read back the metadata file it writes
 
-    :param dict images:  File name -> the bytes of that image. Two images with
-      the same bytes are duplicates of one another.
+    :param dict images:  Path within the archive -> the bytes of that image.
+      Two images with the same bytes are duplicates of one another.
     :param list metadata_entries:  (file name, post IDs, URL, extra) of the
       source archive's metadata
     :return MediaArchiveMetadata:  The metadata written for the filtered archive
@@ -38,6 +38,7 @@ def run_filter(tmp_path, images, metadata_entries):
     items = []
     for filename, content in images.items():
         path = source_area / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
         items.append(SimpleNamespace(file=path))
 
@@ -131,3 +132,53 @@ def test_images_that_are_not_duplicates_are_all_kept(tmp_path):
     # the hash it was compared by is recorded, so a later run can reuse it
     assert written.get_entry("a.jpg")["extra"]["hash_type"] == "file-hash"
     assert written.get_entry("a.jpg")["extra"]["hash"] != written.get_entry("b.jpg")["extra"]["hash"]
+
+
+"""
+What happens to images that arrive with the same name.
+
+The filter writes every image it keeps into one folder, so images that come in
+folders of their own can come in with the same name: a video's frames are
+numbered from the start of that video, and two videos can have the same name
+but for their extension. Copying the second image over the first destroys an
+image that was no duplicate of anything, and the count the filter reports
+still counts it.
+"""
+
+
+def test_images_with_the_same_name_in_different_folders_are_all_kept(tmp_path):
+    run_filter(
+        tmp_path,
+        {"clip.mp4/frame_1.jpeg": b"first video", "clip.webm/frame_1.jpeg": b"second video",
+         "other.mp4/frame_1.jpeg": b"third video"},
+        # the metadata of an archive of video frames describes the videos, not
+        # the frames, so no entry here is named after a file above
+        [("clip.mp4", ["1"], "http://host/clip.mp4", None),
+         ("clip.webm", ["2"], "http://host/clip.webm", None),
+         ("A.mp4", ["3"], "http://host/A.mp4", None),
+         ("a.mp4", ["4"], "http://host/a.mp4", None),
+         ("other.mp4", ["5"], "http://host/other.mp4", None)],
+    )
+
+    kept = [path for path in (tmp_path / "staging").iterdir() if path.name != ".metadata.json"]
+    assert sorted(path.read_bytes() for path in kept) == [b"first video", b"second video", b"third video"]
+
+
+def test_images_named_alike_but_for_their_capitals_are_kept_apart(tmp_path):
+    """
+    The filter chooses the names in its own archive, so it decides whether that
+    archive can be unpacked whole. Two names that differ only in their capitals
+    are two files on the Linux server that writes them and one file on the
+    Windows or macOS machine that unpacks them.
+    """
+    run_filter(
+        tmp_path,
+        {"A.mp4/A_frame_1.jpeg": b"one video", "a.mp4/a_frame_1.jpeg": b"another video"},
+        [("A.mp4", ["1"], "http://host/A.mp4", None),
+         ("a.mp4", ["2"], "http://host/a.mp4", None)],
+    )
+
+    written = [path.name for path in (tmp_path / "staging").iterdir() if path.name != ".metadata.json"]
+    folded = {name.lower() for name in written}
+    assert len(folded) == len(written), ("the filter put these in one folder, so unpacking its archive "
+                                        f"on Windows or macOS would lose one: {sorted(written)}")
