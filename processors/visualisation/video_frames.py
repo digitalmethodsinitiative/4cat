@@ -31,6 +31,7 @@ class VideoFrames(BasicProcessor):
 	title = "Extract frames from videos"  # title displayed in UI
 	description = "Extract frames from videos"  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	media_type = "image"
 
 	# Allow on video datasets when ffmpeg is available
 	compatibility = Compatibility(media_types={"video"}, type_prefixes={"video-downloader"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"] + VideoDownloaderPlus.followups)
