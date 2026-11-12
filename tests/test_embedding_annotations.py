@@ -149,10 +149,32 @@ class FakeSimilarity(EmbeddingSimilarity):
         self.dataset = Recorder()
         self.annotation_batch_size = batch_size
         self.batches = []
+        self.annotations = []
+        self.save_annotations_enabled = True
+        self.parameters = {}
 
     def save_annotations(self, annotations, **kwargs):
         self.batches.append(list(annotations))
         return len(annotations)
+
+    def annotate(self, results, query_text):
+        """Drive the real write path, with a writer that just collects rows."""
+        self.annotation_label = self.similarity_label(query_text)
+        written = []
+        for row in results:
+            self.write_row(CollectingWriter(written), row)
+        self.flush_annotations(force=True)
+        return written
+
+
+class CollectingWriter:
+    """Stands in for a csv.DictWriter."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def writerow(self, row):
+        self.rows.append(row)
 
 
 def make_results(count, posts_per_item=1):
@@ -165,7 +187,7 @@ def make_results(count, posts_per_item=1):
 
 def test_similarity_annotates_posts_not_filenames():
     processor = FakeSimilarity()
-    processor.save_similarity_annotations(make_results(3, posts_per_item=2), "cats")
+    processor.annotate(make_results(3, posts_per_item=2), "cats")
 
     item_ids = [a["item_id"] for batch in processor.batches for a in batch]
     assert len(item_ids) == 6
@@ -175,7 +197,7 @@ def test_similarity_annotates_posts_not_filenames():
 def test_similarity_flushes_in_batches():
     """Held to the end, a large dataset hands the database one enormous list."""
     processor = FakeSimilarity(batch_size=10)
-    processor.save_similarity_annotations(make_results(25), "cats")
+    processor.annotate(make_results(25), "cats")
 
     assert len(processor.batches) > 1
     assert sum(len(b) for b in processor.batches) == 25
@@ -184,7 +206,7 @@ def test_similarity_flushes_in_batches():
 
 def test_similarity_label_is_fixed_but_names_the_query():
     processor = FakeSimilarity()
-    processor.save_similarity_annotations(make_results(1), "pictures of cats")
+    processor.annotate(make_results(1), "pictures of cats")
 
     label = processor.batches[0][0]["label"]
     assert label == "cosine similarity to 'pictures of cats'"
@@ -193,7 +215,7 @@ def test_similarity_label_is_fixed_but_names_the_query():
 def test_similarity_label_truncates_a_long_query():
     """The query can be a whole paragraph; the label still has to be readable."""
     processor = FakeSimilarity()
-    processor.save_similarity_annotations(make_results(1), "a " * 200)
+    processor.annotate(make_results(1), "a " * 200)
 
     label = processor.batches[0][0]["label"]
     assert len(label) < 60 and label.endswith("…'")
@@ -201,7 +223,7 @@ def test_similarity_label_truncates_a_long_query():
 
 def test_similarity_skips_empty_post_ids():
     processor = FakeSimilarity()
-    processor.save_similarity_annotations(
+    processor.annotate(
         [{"id": "x", "post_ids": [None, "", "p1"], "similarity": 0.5}], "cats")
 
     assert [a["item_id"] for a in processor.batches[0]] == ["p1"]
@@ -440,6 +462,13 @@ def test_similarity_runs_on_clustered_embeddings(tmp_path, monkeypatch):
         def get_results_path(self):
             return self.path
 
+        def get_staging_area(self):
+            # sorting scores every item to a scratch file first, so that the
+            # rows themselves are never all in memory at once
+            staging = tmp_path / "staging"
+            staging.mkdir(exist_ok=True)
+            return staging
+
         def update_progress(self, progress):
             pass
 
@@ -452,9 +481,12 @@ def test_similarity_runs_on_clustered_embeddings(tmp_path, monkeypatch):
     class Config:
         def get(self, key, default=None):
             return {
-                "llm.available_models": {"vllm-test-model": {"local_id": "m", "server": "s"}},
+                "llm.available_models": {
+                    "vllm-test-model": {"local_id": "m", "server": "s", "supported_tasks": ["embed"]}},
                 "llm.enabled_models": ["vllm-test-model"],
                 "llm.servers": {"s": {"type": "openai-like"}},
+                # a local model needs this privilege, as it does to be offered
+                "llm.access": True,
             }.get(key, default)
 
     class Client:
@@ -477,3 +509,120 @@ def test_similarity_runs_on_clustered_embeddings(tmp_path, monkeypatch):
     assert [row["cluster"] for row in rows] == ["3", "-1"]
     # the posts behind the file come from the archive two steps up
     assert rows[0]["post_ids"] == "p1, p2"
+
+
+# --------------------------------------------------------------------------- #
+# similarity results are sorted without holding every row
+
+def run_similarity(tmp_path, texts, **parameters):
+    """Score the given texts against a query; return the rows written."""
+    import csv as csv_module
+
+    class Embeddings:
+        type = "text-embeddings"
+        parameters = {"model": "m1"}
+        num_rows = len(texts)
+
+        def get_parent(self):
+            return None
+
+        def iterate_items(self, processor=None, **kwargs):
+            # the first component is the similarity to the query [1, 0]
+            return iter([{"id": str(i), "text": text, "embedding": [score, 1.0 - score]}
+                         for i, (text, score) in enumerate(texts)])
+
+    class Output(Recorder):
+        def __init__(self):
+            super().__init__()
+            self.path, self.error, self.rows = tmp_path / "sorted.csv", None, 0
+
+        def get_results_path(self):
+            return self.path
+
+        def get_staging_area(self):
+            staging = tmp_path / "staging"
+            staging.mkdir(exist_ok=True)
+            return staging
+
+        def update_progress(self, progress):
+            pass
+
+        def finish(self, rows):
+            self.rows = rows
+
+        def finish_with_error(self, error):
+            self.error = error
+
+    class Config:
+        def get(self, key, default=None):
+            return {
+                "llm.available_models": {"m1": {"local_id": "m", "server": "s", "supported_tasks": ["embed"]}},
+                "llm.enabled_models": ["m1"],
+                "llm.servers": {"s": {"type": "openai-like"}},
+                "llm.access": True,
+            }.get(key, default)
+
+    processor = EmbeddingSimilarity.__new__(EmbeddingSimilarity)
+    processor.dataset, processor.config, processor.log, processor.interrupted = Output(), Config(), None, False
+    processor.source_dataset = Embeddings()
+    processor.parameters = {"query_text": "q", "save_annotations": False, **parameters}
+    processor.embed_query_result = None
+    processor.process()
+
+    assert processor.dataset.error is None, processor.dataset.error
+    with processor.dataset.path.open(encoding="utf-8") as infile:
+        return list(csv_module.DictReader(infile)), processor
+
+
+def test_similarity_sorts_most_similar_first(tmp_path, monkeypatch):
+    """
+    Sorting cannot be streamed, but the rows need not be held to do it: the
+    scores are sorted and the rows themselves come back off a scratch file.
+    """
+    from processors.machine_learning import embedding_similarity as module
+
+    monkeypatch.setattr(module, "embed_query",
+                        lambda *args, **kwargs: (module.np.asarray([1.0, 0.0]), {"local_id": "m"}, None))
+
+    rows, processor = run_similarity(tmp_path, [("low", 0.1), ("high", 0.9), ("middle", 0.5)], sort=True)
+
+    assert [row["text"] for row in rows] == ["high", "middle", "low"]
+    assert processor.dataset.rows == 3
+
+
+def test_similarity_keeps_the_original_order_when_not_sorting(tmp_path, monkeypatch):
+    """Unsorted, every row can be written as it is scored."""
+    from processors.machine_learning import embedding_similarity as module
+
+    monkeypatch.setattr(module, "embed_query",
+                        lambda *args, **kwargs: (module.np.asarray([1.0, 0.0]), {"local_id": "m"}, None))
+
+    rows, _ = run_similarity(tmp_path, [("low", 0.1), ("high", 0.9), ("middle", 0.5)], sort=False)
+
+    assert [row["text"] for row in rows] == ["low", "high", "middle"]
+    # nothing was staged, because nothing had to be held back
+    assert not (tmp_path / "staging").exists()
+
+
+def test_similarity_ties_keep_the_order_they_were_read(tmp_path, monkeypatch):
+    """A stable sort, so the same input gives the same file twice."""
+    from processors.machine_learning import embedding_similarity as module
+
+    monkeypatch.setattr(module, "embed_query",
+                        lambda *args, **kwargs: (module.np.asarray([1.0, 0.0]), {"local_id": "m"}, None))
+
+    rows, _ = run_similarity(tmp_path, [("first", 0.5), ("second", 0.5), ("third", 0.5)], sort=True)
+
+    assert [row["text"] for row in rows] == ["first", "second", "third"]
+
+
+def test_similarity_stops_at_the_admin_ceiling(tmp_path, monkeypatch):
+    from processors.machine_learning import embedding_similarity as module
+
+    monkeypatch.setattr(module, "embed_query",
+                        lambda *args, **kwargs: (module.np.asarray([1.0, 0.0]), {"local_id": "m"}, None))
+    monkeypatch.setattr(module, "items_to_read", lambda parameters, config, available: 2)
+
+    rows, _ = run_similarity(tmp_path, [("a", 0.9), ("b", 0.8), ("c", 0.7)], sort=True)
+
+    assert len(rows) == 2

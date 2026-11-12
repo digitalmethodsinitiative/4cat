@@ -506,3 +506,56 @@ def test_audio_capability_maps_to_an_audio_media_type(client):
 
 def test_audio_only_model_still_consumes_text(client):
     assert client.parse_supported_media_types(make_meta(["embedding", "audio"])) == ["text", "audio"]
+
+
+# --------------------------------------------------------------------------- #
+# resolve_model
+
+def test_resolve_model_returns_the_model_and_its_server(config):
+    from common.lib.llm.llm_client import resolve_model
+
+    model, server, error = resolve_model(config, "emb", task="embed")
+    assert error is None
+    assert model["name"] == "Embedder" and server["_id"] == "ollama-test"
+
+
+def test_resolve_model_refuses_a_model_that_cannot_do_the_task(config):
+    """An embedding model returns a vector, so it cannot be prompted."""
+    from common.lib.llm.llm_client import resolve_model
+
+    model, server, error = resolve_model(config, "emb", task="generate")
+    assert model is None and server is None and "not available" in error
+
+
+def test_resolve_model_refuses_a_local_model_without_access(config):
+    """
+    The privilege is checked where the model is resolved, not only where the
+    options are built: a processor that looked the model up itself would
+    otherwise run a local one for a user who may not use it.
+    """
+    from common.lib.llm.llm_client import resolve_model
+
+    config.settings["llm.access"] = False
+    model, _, error = resolve_model(config, "emb", task="embed")
+    assert model is None and error
+
+
+def test_resolve_model_refuses_a_disabled_model(config):
+    from common.lib.llm.llm_client import resolve_model
+
+    model, _, error = resolve_model(config, "disabled", task="embed")
+    assert model is None and error
+
+
+def test_resolve_model_reports_a_missing_server(config):
+    from common.lib.llm.llm_client import resolve_model
+
+    config.settings["llm.servers"] = {}
+    model, _, error = resolve_model(config, "emb", task="embed")
+    assert model is None and "no longer configured" in error
+
+
+def test_library_skips_a_model_whose_server_is_gone(config):
+    """A leftover model entry should not break the whole options page."""
+    config.settings["llm.servers"] = {}
+    assert get_model_library(config, task="embed") == {}
