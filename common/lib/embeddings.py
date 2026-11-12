@@ -6,30 +6,129 @@ Mostly to reduce memory errors
 import numpy as np
 
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.user_input import UserInput
 
 # How often to report progress while reading, in items
 STATUS_EVERY = 1000
 
+# Read embeddings in batches to avoid memory problems
+READ_BATCH = 8192
 
-def get_vector(record: dict) -> list:
-    """
-    Get the embedding of a record as a list of numbers.
+MAX_ITEMS_SETTING = "embeddings.max_clustering_embeddings"
 
-    :param dict record:  Embedding record
-    :return list:  The vector, or an empty list if the record has none
+# processor queue
+MATRIX_QUEUE = "embedding_matrix"
+
+
+def get_max_items(config) -> int:
     """
-    vector = record.get("embedding")
+    The most embeddings a processor may read.
+
+    :param config:  Configuration reader, or `None` if there is none to read
+    :return int:  Most embeddings to read, or 0 for no limit
+    """
+    if config is None:
+        return 0
+
+    try:
+        return max(0, int(config.get(MAX_ITEMS_SETTING, 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def amount_option(config, tooltip: str) -> dict:
+    """
+    The 'No. of items' option capped by admin setting. Follows the image visualisation processors.
+
+    :param config:  Configuration reader, or `None`
+    :param str tooltip:  Tooltip saying what a larger number costs
+    :return dict:  Option definition
+    """
+    maximum = get_max_items(config)
+
+    option = {
+        "type": UserInput.OPTION_TEXT,
+        "help": "No. of items",
+        "default": 0,
+        "min": 0,
+        "coerce_type": int,
+        "tooltip": tooltip + (f" '0' uses all embeddings, up to the {maximum:,} this 4CAT allows."
+                              if maximum else " '0' uses all embeddings."),
+    }
+
+    if maximum:
+        option["max"] = maximum
+
+    return option
+
+
+def items_to_read(parameters: dict, config, available: int) -> int:
+    """
+    How many embeddings to read.
+
+    :param dict parameters:  Processor parameters
+    :param config:  Configuration reader, or `None`
+    :param int available:  Embeddings in the parent dataset
+    :return int:  Number of embeddings to read
+    """
+    wanted = parameters.get("amount", 0) or available
+    maximum = get_max_items(config)
+
+    if maximum:
+        wanted = min(wanted, maximum)
+
+    return min(wanted, available)
+
+
+def get_vector(item: dict) -> list:
+    """
+    Get the embedding of an item as a list of numbers.
+
+    :param dict item:  Embedding item
+    :return list:  The vector, or an empty list if the item has none
+    """
+    vector = item.get("embedding")
     if isinstance(vector, str):
         vector = [float(value) for value in vector.split() if value]
     return vector or []
+
+
+def merge_batch(batch: list, rows: int, dimensions: int):
+    """
+    Join the batch read into one array of exactly `rows` rows. Used to make sure
+    embeddings are not held in memory twice.
+
+    :param list batch:  Batch of rows, in the order they were read
+    :param int rows:  Rows actually filled across all batch
+    :param int dimensions:  Width of each row
+    :return:  One float32 array of `rows` rows
+    """
+    if len(batch) == 1:
+        # one batch is already the right width; copy only if it has a tail of
+        # rows that were never filled, which the caller would otherwise hold on
+        # to for as long as it keeps the matrix
+        return batch[0] if len(batch[0]) == rows else batch[0][:rows].copy()
+
+    matrix = np.empty((rows, dimensions), dtype=np.float32)
+    offset = 0
+    while batch:
+        batch = batch.pop(0)
+        taken = min(len(batch), rows - offset)
+        matrix[offset:offset + taken] = batch[:taken]
+        offset += taken
+        del batch
+
+    return matrix
 
 
 def read_embedding_matrix(dataset, limit: int, processor=None, accept=None, keep=None) -> tuple:
     """
     Read up to `limit` embeddings into one float32 array.
 
-    The array is allocated once, at its full size, instead of collecting rows
-    and stacking them, which would hold every vector twice for a moment.
+    Read in batch rather than into one array of `limit` rows: `limit` is a
+    ceiling, not a count, and an array allocated at its full size keeps the
+    difference for as long as the caller holds the matrix. With an `accept`
+    that leaves most of the dataset out, that difference is nearly all of it.
 
     :param dataset:  Embeddings dataset
     :param int limit:  Most embeddings to read
@@ -44,14 +143,14 @@ def read_embedding_matrix(dataset, limit: int, processor=None, accept=None, keep
       without `keep`)
     :raises ValueError:  If the embeddings are not all the same size
     """
-    matrix = None
+    batch, rows, dimensions = [], 0, None
     positions, kept = [], []
 
     for position, item in enumerate(dataset.iterate_items(processor, get_annotations=False)):
         if processor is not None and processor.interrupted:
             raise ProcessorInterruptedException("Interrupted while reading embeddings")
 
-        if len(positions) >= limit:
+        if rows >= limit:
             break
 
         record = item.original
@@ -63,45 +162,50 @@ def read_embedding_matrix(dataset, limit: int, processor=None, accept=None, keep
         if not vector:
             continue
 
-        if matrix is None:
-            matrix = np.empty((limit, len(vector)), dtype=np.float32)
-        elif len(vector) != matrix.shape[1]:
-            # a ragged matrix cannot be compared; this means the dataset mixes
-            # models, which should not happen but is worth saying out loud
+        if dimensions is None:
+            dimensions = len(vector)
+        elif len(vector) != dimensions:
+            # embeddings shouldn't have different lenghts, something is up!
             raise ValueError("The embeddings are not all the same size.")
 
-        matrix[len(positions)] = vector
+        if rows % READ_BATCH == 0:
+            # never more rows than are still wanted, so a nearly reached limit
+            # does not allocate a whole batch for a handful of vectors
+            batch.append(np.empty((min(READ_BATCH, limit - rows), dimensions), dtype=np.float32))
+
+        batch[-1][rows % READ_BATCH] = vector
+        rows += 1
         positions.append(position)
         if keep is not None:
             kept.append(keep(record))
 
-        if processor is not None and len(positions) % STATUS_EVERY == 0:
-            processor.dataset.update_status(f"Read {len(positions):,} embeddings")
+        if processor is not None and rows % STATUS_EVERY == 0:
+            processor.dataset.update_status(f"Read {rows:,} embeddings")
 
-    if matrix is None:
+    if not rows:
         return np.empty((0, 0), dtype=np.float32), [], []
 
-    return matrix[:len(positions)], positions, kept
+    return merge_batch(batch, rows, dimensions), positions, kept
 
 
 def find_embedding(dataset, match, processor=None):
     """
-    Find the first record that matches, and its vector.
+    Find the first item that matches, and its vector.
 
     :param dataset:  Embeddings dataset
-    :param match:  `function(record) -> bool`
+    :param match:  `function(item) -> bool`
     :param processor:  Processor reading it, to stop when it is interrupted
-    :return tuple:  `(vector as float32 array, record)`, or `(None, None)`
+    :return tuple:  `(vector as float32 array, item)`, or `(None, None)`
     """
     for item in dataset.iterate_items(processor, get_annotations=False):
         if processor is not None and processor.interrupted:
             raise ProcessorInterruptedException("Interrupted while reading embeddings")
 
-        record = item.original
-        if match(record):
-            vector = get_vector(record)
+        item = item.original
+        if match(item):
+            vector = get_vector(item)
             if vector:
-                return np.asarray(vector, dtype=np.float32), record
+                return np.asarray(vector, dtype=np.float32), item
     return None, None
 
 
