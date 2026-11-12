@@ -47,7 +47,7 @@ class MediaThumbnails(BasicProcessor):
     compatibility = Compatibility(
         media_types={"image", "video"},
         type_prefixes={"image-downloader", "video-downloader"},
-        preferred_followups=["media-sprite", "image-embeddings"],
+        preferred_followups=["media-sprite"],
     )
 
     @classmethod

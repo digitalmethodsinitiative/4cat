@@ -23,9 +23,6 @@ __email__ = "4cat@oilab.eu"
 
 SPRITE_NAME = "sprite.jpg"
 
-SOURCE_TYPES = ("media-thumbnails", "video-frames", "video-scene-frames")
-
-
 class MediaSprite(BasicProcessor):
     """
     Merge a dataset of thumbnails into a single sprite sheet.
@@ -39,7 +36,7 @@ class MediaSprite(BasicProcessor):
     # no media_type since the sheet is not really something to use in post-processors
 
     compatibility = Compatibility(
-        types=set(SOURCE_TYPES),
+        types=["media-thumbnails"],
     )
 
     @classmethod
@@ -217,8 +214,6 @@ class MediaSprite(BasicProcessor):
         for ancestor in ancestors:
             sheets = {}
             for source in ancestor.get_children():
-                if source.type not in SOURCE_TYPES:
-                    continue
 
                 for sheet in source.get_children():
                     if sheet.type != cls.type or not sheet.is_finished():
