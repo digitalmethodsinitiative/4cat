@@ -1,6 +1,7 @@
 """
 Tests for the frame extractor, which writes a folder of frames per video
 """
+import json
 import pathlib
 import zipfile
 from types import SimpleNamespace
@@ -22,17 +23,56 @@ videos and need two folders, and the name is how whatever reads the frames
 later looks the video up in the metadata file, which records it by file name.
 """
 
+FRAME_TEST_NAMES = ["clip.mp4", "clip.webm", "A.mp4", "a.mp4", "other.mp4"]
 
-def run_extractor(tmp_path, monkeypatch, video_names, archive_contents=None):
+
+def wire_metadata(processor, source_archive, tmp_path):
+    """
+    Give a mocked processor the two halves of the metadata API it uses.
+
+    Reading comes from the archive the harness actually built, and writing
+    produces a real `MediaArchiveMetadata`, so what a processor writes can be
+    read back and checked rather than swallowed by a mock.
+    """
+    from common.lib.archive_metadata import MediaArchiveMetadata
+    from common.lib.exceptions import MetadataException
+
+    class Source:
+        def get_results_path(self):
+            return source_archive
+
+        def is_finished(self):
+            return True
+
+        def get_results_folder_path(self):
+            return tmp_path / "no-results-folder"
+
+    def read(dataset=None):
+        try:
+            return MediaArchiveMetadata.read(Source())
+        except (FileNotFoundError, MetadataException):
+            return None
+
+    processor.get_media_metadata = read
+    processor.dataset.new_media_metadata.side_effect = (
+        lambda from_dataset, processor_type, filename=".metadata.json": MediaArchiveMetadata.new(
+            processor_type=processor_type, from_dataset=from_dataset, filename=filename))
+
+
+def run_extractor(tmp_path, monkeypatch, video_names, archive_contents=None, metadata=None):
     """
     Extract frames from an archive of videos
 
+    :param dict metadata:  Contents of the archive's `.metadata.json`, if it
+      has one; an upload of loose video files does not
     :return Path:  The folder the frames were written to
     """
     source_archive = tmp_path / "videos.zip"
     with zipfile.ZipFile(source_archive, "w") as archive:
         for filename in (archive_contents if archive_contents is not None else video_names):
             archive.writestr(filename, "content")
+        if metadata is not None:
+            archive.writestr(".metadata.json", json.dumps(metadata))
 
     videos = []
     for name in video_names:
@@ -47,8 +87,10 @@ def run_extractor(tmp_path, monkeypatch, video_names, archive_contents=None):
     monkeypatch.setattr("shutil.make_archive", lambda *args, **kwargs: None)
 
     processor = MagicMock()
+    processor.type = VideoFrames.type
     processor.parameters = {"frame_interval": 1.0, "frame_size": "no_modify"}
     processor.interrupted = False
+    processor.source_dataset.key = "videoskey"
     processor.source_dataset.num_rows = len(videos)
     processor.source_dataset.get_results_path.return_value = source_archive
     processor.source_dataset.iterate_items.return_value = videos
@@ -56,7 +98,16 @@ def run_extractor(tmp_path, monkeypatch, video_names, archive_contents=None):
     processor.dataset.get_results_path.return_value = tmp_path / "results.zip"
     processor.extract_archived_file_by_name = \
         lambda *args: BasicProcessor.extract_archived_file_by_name(processor, *args)
-    processor.run_interruptable_process.return_value = SimpleNamespace(stdout=b"", stderr=b"", returncode=0)
+
+    def fake_ffmpeg(command, **kwargs):
+        # ffmpeg writes the file named last on its command line, numbering the
+        # frames of each video from 1
+        for number in (1, 2):
+            pathlib.Path(command[-1].replace("%07d", "%07d" % number)).write_text("frame")
+        return SimpleNamespace(stdout=b"", stderr=b"", returncode=0)
+
+    processor.run_interruptable_process.side_effect = fake_ffmpeg
+    wire_metadata(processor, source_archive, tmp_path)
 
     VideoFrames.process(processor)
     return staging_area / "frames"
@@ -74,20 +125,109 @@ def test_videos_differing_only_in_extension_get_a_folder_each(tmp_path, monkeypa
     assert sorted(folder.name for folder in frames.iterdir() if folder.is_dir()) == ["clip.mp4", "clip.webm"]
 
 
-def test_the_videos_metadata_is_copied_along(tmp_path, monkeypatch):
-    """Without it the frames cannot be traced back to the items the videos were found in"""
-    frames = run_extractor(tmp_path, monkeypatch, ["clip.mp4"],
-                           archive_contents=[".metadata.json", "clip.mp4"])
+def test_the_frames_get_metadata_of_their_own(tmp_path, monkeypatch):
+    """
+    A copy of the videos' metadata is keyed by video, so nothing in it names a
+    frame and anything looking a frame up finds nothing. Each frame gets its
+    own entry instead, carrying the posts its video was downloaded for.
+    """
+    frames = run_extractor(tmp_path, monkeypatch, ["clip.mp4"], metadata={
+        "https://example.test/clip": {"success": True, "post_ids": ["p1", "p2"],
+                                      "files": [{"filename": "clip.mp4", "success": True}]},
+    })
 
     assert (frames / ".metadata.json").is_file()
+    written = json.loads((frames / ".metadata.json").read_text(encoding="utf-8"))
+
+    assert written["schema_version"] == 1
+    assert written["processor_type"] == "video-frames"
+
+    # keyed by each frame's path inside the archive, with its video recorded
+    assert sorted(written["items"]) == ["clip.mp4/clip_frame_0000001.jpeg",
+                                        "clip.mp4/clip_frame_0000002.jpeg"]
+    for entry in written["items"].values():
+        assert entry["post_ids"] == ["p1", "p2"]
+        assert entry["extra"]["video_filename"] == "clip.mp4"
+
+    # and a consumer can get from a post back to the frames it produced, which
+    # is the whole point of writing this
+    from common.lib.archive_metadata import MediaArchiveMetadata
+
+    class Written:
+        def get_results_path(self):
+            return frames / ".metadata.json"
+
+        def is_finished(self):
+            return True
+
+        def get_results_folder_path(self):
+            return frames
+
+    assert MediaArchiveMetadata.read(Written()).post_id_to_filenames()["p1"] == [
+        "clip.mp4/clip_frame_0000001.jpeg", "clip.mp4/clip_frame_0000002.jpeg"]
 
 
 def test_an_archive_without_metadata_still_works(tmp_path, monkeypatch):
-    """An upload of loose video files has no metadata file"""
+    """
+    An upload of loose video files has no metadata, so the frames know no posts
+    - but which video each came from is worth recording either way.
+    """
     frames = run_extractor(tmp_path, monkeypatch, ["clip.mp4"])
 
-    assert not (frames / ".metadata.json").exists()
     assert (frames / "clip.mp4").is_dir()
+    written = json.loads((frames / ".metadata.json").read_text(encoding="utf-8"))
+    entry = written["items"]["clip.mp4/clip_frame_0000001.jpeg"]
+    assert entry["post_ids"] == []
+    assert entry["extra"]["video_filename"] == "clip.mp4"
+
+
+"""
+Whether two frames can be given the same name.
+
+The folder a frame is in is what ties it to its video, but not everything that
+reads the frames keeps the folders. The image wall holds the files it is about
+to draw in a dictionary by name, and the unique image filter copies them all
+into a single folder. A name that two frames share is then one frame, and the
+other is gone without a word. So no two frames in an archive may be called the
+same thing, whichever videos they were taken from.
+
+Names that differ only in their capitals are two names to Linux and one name
+to Windows and macOS. 4CAT writes the archive on the server, but the
+researcher unpacks it on their own machine, so such a pair loses a frame there
+while the server sees nothing wrong. Both kinds are checked here, apart from
+one another, because a server running Linux can only ever notice the first.
+"""
+
+
+def shared_names(folder):
+    """
+    The file names in `folder` that more than one file has
+
+    :param Path folder:  Folder to look through, including its subfolders
+    :return tuple:  (names that more than one file has, names that more than
+      one file has once capitals are ignored)
+    """
+    names = [file.name for file in folder.rglob("*") if file.is_file()]
+    folded = [name.lower() for name in names]
+    same = sorted({name for name in names if names.count(name) > 1})
+    same_but_for_capitals = sorted({name for name in names
+                                    if folded.count(name.lower()) > 1 and name not in same})
+    return same, same_but_for_capitals
+
+
+def test_no_two_frames_are_given_the_same_name(tmp_path, monkeypatch):
+    frames = run_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
+
+    same, _ = shared_names(frames)
+    assert not same, f"frames of different videos were given these names: {same}"
+
+
+def test_no_two_frames_are_named_alike_but_for_their_capitals(tmp_path, monkeypatch):
+    frames = run_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
+
+    _, same_but_for_capitals = shared_names(frames)
+    assert not same_but_for_capitals, ("unpacking the archive on Windows or macOS would lose one of "
+                                       f"each of these: {same_but_for_capitals}")
 
 
 """
@@ -123,10 +263,12 @@ def run_scene_extractor(tmp_path, monkeypatch, video_names):
     monkeypatch.setattr("shutil.make_archive", lambda *args, **kwargs: None)
 
     video_dataset = MagicMock()
+    video_dataset.key = "videoskey"
     video_dataset.get_results_path.return_value = source_archive
     video_dataset.iterate_items.return_value = videos
 
     processor = MagicMock()
+    processor.type = VideoSceneFrames.type
     processor.parameters = {"frame_size": "no_modify", "key_frame": "first"}
     processor.interrupted = False
     processor.for_cleanup = []
@@ -145,6 +287,7 @@ def run_scene_extractor(tmp_path, monkeypatch, video_names):
         return SimpleNamespace(stdout=b"", stderr=b"", returncode=0)
 
     processor.run_interruptable_process.side_effect = fake_ffmpeg
+    wire_metadata(processor, source_archive, tmp_path)
 
     VideoSceneFrames.process(processor)
     return staging_area
@@ -167,3 +310,20 @@ def test_scene_frames_of_videos_differing_only_in_extension_stay_apart(tmp_path,
     assert folders == ["clip.mp4", "clip.webm"]
     for folder in folders:
         assert len(list((staging_area / folder).iterdir())) == 1
+
+
+def test_no_two_scene_frames_are_given_the_same_name(tmp_path, monkeypatch):
+    """Two videos whose names differ only in the extension share a name for their frames"""
+    staging_area = run_scene_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
+
+    same, _ = shared_names(staging_area)
+    assert not same, f"scene frames of different videos were given these names: {same}"
+
+
+def test_no_two_scene_frames_are_named_alike_but_for_their_capitals(tmp_path, monkeypatch):
+    """Two videos whose names differ only in their capitals are one video to Windows and macOS"""
+    staging_area = run_scene_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
+
+    _, same_but_for_capitals = shared_names(staging_area)
+    assert not same_but_for_capitals, ("unpacking the archive on Windows or macOS would lose one of "
+                                       f"each of these: {same_but_for_capitals}")
