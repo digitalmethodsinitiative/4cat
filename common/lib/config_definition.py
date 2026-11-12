@@ -762,6 +762,15 @@ config_definition = {
         "help": "Maximum images to show",
         "tooltip": "Maximum number of images to show in the image visualization tab of a dataset. This is to prevent "
                    "issues with large datasets.",
+    },
+    "embeddings.max_embeddings": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 100000,
+        "coerce_type": int,
+        "help": "Maximum embeddings to analyse",
+        "tooltip": "Maximum number of embeddings a single processor may read into memory at once, e.g. for clustering, "
+                   "or reducing dimensions, which need to hold every vector in memory at the same time. "
+                   "'0' means no limit.",
     }
 }
 
@@ -782,6 +791,7 @@ categories = {
     "ui": "User interface",
     "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
+    "embeddings": "Embeddings",
     "extensions": "Extensions",
     "llm": "LLM servers"
 }
