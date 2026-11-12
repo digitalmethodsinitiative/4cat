@@ -19,7 +19,7 @@ from common.lib.item_mapping import MappedItem
 from common.lib.exceptions import ProcessorInterruptedException, QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, nthify, andify, remove_nuls, flatten_dict, urls_in_text
 from common.lib.llm.adapter import LLMAdapter
-from common.lib.llm.llm_client import get_model_library
+from common.lib.llm.llm_client import get_model_library, resolve_model
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
 
@@ -382,15 +382,11 @@ class LLMPrompter(BasicProcessor):
 
         # load model and server metadata
         chosen_model_id = self.parameters.get("model")
-        available_models = {k: v for k, v in self.config.get("llm.available_models").items() if k in self.config.get("llm.enabled_models")}
-        if chosen_model_id not in available_models:
-            return self.dataset.finish_with_error(f"Model {chosen_model_id} not supported")
-
-        model = available_models[chosen_model_id]
-        server = self.config.get("llm.servers").get(model["server"])
-
-        if not server:
-            return self.dataset.finish_with_error(f"Model server for {chosen_model_id} not currently available.")
+        # the same lookup the option list uses, so that a model the user may no
+        # longer pick is not run for them either
+        model, server, error = resolve_model(self.config, chosen_model_id)
+        if error:
+            return self.dataset.finish_with_error(error)
 
         if server["type"] == "thirdparty" and not api_key:
             return self.dataset.finish_with_error(f"No API key provided for model {chosen_model_id}")
