@@ -135,7 +135,8 @@ class VideoSceneFrames(BasicProcessor):
 
             self.dataset.log(f"Video {video.file.name} has {len(scenes[video.file.name]):,} scenes")
 
-            video_folder = staging_area.joinpath(scene_folders.reserve(video.file.name))
+            vid_name = scene_folders.reserve(video.file.name)
+            video_folder = staging_area.joinpath(vid_name)
             video_folder.mkdir()
 
             ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
@@ -181,6 +182,10 @@ class VideoSceneFrames(BasicProcessor):
             # the default filenames can be improved - use scene ID instead of frame #
             for i in range(0, len(scenes[video.file.name])):
                 frame_file = video_folder.joinpath(f"{video.file.stem}_frame_{i+1}.jpeg")
+                if not frame_file.exists():
+                    # don't fail on rename if anything above with ffmpeg crashed
+                    continue
+
                 frame_file.rename(frame_file.with_stem(f"{video.file.stem}_scene_{frame_scenes[i]['scene']}"))
 
             processed_frames += len(scenes[video.file.name])
