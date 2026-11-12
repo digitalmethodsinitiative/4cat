@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from common.lib.archive_metadata import MediaArchiveMetadata
+from common.lib.helpers import fold_filename
 from processors.filtering.unique_images import UniqueImageFilter
 
 
@@ -164,7 +165,7 @@ def test_images_with_the_same_name_in_different_folders_are_all_kept(tmp_path):
     assert sorted(path.read_bytes() for path in kept) == [b"first video", b"second video", b"third video"]
 
 
-def test_images_named_alike_but_for_their_capitals_are_kept_apart(tmp_path):
+def test_images_that_are_one_name_on_windows_or_macos_are_kept_apart(tmp_path):
     """
     The filter chooses the names in its own archive, so it decides whether that
     archive can be unpacked whole. Two names that differ only in their capitals
@@ -179,6 +180,6 @@ def test_images_named_alike_but_for_their_capitals_are_kept_apart(tmp_path):
     )
 
     written = [path.name for path in (tmp_path / "staging").iterdir() if path.name != ".metadata.json"]
-    folded = {name.lower() for name in written}
+    folded = {fold_filename(name) for name in written}
     assert len(folded) == len(written), ("the filter put these in one folder, so unpacking its archive "
                                         f"on Windows or macOS would lose one: {sorted(written)}")

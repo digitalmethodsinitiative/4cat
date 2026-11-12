@@ -8,7 +8,7 @@ real processors.
 """
 import pytest
 
-from common.lib.helpers import UniqueFilenames, deduplicate_filename, url_to_filename
+from common.lib.helpers import UniqueFilenames, deduplicate_filename, fold_filename, url_to_filename
 
 
 def test_free_name_is_returned_unchanged(tmp_path):
@@ -154,7 +154,7 @@ def test_long_urls_sharing_a_slug_prefix_get_different_names(tmp_path):
 
 def test_deduplicate_filename_rejects_a_non_set():
 	with pytest.raises(TypeError):
-		deduplicate_filename("clip.wav", existing_filenames=["clip.wav"])
+		deduplicate_filename("clip.wav", existing_filenames_folded=["clip.wav"])
 
 
 def test_deduplicate_filename_respects_max_bytes():
@@ -166,7 +166,90 @@ def test_deduplicate_filename_respects_max_bytes():
 def test_deduplicate_filename_keeps_the_index_within_max_bytes():
 	seen = set()
 	for _ in range(3):
-		name = deduplicate_filename("a" * 300 + ".wav", existing_filenames=seen, max_bytes=32)
-		seen.add(name)
+		name = deduplicate_filename("a" * 300 + ".wav", existing_filenames_folded=seen, max_bytes=32)
+		seen.add(fold_filename(name))
 	assert len(seen) == 3
 	assert all(len(name.encode("utf-8")) <= 32 for name in seen)
+
+
+"""
+Names that are one name to some file systems.
+
+4CAT writes an archive on the server and the researcher unpacks it on their
+own machine. Windows and macOS see two names as one in ways Linux does not, so
+a name that looks free on the server can land on a file that is already there
+once the archive is opened: it unpacks short, with nothing to say so. A name is
+free here only when no name already taken reduces to the same text.
+"""
+
+
+def test_names_differing_only_in_capitals_are_not_both_free(tmp_path):
+	names = UniqueFilenames(tmp_path)
+
+	assert names.reserve("A.mp4") == "A.mp4"
+	assert names.reserve("a.mp4") == "a-1.mp4"
+
+
+def test_the_name_handed_out_keeps_its_own_capitals(tmp_path):
+	"""Only the comparing is done on a reduced name; the caller gets what it asked for"""
+	assert UniqueFilenames(tmp_path).reserve("Clip.MP4") == "Clip.MP4"
+
+
+def test_a_file_on_disk_differing_only_in_capitals_is_taken(tmp_path):
+	"""The file in the way need not have been named from here"""
+	tmp_path.joinpath("Clip.wav").touch()
+
+	assert UniqueFilenames(tmp_path).reserve("clip.wav") == "clip-1.wav"
+
+
+def test_a_claimed_name_differing_only_in_capitals_is_taken(tmp_path):
+	names = UniqueFilenames(tmp_path)
+	names.claim("Some_URL_00001.mp4")
+
+	assert names.reserve_for_url("https://example.com/some_url_00001.mp4") == "some_url_00001-1.mp4"
+
+
+def test_the_german_sharp_s_matches_its_two_letter_spelling(tmp_path):
+	"""
+	Lower-casing leaves the sharp s as it is, so seeing that these are one name
+	takes case folding rather than lower-casing.
+	"""
+	names = UniqueFilenames(tmp_path)
+
+	assert names.reserve("stra\u00dfe.mp4") == "stra\u00dfe.mp4"
+	assert names.reserve("STRASSE.mp4") == "STRASSE-1.mp4"
+
+
+def test_an_accent_written_two_ways_is_one_name(tmp_path):
+	"""
+	macOS stores an accented letter as the plain letter followed by the accent,
+	and treats the single-character spelling as the same file.
+
+	The two names below are written as escapes on purpose. Spelled out they
+	look exactly alike, and a reader tidying them into the characters they
+	stand for would leave a test that no longer tests anything.
+	"""
+	names = UniqueFilenames(tmp_path)
+	one_character = "caf\u00e9.mp4"
+	letter_then_accent = "cafe\u0301.mp4"
+
+	assert names.reserve(one_character) == one_character
+	assert names.reserve(letter_then_accent) != letter_then_accent
+
+
+def test_a_dot_or_space_at_the_end_does_not_make_a_new_name(tmp_path):
+	"""Windows drops dots and spaces at the end of a name, so these are all `clip` there"""
+	names = UniqueFilenames(tmp_path)
+
+	assert names.reserve("clip") == "clip"
+	assert names.reserve("clip.") != "clip."
+	assert names.reserve("clip ") != "clip "
+
+
+def test_reducing_a_name_is_not_a_way_to_write_it(tmp_path):
+	"""
+	The reduced name is for comparing. A caller that wrote a file under it would
+	undo the point of the exercise, so this records what it is.
+	"""
+	assert fold_filename("Clip.MP4") == "clip.mp4"
+	assert fold_filename("clip. ") == "clip"

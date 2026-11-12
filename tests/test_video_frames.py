@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 from packaging import version
 
 from backend.lib.processor import BasicProcessor
+from common.lib.helpers import fold_filename
 from processors.visualisation.video_frames import VideoFrames
 from processors.visualisation.video_scene_frames import VideoSceneFrames
 
@@ -122,16 +123,20 @@ def shared_names(folder):
     """
     The file names in `folder` that more than one file has
 
+    The second kind is judged with `fold_filename`, the same way the code that
+    hands names out judges it, so a name this accepts is a name that can be
+    written. Capitals are only one of the differences it covers.
+
     :param Path folder:  Folder to look through, including its subfolders
-    :return tuple:  (names that more than one file has, names that more than
-      one file has once capitals are ignored)
+    :return tuple:  (names that more than one file has, names that are one
+      name to Windows or macOS)
     """
     names = [file.name for file in folder.rglob("*") if file.is_file()]
-    folded = [name.lower() for name in names]
+    folded = [fold_filename(name) for name in names]
     same = sorted({name for name in names if names.count(name) > 1})
-    same_but_for_capitals = sorted({name for name in names
-                                    if folded.count(name.lower()) > 1 and name not in same})
-    return same, same_but_for_capitals
+    same_elsewhere = sorted({name for name in names
+                             if folded.count(fold_filename(name)) > 1 and name not in same})
+    return same, same_elsewhere
 
 
 def test_no_two_frames_are_given_the_same_name(tmp_path, monkeypatch):
@@ -141,12 +146,12 @@ def test_no_two_frames_are_given_the_same_name(tmp_path, monkeypatch):
     assert not same, f"frames of different videos were given these names: {same}"
 
 
-def test_no_two_frames_are_named_alike_but_for_their_capitals(tmp_path, monkeypatch):
+def test_no_two_frames_are_one_name_on_windows_or_macos(tmp_path, monkeypatch):
     frames = run_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
 
-    _, same_but_for_capitals = shared_names(frames)
-    assert not same_but_for_capitals, ("unpacking the archive on Windows or macOS would lose one of "
-                                       f"each of these: {same_but_for_capitals}")
+    _, same_elsewhere = shared_names(frames)
+    assert not same_elsewhere, ("unpacking the archive on Windows or macOS would lose one of "
+                                f"each of these: {same_elsewhere}")
 
 
 """
@@ -236,10 +241,10 @@ def test_no_two_scene_frames_are_given_the_same_name(tmp_path, monkeypatch):
     assert not same, f"scene frames of different videos were given these names: {same}"
 
 
-def test_no_two_scene_frames_are_named_alike_but_for_their_capitals(tmp_path, monkeypatch):
+def test_no_two_scene_frames_are_one_name_on_windows_or_macos(tmp_path, monkeypatch):
     """Two videos whose names differ only in their capitals are one video to Windows and macOS"""
     staging_area = run_scene_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
 
-    _, same_but_for_capitals = shared_names(staging_area)
-    assert not same_but_for_capitals, ("unpacking the archive on Windows or macOS would lose one of "
-                                       f"each of these: {same_but_for_capitals}")
+    _, same_elsewhere = shared_names(staging_area)
+    assert not same_elsewhere, ("unpacking the archive on Windows or macOS would lose one of "
+                                f"each of these: {same_elsewhere}")

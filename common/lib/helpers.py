@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import unicodedata
 import subprocess
 import imagehash
 import hashlib
@@ -1373,7 +1374,8 @@ def readable_url(url):
     # encode what a URL cannot contain as it is, and what would be invisible
     return URL_ENCODED_CHARACTERS.sub(lambda match: quote(match.group(), safe=""), url)
 
-def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
+def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255,
+                    existing_filenames_folded=None):
         """
         Determine filenames for saved files
 
@@ -1393,8 +1395,9 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         :param str default_ext:  Default extension to use if no filename can be
         extracted from the URL
         :param int max_bytes:  Maximum number of bytes for the filename
-        :param set existing_filenames:  Set of existing filenames to avoid
-        collisions with (in addition to those in the staging area, if provided).
+        :param set existing_filenames_folded:  Set of existing filenames to
+        avoid collisions with (in addition to those in the staging area, if
+        provided), each one put through `fold_filename` first.
         :return str:  Suitable file name
         """
         clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
@@ -1407,11 +1410,45 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         base_filename = re.sub(r"[:~]", "", base_filename)
 
         return deduplicate_filename(base_filename, staging_area=staging_area, max_bytes=max_bytes,
-                                    existing_filenames=existing_filenames,
+                                    existing_filenames_folded=existing_filenames_folded,
                                     fallback_name=default_name, fallback_ext=default_ext)
 
 
-def deduplicate_filename(filename, staging_area=None, existing_filenames=None, max_bytes=255,
+def fold_filename(filename) -> str:
+    """
+    Reduce a file name to what a file system may see as one name
+
+    Two names that reduce to the same text are two files on a Linux server and
+    one file on a Windows or macOS machine, so an archive holding both unpacks
+    short there, with no warning and no way for the server to have noticed.
+    Reducing both names and comparing those catches it while the archive is
+    still being written.
+
+    What is reduced, and why each one:
+
+    - Upper and lower case, because Windows and macOS do not tell them apart.
+      `casefold` rather than `lower`, so that `straße` and `STRASSE` come
+      out the same as well.
+    - An accented letter written as one character, or as the plain letter
+      followed by a combining accent. macOS stores the second spelling and
+      treats both as one name, so `café` is one file there however it was
+      typed. Those two spellings cannot be told apart by eye, which is why
+      the tests for them write the characters out as escapes.
+    - Dots and spaces at the end of the name, because Windows drops them, so
+      `clip.` and `clip` are one name there.
+
+    The result is for comparing only. Never write a file under it: it is not
+    the name anybody asked for.
+
+    :param str filename:  Name to reduce
+    :return str:  The reduced name
+    """
+    # case first, then the accents, because folding the case of a decomposed
+    # letter leaves it decomposed
+    return unicodedata.normalize("NFC", filename.casefold()).rstrip(". ")
+
+
+def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=None, max_bytes=255,
                          fallback_name="file", fallback_ext="") -> str:
     """
     Make a filename unique within a directory
@@ -1425,18 +1462,23 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames=None, m
     :param str filename:  The name to use if it is free
     :param Path staging_area:  Directory to check for a file of this name; if
       None, only `existing_filenames` is consulted
-    :param set existing_filenames:  Names already taken
+    :param set existing_filenames_folded:  Names already taken, each one put
+      through `fold_filename` first. The caller holds this set and so folds
+      it; folding it here would mean redoing every name on every call, which
+      over an archive of many thousands of files is work enough to notice.
+      `UniqueFilenames` keeps such a set as it hands names out, and is the
+      way to do this unless there is a reason to call here directly.
     :param int max_bytes:  Maximum number of bytes for the filename
     :param str fallback_name:  Name to fall back on in the extreme case of an
       extension that does not itself fit within `max_bytes`
     :param str fallback_ext:  Extension to use in that same case
     :return str:  A name nothing else has
     """
-    if existing_filenames is None:
-        existing_filenames = set()
-    if type(existing_filenames) is not set:
+    if existing_filenames_folded is None:
+        existing_filenames_folded = set()
+    if type(existing_filenames_folded) is not set:
         # Could force set() here, but likely would be forcing in a loop
-        raise TypeError("existing_filenames must be a set")
+        raise TypeError("existing_filenames_folded must be a set")
 
     # Split base filename into name and extension
     if '.' in filename:
@@ -1466,14 +1508,15 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames=None, m
 
         filename = name_part + ext_part
 
-    if staging_area or existing_filenames:
+    if staging_area or existing_filenames_folded:
         # Ensure the filename is unique in the staging area
         file_index = 1
 
         file_path = staging_area.joinpath(filename) if staging_area else None
 
         # Loop while collision in-memory OR on disk (if staging_area given)
-        while (filename in existing_filenames) or (staging_area and file_path.exists()):
+        while (fold_filename(filename) in existing_filenames_folded) \
+                or (staging_area and file_path.exists()):
             # Calculate space needed for index suffix
             index_suffix = f"-{file_index}"
 
@@ -1519,9 +1562,19 @@ class UniqueFilenames:
     and every name handed out afterwards is checked against it as well. That
     second check is what catches a file written by something that never asked
     for a name - yt-dlp naming its own download, a video copied out of an
-    earlier archive - and it is the file system's own answer, so on Windows
-    and macOS it also catches a name that an existing file differs from only
-    in its capitals.
+    earlier archive.
+
+    A name is free only if no name taken already reduces to the same text, as
+    `fold_filename` reduces it. So the names here are kept twice over: as they
+    were handed out, which is what callers get, and reduced, which is what
+    they are compared by. Without that, an archive could be given both `A.mp4`
+    and `a.mp4` on a Linux server and lose one of them when a researcher
+    unpacks it on their own machine.
+
+    Record a name with `reserve`, `reserve_for_url` or `claim`, never by
+    adding to the sets directly. There are two of them to keep in step, and a
+    name added to one but not the other is a name the checks do not know
+    about.
 
     A name that has been reserved but not yet written exists only in this
     object, so reserve a name before writing to it rather than relying on the
@@ -1536,8 +1589,10 @@ class UniqueFilenames:
         """
         self.directory = directory
         self.taken = set()
+        self.taken_folded = set()
         if directory is not None and directory.is_dir():
-            self.taken = {item.name for item in directory.iterdir()}
+            for item in directory.iterdir():
+                self._remember(item.name)
 
     def reserve(self, filename, **kwargs) -> str:
         """
@@ -1549,8 +1604,8 @@ class UniqueFilenames:
         :return str:  The name reserved, which is `filename` if it was free
         """
         filename = deduplicate_filename(filename, staging_area=self.directory,
-                                        existing_filenames=self.taken, **kwargs)
-        self.taken.add(filename)
+                                        existing_filenames_folded=self.taken_folded, **kwargs)
+        self._remember(filename)
         return filename
 
     def reserve_for_url(self, url, **kwargs) -> str:
@@ -1562,8 +1617,8 @@ class UniqueFilenames:
         :return str:  The name reserved
         """
         filename = url_to_filename(url, staging_area=self.directory,
-                                   existing_filenames=self.taken, **kwargs)
-        self.taken.add(filename)
+                                   existing_filenames_folded=self.taken_folded, **kwargs)
+        self._remember(filename)
         return filename
 
     def claim(self, filename) -> None:
@@ -1577,7 +1632,16 @@ class UniqueFilenames:
 
         :param str filename:  Name to record as taken
         """
+        self._remember(filename)
+
+    def _remember(self, filename) -> None:
+        """
+        Record a name as taken, both as it was given and reduced
+
+        :param str filename:  Name to record
+        """
         self.taken.add(filename)
+        self.taken_folded.add(fold_filename(filename))
 
     def replace(self, current, filename, **kwargs) -> str:
         """
@@ -1593,6 +1657,11 @@ class UniqueFilenames:
         :return str:  The name reserved
         """
         self.taken.discard(current)
+        # another name still taken may reduce to the same text, and that text
+        # is then still taken too
+        folded = fold_filename(current)
+        if not any(fold_filename(name) == folded for name in self.taken):
+            self.taken_folded.discard(folded)
         return self.reserve(filename, **kwargs)
 
 
