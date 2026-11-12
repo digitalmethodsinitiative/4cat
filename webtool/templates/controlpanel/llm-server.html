@@ -112,11 +112,10 @@
                                 </td>
                                 <td>
                                     {% if model.supported_media_types %}
-
                                         {% for supported_media_type in model.supported_media_types %}
                                             <span class="property-badge">{{ supported_media_type }}</span>
                                         {% endfor %}
-                                    {% else %}
+                                    {% elif model.model_card %}
                                         <a href="{{ model.model_card }}" target="_blank">
                                             <span class="property-badge">See model card</span>
                                         </a>
