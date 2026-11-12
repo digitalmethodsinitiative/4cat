@@ -18,10 +18,14 @@ from processors.visualisation.video_scene_frames import VideoSceneFrames
 """
 What a video's frames folder is called.
 
-Each video's frames go into a folder of their own, named after the video file.
-Keeping the extension matters twice over: `clip.mp4` and `clip.webm` are two
-videos and need two folders, and the name is how whatever reads the frames
-later looks the video up in the metadata file, which records it by file name.
+Each video's frames go into a folder of their own, named after the video file,
+so that an archive of many thousands of frames can still be looked through.
+The extension is part of the name, because `clip.mp4` and `clip.webm` are two
+videos and need two folders.
+
+The folder is for tidiness only. Which video a frame came from is recorded in
+the metadata, as the frame entry's `source_file`, and the frames are named so
+that no two of them in an archive share a name whatever folder they are in.
 """
 
 FRAME_TEST_NAMES = ["clip.mp4", "clip.webm", "A.mp4", "a.mp4", "other.mp4"]
@@ -143,12 +147,15 @@ def test_the_frames_get_metadata_of_their_own(tmp_path, monkeypatch):
     assert written["schema_version"] == 1
     assert written["processor_type"] == "video-frames"
 
-    # keyed by each frame's path inside the archive, with its video recorded
-    assert sorted(written["items"]) == ["clip.mp4/clip_frame_0000001.jpeg",
-                                        "clip.mp4/clip_frame_0000002.jpeg"]
+    # keyed by each frame's name, not by its path in the archive. Everything
+    # that reads a media archive looks a file up by `item.file.name`, so a
+    # path would be a key nothing asks for. The names are unique archive-wide,
+    # which is what lets the folders stay out of it.
+    assert sorted(written["items"]) == ["clip_mp4_frame_0000001.jpeg",
+                                        "clip_mp4_frame_0000002.jpeg"]
     for entry in written["items"].values():
         assert entry["post_ids"] == ["p1", "p2"]
-        assert entry["extra"]["video_filename"] == "clip.mp4"
+        assert entry["source_file"] == "clip.mp4"
 
     # and a consumer can get from a post back to the frames it produced, which
     # is the whole point of writing this
@@ -165,7 +172,7 @@ def test_the_frames_get_metadata_of_their_own(tmp_path, monkeypatch):
             return frames
 
     assert MediaArchiveMetadata.read(Written()).post_id_to_filenames()["p1"] == [
-        "clip.mp4/clip_frame_0000001.jpeg", "clip.mp4/clip_frame_0000002.jpeg"]
+        "clip_mp4_frame_0000001.jpeg", "clip_mp4_frame_0000002.jpeg"]
 
 
 def test_an_archive_without_metadata_still_works(tmp_path, monkeypatch):
@@ -177,9 +184,9 @@ def test_an_archive_without_metadata_still_works(tmp_path, monkeypatch):
 
     assert (frames / "clip.mp4").is_dir()
     written = json.loads((frames / ".metadata.json").read_text(encoding="utf-8"))
-    entry = written["items"]["clip.mp4/clip_frame_0000001.jpeg"]
+    entry = written["items"]["clip_mp4_frame_0000001.jpeg"]
     assert entry["post_ids"] == []
-    assert entry["extra"]["video_filename"] == "clip.mp4"
+    assert entry["source_file"] == "clip.mp4"
 
 
 """

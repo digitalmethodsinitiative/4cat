@@ -14,7 +14,7 @@ from packaging import version
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.user_input import UserInput
-from common.lib.helpers import get_ffmpeg_version, UniqueFilenames
+from common.lib.helpers import get_ffmpeg_version, UniqueFilenames, filename_to_prefix
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -126,10 +126,18 @@ class VideoSceneFrames(BasicProcessor):
                           or video_dataset.key),
         )
 
-        # a folder of frames per video, named after the video file. The
-        # extension is part of it: clip.mp4 and clip.webm are two videos, and
-        # the metadata records each by its file name.
+        # a folder of frames per video, named after the video file, to keep an
+        # archive of many thousands of frames possible to look through. The
+        # extension is part of the name, since clip.mp4 and clip.webm are two
+        # videos. Which video a frame came from is recorded in the metadata as
+        # its source_file, not left to the folder it sits in.
         scene_folders = UniqueFilenames(staging_area)
+
+        # the frames are named after their video as well, and no two frames in
+        # the archive may share a name. Whatever reads them next may hold them
+        # all in one folder, and the metadata records each frame by its name
+        # alone, so the folders keep the frames tidy rather than apart.
+        frame_names = UniqueFilenames()
 
         for video in video_dataset.iterate_items(self):
             if video.file.name not in scenes:
@@ -140,6 +148,10 @@ class VideoSceneFrames(BasicProcessor):
             vid_name = scene_folders.reserve(video.file.name)
             video_folder = staging_area.joinpath(vid_name)
             video_folder.mkdir()
+
+            # every video numbers its frames from 1, so the video's name is what
+            # tells one video's first frame from another's
+            frame_name = frame_names.reserve(filename_to_prefix(video.file.name))
 
             ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
             fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
@@ -166,7 +178,7 @@ class VideoSceneFrames(BasicProcessor):
                 "-i", oslex.quote(str(video.file)),
                 "-vf", f"select='{vf_param}'",
                 fps_command, "passthrough",
-                oslex.quote(str(video_folder.joinpath(f"{video.file.stem}_frame_%d.jpeg")))
+                oslex.quote(str(video_folder.joinpath(f"{frame_name}_frame_%d.jpeg")))
             ]
 
             if frame_size != "no_modify":
@@ -190,16 +202,16 @@ class VideoSceneFrames(BasicProcessor):
             # the default filenames can be improved - use scene ID instead of frame #
             captured = 0
             for i in range(0, len(scenes[video.file.name])):
-                frame_file = video_folder.joinpath(f"{video.file.stem}_frame_{i+1}.jpeg")
+                frame_file = video_folder.joinpath(f"{frame_name}_frame_{i+1}.jpeg")
                 if not frame_file.exists():
                     # don't fail on rename if anything above with ffmpeg crashed
                     continue
 
                 scene_frame = frame_file.rename(
-                    frame_file.with_stem(f"{video.file.stem}_scene_{frame_scenes[i]['scene']}"))
-                metadata.add_item(f"{vid_name}/{scene_frame.name}", post_ids=post_ids, url=source_url,
-                                  extra={"video_filename": video.file.name,
-                                         "scene": frame_scenes[i]["scene"]})
+                    frame_file.with_stem(f"{frame_name}_scene_{frame_scenes[i]['scene']}"))
+                metadata.add_item(scene_frame.name, post_ids=post_ids, url=source_url,
+                                  source_file=video.file.name,
+                                  extra={"scene": frame_scenes[i]["scene"]})
                 captured += 1
 
             if not captured:
@@ -207,7 +219,7 @@ class VideoSceneFrames(BasicProcessor):
                     post_ids=post_ids, url=source_url, reason="no_frames_extracted",
                     reason_description=(f"ffmpeg exited with code {result.returncode}" if result.returncode
                                         else "ffmpeg reported no error but wrote no frames"),
-                    extra={"video_filename": video.file.name})
+                    source_file=video.file.name)
 
             processed_frames += len(scenes[video.file.name])
 

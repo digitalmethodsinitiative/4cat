@@ -134,16 +134,17 @@ class AudioExtractor(BasicProcessor):
             video_item = source_metadata.get_entry(item.file.name) if source_metadata else None
             post_ids = video_item.get("post_ids", []) if video_item else []
             source_url = video_item.get("url") if video_item else None
-            extra = {"video_filename": item.file.name}
 
             # the name is this video's alone, so the file can only have been
             # written by the run above
             if audio_file.exists():
                 written += 1
-                metadata.add_item(audio_filename, post_ids=post_ids, url=source_url, extra=extra)
+                metadata.add_item(audio_filename, post_ids=post_ids, url=source_url,
+                                  source_file=item.file.name)
             else:
                 metadata.add_failure(
                     post_ids=post_ids,
+                    source_file=item.file.name,
                     reason="extraction_failed",
                     reason_description=(
                         f"ffmpeg exited with code {result.returncode}" if result.returncode

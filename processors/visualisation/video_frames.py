@@ -10,7 +10,7 @@ import oslex
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UniqueFilenames
+from common.lib.helpers import UniqueFilenames, filename_to_prefix
 from common.lib.user_input import UserInput
 from processors.visualisation.download_videos import VideoDownloaderPlus
 
@@ -92,10 +92,18 @@ class VideoFrames(BasicProcessor):
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
-		# a folder of frames per video, named after the video file. The
-		# extension is part of it: clip.mp4 and clip.webm are two videos, and
-		# the metadata records each by its file name.
+		# a folder of frames per video, named after the video file, to keep an
+		# archive of many thousands of frames possible to look through. The
+		# extension is part of the name, since clip.mp4 and clip.webm are two
+		# videos. Which video a frame came from is recorded in the metadata as
+		# its source_file, not left to the folder it sits in.
 		frame_folders = UniqueFilenames(output_directory)
+
+		# the frames are named after their video as well, and no two frames in
+		# the archive may share a name. Whatever reads them next may hold them
+		# all in one folder, and the metadata records each frame by its name
+		# alone, so the folders keep the frames tidy rather than apart.
+		frame_names = UniqueFilenames()
 
 		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
@@ -117,6 +125,10 @@ class VideoFrames(BasicProcessor):
 			video_dir = output_directory.joinpath(vid_name)
 			video_dir.mkdir()
 
+			# every video numbers its frames from 1, so the video's name is what
+			# tells one video's first frame from another's
+			frame_name = frame_names.reserve(filename_to_prefix(video.file.name))
+
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
 				"-y", "-nostdin", "-i", str(video.file),
@@ -130,8 +142,7 @@ class VideoFrames(BasicProcessor):
 			if frame_size != 'no_modify':
 				command.extend(['-s', oslex.quote(frame_size)])
 
-			# the video's name, since every video numbers its frames from 1
-			command.extend([str(video_dir.joinpath(f"{video.file.stem}_frame_%07d.jpeg"))])
+			command.extend([str(video_dir.joinpath(f"{frame_name}_frame_%07d.jpeg"))])
 
 			self.dataset.log(" ".join(command))
 
@@ -142,11 +153,11 @@ class VideoFrames(BasicProcessor):
 			ffmpeg_error = result.stderr.decode("utf-8")
 
 			if ffmpeg_output:
-				with open(video_dir.joinpath('ffmpeg_output.log'), 'w') as outfile:
+				with open(video_dir.joinpath(f"{frame_name}_ffmpeg_output.log"), 'w') as outfile:
 					outfile.write(ffmpeg_output)
 
 			if ffmpeg_error:
-				with open(video_dir.joinpath('ffmpeg_error.log'), 'w') as outfile:
+				with open(video_dir.joinpath(f"{frame_name}_ffmpeg_error.log"), 'w') as outfile:
 					outfile.write(ffmpeg_error)
 
 			if result.returncode != 0:
@@ -165,8 +176,8 @@ class VideoFrames(BasicProcessor):
 
 			frames = sorted(video_dir.glob("*.jpeg"))
 			for frame in frames:
-				metadata.add_item(f"{vid_name}/{frame.name}", post_ids=post_ids, url=source_url,
-								  extra={"video_filename": video.file.name})
+				metadata.add_item(frame.name, post_ids=post_ids, url=source_url,
+								  source_file=video.file.name)
 
 			if not frames:
 				# ffmpeg can fail, but let's keep the items stay traceable
@@ -174,7 +185,7 @@ class VideoFrames(BasicProcessor):
 					post_ids=post_ids, url=source_url, reason="no_frames_extracted",
 					reason_description=(f"ffmpeg exited with code {result.returncode}" if result.returncode
 										else "ffmpeg reported no error but wrote no frames"),
-					extra={"video_filename": video.file.name})
+					source_file=video.file.name)
 
 			self.dataset.update_progress(i / total_possible_videos)
 

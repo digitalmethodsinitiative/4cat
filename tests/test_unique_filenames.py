@@ -8,7 +8,8 @@ real processors.
 """
 import pytest
 
-from common.lib.helpers import UniqueFilenames, deduplicate_filename, fold_filename, url_to_filename
+from common.lib.helpers import (UniqueFilenames, deduplicate_filename, filename_to_prefix,
+                                fold_filename, url_to_filename)
 
 
 def test_free_name_is_returned_unchanged(tmp_path):
@@ -253,3 +254,62 @@ def test_reducing_a_name_is_not_a_way_to_write_it(tmp_path):
 	"""
 	assert fold_filename("Clip.MP4") == "clip.mp4"
 	assert fold_filename("clip. ") == "clip"
+
+"""
+Building a name out of another file's name.
+
+A file made from another file is named after it, so that the two can be told
+apart by eye. What comes out has to be a name a file system will take, and two
+videos that are not the same video should not lead to one name.
+"""
+
+
+def test_the_extension_becomes_part_of_the_name():
+	"""So that a frame of `clip.mp4` is not called `clip.mp4_frame_1.jpeg`"""
+	assert filename_to_prefix("clip.mp4") == "clip_mp4"
+
+
+def test_only_the_last_dot_changes():
+	"""
+	Replacing every dot would give `my_video_mp4` for both of these, and they
+	are two different videos.
+	"""
+	assert filename_to_prefix("my.video.mp4") == "my.video_mp4"
+	assert filename_to_prefix("my_video.mp4") == "my_video_mp4"
+
+
+def test_a_name_without_an_extension_is_left_alone():
+	assert filename_to_prefix("clip") == "clip"
+
+
+def test_characters_windows_forbids_are_replaced():
+	"""A file by this name cannot be written on Windows at all"""
+	for forbidden in (":", "?", "*", "\"", "<", ">", "|", "/", "\\"):
+		assert not set(forbidden) & set(filename_to_prefix(f"what{forbidden}.mp4"))
+
+
+def test_dots_and_spaces_at_the_ends_are_dropped():
+	"""
+	Windows drops a dot at the end of a name, and a name starting with one is
+	hidden from whoever unpacks the archive.
+	"""
+	assert filename_to_prefix("clip.") == "clip"
+	assert filename_to_prefix("clip ") == "clip"
+	assert filename_to_prefix(".clip.mp4") == "clip_mp4"
+
+
+def test_a_name_with_nothing_usable_left_falls_back():
+	assert filename_to_prefix("...") == "file"
+	assert filename_to_prefix("...", fallback="video") == "video"
+
+
+def test_two_names_that_still_meet_are_kept_apart_by_the_registry(tmp_path):
+	"""
+	The one pair this cannot keep apart, and what happens to it. Nothing is
+	lost: the names differ, and which video each came from is in the metadata.
+	"""
+	assert filename_to_prefix("a.mp4") == filename_to_prefix("a_mp4") == "a_mp4"
+
+	names = UniqueFilenames()
+	assert names.reserve(filename_to_prefix("a.mp4")) == "a_mp4"
+	assert names.reserve(filename_to_prefix("a_mp4")) == "a_mp4-1"

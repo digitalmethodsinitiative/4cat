@@ -1414,6 +1414,47 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
                                     fallback_name=default_name, fallback_ext=default_ext)
 
 
+WINDOWS_FORBIDS_IN_A_FILENAME = re.compile(r'[:?*"<>|\\/]')
+
+
+def filename_to_prefix(filename, fallback="file") -> str:
+    """
+    Turn a file's name into the start of a name for a file made from it
+
+    A processor that writes a file per item of another archive - frames out of
+    a video, audio out of a video - names what it writes after what it read, so
+    the two can be told apart by eye. It starts from a file name and has to end
+    up with one, so three things are seen to here:
+
+    - Characters Windows does not allow are replaced, because a file whose name
+      holds one of them cannot be written there at all.
+    - The dot before the extension becomes an underscore, so the name built
+      from it does not read as though it had two extensions: `clip.mp4` gives
+      `clip_mp4`, and `clip_mp4_frame_1.jpeg` has one extension rather than
+      looking like it has two. Only that last dot changes, so `my.video.mp4`
+      and `my_video.mp4` do not turn into one name.
+    - Dots and spaces at either end are dropped. Windows drops a dot at the
+      end, and a name starting with one is hidden from the researcher who
+      unpacks the archive.
+
+    Two names can still come out of this the same - a video called `a.mp4` and
+    a video with no extension called `a_mp4` both give `a_mp4` - so what comes
+    back is a suggestion rather than a name nothing else has. Reserve it with
+    `UniqueFilenames` to get one of those.
+
+    :param str filename:  Name of the file the new one is made from
+    :param str fallback:  Name to fall back on when nothing usable is left,
+      as for a name that is nothing but dots
+    :return str:  Name to build another file's name out of
+    """
+    name = WINDOWS_FORBIDS_IN_A_FILENAME.sub("_", filename)
+    stem, _, extension = name.rpartition(".")
+    if stem and extension:
+        name = f"{stem}_{extension}"
+
+    return name.strip(". ") or fallback
+
+
 def fold_filename(filename) -> str:
     """
     Reduce a file name to what a file system may see as one name
