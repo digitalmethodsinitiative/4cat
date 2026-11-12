@@ -29,11 +29,12 @@ db = Database(
 )
 
 print("  Clearing known LLM models so they are re-indexed with task support...")
-has_setting = db.fetchone("SELECT COUNT(*) AS num FROM settings WHERE name = 'llm.available_models'")
+# every tag!
+cleared = db.execute("UPDATE settings SET value = '{}' WHERE name = 'llm.available_models'")
 
-if has_setting["num"] > 0:
-    db.upsert("settings", {"name": "llm.available_models", "value": "{}", "tag": ""}, constraints=["name", "tag"])
-    print("    ...cleared; models will be re-indexed on 4CAT restart")
+if cleared:
+    print(f"    ...cleared {cleared} inventor{'y' if cleared == 1 else 'ies'}; models will be re-indexed on 4CAT "
+          f"restart")
 else:
     print("    ...no models indexed yet, nothing to do")
 
