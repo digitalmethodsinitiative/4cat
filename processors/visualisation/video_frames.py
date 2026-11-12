@@ -129,7 +129,7 @@ class VideoFrames(BasicProcessor):
 			if frame_size != 'no_modify':
 				command.extend(['-s', oslex.quote(frame_size)])
 
-			command.extend([str(video_dir.joinpath("video_frame_%07d.jpeg"))])
+			command.extend([str(video_dir.joinpath(f"{vid_name}_frame_%07d.jpeg"))])
 
 			self.dataset.log(" ".join(command))
 
