@@ -48,7 +48,7 @@ class OllamaClient(LLMServerClient):
         - `"completion"` → `"text"`
         - `"vision"`     → `"image"`
         - `"audio"`      → `"audio"`
-        - `"embedding"`  → `"text"` (an embedder still consumes text)
+        - `"embedding"`  → `"text"`
 
         **Fallback path** (used when capabilities are absent or only yield `"text"`):
         inspects GGUF `model_info` / `details` for vision signals and adds
@@ -67,7 +67,7 @@ class OllamaClient(LLMServerClient):
 
         _cap_map = {
             "completion": "text",
-            "embedding": "embed",  # there are multimodal embeddings in Ollama now, so we don't know what input type..
+            "embedding": "text",  # a multimodal embedder also shows vision and audio
             "vision": "image",
             "audio": "audio",
         }
