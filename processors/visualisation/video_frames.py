@@ -151,12 +151,16 @@ class VideoFrames(BasicProcessor):
 			ffmpeg_output = result.stdout.decode("utf-8")
 			ffmpeg_error = result.stderr.decode("utf-8")
 
+			# ffmpeg names the video it was working on, so the log can hold
+			# anything the file name holds
 			if ffmpeg_output:
-				with open(video_dir.joinpath(f"{frame_name}{output_log_suffix}"), 'w') as outfile:
+				with open(video_dir.joinpath(f"{frame_name}{output_log_suffix}"), 'w',
+						  encoding="utf-8") as outfile:
 					outfile.write(ffmpeg_output)
 
 			if ffmpeg_error:
-				with open(video_dir.joinpath(f"{frame_name}{error_log_suffix}"), 'w') as outfile:
+				with open(video_dir.joinpath(f"{frame_name}{error_log_suffix}"), 'w',
+						  encoding="utf-8") as outfile:
 					outfile.write(ffmpeg_error)
 
 			if result.returncode != 0:

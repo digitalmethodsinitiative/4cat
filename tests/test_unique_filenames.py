@@ -432,3 +432,17 @@ def test_reserve_prefix_keeps_apart_two_videos_whose_names_meet(tmp_path):
 
 	assert names.reserve_prefix("a.mp4") == "a_mp4"
 	assert names.reserve_prefix("a_mp4") == "a_mp4-1"
+
+
+def test_reserve_prefix_tells_apart_videos_sharing_a_stem(tmp_path):
+	"""
+	What the audio extractor and the video hasher need: `clip.mp4` and
+	`clip.webm` are one stem, so naming their output after the stem gave the
+	second one a `-1` and no way to tell which video it came from.
+	"""
+	names = UniqueFilenames(tmp_path)
+
+	first = names.reserve_prefix("clip.mp4", adds=".wav")
+	second = names.reserve_prefix("clip.webm", adds=".wav")
+
+	assert [f"{first}.wav", f"{second}.wav"] == ["clip_mp4.wav", "clip_webm.wav"]
