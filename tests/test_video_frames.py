@@ -3,6 +3,7 @@ Tests for the frame extractor, which writes a folder of frames per video
 """
 import json
 import pathlib
+import re
 import zipfile
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -18,14 +19,14 @@ from processors.visualisation.video_scene_frames import VideoSceneFrames
 """
 What a video's frames folder is called.
 
-Each video's frames go into a folder of their own, named after the video file,
-so that an archive of many thousands of frames can still be looked through.
-The extension is part of the name, because `clip.mp4` and `clip.webm` are two
-videos and need two folders.
+Each video's frames go into their own folder, which keeps a big archive
+possible to look through. The folder and the frames in it share one name,
+built from the video's name. The extension is part of it, because `clip.mp4`
+and `clip.webm` are two videos, and the dot before it becomes an underscore so
+a frame is not called `clip.mp4_frame_0000001.jpeg`.
 
-The folder is for tidiness only. Which video a frame came from is recorded in
-the metadata, as the frame entry's `source_file`, and the frames are named so
-that no two of them in an archive share a name whatever folder they are in.
+Nothing reads the folders. Which video a frame came from is in the metadata,
+as the entry's `source_file`, and no two frames in an archive share a name.
 """
 
 FRAME_TEST_NAMES = ["clip.mp4", "clip.webm", "A.mp4", "a.mp4", "other.mp4"]
@@ -121,13 +122,21 @@ def run_extractor(tmp_path, monkeypatch, video_names, archive_contents=None, met
 def test_a_frames_folder_is_named_after_the_video_file(tmp_path, monkeypatch):
     frames = run_extractor(tmp_path, monkeypatch, ["clip.mp4"])
 
-    assert [folder.name for folder in frames.iterdir() if folder.is_dir()] == ["clip.mp4"]
+    assert [folder.name for folder in frames.iterdir() if folder.is_dir()] == ["clip_mp4"]
+
+
+def test_a_frames_folder_is_named_the_same_as_the_frames_in_it(tmp_path, monkeypatch):
+    """One name per video, so the folder cannot drift from what the frames say"""
+    frames = run_extractor(tmp_path, monkeypatch, ["clip.mp4"])
+    folder = next(item for item in frames.iterdir() if item.is_dir())
+
+    assert all(frame.name.startswith(folder.name + "_") for frame in folder.iterdir())
 
 
 def test_videos_differing_only_in_extension_get_a_folder_each(tmp_path, monkeypatch):
     frames = run_extractor(tmp_path, monkeypatch, ["clip.mp4", "clip.webm"])
 
-    assert sorted(folder.name for folder in frames.iterdir() if folder.is_dir()) == ["clip.mp4", "clip.webm"]
+    assert sorted(folder.name for folder in frames.iterdir() if folder.is_dir()) == ["clip_mp4", "clip_webm"]
 
 
 def test_the_frames_get_metadata_of_their_own(tmp_path, monkeypatch):
@@ -182,7 +191,7 @@ def test_an_archive_without_metadata_still_works(tmp_path, monkeypatch):
     """
     frames = run_extractor(tmp_path, monkeypatch, ["clip.mp4"])
 
-    assert (frames / "clip.mp4").is_dir()
+    assert (frames / "clip_mp4").is_dir()
     written = json.loads((frames / ".metadata.json").read_text(encoding="utf-8"))
     entry = written["items"]["clip_mp4_frame_0000001.jpeg"]
     assert entry["post_ids"] == []
@@ -247,11 +256,22 @@ The same for scene frames, which has its own extractor.
 """
 
 
-def run_scene_extractor(tmp_path, monkeypatch, video_names):
+def run_scene_extractor(tmp_path, monkeypatch, video_names, scenes_per_video=1, frames_written=None,
+                        frame_size="no_modify", reverse_scenes=False):
     """
-    Capture one scene frame per video
+    Capture a frame per scene of each video
 
-    :return Path:  The staging area the folders were written to
+    Scene `n` of a video starts at frame `n * 10`, so a frame holding
+    `video frame 30` is the one scene 3 asked for.
+
+    :param int scenes_per_video:  How many scenes each video is said to have
+    :param int frames_written:  How many frames ffmpeg writes, which is one
+      per scene unless a test is about it writing fewer
+    :param str frame_size:  The size to resize the frames to, if any
+    :param bool reverse_scenes:  Hand the scenes over last-first, for a test
+      about not relying on the order they arrive in
+    :return tuple:  The staging area the folders were written to, and the
+      processor, whose mock records what was logged and what ffmpeg was asked
     """
     source_archive = tmp_path / "videos.zip"
     with zipfile.ZipFile(source_archive, "w") as archive:
@@ -263,7 +283,10 @@ def run_scene_extractor(tmp_path, monkeypatch, video_names):
         video = tmp_path / name
         video.write_text("content")
         videos.append(SimpleNamespace(file=video))
-        scenes.append({"id": f"{name}_scene_1", "start_frame": "0", "end_frame": "10"})
+        of_this_video = [{"id": f"{name}_scene_{number}",
+                          "start_frame": str(number * 10), "end_frame": str(number * 10 + 10)}
+                         for number in range(1, scenes_per_video + 1)]
+        scenes.extend(reversed(of_this_video) if reverse_scenes else of_this_video)
 
     staging_area = tmp_path / "staging"
     staging_area.mkdir()
@@ -281,7 +304,7 @@ def run_scene_extractor(tmp_path, monkeypatch, video_names):
 
     processor = MagicMock()
     processor.type = VideoSceneFrames.type
-    processor.parameters = {"frame_size": "no_modify", "key_frame": "first"}
+    processor.parameters = {"frame_size": frame_size, "key_frame": "first"}
     processor.interrupted = False
     processor.for_cleanup = []
     processor.source_dataset.num_rows = len(scenes)
@@ -292,23 +315,31 @@ def run_scene_extractor(tmp_path, monkeypatch, video_names):
     processor.extract_archived_file_by_name = \
         lambda *args: BasicProcessor.extract_archived_file_by_name(processor, *args)
 
+    emitted = scenes_per_video if frames_written is None else frames_written
+
     def fake_ffmpeg(command, **kwargs):
-        # ffmpeg writes the file named last on its command line, numbered from 1
-        target = pathlib.Path(command[-1].replace("%d", "1"))
-        target.write_text("frame")
+        # ffmpeg reads the video once and saves the frames it was asked for as
+        # it reaches them, so they come out in video order whatever order they
+        # were asked in, numbered from 1. Each file holds the video frame it
+        # came from, so a test can see which scene it was named after.
+        select = next(argument for argument in command if argument.startswith("select="))
+        wanted = sorted(int(number) for number in re.findall(r"eq\(n\\,(\d+)\)", select))
+        for position, source_frame in enumerate(wanted[:emitted], start=1):
+            pathlib.Path(command[-1].replace("%07d", "%07d" % position)).write_text(
+                f"video frame {source_frame}")
         return SimpleNamespace(stdout=b"", stderr=b"", returncode=0)
 
     processor.run_interruptable_process.side_effect = fake_ffmpeg
     wire_metadata(processor, source_archive, tmp_path)
 
     VideoSceneFrames.process(processor)
-    return staging_area
+    return staging_area, processor
 
 
 def test_a_scene_frames_folder_is_named_after_the_video_file(tmp_path, monkeypatch):
-    staging_area = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4"])
+    staging_area, _ = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4"])
 
-    assert [f.name for f in staging_area.iterdir() if f.is_dir()] == ["clip.mp4"]
+    assert [f.name for f in staging_area.iterdir() if f.is_dir()] == ["clip_mp4"]
 
 
 def test_scene_frames_of_videos_differing_only_in_extension_stay_apart(tmp_path, monkeypatch):
@@ -316,17 +347,17 @@ def test_scene_frames_of_videos_differing_only_in_extension_stay_apart(tmp_path,
     Each video's frames are numbered from the start, so sharing one folder would
     mean the second video's frames land on the first video's.
     """
-    staging_area = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4", "clip.webm"])
+    staging_area, _ = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4", "clip.webm"])
 
     folders = sorted(f.name for f in staging_area.iterdir() if f.is_dir())
-    assert folders == ["clip.mp4", "clip.webm"]
+    assert folders == ["clip_mp4", "clip_webm"]
     for folder in folders:
         assert len(list((staging_area / folder).iterdir())) == 1
 
 
 def test_no_two_scene_frames_are_given_the_same_name(tmp_path, monkeypatch):
     """Two videos whose names differ only in the extension share a name for their frames"""
-    staging_area = run_scene_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
+    staging_area, _ = run_scene_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
 
     same, _ = shared_names(staging_area)
     assert not same, f"scene frames of different videos were given these names: {same}"
@@ -334,8 +365,74 @@ def test_no_two_scene_frames_are_given_the_same_name(tmp_path, monkeypatch):
 
 def test_no_two_scene_frames_are_one_name_on_windows_or_macos(tmp_path, monkeypatch):
     """Two videos whose names differ only in their capitals are one video to Windows and macOS"""
-    staging_area = run_scene_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
+    staging_area, _ = run_scene_extractor(tmp_path, monkeypatch, FRAME_TEST_NAMES)
 
     _, same_elsewhere = shared_names(staging_area)
     assert not same_elsewhere, ("unpacking the archive on Windows or macOS would lose one of "
                                 f"each of these: {same_elsewhere}")
+
+
+"""
+Which scene a frame is named after.
+
+ffmpeg numbers the frames it saves from 1, in the order they appear in the
+video. The frames are read back in that order and matched with the scenes
+sorted the same way. If ffmpeg saved fewer frames than there are scenes, the
+match cannot be trusted and the dataset says so.
+"""
+
+
+def test_scene_frames_are_paired_with_scenes_in_ffmpeg_s_own_order(tmp_path, monkeypatch):
+    """
+    More than nine frames, so the order matters: as text `_frame_10` comes
+    before `_frame_2`, and pairing them that way would name almost every frame
+    after the wrong scene.
+    """
+    staging_area, _ = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4"], scenes_per_video=11)
+    folder = staging_area / "clip_mp4"
+
+    for number in range(1, 12):
+        assert (folder / f"clip_mp4_scene_{number}.jpeg").read_text() == f"video frame {number * 10}"
+
+
+def test_scenes_that_arrive_out_of_order_still_get_their_own_frames(tmp_path, monkeypatch):
+    """
+    The scenes need not arrive in the order they appear in the video, but
+    ffmpeg always saves its frames in that order, so the scenes are sorted
+    before being matched with them.
+    """
+    staging_area, _ = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4"],
+                                          scenes_per_video=4, reverse_scenes=True)
+    folder = staging_area / "clip_mp4"
+
+    for number in range(1, 5):
+        assert (folder / f"clip_mp4_scene_{number}.jpeg").read_text() == f"video frame {number * 10}"
+
+
+def test_fewer_frames_than_scenes_is_reported(tmp_path, monkeypatch):
+    """
+    A missing frame would move every frame after it onto the wrong scene, and
+    the files do not say which scene is missing, so the dataset gets a warning.
+    """
+    staging_area, processor = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4"],
+                                                  scenes_per_video=3, frames_written=2)
+
+    logged = " ".join(str(call) for call in processor.dataset.log.call_args_list)
+    assert "3 frame(s) of clip.mp4 but it wrote 2" in logged
+    assert processor.dataset.finish_with_warning.called
+
+    # and the frames it did write are still named, kept and traceable
+    kept = sorted(path.name for path in (staging_area / "clip_mp4").iterdir())
+    assert kept == ["clip_mp4_scene_1.jpeg", "clip_mp4_scene_2.jpeg"]
+
+
+def test_the_frame_size_option_comes_before_the_output_file(tmp_path, monkeypatch):
+    """
+    ffmpeg options for a file go before that file's name. After it, `-s`
+    belongs to an output that never comes and ffmpeg saves nothing.
+    """
+    _, processor = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4"], frame_size="144x144")
+    command = processor.run_interruptable_process.call_args_list[0][0][0]
+
+    assert command[-1].endswith(".jpeg"), f"the output file should come last: {command}"
+    assert "-s" in command[:-1], f"the frame size should come before the output file: {command}"

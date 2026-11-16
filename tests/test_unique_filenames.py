@@ -165,12 +165,16 @@ def test_deduplicate_filename_respects_max_bytes():
 
 
 def test_deduplicate_filename_keeps_the_index_within_max_bytes():
+	# the names as they come back, since it is those that have to fit: folding
+	# one can shorten it, so measuring the folded names would measure nothing
+	names = []
 	seen = set()
 	for _ in range(3):
 		name = deduplicate_filename("a" * 300 + ".wav", existing_filenames_folded=seen, max_bytes=32)
+		names.append(name)
 		seen.add(fold_filename(name))
 	assert len(seen) == 3
-	assert all(len(name.encode("utf-8")) <= 32 for name in seen)
+	assert all(len(name.encode("utf-8")) <= 32 for name in names)
 
 
 """
@@ -313,3 +317,65 @@ def test_two_names_that_still_meet_are_kept_apart_by_the_registry(tmp_path):
 	names = UniqueFilenames()
 	assert names.reserve(filename_to_prefix("a.mp4")) == "a_mp4"
 	assert names.reserve(filename_to_prefix("a_mp4")) == "a_mp4-1"
+
+
+"""
+Reserving the start of a name.
+
+A name built from another file's name is one piece: any dot left in it came
+from the source file and is not an extension. It is also not a file name
+itself, since the caller adds to it, so it is reserved with room for whatever
+the caller will add.
+"""
+
+
+def test_an_index_goes_at_the_end_of_a_name_with_no_extension():
+	"""
+	Left to itself, `deduplicate_filename` would read `my.video_mp4` as a name
+	`my` with an extension `.video_mp4` and hand back `my-1.video_mp4`.
+	"""
+	taken = {fold_filename("my.video_mp4")}
+
+	assert deduplicate_filename("my.video_mp4", existing_filenames_folded=taken,
+								has_extension=False) == "my.video_mp4-1"
+
+
+def test_shortening_a_name_with_no_extension_keeps_its_start():
+	"""
+	Nothing is held back as an extension, so what is dropped is the end of the
+	name rather than the beginning of it.
+	"""
+	name = deduplicate_filename("2026.01.15." + "a" * 300, max_bytes=32, has_extension=False)
+
+	assert name.startswith("2026.01.15.")
+	assert len(name.encode("utf-8")) == 32
+
+
+def test_reserve_prefix_builds_the_name_and_reserves_it(tmp_path):
+	names = UniqueFilenames(tmp_path)
+
+	assert names.reserve_prefix("clip.mp4") == "clip_mp4"
+	assert names.reserve_prefix("clip.mp4") == "clip_mp4-1"
+
+
+def test_reserve_prefix_leaves_room_for_what_the_caller_adds(tmp_path):
+	"""
+	A video's name can be 255 bytes, the longest a file name may be, so
+	anything named after it needs the name shortened first. The frame
+	extractor builds three names from it: a frame and the two ffmpeg logs. It
+	has to ask room for the longest of them.
+	"""
+	built = ("_frame_0000001.jpeg", "_ffmpeg_output.log", "_ffmpeg_error.log")
+	video = "v" * 251 + ".mp4"
+
+	prefix = UniqueFilenames(tmp_path).reserve_prefix(video, adds=max(built, key=len))
+
+	assert all(len((prefix + suffix).encode("utf-8")) <= 255 for suffix in built)
+
+
+def test_reserve_prefix_keeps_apart_two_videos_whose_names_meet(tmp_path):
+	"""The pair `filename_to_prefix` cannot keep apart, reserved the usual way"""
+	names = UniqueFilenames(tmp_path)
+
+	assert names.reserve_prefix("a.mp4") == "a_mp4"
+	assert names.reserve_prefix("a_mp4") == "a_mp4-1"

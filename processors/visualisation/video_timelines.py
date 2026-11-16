@@ -192,9 +192,9 @@ class VideoTimelines(BasicProcessor):
         """
         Which video a frame was taken from
 
-        Metadata stores the source file for each frame. Older frame datasets
-        lacked metadata so the folder name was used instead (this may not always
-        be correct due to filename collisions).
+        The frame's metadata entry says which video it came from. Older
+        archives have no entry per frame, so for those the folder name is
+        used, which is the video's name in those archives.
 
         :param MediaArchiveMetadata|None metadata:  The archive's metadata
         :param Path frame:  The frame file
@@ -216,9 +216,8 @@ class VideoTimelines(BasicProcessor):
         some data source-specific pathways.
 
         :param MediaArchiveMetadata metadata:  Loaded archive metadata.
-        :return dict:  Name of a video -> the label its timeline gets. The
-          names are the ones `video_for` gives for that video's frames, so
-          that every frame finds the label of the video it came from.
+        :return dict:  Name of a video -> the label its timeline gets, named
+          the same way `video_for` names a video
         """
         if not metadata:
             return {}
@@ -234,8 +233,10 @@ class VideoTimelines(BasicProcessor):
                 # the entry is a frame, and names the video it was cut from
                 names = (source_file,)
             else:
-                # an older archive lacked metadata, so the folder name is used instead 
-                # (this may not always be correct due to filename collisions without extensions or capitalisation differences)
+                # an older archive carries the video archive's metadata, so
+                # this entry is a video. Its frames are found by their folder,
+                # which those archives named after the video either with or
+                # without its extension, so allow for both
                 names = (filename, filename.rsplit(".", 1)[0])
 
             for name in dict.fromkeys(names):
