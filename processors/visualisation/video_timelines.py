@@ -111,7 +111,7 @@ class VideoTimelines(BasicProcessor):
             if looping and item.file.suffix not in (".jpeg", ".jpg", ".png", ".gif"):
                 continue
             else:
-                video = str(item.file.parent.name)
+                video = self.video_for(metadata, item.file)
 
             # at the end of each timeline (or at the end of the archive) add a
             # footer to it and paint to the canvas
@@ -187,6 +187,26 @@ class VideoTimelines(BasicProcessor):
         self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
         return self.dataset.finish(len(timeline_widths))
 
+    @staticmethod
+    def video_for(metadata, frame):
+        """
+        Which video a frame was taken from
+
+        Metadata stores the source file for each frame. Older frame datasets
+        lacked metadata so the folder name was used instead (this may not always
+        be correct due to filename collisions).
+
+        :param MediaArchiveMetadata|None metadata:  The archive's metadata
+        :param Path frame:  The frame file
+        :return str:  Name of the video the frame was taken from
+        """
+        if metadata:
+            source_file = metadata.source_file_for(frame.name)
+            if source_file:
+                return source_file
+
+        return str(frame.parent.name)
+
     def get_video_labels(self, metadata):
         """
         Determine appropriate labels for each video
@@ -196,7 +216,9 @@ class VideoTimelines(BasicProcessor):
         some data source-specific pathways.
 
         :param MediaArchiveMetadata metadata:  Loaded archive metadata.
-        :return dict:  Name of the folder a video's frames are in -> label
+        :return dict:  Name of a video -> the label its timeline gets. The
+          names are the ones `video_for` gives for that video's frames, so
+          that every frame finds the label of the video it came from.
         """
         if not metadata:
             return {}
@@ -207,16 +229,26 @@ class VideoTimelines(BasicProcessor):
         from_dataset = metadata.from_dataset
 
         for filename, item in metadata.iter_entries():
-            # a video's frames are in a folder named after the video file
-            stem = filename.rsplit(".", 1)[0]
-            # Match folders previously saved with only stem.
-            for folder in dict.fromkeys((filename, stem)):
-                mapping_ids.setdefault(folder, item.get("post_ids", []))
-                labels.setdefault(folder, stem)
-                if from_dataset:
-                    mapping_dataset.setdefault(from_dataset, []).append(folder)
+            source_file = item.get("source_file")
+            if source_file:
+                # the entry is a frame, and names the video it was cut from
+                names = (source_file,)
+            else:
+                # an older archive lacked metadata, so the folder name is used instead 
+                # (this may not always be correct due to filename collisions without extensions or capitalisation differences)
+                names = (filename, filename.rsplit(".", 1)[0])
 
-        for dataset, folders in mapping_dataset.items():
+            for name in dict.fromkeys(names):
+                if name in mapping_ids:
+                    # one video has many frames, and they all say the same
+                    # thing about it
+                    continue
+                mapping_ids[name] = item.get("post_ids", [])
+                labels[name] = name.rsplit(".", 1)[0]
+                if from_dataset:
+                    mapping_dataset.setdefault(from_dataset, []).append(name)
+
+        for dataset, video_names in mapping_dataset.items():
             try:
                 video_dataset = DataSet(key=dataset, db=self.db, modules=self.modules)
             except DataSetNotFoundException:
@@ -240,16 +272,16 @@ class VideoTimelines(BasicProcessor):
             else:
                 mapper = lambda item: item.get("id")  # noqa: E731
 
-            # which folders hold the frames of each item's video
-            folders_by_post_id = {}
-            for folder in folders:
-                for post_id in mapping_ids[folder]:
-                    folders_by_post_id.setdefault(post_id, []).append(folder)
+            # which videos were downloaded for each item
+            videos_by_post_id = {}
+            for video_name in video_names:
+                for post_id in mapping_ids[video_name]:
+                    videos_by_post_id.setdefault(post_id, []).append(video_name)
 
             # There may not be a "nearest" source e.g. Media Imports
             if source_dataset is not None:
                 for item in source_dataset.iterate_items(self):
-                    for folder in folders_by_post_id.get(normalize_post_id(item["id"]), []):
-                        labels[folder] = mapper(item)
+                    for video_name in videos_by_post_id.get(normalize_post_id(item["id"]), []):
+                        labels[video_name] = mapper(item)
 
         return labels
