@@ -91,3 +91,26 @@ def test_an_archive_without_metadata_still_finds_mp4_collages(staging_area):
     assert collages["clip.mp4"] == [staging_area / "clip.jpg"]
     # a video that was not an .mp4 goes on finding nothing, as it always did
     assert "clip.webm" not in collages
+
+
+def test_a_video_that_could_not_be_hashed_is_recorded_without_a_collage(staging_area):
+    """
+    A video ffmpeg cannot read gets no collage, but the posts counting on it
+    are still named, so the researcher can tell a missing image from a video
+    that was never there. Failures are not items, so the mapping below ignores
+    them rather than offering a collage that does not exist.
+    """
+    metadata = MediaArchiveMetadata(from_dataset="posts")
+    metadata.add_item("good_mp4.jpg", post_ids=["1"], source_file="good.mp4")
+    metadata.add_failure(post_ids=["2"], source_file="broken.mp4",
+                         reason="no_frames_extracted",
+                         reason_description="ffmpeg could not read a frame from broken.mp4")
+    staging_area.joinpath("good_mp4.jpg").touch()
+
+    collages = make_wall(metadata).map_collages_to_videos(MagicMock(), staging_area)
+
+    assert list(collages) == ["good.mp4"]
+
+    failure = next(iter(metadata.iter_failures()))
+    assert failure["source_file"] == "broken.mp4"
+    assert failure["post_ids"] == ["2"]

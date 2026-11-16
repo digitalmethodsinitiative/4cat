@@ -210,6 +210,12 @@ class VideoHasher(BasicProcessor):
             if max_videos != 0 and processed_videos >= max_videos:
                 break
 
+            # read before the hashing, so a video that cannot be hashed still
+            # records which posts were counting on it
+            video_item = video_metadata.get_entry(video.file.name) if video_metadata else None
+            post_ids = video_item.get("post_ids", []) if video_item else []
+            source_url = video_item.get("url") if video_item else None
+
             try:
                 videohash = VideoHash(path=str(video.file), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
             except FFmpegNotFound:
@@ -218,10 +224,18 @@ class VideoHasher(BasicProcessor):
                 return
             except FileNotFoundError:
                 self.dataset.update_status(f"Unable to find file {video.file.name}")
+                collage_metadata.add_failure(
+                    post_ids=post_ids, url=source_url, source_file=video.file.name,
+                    reason="file_missing",
+                    reason_description=f"{video.file.name} was not among the files read")
                 continue
             except FFmpegFailedToExtractFrames as e:
                 self.dataset.log(f"Unable to extract frame for {str(video.file)}: {e}")
                 self.dataset.finish_with_error(f"Unable to extract frame for {video.file.name} (see log for details)")
+                collage_metadata.add_failure(
+                    post_ids=post_ids, url=source_url, source_file=video.file.name,
+                    reason="no_frames_extracted",
+                    reason_description=f"ffmpeg could not read a frame from {video.file.name}: {e}")
                 continue
             except OSError:
                 self.dataset.finish_with_error("4CAT does not have the right privileges to access the video files.")
@@ -234,11 +248,10 @@ class VideoHasher(BasicProcessor):
             shutil.copy(videohash.collage_path, output_dir.joinpath(collage_filename))
             video_hashes[video.file.name]['video_collage_filename'] = collage_filename
 
-            video_item = video_metadata.get_entry(video.file.name) if video_metadata else None
             collage_metadata.add_item(
                 collage_filename,
-                post_ids=video_item.get("post_ids", []) if video_item else [],
-                url=video_item.get("url") if video_item else None,
+                post_ids=post_ids,
+                url=source_url,
                 source_file=video.file.name,
                 extra={"video_hash": videohash.hash, "video_duration": videohash.video_duration},
             )
