@@ -6,6 +6,9 @@ name, and a collage image named after it. The two names are not the same, so
 each collage records the video it was made from, and the image wall reads that
 rather than working backwards from the collage's name.
 """
+import json
+import pathlib
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -114,3 +117,96 @@ def test_a_video_that_could_not_be_hashed_is_recorded_without_a_collage(staging_
     failure = next(iter(metadata.iter_failures()))
     assert failure["source_file"] == "broken.mp4"
     assert failure["post_ids"] == ["2"]
+
+
+"""
+What happens to the run when one video cannot be hashed.
+
+One unreadable video is not a reason to fail the whole dataset: the others are
+hashed, the archive is written, and the dataset finishes with a warning. The
+unreadable one is in the metadata as a failure, so it is not simply absent.
+"""
+
+
+def run_hasher(tmp_path, monkeypatch, videos, unreadable=()):
+    """
+    Hash `videos`, with the names in `unreadable` failing in ffmpeg
+
+    :return tuple:  The staging area written to, the keyword arguments the
+      archive was finished with, and the processor, whose dataset mock records
+      how the run ended
+    """
+    from videohash.exceptions import FFmpegFailedToExtractFrames
+    from processors.visualisation import video_hasher as module
+
+    staging_area = tmp_path / "staging"
+    staging_area.mkdir()
+    collage_source = tmp_path / "collage.jpg"
+    collage_source.write_text("collage")
+
+    class FakeVideoHash:
+        def __init__(self, path, **kwargs):
+            if pathlib.Path(path).name in unreadable:
+                raise FFmpegFailedToExtractFrames("no frames here")
+            self.collage_path = str(collage_source)
+            self.hash = "0b1010"
+            self.video_duration = 3.5
+
+        def delete_storage_path(self):
+            pass
+
+    monkeypatch.setattr(module, "VideoHash", FakeVideoHash)
+
+    items = []
+    for name in videos:
+        video = tmp_path / name
+        video.write_text("video")
+        items.append(SimpleNamespace(file=video))
+
+    written = {}
+    processor = module.VideoHasher.__new__(module.VideoHasher)
+    processor.parameters = {"frame_interval": 1, "amount": 0, "save_annotations": False}
+    processor.interrupted = False
+    processor.log = MagicMock()
+    processor.dataset = MagicMock()
+    processor.dataset.get_staging_area.side_effect = [tmp_path / "videos", staging_area]
+    (tmp_path / "videos").mkdir()
+    processor.source_dataset = MagicMock()
+    processor.source_dataset.num_rows = len(items)
+    processor.source_dataset.key = "videoskey"
+    processor.source_dataset.iterate_items.return_value = items
+    processor.get_media_metadata = lambda dataset=None: None
+    processor.dataset.new_media_metadata.side_effect = (
+        lambda from_dataset, processor_type, filename=".metadata.json": MediaArchiveMetadata.new(
+            processor_type=processor_type, from_dataset=from_dataset, filename=filename))
+    processor.write_archive_and_finish = lambda files, **kwargs: written.update(kwargs)
+
+    module.VideoHasher.process(processor)
+    return staging_area, written, processor
+
+
+def test_one_unreadable_video_warns_instead_of_failing_the_run(tmp_path, monkeypatch):
+    staging_area, written, processor = run_hasher(
+        tmp_path, monkeypatch, ["good.mp4", "broken.mp4"], unreadable=["broken.mp4"])
+
+    processor.dataset.finish_with_error.assert_not_called()
+    assert written["num_items"] == 1
+    assert "1 of 2" in written["warning"]
+    # the run was not finished early, so the archive holds the other collage
+    assert (staging_area / "good_mp4.jpg").exists()
+
+
+def test_the_unreadable_video_is_in_the_metadata_as_a_failure(tmp_path, monkeypatch):
+    staging_area, _, _ = run_hasher(tmp_path, monkeypatch,
+                                    ["good.mp4", "broken.mp4"], unreadable=["broken.mp4"])
+    written = json.loads((staging_area / ".metadata.json").read_text(encoding="utf-8"))
+
+    assert list(written["items"]) == ["good_mp4.jpg"]
+    assert [failure["source_file"] for failure in written["failures"]] == ["broken.mp4"]
+
+
+def test_no_warning_when_every_video_is_hashed(tmp_path, monkeypatch):
+    _, written, _ = run_hasher(tmp_path, monkeypatch, ["a.mp4", "b.webm"])
+
+    assert written["num_items"] == 2
+    assert written["warning"] is None

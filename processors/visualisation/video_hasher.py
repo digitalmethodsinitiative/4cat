@@ -189,6 +189,7 @@ class VideoHasher(BasicProcessor):
         video_metadata = self.get_media_metadata()
         total_possible_videos = max((min(self.source_dataset.num_rows, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
         processed_videos = 0
+        skipped_videos = 0
         # one name per video, which its collage is named after. The video's
         # extension is part of the name, so clip.mp4 and clip.webm say which
         # video they came from rather than one of them being given a `-1`
@@ -224,14 +225,17 @@ class VideoHasher(BasicProcessor):
                 return
             except FileNotFoundError:
                 self.dataset.update_status(f"Unable to find file {video.file.name}")
+                skipped_videos += 1
                 collage_metadata.add_failure(
                     post_ids=post_ids, url=source_url, source_file=video.file.name,
                     reason="file_missing",
                     reason_description=f"{video.file.name} was not among the files read")
                 continue
             except FFmpegFailedToExtractFrames as e:
+                # one video ffmpeg cannot read is not the end of the run; the
+                # dataset finishes with a warning below
                 self.dataset.log(f"Unable to extract frame for {str(video.file)}: {e}")
-                self.dataset.finish_with_error(f"Unable to extract frame for {video.file.name} (see log for details)")
+                skipped_videos += 1
                 collage_metadata.add_failure(
                     post_ids=post_ids, url=source_url, source_file=video.file.name,
                     reason="no_frames_extracted",
@@ -330,7 +334,9 @@ class VideoHasher(BasicProcessor):
 
         # Finish up
         self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')
-        self.write_archive_and_finish(output_dir, num_items=processed_videos)
+        warning = f"Could not hash {skipped_videos} of {skipped_videos + processed_videos} videos, " \
+                  f"see the dataset log for details." if skipped_videos else None
+        self.write_archive_and_finish(output_dir, num_items=processed_videos, warning=warning)
 
 
 class VideoHashNetwork(BasicProcessor):
