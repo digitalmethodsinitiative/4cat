@@ -2525,8 +2525,13 @@ class DataSet(FourcatModule):
         Empty `MediaArchiveMetadata` container for a processor producing a
         media archive for this dataset.
 
-        :param str from_dataset:  key of the *source* dataset whose posts are
-            being downloaded from (this is generally not the same as `self`).
+        :param str from_dataset:  key of the dataset the posts are in, which is
+            where the media was found rather than the dataset this archive
+            belongs to. A processor making media out of media passes on what
+            its own source archive recorded, so this stays the dataset at the
+            top of the chain however long the chain grows. Not to be confused
+            with a processor's `source_dataset`, which is the dataset one step
+            above it.
         :param str processor_type:  type of the processor, used for metadata.
         """
         return MediaArchiveMetadata.new(self, processor_type=processor_type,

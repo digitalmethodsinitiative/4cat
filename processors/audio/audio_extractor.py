@@ -6,7 +6,6 @@ https://ffmpeg.org/
 """
 import shutil
 import zipfile
-from pathlib import Path
 import oslex
 
 from backend.lib.processor import BasicProcessor
@@ -95,9 +94,14 @@ class AudioExtractor(BasicProcessor):
 
         processed_videos = 0
         written = 0
-        # two videos can share a stem (e.g. clip.mp4 and clip.webm) and would
-        # then be given the same .wav name. Track and ensure uniqueness.
+        # one name per video, which its audio file and the two ffmpeg logs are
+        # named after. The video's extension is part of the name, so clip.mp4
+        # and clip.webm say which video they came from rather than one of them
+        # being given a `-1`.
         audio_filenames = UniqueFilenames(output_dir)
+        stdout_log_suffix = "_stdout.log"
+        stderr_log_suffix = "_stderr.log"
+        longest_name_added = max(".wav", stdout_log_suffix, stderr_log_suffix, key=len)
 
         self.dataset.update_status("Extracting audio from video")
         for item in self.source_dataset.iterate_items(processor=self, get_annotations=False):
@@ -107,11 +111,11 @@ class AudioExtractor(BasicProcessor):
             if max_files != 0 and processed_videos >= max_files:
                 break
 
-            audio_filename = audio_filenames.reserve(f"{Path(item.file.name).stem}.wav")
+            # the ffmpeg logs are named after the same thing as the audio, so
+            # they stay paired with it and cannot collide either
+            audio_name = audio_filenames.reserve_prefix(item.file.name, adds=longest_name_added)
+            audio_filename = f"{audio_name}.wav"
             audio_file = output_dir.joinpath(audio_filename)
-            # name the ffmpeg logs after the audio file, so they stay paired
-            # with it and cannot collide either
-            log_stem = audio_filename.rsplit(".", 1)[0]
 
             # ffmpeg -i video.mkv -map 0:a -acodec libmp3lame audio.mp4
             command = [
@@ -134,16 +138,17 @@ class AudioExtractor(BasicProcessor):
             video_item = source_metadata.get_entry(item.file.name) if source_metadata else None
             post_ids = video_item.get("post_ids", []) if video_item else []
             source_url = video_item.get("url") if video_item else None
-            extra = {"video_filename": item.file.name}
 
             # the name is this video's alone, so the file can only have been
             # written by the run above
             if audio_file.exists():
                 written += 1
-                metadata.add_item(audio_filename, post_ids=post_ids, url=source_url, extra=extra)
+                metadata.add_item(audio_filename, post_ids=post_ids, url=source_url,
+                                  source_file=item.file.name)
             else:
                 metadata.add_failure(
                     post_ids=post_ids,
+                    source_file=item.file.name,
                     reason="extraction_failed",
                     reason_description=(
                         f"ffmpeg exited with code {result.returncode}" if result.returncode
@@ -153,12 +158,14 @@ class AudioExtractor(BasicProcessor):
                 )
 
             if ffmpeg_output:
-                with open(str(output_dir.joinpath(f"{log_stem}_stdout.log")), 'w', encoding="utf-8") as outfile:
+                with open(str(output_dir.joinpath(f"{audio_name}{stdout_log_suffix}")), 'w',
+                          encoding="utf-8") as outfile:
                     outfile.write(ffmpeg_output)
 
             if ffmpeg_error:
                 # TODO: Currently, appears all output is here; perhaps subprocess.PIPE?
-                with open(str(output_dir.joinpath(f"{log_stem}_stderr.log")), 'w', encoding="utf-8") as outfile:
+                with open(str(output_dir.joinpath(f"{audio_name}{stderr_log_suffix}")), 'w',
+                          encoding="utf-8") as outfile:
                     outfile.write(ffmpeg_error)
 
             if result.returncode != 0:

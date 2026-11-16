@@ -563,10 +563,13 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		return failure
 
 	@staticmethod
-	def _build_item(filename: str, post_ids: list, url, extra: dict) -> dict:
+	def _build_item(filename: str, post_ids: list, url, extra: dict,
+					source_file: Optional[str] = None) -> dict:
 		item = {"filename": filename, "post_ids": list(post_ids)}
 		if url is not None:
 			item["url"] = url
+		if source_file is not None:
+			item["source_file"] = source_file
 		if extra:
 			item["extra"] = extra
 		return item
@@ -598,6 +601,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 
 	def add_item(self, filename: str, *, post_ids,
 				 url: Optional[str] = None,
+				 source_file: Optional[str] = None,
 				 extra: Optional[dict] = None,
 				 replace: bool = False,
 				 merge: bool = False) -> None:
@@ -608,6 +612,14 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			within this metadata instance unless `replace` or `merge` is set.
 		:param post_ids:  list of source post IDs (string-coerced).
 		:param url:  optional originating URL.
+		:param source_file:  name of the file this one was made from, as it
+			is called in the archive of the dataset one step above this one -
+			the video a frame was cut from, the video audio was taken out of.
+			One step back, not the file at the start of a longer chain: that
+			file is named by the entry for this one's own source file, in that
+			archive's metadata. Left out by a processor that fetches media from
+			elsewhere rather than making it out of a file, and its absence
+			therefore means this file is where the media came into 4CAT.
 		:param extra:  optional free-form per-file data (e.g. yt-dlp dump).
 		:param replace:  overwrite an existing entry with the same filename.
 		:param merge:  if an entry with the same filename exists, add these
@@ -635,6 +647,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 					known_ids.append(post_id)
 			if url is not None and existing.get("url") is None:
 				existing["url"] = url
+			if source_file is not None and existing.get("source_file") is None:
+				existing["source_file"] = source_file
 			if extra:
 				# the entry keeps its own value where both sides have a key,
 				# except for `other_urls`: both sides are listing URLs that
@@ -650,12 +664,14 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		if existing is not None and not replace:
 			raise MetadataException(f"add_item: filename {filename!r} already present.")
 		self.items[filename] = self._build_item(
-			filename, self._normalize_post_ids(post_ids), url, dict(extra) if extra else {}
+			filename, self._normalize_post_ids(post_ids), url, dict(extra) if extra else {},
+			source_file=source_file
 		)
 
 	def add_failure(self, *, post_ids, reason: str,
 					reason_description: Optional[str] = None,
 					url: Optional[str] = None,
+					source_file: Optional[str] = None,
 					extra: Optional[dict] = None) -> None:
 		"""
 		Record a download attempt that did not produce a file.
@@ -664,6 +680,10 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		:param reason:  structured failure code (e.g. "error", "no_media").
 		:param reason_description:  optional human-readable explanation.
 		:param url:  optional URL that was attempted.
+		:param source_file:  name of the file that could not be processed, for
+			a processor working from files rather than from URLs. Without it a
+			failure says a post's media is missing but not which of the files
+			read it was working on.
 		:param extra:  optional free-form data about the attempt.
 		"""
 		if not reason or not isinstance(reason, str):
@@ -674,6 +694,8 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 		}
 		if url is not None:
 			failure["url"] = url
+		if source_file is not None:
+			failure["source_file"] = source_file
 		if reason_description is not None:
 			failure["reason_description"] = reason_description
 		if extra:
@@ -717,6 +739,18 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 
 	def get_entry(self, filename: str) -> Optional[dict]:
 		return self.items.get(filename)
+
+	def source_file_for(self, filename: str) -> Optional[str]:
+		"""
+		The file an entry's file was made from, if it was made from one.
+
+		:param str filename:  Name of the file in this archive
+		:return str|None:  Name of the file it was made from, in the archive
+		  one step above this one, or None if it was not made from a file or
+		  the archive was written before this was recorded.
+		"""
+		entry = self.items.get(filename)
+		return entry.get("source_file") if entry else None
 
 	def iter_entries(self) -> Iterator[tuple]:
 		return iter(self.items.items())
@@ -786,6 +820,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			"number_of_posts": len(item.get("post_ids", [])),
 			"post_ids": ", ".join(item.get("post_ids", [])),
 			"filename": filename,
+			"source_file": item.get("source_file") or "",
 			"download_successful": True,
 		}
 		yield cls._add_simple_values(row, item.get("extra"))
@@ -800,6 +835,7 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 			"number_of_posts": len(failure.get("post_ids", [])),
 			"post_ids": ", ".join(failure.get("post_ids", [])),
 			"filename": "",
+			"source_file": failure.get("source_file") or "",
 			"download_successful": False,
 			"reason": failure.get("reason", ""),
 			"reason_description": failure.get("reason_description", ""),
@@ -871,11 +907,15 @@ class MediaArchiveMetadata(ArchiveMetadataFile):
 				)
 			if not isinstance(entry.get("post_ids"), list):
 				raise MetadataException(f"items[{filename!r}].post_ids must be a list.")
+			if "source_file" in entry and not isinstance(entry["source_file"], str):
+				raise MetadataException(f"items[{filename!r}].source_file must be a string.")
 		for i, failure in enumerate(self.failures):
 			if not isinstance(failure, dict):
 				raise MetadataException(f"failures[{i}] must be a dict.")
 			if not isinstance(failure.get("post_ids"), list):
 				raise MetadataException(f"failures[{i}].post_ids must be a list.")
+			if "source_file" in failure and not isinstance(failure["source_file"], str):
+				raise MetadataException(f"failures[{i}].source_file must be a string.")
 			reason = failure.get("reason")
 			if not isinstance(reason, str) or not reason:
 				raise MetadataException(f"failures[{i}].reason must be a non-empty string.")

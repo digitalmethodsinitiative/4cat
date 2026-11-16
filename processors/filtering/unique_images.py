@@ -5,7 +5,7 @@ import shutil
 
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UserInput, hash_file
+from common.lib.helpers import UniqueFilenames, UserInput, hash_file
 from common.lib.compatibility import Compatibility
 
 __author__ = "Stijn Peeters"
@@ -67,13 +67,24 @@ class UniqueImageFilter(BasicProcessor):
 
         :return:
         """
-        seen_hashes = set()
+        # the name each hash is kept under, which is how a duplicate finds the
+        # image standing in for it
         hash_map = {}
-        duplicate_of = {}
+        # which name each image that arrived is kept under, for the images kept
+        # and for the duplicates that are stood in for
+        kept_as = {}
+        # the image each kept name was made from, which is its source_file
+        source_of = {}
         hash_type = self.parameters.get("hash-type")
         dupes = 0
         processed = 0
         staging_area = self.dataset.get_staging_area()
+
+        # images arrive in folders of their own but are all written into one,
+        # so two of them can arrive wanting the same name: a video's frames are
+        # numbered from the start of that video. Copying the second onto the
+        # first would destroy an image that is no duplicate of anything.
+        kept_names = UniqueFilenames(staging_area)
 
         self.dataset.update_status("Processing images and looking for duplicates")
         for image in self.source_dataset.iterate_items():
@@ -88,13 +99,15 @@ class UniqueImageFilter(BasicProcessor):
 
             image_hash = hash_file(image.file, hash_type)
 
-            if image_hash not in seen_hashes:
-                seen_hashes.add(image_hash)
-                shutil.copy2(image.file, staging_area)
-                hash_map[image_hash] = image.file.name
+            if image_hash not in hash_map:
+                kept_name = kept_names.reserve(image.file.name)
+                shutil.copy2(image.file, staging_area.joinpath(kept_name))
+                hash_map[image_hash] = kept_name
+                kept_as[image.file.name] = kept_name
+                source_of[kept_name] = image.file.name
             else:
                 self.dataset.log(f"{image.file.name} is a duplicate of {hash_map[image_hash]} - skipping")
-                duplicate_of[image.file.name] = hash_map[image_hash]
+                kept_as[image.file.name] = hash_map[image_hash]
                 dupes += 1
 
         source_metadata = self.get_media_metadata()
@@ -108,23 +121,24 @@ class UniqueImageFilter(BasicProcessor):
             # each image that is kept stands in for its duplicates too, so the
             # posts and URLs of a removed duplicate are added to the kept image
             # and no post loses its image
-            kept_file = {filename: filename for filename in inverse_hashmap}
-            kept_file.update(duplicate_of)
 
-            # kept images first, so each keeps its own URL; a duplicate's URL
-            # is then listed in the kept image's extra["other_urls"]
-            entries = sorted(source_metadata.iter_entries(), key=lambda entry: entry[0] not in inverse_hashmap)
+            # kept images first, so each keeps its own URL and names the image it
+            # was kept from; a duplicate's URL is then listed in the kept image's
+            # extra["other_urls"]
+            kept_sources = set(source_of.values())
+            entries = sorted(source_metadata.iter_entries(), key=lambda entry: entry[0] not in kept_sources)
             for filename, item in entries:
-                if filename not in kept_file:
+                if filename not in kept_as:
                     continue
                 extra = dict(item.get("extra") or {})
-                extra["hash"] = inverse_hashmap[kept_file[filename]]
+                extra["hash"] = inverse_hashmap[kept_as[filename]]
                 extra["hash_type"] = hash_type
                 # merging adds the duplicate's posts and URLs to the kept image
                 new_metadata.add_item(
-                    kept_file[filename],
+                    kept_as[filename],
                     post_ids=item.get("post_ids", []),
                     url=item.get("url"),
+                    source_file=filename,
                     extra=extra,
                     merge=True,
                 )
@@ -132,6 +146,7 @@ class UniqueImageFilter(BasicProcessor):
             for h, filename in hash_map.items():
                 new_metadata.add_item(
                     filename, post_ids=[],
+                    source_file=source_of[filename],
                     extra={"hash": h, "hash_type": hash_type},
                 )
 
