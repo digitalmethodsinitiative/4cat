@@ -1414,7 +1414,7 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
                                     fallback_name=default_name, fallback_ext=default_ext)
 
 
-WINDOWS_FORBIDS_IN_A_FILENAME = re.compile(r'[:?*"<>|\\/]')
+WINDOWS_FORBIDS_IN_A_FILENAME = re.compile(r'[:?*"<>|\\/\x00-\x1f]')
 
 
 def filename_to_prefix(filename, fallback="file") -> str:
@@ -1427,7 +1427,8 @@ def filename_to_prefix(filename, fallback="file") -> str:
     up with one, so three things are seen to here:
 
     - Characters Windows does not allow are replaced, because a file whose name
-      holds one of them cannot be written there at all.
+      holds one of them cannot be written there at all. Control characters go
+      too.
     - The dot before the extension becomes an underscore, so the name built
       from it does not read as though it had two extensions: `clip.mp4` gives
       `clip_mp4`, and `clip_mp4_frame_1.jpeg` has one extension rather than
@@ -1468,8 +1469,8 @@ def fold_filename(filename) -> str:
     What is reduced, and why each one:
 
     - Upper and lower case, because Windows and macOS do not tell them apart.
-      `casefold` rather than `lower`, so that `straße` and `STRASSE` come
-      out the same as well.
+      `casefold` rather than `lower`, which also makes `straße` and `STRASSE`
+      one name here.
     - An accented letter written as one character, or as the plain letter
       followed by a combining accent. macOS stores the second spelling and
       treats both as one name, so `café` is one file there however it was
@@ -1523,6 +1524,11 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
     if not isinstance(existing_filenames_folded, (set, frozenset, dict)):
         # ensure passing something for membership checks
         raise TypeError("existing_filenames_folded must be a set or a dict")
+
+    if not fold_filename(filename):
+        # a name of nothing but dots and spaces, which could strip to
+        # nothing at all. Names like this can come out of uploaded archives
+        filename = fallback_name + fallback_ext
 
     # Split base filename into name and extension
     if has_extension and '.' in filename:

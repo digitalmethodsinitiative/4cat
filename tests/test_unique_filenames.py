@@ -267,10 +267,11 @@ def test_a_claimed_name_differing_only_in_capitals_is_taken(tmp_path):
 	assert names.reserve_for_url("https://example.com/some_url_00001.mp4") == "some_url_00001-1.mp4"
 
 
-def test_the_german_sharp_s_matches_its_two_letter_spelling(tmp_path):
+def test_the_german_sharp_s_is_treated_as_its_two_letter_spelling(tmp_path):
 	"""
-	Lower-casing leaves the sharp s as it is, so seeing that these are one name
-	takes case folding rather than lower-casing.
+	Case folding makes these one name. No file system agrees, so this is
+	stricter than it needs to be: it costs the second one a `-1` it could have
+	done without, and it is recorded here so the behaviour is not a surprise.
 	"""
 	names = UniqueFilenames(tmp_path)
 
@@ -446,3 +447,18 @@ def test_reserve_prefix_tells_apart_videos_sharing_a_stem(tmp_path):
 	second = names.reserve_prefix("clip.webm", adds=".wav")
 
 	assert [f"{first}.wav", f"{second}.wav"] == ["clip_mp4.wav", "clip_webm.wav"]
+
+
+def test_a_name_of_nothing_but_dots_is_not_handed_back(tmp_path):
+	"""
+	Windows strips dots and spaces from the end of a name, so a name made only
+	of those is no name at all there. A zip member can be called this.
+	"""
+	assert UniqueFilenames(tmp_path).reserve("...") == "file"
+	assert deduplicate_filename("   ", fallback_name="image", fallback_ext=".png") == "image.png"
+
+
+def test_characters_windows_forbids_include_control_characters():
+	"""A zero byte stops Python's own file calls before any file system sees it"""
+	assert filename_to_prefix("a\x00b.mp4") == "a_b_mp4"
+	assert filename_to_prefix("line\nbreak.mp4") == "line_break_mp4"

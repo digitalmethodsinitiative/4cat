@@ -222,7 +222,6 @@ class VideoTimelines(BasicProcessor):
         if not metadata:
             return {}
 
-        mapping_dataset = {}
         mapping_ids = {}
         labels = {}
         from_dataset = metadata.from_dataset
@@ -246,17 +245,17 @@ class VideoTimelines(BasicProcessor):
                     continue
                 mapping_ids[name] = item.get("post_ids", [])
                 labels[name] = name.rsplit(".", 1)[0]
-                if from_dataset:
-                    mapping_dataset.setdefault(from_dataset, []).append(name)
 
-        for dataset, video_names in mapping_dataset.items():
+        # the label of each video is its post's, so the posts have to be read;
+        # the archive says in one place which dataset they are in
+        if from_dataset:
             try:
-                video_dataset = DataSet(key=dataset, db=self.db, modules=self.modules)
+                video_dataset = DataSet(key=from_dataset, db=self.db, modules=self.modules)
             except DataSetNotFoundException:
                 # Imported media datasets may not have the source on this instance
-                self.dataset.log(f"Could not find source dataset {dataset} on 4CAT for video frame labels")
-                continue
-            
+                self.dataset.log(f"Could not find source dataset {from_dataset} on 4CAT for video frame labels")
+                return labels
+
             source_dataset = video_dataset.nearest("*-search")
             if source_dataset is None:
                 # One type ignored a convention years ago...
@@ -275,8 +274,8 @@ class VideoTimelines(BasicProcessor):
 
             # which videos were downloaded for each item
             videos_by_post_id = {}
-            for video_name in video_names:
-                for post_id in mapping_ids[video_name]:
+            for video_name, post_ids in mapping_ids.items():
+                for post_id in post_ids:
                     videos_by_post_id.setdefault(post_id, []).append(video_name)
 
             # There may not be a "nearest" source e.g. Media Imports

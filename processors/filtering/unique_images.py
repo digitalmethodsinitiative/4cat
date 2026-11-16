@@ -67,13 +67,13 @@ class UniqueImageFilter(BasicProcessor):
 
         :return:
         """
-        seen_hashes = set()
+        # the name each hash is kept under, which is how a duplicate finds the
+        # image standing in for it
         hash_map = {}
-        duplicate_of = {}
         # which name each image that arrived is kept under, for the images kept
         # and for the duplicates that are stood in for
         kept_as = {}
-        kept_sources = set()
+        # the image each kept name was made from, which is its source_file
         source_of = {}
         hash_type = self.parameters.get("hash-type")
         dupes = 0
@@ -99,17 +99,14 @@ class UniqueImageFilter(BasicProcessor):
 
             image_hash = hash_file(image.file, hash_type)
 
-            if image_hash not in seen_hashes:
-                seen_hashes.add(image_hash)
+            if image_hash not in hash_map:
                 kept_name = kept_names.reserve(image.file.name)
                 shutil.copy2(image.file, staging_area.joinpath(kept_name))
                 hash_map[image_hash] = kept_name
                 kept_as[image.file.name] = kept_name
-                kept_sources.add(image.file.name)
                 source_of[kept_name] = image.file.name
             else:
                 self.dataset.log(f"{image.file.name} is a duplicate of {hash_map[image_hash]} - skipping")
-                duplicate_of[image.file.name] = hash_map[image_hash]
                 kept_as[image.file.name] = hash_map[image_hash]
                 dupes += 1
 
@@ -128,6 +125,7 @@ class UniqueImageFilter(BasicProcessor):
             # kept images first, so each keeps its own URL and names the image it
             # was kept from; a duplicate's URL is then listed in the kept image's
             # extra["other_urls"]
+            kept_sources = set(source_of.values())
             entries = sorted(source_metadata.iter_entries(), key=lambda entry: entry[0] not in kept_sources)
             for filename, item in entries:
                 if filename not in kept_as:
