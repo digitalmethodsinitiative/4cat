@@ -1437,10 +1437,10 @@ def filename_to_prefix(filename, fallback="file") -> str:
       end, and a name starting with one is hidden from the researcher who
       unpacks the archive.
 
-    Two names can still come out of this the same - a video called `a.mp4` and
-    a video with no extension called `a_mp4` both give `a_mp4` - so what comes
-    back is a suggestion rather than a name nothing else has. Reserve it with
-    `UniqueFilenames` to get one of those.
+    Two names can still come out of this the same. For example, a video called.
+    `a.mp4` and a video with no extension called `a_mp4` both give `a_mp4`. Use
+    `UniqueFilenames.reserve_prefix` to get a unique version of those, which calls 
+    this and reserves what it returns.
 
     :param str filename:  Name of the file the new one is made from
     :param str fallback:  Name to fall back on when nothing usable is left,
@@ -1490,7 +1490,7 @@ def fold_filename(filename) -> str:
 
 
 def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=None, max_bytes=255,
-                         fallback_name="file", fallback_ext="") -> str:
+                         fallback_name="file", fallback_ext="", has_extension=True) -> str:
     """
     Make a filename unique within a directory
 
@@ -1513,6 +1513,10 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
     :param str fallback_name:  Name to fall back on in the extreme case of an
       extension that does not itself fit within `max_bytes`
     :param str fallback_ext:  Extension to use in that same case
+    :param bool has_extension:  Whether the last dot in `filename` starts an
+      extension. Set it to False for a name that is all one piece, such as the
+      prefix built out of another file's name; avoids `my.video_mp4` read as
+      a name `my` with an extension `.video_mp4`.
     :return str:  A name nothing else has
     """
     if existing_filenames_folded is None:
@@ -1522,7 +1526,7 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
         raise TypeError("existing_filenames_folded must be a set")
 
     # Split base filename into name and extension
-    if '.' in filename:
+    if has_extension and '.' in filename:
         name_part, ext_part = filename.rsplit('.', 1)
         ext_part = '.' + ext_part
     else:
@@ -1612,10 +1616,9 @@ class UniqueFilenames:
     and `a.mp4` on a Linux server and lose one of them when a researcher
     unpacks it on their own machine.
 
-    Record a name with `reserve`, `reserve_for_url` or `claim`, never by
-    adding to the sets directly. There are two of them to keep in step, and a
-    name added to one but not the other is a name the checks do not know
-    about.
+    Record a name with `reserve`, `reserve_for_url`, `reserve_prefix` or
+    `claim`, never by adding to the sets directly. There are two sets to
+    keep aligned and this ensure both sets are updated together.
 
     A name that has been reserved but not yet written exists only in this
     object, so reserve a name before writing to it rather than relying on the
@@ -1661,6 +1664,29 @@ class UniqueFilenames:
                                    existing_filenames_folded=self.taken_folded, **kwargs)
         self._remember(filename)
         return filename
+
+    def reserve_prefix(self, filename, adds="", **kwargs) -> str:
+        """
+        Reserve the start of a name for the files made out of `filename`
+
+        For a processor that writes a file per item of another archive and
+        names what it writes after what it read (e.g. frames out of a video).
+        `filename_to_prefix` turns the source file's name into a name to build
+        on and reserves it here to keep source files colliding.
+
+        Returns a whole name rather than a name and an extension and reserves 
+        room for the extension and whatever the caller puts after it to be
+        within `max_bytes`.
+
+        :param str filename:  Name of the file the new ones are made from
+        :param str adds:  What the caller puts after the name it gets back,
+          e.g. `"_frame_0000001.jpeg"`
+        :param kwargs:  Passed on to `deduplicate_filename`
+        :return str:  The name reserved
+        """
+        max_bytes = kwargs.pop("max_bytes", 255) - len(adds.encode("utf-8"))
+        return self.reserve(filename_to_prefix(filename), has_extension=False,
+                            max_bytes=max_bytes, **kwargs)
 
     def claim(self, filename) -> None:
         """
