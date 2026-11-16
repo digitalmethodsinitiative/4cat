@@ -257,7 +257,7 @@ The same for scene frames, which has its own extractor.
 
 
 def run_scene_extractor(tmp_path, monkeypatch, video_names, scenes_per_video=1, frames_written=None,
-                        frame_size="no_modify", reverse_scenes=False):
+                        frame_size="no_modify", reverse_scenes=False, start_frames=None):
     """
     Capture a frame per scene of each video
 
@@ -265,11 +265,15 @@ def run_scene_extractor(tmp_path, monkeypatch, video_names, scenes_per_video=1, 
     `video frame 30` is the one scene 3 asked for.
 
     :param int scenes_per_video:  How many scenes each video is said to have
-    :param int frames_written:  How many frames ffmpeg writes, which is one
-      per scene unless a test is about it writing fewer
+    :param frames_written:  How many frames ffmpeg writes, which is one per
+      frame it was asked for unless a test is about it writing a different
+      number. A dict keyed by video name sets it for those videos only
     :param str frame_size:  The size to resize the frames to, if any
     :param bool reverse_scenes:  Hand the scenes over last-first, for a test
       about not relying on the order they arrive in
+    :param list start_frames:  The frame each scene starts at, one per scene,
+      instead of the `n * 10` above; for a test about two scenes starting on
+      the same frame
     :return tuple:  The staging area the folders were written to, and the
       processor, whose mock records what was logged and what ffmpeg was asked
     """
@@ -277,15 +281,25 @@ def run_scene_extractor(tmp_path, monkeypatch, video_names, scenes_per_video=1, 
     with zipfile.ZipFile(source_archive, "w") as archive:
         for filename in video_names:
             archive.writestr(filename, "content")
+        # the video archive the frames are cut from, so the frames can be
+        # checked for carrying its posts and URLs over
+        archive.writestr(".metadata.json", json.dumps({
+            "schema_version": 1, "from_dataset": "postskey", "processor_type": "video-downloader",
+            "items": {name: {"filename": name, "post_ids": ["p1", "p2"],
+                             "url": f"https://example.com/{name}"} for name in video_names},
+            "failures": [],
+        }))
 
     videos, scenes = [], []
     for name in video_names:
         video = tmp_path / name
         video.write_text("content")
         videos.append(SimpleNamespace(file=video))
+        starts = start_frames if start_frames else [number * 10
+                                                    for number in range(1, scenes_per_video + 1)]
         of_this_video = [{"id": f"{name}_scene_{number}",
-                          "start_frame": str(number * 10), "end_frame": str(number * 10 + 10)}
-                         for number in range(1, scenes_per_video + 1)]
+                          "start_frame": str(start), "end_frame": str(start + 10)}
+                         for number, start in enumerate(starts, start=1)]
         scenes.extend(reversed(of_this_video) if reverse_scenes else of_this_video)
 
     staging_area = tmp_path / "staging"
@@ -315,16 +329,23 @@ def run_scene_extractor(tmp_path, monkeypatch, video_names, scenes_per_video=1, 
     processor.extract_archived_file_by_name = \
         lambda *args: BasicProcessor.extract_archived_file_by_name(processor, *args)
 
-    emitted = scenes_per_video if frames_written is None else frames_written
-
     def fake_ffmpeg(command, **kwargs):
         # ffmpeg reads the video once and saves the frames it was asked for as
         # it reaches them, so they come out in video order whatever order they
-        # were asked in, numbered from 1. Each file holds the video frame it
-        # came from, so a test can see which scene it was named after.
+        # were asked in, numbered from 1. A frame it is asked for twice is
+        # saved once. Each file holds the video frame it came from, so a test
+        # can see which scene it was named after.
         select = next(argument for argument in command if argument.startswith("select="))
-        wanted = sorted(int(number) for number in re.findall(r"eq\(n\\,(\d+)\)", select))
-        for position, source_frame in enumerate(wanted[:emitted], start=1):
+        wanted = sorted({int(number) for number in re.findall(r"eq\(n\\,(\d+)\)", select)})
+        video = pathlib.Path(command[command.index("-i") + 1]).name
+        if isinstance(frames_written, dict):
+            emitted = frames_written.get(video, len(wanted))
+        else:
+            emitted = len(wanted) if frames_written is None else frames_written
+        for position in range(1, emitted + 1):
+            # a test can ask for more files than there were frames to save, to
+            # stand for ffmpeg writing one nothing asked for
+            source_frame = wanted[position - 1] if position <= len(wanted) else "nobody asked for"
             pathlib.Path(command[-1].replace("%07d", "%07d" % position)).write_text(
                 f"video frame {source_frame}")
         return SimpleNamespace(stdout=b"", stderr=b"", returncode=0)
@@ -376,9 +397,16 @@ def test_no_two_scene_frames_are_one_name_on_windows_or_macos(tmp_path, monkeypa
 Which scene a frame is named after.
 
 ffmpeg numbers the frames it saves from 1, in the order they appear in the
-video. The frames are read back in that order and matched with the scenes
-sorted the same way. If ffmpeg saved fewer frames than there are scenes, the
-match cannot be trusted and the dataset says so.
+video, and a file says nothing about which frame of the video it holds. So
+each frame is asked for once, however many scenes want it, and the files are
+read back in that order and matched with the frames asked for in the same
+order.
+
+If ffmpeg saved a different number of files than it was asked for, that match
+is guesswork, and a frame named after the wrong scene is wrong in a way nobody
+can see. The frames are still in the order they appear in the video, and still
+belong to the video and its posts, so they are kept under ffmpeg's own names,
+which claim no scene, and the dataset finishes with a warning.
 """
 
 
@@ -409,21 +437,113 @@ def test_scenes_that_arrive_out_of_order_still_get_their_own_frames(tmp_path, mo
         assert (folder / f"clip_mp4_scene_{number}.jpeg").read_text() == f"video frame {number * 10}"
 
 
-def test_fewer_frames_than_scenes_is_reported(tmp_path, monkeypatch):
+def test_two_scenes_that_name_one_frame_each_get_an_image(tmp_path, monkeypatch):
     """
-    A missing frame would move every frame after it onto the wrong scene, and
-    the files do not say which scene is missing, so the dataset gets a warning.
+    The detector shortens the last scene of a video to end on a frame that
+    exists, which can leave it naming the frame the scene before it names.
+    ffmpeg saves a frame it is asked for twice only once, so asking twice
+    would leave one file fewer than there are scenes and throw the whole
+    video away.
     """
     staging_area, processor = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4"],
-                                                  scenes_per_video=3, frames_written=2)
+                                                  start_frames=[10, 10, 30])
+    folder = staging_area / "clip_mp4"
+
+    # ffmpeg was asked for the shared frame once
+    command = processor.run_interruptable_process.call_args_list[0][0][0]
+    select = next(argument for argument in command if argument.startswith("select="))
+    assert select.count("eq(n\\,10)") == 1
+
+    # and both scenes that named it have an image of it
+    assert (folder / "clip_mp4_scene_1.jpeg").read_text() == "video frame 10"
+    assert (folder / "clip_mp4_scene_2.jpeg").read_text() == "video frame 10"
+    assert (folder / "clip_mp4_scene_3.jpeg").read_text() == "video frame 30"
+    processor.dataset.finish_with_warning.assert_not_called()
+
+
+def test_frames_that_cannot_be_matched_are_kept_without_a_scene(tmp_path, monkeypatch):
+    """
+    The frames still show the video, so they are worth keeping; it is only
+    which scene each one belongs to that is lost. The video alongside it is
+    unaffected, which is what makes a warning the right ending.
+    """
+    staging_area, processor = run_scene_extractor(tmp_path, monkeypatch, ["good.mp4", "bad.mp4"],
+                                                  scenes_per_video=3, frames_written={"bad.mp4": 2})
 
     logged = " ".join(str(call) for call in processor.dataset.log.call_args_list)
-    assert "3 frame(s) of clip.mp4 but it wrote 2" in logged
-    assert processor.dataset.finish_with_warning.called
+    assert "3 frame(s) of bad.mp4 but it wrote 2" in logged
 
-    # and the frames it did write are still named, kept and traceable
-    kept = sorted(path.name for path in (staging_area / "clip_mp4").iterdir())
-    assert kept == ["clip_mp4_scene_1.jpeg", "clip_mp4_scene_2.jpeg"]
+    # kept under ffmpeg's names, which say nothing about scenes
+    assert sorted(path.name for path in (staging_area / "bad_mp4").iterdir()) == [
+        "bad_mp4_frame_0000001.jpeg", "bad_mp4_frame_0000002.jpeg"]
+
+    written = json.loads((staging_area / ".metadata.json").read_text(encoding="utf-8"))
+    assert written["failures"] == []
+    for name in ("bad_mp4_frame_0000001.jpeg", "bad_mp4_frame_0000002.jpeg"):
+        entry = written["items"][name]
+        # everything still known about the frame is recorded
+        assert entry["source_file"] == "bad.mp4"
+        assert entry["post_ids"] == ["p1", "p2"]
+        assert entry["url"] == "https://example.com/bad.mp4"
+        # and the one thing that is not known is not claimed
+        assert "scene" not in (entry.get("extra") or {})
+
+    # the video alongside it kept its scenes
+    assert written["items"]["good_mp4_scene_1.jpeg"]["extra"]["scene"] == "1"
+
+    processor.dataset.finish_with_warning.assert_called_once()
+    count, keywords = processor.dataset.finish_with_warning.call_args
+    assert count[0] == 5
+    assert "1 video(s)" in keywords["warning"]
+
+
+def test_the_frames_kept_are_still_in_video_order(tmp_path, monkeypatch):
+    """
+    Which is what makes them worth keeping: a missing frame leaves a gap in
+    the sequence but does not reorder it, so the frames still represent the
+    video over time and a timeline of them is still true.
+    """
+    staging_area, _ = run_scene_extractor(tmp_path, monkeypatch, ["good.mp4", "bad.mp4"],
+                                          scenes_per_video=4, frames_written={"bad.mp4": 3})
+    folder = staging_area / "bad_mp4"
+
+    kept = [path.read_text() for path in sorted(folder.iterdir())]
+    assert kept == ["video frame 10", "video frame 20", "video frame 30"]
+
+
+def test_more_frames_than_asked_for_is_the_same_problem(tmp_path, monkeypatch):
+    """
+    A file ffmpeg wrote that nothing asked for shifts the match just as a
+    missing one does, so the scenes go but the frames stay.
+    """
+    staging_area, processor = run_scene_extractor(tmp_path, monkeypatch, ["good.mp4", "bad.mp4"],
+                                                  scenes_per_video=1, frames_written={"bad.mp4": 2})
+
+    logged = " ".join(str(call) for call in processor.dataset.log.call_args_list)
+    assert "1 frame(s) of bad.mp4 but it wrote 2" in logged
+    assert len(list((staging_area / "bad_mp4").iterdir())) == 2
+
+    written = json.loads((staging_area / ".metadata.json").read_text(encoding="utf-8"))
+    assert "bad_mp4_frame_0000002.jpeg" in written["items"], "a file in the archive the metadata does not name"
+
+
+def test_a_video_ffmpeg_wrote_nothing_for_says_so(tmp_path, monkeypatch):
+    """The reason kept its old name for the case it has always covered"""
+    staging_area, _ = run_scene_extractor(tmp_path, monkeypatch, ["good.mp4", "bad.mp4"],
+                                          scenes_per_video=2, frames_written={"bad.mp4": 0})
+
+    written = json.loads((staging_area / ".metadata.json").read_text(encoding="utf-8"))
+    assert written["failures"][0]["reason"] == "no_frames_extracted"
+
+
+def test_no_frames_at_all_is_an_error(tmp_path, monkeypatch):
+    """A dataset with nothing in it is not a result, so it is not finished as one"""
+    _, processor = run_scene_extractor(tmp_path, monkeypatch, ["clip.mp4"],
+                                       scenes_per_video=2, frames_written=0)
+
+    processor.dataset.finish_with_error.assert_called_once()
+    processor.dataset.finish.assert_not_called()
+    processor.dataset.finish_with_warning.assert_not_called()
 
 
 def test_the_frame_size_option_comes_before_the_output_file(tmp_path, monkeypatch):
