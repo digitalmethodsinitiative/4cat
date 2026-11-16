@@ -189,11 +189,18 @@ class VideoHasher(BasicProcessor):
         video_metadata = self.get_media_metadata()
         total_possible_videos = max((min(self.source_dataset.num_rows, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
         processed_videos = 0
-        # the collage is named after the video, and two videos can share a stem
-        # (e.g. clip.mp4 and clip.webm): without a name of its own the second
-        # collage overwrites the first, and both videos' hashes then point at
-        # the same image
+        # one name per video, which its collage is named after. The video's
+        # extension is part of the name, so clip.mp4 and clip.webm say which
+        # video they came from rather than one of them being given a `-1`
         collage_filenames = UniqueFilenames(output_dir)
+
+        # the collages get metadata of their own, so a consumer can tell which
+        # video each one was made from without reading its name
+        collage_metadata = self.dataset.new_media_metadata(
+            processor_type=self.type,
+            from_dataset=((video_metadata.from_dataset if video_metadata else None)
+                          or self.source_dataset.key),
+        )
 
         self.dataset.update_status("Creating video hashes")
         for video in self.source_dataset.iterate_items(self, staging_area=staging_area):
@@ -222,9 +229,19 @@ class VideoHasher(BasicProcessor):
 
             video_hashes[video.file.name] = {'videohash': videohash}
 
-            collage_filename = collage_filenames.reserve(video.file.stem + '.jpg')
+            collage_name = collage_filenames.reserve_prefix(video.file.name, adds='.jpg')
+            collage_filename = f"{collage_name}.jpg"
             shutil.copy(videohash.collage_path, output_dir.joinpath(collage_filename))
             video_hashes[video.file.name]['video_collage_filename'] = collage_filename
+
+            video_item = video_metadata.get_entry(video.file.name) if video_metadata else None
+            collage_metadata.add_item(
+                collage_filename,
+                post_ids=video_item.get("post_ids", []) if video_item else [],
+                url=video_item.get("url") if video_item else None,
+                source_file=video.file.name,
+                extra={"video_hash": videohash.hash, "video_duration": videohash.video_duration},
+            )
 
             processed_videos += 1
             self.dataset.update_status(
@@ -291,7 +308,8 @@ class VideoHasher(BasicProcessor):
                     writer = csv.DictWriter(outfile, fieldnames=row.keys())
                     writer.writeheader()
                 writer.writerow(row)
-                num_posts += 1
+
+        collage_metadata.write(output_dir)
 
         if save_annotations and annotations:
             self.dataset.update_status("Saving hashes as annotations to top dataset")
