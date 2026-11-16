@@ -1548,13 +1548,17 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
             ext_part = fallback_ext
             available_bytes = max_bytes - len(ext_part.encode('utf-8'))
 
-        # Truncate name part to fit
-        name_bytes = name_part.encode('utf-8')
-        if len(name_bytes) > available_bytes:
-            # Truncate byte by byte to ensure valid UTF-8
-            while len(name_bytes) > available_bytes:
-                name_part = name_part[:-1]
-                name_bytes = name_part.encode('utf-8')
+        if available_bytes <= 0:
+            # No room for a name at all
+            name_part = "f"
+        else:
+            # Truncate name part to fit
+            name_bytes = name_part.encode('utf-8')
+            if len(name_bytes) > available_bytes:
+                # Truncate byte by byte to ensure valid UTF-8
+                while len(name_bytes) > available_bytes:
+                    name_part = name_part[:-1]
+                    name_bytes = name_part.encode('utf-8')
 
         filename = name_part + ext_part
 

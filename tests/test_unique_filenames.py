@@ -458,6 +458,18 @@ def test_a_name_of_nothing_but_dots_is_not_handed_back(tmp_path):
 	assert deduplicate_filename("   ", fallback_name="image", fallback_ext=".png") == "image.png"
 
 
+def test_leaving_no_room_for_a_name_still_gives_one(tmp_path):
+	"""
+	`reserve_prefix` works out how many bytes are left for the name by taking
+	what the caller will add off the longest a name may be, so a caller that
+	adds more than that leaves nothing. There is no sensible name to hand back
+	then, but shortening one towards nothing has to stop somewhere: without
+	this the loop that shortens it never ends and the processor hangs.
+	"""
+	assert deduplicate_filename("clip.mp4", max_bytes=-5, has_extension=False) == "f"
+	assert UniqueFilenames(tmp_path).reserve_prefix("clip.mp4", adds="a" * 300) == "f"
+
+
 def test_characters_windows_forbids_include_control_characters():
 	"""A zero byte stops Python's own file calls before any file system sees it"""
 	assert filename_to_prefix("a\x00b.mp4") == "a_b_mp4"
