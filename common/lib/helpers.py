@@ -1503,12 +1503,11 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
     :param str filename:  The name to use if it is free
     :param Path staging_area:  Directory to check for a file of this name; if
       None, only `existing_filenames` is consulted
-    :param set existing_filenames_folded:  Names already taken, each one put
-      through `fold_filename` first. The caller holds this set and so folds
-      it; folding it here would mean redoing every name on every call, which
-      over an archive of many thousands of files is work enough to notice.
-      `UniqueFilenames` keeps such a set as it hands names out, and is the
-      way to do this unless there is a reason to call here directly.
+    :param existing_filenames_folded:  Names already taken, each one put
+      through `fold_filename` first. A set, or a dict keyed by those names.
+      The caller holds and folds it; folding it here would mean redoing
+      every name on every call. `UniqueFilenames` keeps this track as it hands
+      names out.
     :param int max_bytes:  Maximum number of bytes for the filename
     :param str fallback_name:  Name to fall back on in the extreme case of an
       extension that does not itself fit within `max_bytes`
@@ -1521,9 +1520,9 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
     """
     if existing_filenames_folded is None:
         existing_filenames_folded = set()
-    if type(existing_filenames_folded) is not set:
-        # Could force set() here, but likely would be forcing in a loop
-        raise TypeError("existing_filenames_folded must be a set")
+    if not isinstance(existing_filenames_folded, (set, frozenset, dict)):
+        # ensure passing something for membership checks
+        raise TypeError("existing_filenames_folded must be a set or a dict")
 
     # Split base filename into name and extension
     if has_extension and '.' in filename:
@@ -1610,15 +1609,13 @@ class UniqueFilenames:
     earlier archive.
 
     A name is free only if no name taken already reduces to the same text, as
-    `fold_filename` reduces it. So the names here are kept twice over: as they
-    were handed out, which is what callers get, and reduced, which is what
-    they are compared by. Without that, an archive could be given both `A.mp4`
-    and `a.mp4` on a Linux server and lose one of them when a researcher
-    unpacks it on their own machine.
+    `fold_filename` reduces it. Without that, an archive could be given both
+    `A.mp4` and `a.mp4` on a Linux server and lose one of them when a
+    researcher unpacks it on their own machine. Names are handed out as they
+    came and only compared reduced.
 
     Record a name with `reserve`, `reserve_for_url`, `reserve_prefix` or
-    `claim`, never by adding to the sets directly. There are two sets to
-    keep aligned and this ensure both sets are updated together.
+    `claim`, never by adding to `taken` directly.
 
     A name that has been reserved but not yet written exists only in this
     object, so reserve a name before writing to it rather than relying on the
@@ -1632,8 +1629,11 @@ class UniqueFilenames:
           yet or when only this run's names matter.
         """
         self.directory = directory
-        self.taken = set()
-        self.taken_folded = set()
+        # each reduced name, and the names handed out that reduce to it:
+        # `A.mp4` and `a.mp4` reduce to one text and are two names. A name is
+        # free when nothing reduces to it, and giving one up only frees its
+        # text once it was the last name holding it.
+        self.taken = {}
         if directory is not None and directory.is_dir():
             for item in directory.iterdir():
                 self._remember(item.name)
@@ -1648,7 +1648,7 @@ class UniqueFilenames:
         :return str:  The name reserved, which is `filename` if it was free
         """
         filename = deduplicate_filename(filename, staging_area=self.directory,
-                                        existing_filenames_folded=self.taken_folded, **kwargs)
+                                        existing_filenames_folded=self.taken, **kwargs)
         self._remember(filename)
         return filename
 
@@ -1661,7 +1661,7 @@ class UniqueFilenames:
         :return str:  The name reserved
         """
         filename = url_to_filename(url, staging_area=self.directory,
-                                   existing_filenames_folded=self.taken_folded, **kwargs)
+                                   existing_filenames_folded=self.taken, **kwargs)
         self._remember(filename)
         return filename
 
@@ -1703,12 +1703,35 @@ class UniqueFilenames:
 
     def _remember(self, filename) -> None:
         """
-        Record a name as taken, both as it was given and reduced
+        Record a name as taken, if it is not recorded already
+
+        A name recorded twice would have to be given up twice, and callers do
+        record one twice: yt-dlp reports a file once per postprocessor that
+        runs on it.
 
         :param str filename:  Name to record
         """
-        self.taken.add(filename)
-        self.taken_folded.add(fold_filename(filename))
+        holders = self.taken.setdefault(fold_filename(filename), [])
+        if filename not in holders:
+            holders.append(filename)
+
+    def _release(self, filename) -> None:
+        """
+        Give up a name recorded as taken, if it was recorded here
+
+        A name this does not know is ignored: its reduced form belongs to
+        whichever name does hold it, which is why the names are kept and not
+        only counted.
+
+        :param str filename:  Name to give up
+        """
+        holders = self.taken.get(fold_filename(filename), [])
+        if filename not in holders:
+            return
+
+        holders.remove(filename)
+        if not holders:
+            del self.taken[fold_filename(filename)]
 
     def replace(self, current, filename, **kwargs) -> str:
         """
@@ -1723,12 +1746,7 @@ class UniqueFilenames:
         :param kwargs:  Passed on to `deduplicate_filename`
         :return str:  The name reserved
         """
-        self.taken.discard(current)
-        # another name still taken may reduce to the same text, and that text
-        # is then still taken too
-        folded = fold_filename(current)
-        if not any(fold_filename(name) == folded for name in self.taken):
-            self.taken_folded.discard(folded)
+        self._release(current)
         return self.reserve(filename, **kwargs)
 
 

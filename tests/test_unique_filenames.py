@@ -127,6 +127,51 @@ def test_replace_avoids_a_name_another_file_has(tmp_path):
 	assert second == "photo-1.jpeg"
 
 
+def test_claiming_one_name_twice_counts_it_once(tmp_path):
+	"""
+	yt-dlp reports a file once per postprocessor that runs on it, so the same
+	name is claimed more than once. Counting it twice would mean it had to be
+	given up twice before it was free again.
+	"""
+	names = UniqueFilenames(tmp_path)
+	names.claim("video.mp4")
+	names.claim("video.mp4")
+
+	names.replace("video.mp4", "video.webm")
+
+	assert names.reserve("video.mp4") == "video.mp4"
+
+
+def test_giving_up_a_name_it_never_handed_out_frees_nothing(tmp_path):
+	"""
+	This is why the names are kept as they were handed out as well as reduced.
+	`A.mp4` and `a.mp4` reduce to one text, so without the names themselves,
+	giving up the first would free the text the second still holds.
+	"""
+	names = UniqueFilenames(tmp_path)
+	names.claim("a.mp4")
+
+	names.replace("A.mp4", "unrelated.png")
+
+	assert names.reserve("a.mp4") == "a-1.mp4"
+
+
+def test_a_name_given_up_stays_taken_while_another_reduces_to_it(tmp_path):
+	"""
+	Two names can reduce to the same text, which the downloaders can both hold
+	at once because `claim` takes a name as it is. Giving one up must leave the
+	other's name taken, or a later file could be handed a name that unpacks
+	onto it on Windows.
+	"""
+	names = UniqueFilenames(tmp_path)
+	names.claim("Photo.png")
+	names.claim("photo.png")
+
+	names.replace("Photo.png", "something.jpeg")
+
+	assert names.reserve("photo.png") == "photo-1.png"
+
+
 def test_claim_records_a_name_chosen_elsewhere(tmp_path):
 	"""
 	The video downloader has three things writing into one folder: files copied
@@ -153,9 +198,17 @@ def test_long_urls_sharing_a_slug_prefix_get_different_names(tmp_path):
 	assert names.reserve(slug) == f"{slug}-1"
 
 
-def test_deduplicate_filename_rejects_a_non_set():
+def test_deduplicate_filename_rejects_a_list_of_names():
+	"""A list is checked name by name, which in a loop over an archive is slow"""
 	with pytest.raises(TypeError):
 		deduplicate_filename("clip.wav", existing_filenames_folded=["clip.wav"])
+
+
+def test_deduplicate_filename_takes_names_as_the_keys_of_a_dict():
+	"""Which is how `UniqueFilenames` holds them, with the names against each"""
+	taken = {fold_filename("clip.wav"): ["clip.wav"]}
+
+	assert deduplicate_filename("clip.wav", existing_filenames_folded=taken) == "clip-1.wav"
 
 
 def test_deduplicate_filename_respects_max_bytes():
