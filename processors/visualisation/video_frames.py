@@ -10,7 +10,7 @@ import oslex
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.helpers import UniqueFilenames, filename_to_prefix
+from common.lib.helpers import UniqueFilenames
 from common.lib.user_input import UserInput
 from processors.visualisation.download_videos import VideoDownloaderPlus
 
@@ -92,18 +92,19 @@ class VideoFrames(BasicProcessor):
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
-		# a folder of frames per video, named after the video file, to keep an
-		# archive of many thousands of frames possible to look through. The
-		# extension is part of the name, since clip.mp4 and clip.webm are two
-		# videos. Which video a frame came from is recorded in the metadata as
-		# its source_file, not left to the folder it sits in.
-		frame_folders = UniqueFilenames(output_directory)
+		# one name per video (folder) and frames. frames are named after the 
+		# video. No two frames in the archive can share a name: processors
+		# loops through all files and ignore folders (better to rely on metadata).
+		# The folders keep the frames tidy, but metadata stores `source_file`.
+		# UniqueFilenames ensures that the names are unique, even if two videos have
+		# or would have the same name (include extension for "clip.mp4" and "clip.webm").
+		frame_names = UniqueFilenames(output_directory)
 
-		# the frames are named after their video as well, and no two frames in
-		# the archive may share a name. Whatever reads them next may hold them
-		# all in one folder, and the metadata records each frame by its name
-		# alone, so the folders keep the frames tidy rather than apart.
-		frame_names = UniqueFilenames()
+		# figure out the longest suffix that will be added to a frame name, so we can reserve enough space.
+		frame_pattern = "_frame_%07d.jpeg"
+		output_log_suffix = "_ffmpeg_output.log"
+		error_log_suffix = "_ffmpeg_error.log"
+		longest_name_added = max(frame_pattern % 10 ** 10, output_log_suffix, error_log_suffix, key=len)
 
 		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
@@ -121,13 +122,11 @@ class VideoFrames(BasicProcessor):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
-			vid_name = frame_folders.reserve(video.file.name)
-			video_dir = output_directory.joinpath(vid_name)
-			video_dir.mkdir()
-
 			# every video numbers its frames from 1, so the video's name is what
 			# tells one video's first frame from another's
-			frame_name = frame_names.reserve(filename_to_prefix(video.file.name))
+			frame_name = frame_names.reserve_prefix(video.file.name, adds=longest_name_added)
+			video_dir = output_directory.joinpath(frame_name)
+			video_dir.mkdir()
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
@@ -142,7 +141,7 @@ class VideoFrames(BasicProcessor):
 			if frame_size != 'no_modify':
 				command.extend(['-s', oslex.quote(frame_size)])
 
-			command.extend([str(video_dir.joinpath(f"{frame_name}_frame_%07d.jpeg"))])
+			command.extend([str(video_dir.joinpath(f"{frame_name}{frame_pattern}"))])
 
 			self.dataset.log(" ".join(command))
 
@@ -153,17 +152,19 @@ class VideoFrames(BasicProcessor):
 			ffmpeg_error = result.stderr.decode("utf-8")
 
 			if ffmpeg_output:
-				with open(video_dir.joinpath(f"{frame_name}_ffmpeg_output.log"), 'w') as outfile:
+				with open(video_dir.joinpath(f"{frame_name}{output_log_suffix}"), 'w') as outfile:
 					outfile.write(ffmpeg_output)
 
 			if ffmpeg_error:
-				with open(video_dir.joinpath(f"{frame_name}_ffmpeg_error.log"), 'w') as outfile:
+				with open(video_dir.joinpath(f"{frame_name}{error_log_suffix}"), 'w') as outfile:
 					outfile.write(ffmpeg_error)
 
 			if result.returncode != 0:
-				self.dataset.update_status(f"Unable to extract frames from video {vid_name} (see logs for details)")
+				self.dataset.update_status(
+					f"Unable to extract frames from video {video.file.name} (see logs for details)")
 				self.dataset.log('Error Return Code (%s) with video %s: %s' % (
-					str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
+					str(result.returncode), video.file.name,
+					"\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
 			else:
 				processed_videos += 1
 				self.dataset.update_status(
