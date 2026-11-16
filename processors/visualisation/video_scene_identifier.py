@@ -474,8 +474,8 @@ class VideoSceneDetector(BasicProcessor):
 		# is 1-indexed, but otherwise frames are 0-indexed
 		# anyway, ffmpeg won't want to select frame 2808 later in that case, so
 		# correct the number to a valid 0-indexed number
-		while scenes[-1]["end_frame"] >= total_frames:
-			scenes[-1]["end_frame"] -= 1
+		scenes[-1]["end_frame"] = max(scenes[-1]["start_frame"],
+									  min(scenes[-1]["end_frame"], total_frames - 1))
 
 		return scenes
 
