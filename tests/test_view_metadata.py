@@ -189,7 +189,7 @@ def test_item_ids(item, expected):
     ("image-downloader", True),
     ("image-downloader-unique", True),  # a filtered image archive
     ("video-downloader-telegram", True),
-    ("video-downloader-tiktok", True),  # the preset, which carries its own type
+    ("video-downloader-tiktok", True),  # a video downloader for one platform, with its own type
     ("tiktok-search", False),
     ("metadata-viewer", False),
 ])
@@ -660,32 +660,10 @@ def test_video_downloader_honours_from_dataset_override(tmp_path):
     assert credited == ["original", "helper"]
 
 
-@pytest.mark.parametrize("dataset_type,parameters,expected", [
-    # the id column is the items' own `id`, so the original can be credited
-    ("tiktok-search", {}, "original"),
-    ("tiktok-urls-search", {}, "original"),
-    ("upload-search", {"column": "id"}, "original"),
-    # a different id column: the recorded post IDs would not match that
-    # dataset's items, so the helper stays the right answer
-    ("upload-search", {"column": "tiktok_post_id"}, None),
-])
-def test_tiktok_preset_credits_original_only_when_ids_line_up(dataset_type, parameters, expected):
-    from processors.visualisation.download_tiktok_video import TikTokVideoDownloader
-
-    preset = TikTokVideoDownloader.__new__(TikTokVideoDownloader)
-    preset.source_dataset = SimpleNamespace(type=dataset_type, key="original")
-    preset.parameters = {"amount": 10, **parameters}
-
-    stages = preset.get_processor_pipeline()
-    video_stage = next(stage for stage in stages if stage["type"] == "video-downloader")
-
-    assert video_stage["parameters"].get("_from_dataset") == expected
-
-
-def test_tiktok_preset_reads_video_downloader_metadata():
+def test_tiktok_downloader_reads_video_downloader_metadata():
     """
-    The preset has the video downloader write its archive, so it reads that
-    archive the same way the video downloader would.
+    The TikTok downloader writes its archive as the video downloader does, so
+    it reads that archive the same way.
     """
     from processors.visualisation.download_tiktok_video import TikTokVideoDownloader
     from processors.visualisation.download_videos import VideoDownloaderPlus
