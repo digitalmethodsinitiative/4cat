@@ -93,7 +93,11 @@
                 {% endif %}
                 <div class="form-element">
                     <label for="user-deactivated">Is deactivated?</label>
-                    <input type="checkbox"{% if user.is_deactivated %} checked="checked"{% endif %} id="user-deactivated" name="is_deactivated">
+                    <div>
+                        <input type="checkbox"{% if user.is_deactivated %} checked="checked"{% endif %} id="user-deactivated" name="is_deactivated">
+                        <button class="tooltip-trigger" aria-controls="tooltip-deactivated-label" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-deactivated-label" class="force-width">A deactivated user cannot use 4CAT. If they are logged in, they are logged out the next time they load a page, and they cannot log in again. Requests with their API access tokens are refused too. Their datasets and other data are kept, and datasets that are already queued or running are not stopped. Untick this to reactivate them.</p>
+                    </div>
                 </div>
                 <div class="form-element">
                     <label for="user-autodelete">Delete after</label>

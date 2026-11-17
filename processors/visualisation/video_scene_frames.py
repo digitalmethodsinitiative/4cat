@@ -14,7 +14,7 @@ from packaging import version
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.user_input import UserInput
-from common.lib.helpers import get_ffmpeg_version
+from common.lib.helpers import get_ffmpeg_version, UniqueFilenames
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -114,20 +114,48 @@ class VideoSceneFrames(BasicProcessor):
         staging_area = self.dataset.get_staging_area()
 
         errors = 0
+        # scenes looked at, which is what the progress bar counts, and frames
+        # actually written, which is what the dataset ends up holding. track
+        # to report as we lose which scene each frame belongs to if they differ.
         processed_frames = 0
+        captured_frames = 0
+        unmatched_videos = 0
         num_scenes = self.source_dataset.num_rows
-        for video in video_dataset.iterate_items(self):
-            # Check for 4CAT's metadata JSON and copy it
-            if video.file.name == '.metadata.json':
-                shutil.copy(video.file, staging_area)
 
+
+        # create metadata file so frames can be traced back to original videos/posts
+        source_metadata = self.get_media_metadata(video_dataset)
+        metadata = self.dataset.new_media_metadata(
+            processor_type=self.type,
+            from_dataset=((source_metadata.from_dataset if source_metadata else None)
+                          or video_dataset.key),
+        )
+
+        # one name per video (folder) and frames. frames are named after the
+        # video. No two frames in the archive can share a name: processors
+        # loops through all files and ignore folders (better to rely on metadata).
+        # The folders keep the frames tidy, but metadata stores `source_file`.
+        # UniqueFilenames ensures that the names are unique, even if two videos have
+        # or would have the same name (include extension for "clip.mp4" and "clip.webm").
+        frame_names = UniqueFilenames(staging_area)
+
+        # figure out the longest suffix that will be added to a frame name, so we can reserve enough space.
+        # the number is padded so the frames sort in the order ffmpeg saved them
+        frame_pattern = "_frame_%07d.jpeg"
+        scene_pattern = "_scene_%s.jpeg"
+        longest_name_added = max(frame_pattern % 10 ** 10, scene_pattern % 10 ** 10, key=len)
+
+        for video in video_dataset.iterate_items(self):
             if video.file.name not in scenes:
                 continue
 
             self.dataset.log(f"Video {video.file.name} has {len(scenes[video.file.name]):,} scenes")
 
-            video_folder = staging_area.joinpath(video.file.stem)
-            video_folder.mkdir(exist_ok=True)
+            # every video numbers its frames from 1, so the video's name is what
+            # tells one video's first frame from another's
+            frame_name = frame_names.reserve_prefix(video.file.name, adds=longest_name_added)
+            video_folder = staging_area.joinpath(frame_name)
+            video_folder.mkdir()
 
             ffmpeg_path = shutil.which(self.config.get("video-downloader.ffmpeg_path"))
             fps_command = "-fps_mode" if get_ffmpeg_version(ffmpeg_path) >= version.parse("5.1") else "-vsync"
@@ -137,28 +165,38 @@ class VideoSceneFrames(BasicProcessor):
             # which frame? depends on the key frame setting - for 'middle' we
             # need to do some calculations
             keyframe_field = {"first": "start_frame", "last": "end_frame", "middle": None}.get(key_frame)
-            frame_scenes = []
+            # which scenes want each frame of the video. Two scenes could name
+            # the same frame if the detector shortens the last scene of a video
+            # to end on a frame that is already used by another scene or a scene
+            # is a frame long (ffmpeg saves a only once).
+            scenes_by_frame = {}
             for scene in scenes[video.file.name]:
+                # from `bounds`, which has these as numbers; the scene dataset
+                # stores them as text
                 bounds = {k: int(v) for k, v in scene.items() if k.endswith("_frame")}
-                frame_scenes.append({
-                    "scene": scene["id"].split("_").pop(),
-                    "frame": scene.get(keyframe_field) if keyframe_field else int(
-                        bounds["start_frame"] + ((bounds["end_frame"] - bounds["start_frame"]) / 2)
-                    )
-                })
+                frame = bounds[keyframe_field] if keyframe_field else int(
+                    bounds["start_frame"] + ((bounds["end_frame"] - bounds["start_frame"]) / 2)
+                )
+                scenes_by_frame.setdefault(frame, []).append(scene["id"].split("_").pop())
 
-            vf_param = "+".join([f"eq(n\\,{frame['frame']})" for frame in frame_scenes])
+            # ffmpeg saves the frames in the order they appear in the video,
+            # so ask for them in that order and they come back in it
+            wanted_frames = sorted(scenes_by_frame)
+
+            vf_param = "+".join([f"eq(n\\,{frame})" for frame in wanted_frames])
 
             command = [
                 ffmpeg_path,
                 "-i", oslex.quote(str(video.file)),
                 "-vf", f"select='{vf_param}'",
                 fps_command, "passthrough",
-                oslex.quote(str(video_folder.joinpath(f"{video.file.stem}_frame_%d.jpeg")))
             ]
 
+            # ffmpeg options for a file go before that file's name
             if frame_size != "no_modify":
                 command += ["-s", oslex.quote(frame_size)]
+
+            command.append(oslex.quote(str(video_folder.joinpath(f"{frame_name}{frame_pattern}"))))
 
             result = self.run_interruptable_process(command, cleanup_paths=(staging_area,))
 
@@ -169,10 +207,60 @@ class VideoSceneFrames(BasicProcessor):
 
                 errors += 1
 
-            # the default filenames can be improved - use scene ID instead of frame #
-            for i in range(0, len(scenes[video.file.name])):
-                frame_file = video_folder.joinpath(f"{video.file.stem}_frame_{i+1}.jpeg")
-                frame_file.rename(frame_file.with_stem(f"{video.file.stem}_scene_{frame_scenes[i]['scene']}"))
+            # every frame stands for the items the video did, and says which
+            # scene it was taken from
+            video_item = source_metadata.get_entry(video.file.name) if source_metadata else None
+            post_ids = video_item.get("post_ids", []) if video_item else []
+            source_url = video_item.get("url") if video_item else None
+
+            # the frames ffmpeg saved, in the order it saved them. This folder
+            # holds nothing else yet, so reading it is simpler than working
+            # out the names ffmpeg gave them
+            written = sorted(video_folder.glob("*.jpeg"))
+
+            if len(written) == len(wanted_frames):
+                # use scene ID for the default filenames
+                for frame_file, frame in zip(written, wanted_frames):
+                    scene_frames = [video_folder.joinpath(f"{frame_name}{scene_pattern % scene}")
+                                    for scene in scenes_by_frame[frame]]
+                    # the file is renamed for the first scene that named this
+                    # frame and copied for the others, so each scene has an
+                    # image of its own
+                    frame_file.rename(scene_frames[0])
+                    for scene_frame in scene_frames[1:]:
+                        shutil.copy2(scene_frames[0], scene_frame)
+
+                    for scene, scene_frame in zip(scenes_by_frame[frame], scene_frames):
+                        metadata.add_item(scene_frame.name, post_ids=post_ids, url=source_url,
+                                          source_file=video.file.name,
+                                          extra={"scene": scene})
+                        captured_frames += 1
+            elif not written:
+                # nothing to name or keep, so the posts are recorded as having
+                # got no frame at all
+                errors += 1
+                metadata.add_failure(
+                    post_ids=post_ids, url=source_url, source_file=video.file.name,
+                    reason="no_frames_extracted",
+                    reason_description=(f"ffmpeg exited with code {result.returncode}" if result.returncode
+                                        else "ffmpeg reported no error but wrote no frames"))
+            else:
+                # We ended up with too many frames or not enough.
+                # And we cannot tell which frames were missed (ffmpeg numbers
+                # the frames it saves from 1 but that doesn't tell us which frame
+                # of the video it represents)
+                # They are still in the order they appear in the video though,
+                # so we only lose the scene the frame is from
+                errors += 1
+                unmatched_videos += 1
+                self.dataset.log(
+                    f"Asked ffmpeg for {len(wanted_frames):,} frame(s) of {video.file.name} but it wrote "
+                    f"{len(written):,}, so which scene each frame belongs to cannot be established; "
+                    f"keeping them in the order ffmpeg saved them, without a scene")
+                for frame_file in written:
+                    metadata.add_item(frame_file.name, post_ids=post_ids, url=source_url,
+                                      source_file=video.file.name)
+                    captured_frames += 1
 
             processed_frames += len(scenes[video.file.name])
 
@@ -180,13 +268,22 @@ class VideoSceneFrames(BasicProcessor):
             self.dataset.update_progress(processed_frames / num_scenes)
 
         # Finish up
+        if not captured_frames:
+            self.dataset.finish_with_error(
+                "ffmpeg captured no frames for any of the videos. See the dataset log for details.")
+            return
+
         # We've created a directory and folder structure here as opposed to a single folder with single files as
         # expected by self.write_archive_and_finish() so we use make_archive instead
+        metadata.write(staging_area)
+
         from shutil import make_archive
         make_archive(self.dataset.get_results_path().with_suffix(''), "zip", staging_area)
 
         if errors:
-            warning = "Not all scenes could be captured. See dataset log for details."
-            self.dataset.finish_with_warning(processed_frames, warning=warning)
+            warning = (f"The frames of {unmatched_videos:,} video(s) could not be matched to their scenes, so they "
+                       f"are named and recorded without one. See the dataset log for details."
+                       if unmatched_videos else "Not all scenes could be captured. See dataset log for details.")
+            self.dataset.finish_with_warning(captured_frames, warning=warning)
         else:
-            self.dataset.finish(processed_frames)
+            self.dataset.finish(captured_frames)

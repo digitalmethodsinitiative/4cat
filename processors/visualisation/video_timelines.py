@@ -2,7 +2,6 @@
 Create timelines from collections of video frames
 """
 import base64
-import json
 import io
 
 from PIL import Image
@@ -14,6 +13,7 @@ from svgwrite.image import Image as ImageElement
 from ural import is_url
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import normalize_post_id
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import DataSetNotFoundException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
@@ -68,7 +68,7 @@ class VideoTimelines(BasicProcessor):
         }
 
     def process(self):
-        metadata = {}
+        metadata = self.get_media_metadata()
         base_height = self.parameters.get("height", 100)
         fontsize = 12
 
@@ -77,11 +77,16 @@ class VideoTimelines(BasicProcessor):
         offset_y = -base_height
         timeline = None
         iterator = self.source_dataset.iterate_items(self)
+        item = None
         looping = True
         timelines = []
         timeline_widths = {}
 
         # why not just loop through iterate_items?
+        # reading the labels walks the whole source dataset, and nothing about
+        # them changes while the frames are rendered, so do it once
+        labels = self.get_video_labels(metadata)
+
         # in SVG the order of elements matters, so we want to do some things
         # _after_ adding the last frame of a timeline. If we do this within the
         # loop we need to do the same outside of the loop after it finishes the
@@ -98,20 +103,15 @@ class VideoTimelines(BasicProcessor):
                 # this means that at the end of the iterator we complete one
                 # final iteration in which we finish things up (see below)
                 looping = False
-
-            # there is a metadata file, always read first, which we can use
-            if item.file.name == ".metadata.json":
-                with item.file.open() as infile:
-                    metadata = json.load(infile)
-                    continue
+                if item is None:
+                    # the archive holds no files to make timelines from
+                    break
 
             # skip if file is a real file but not an image
             if looping and item.file.suffix not in (".jpeg", ".jpg", ".png", ".gif"):
                 continue
             else:
-                video = str(item.file.parent.name)
-
-            labels = self.get_video_labels(metadata)
+                video = self.video_for(metadata, item.file)
 
             # at the end of each timeline (or at the end of the archive) add a
             # footer to it and paint to the canvas
@@ -187,6 +187,26 @@ class VideoTimelines(BasicProcessor):
         self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
         return self.dataset.finish(len(timeline_widths))
 
+    @staticmethod
+    def video_for(metadata, frame):
+        """
+        Which video a frame was taken from
+
+        The frame's metadata entry says which video it came from. Older
+        archives have no entry per frame, so for those the folder name is
+        used, which is the video's name in those archives.
+
+        :param MediaArchiveMetadata|None metadata:  The archive's metadata
+        :param Path frame:  The frame file
+        :return str:  Name of the video the frame was taken from
+        """
+        if metadata:
+            source_file = metadata.source_file_for(frame.name)
+            if source_file:
+                return source_file
+
+        return str(frame.parent.name)
+
     def get_video_labels(self, metadata):
         """
         Determine appropriate labels for each video
@@ -195,34 +215,47 @@ class VideoTimelines(BasicProcessor):
         determine an appropriate label. There is a generalised heuristic and
         some data source-specific pathways.
 
-        :param metadata:  Metadata as parsed from the 'Extract Frames' JSON
-        :return dict:  Filename -> label mapping
+        :param MediaArchiveMetadata metadata:  Loaded archive metadata.
+        :return dict:  Name of a video -> the label its timeline gets, named
+          the same way `video_for` names a video
         """
-        mapping_dataset = {}
-        mapping_ids = {}
-        labels = {}
-
         if not metadata:
             return {}
 
-        for url, data in metadata.items():
-            if data.get('success'):
-                for filename in [f["filename"] for f in data.get("files", [])]:
-                    filename = ".".join(filename.split(".")[:-1])
-                    mapping_ids[filename] = data["post_ids"]
-                    if data.get("from_dataset", data.get("source_dataset")) not in mapping_dataset:
-                        mapping_dataset[data.get("from_dataset", data.get("source_dataset"))] = []
-                    mapping_dataset[data.get("from_dataset", data.get("source_dataset"))].append(filename)
-                    labels[filename] = filename
+        mapping_ids = {}
+        labels = {}
+        from_dataset = metadata.from_dataset
 
-        for dataset, urls in mapping_dataset.items():
+        for filename, item in metadata.iter_entries():
+            source_file = item.get("source_file")
+            if source_file:
+                # the entry is a frame, and names the video it was cut from
+                names = (source_file,)
+            else:
+                # an older archive carries the video archive's metadata, so
+                # this entry is a video. Its frames are found by their folder,
+                # which those archives named after the video either with or
+                # without its extension, so allow for both
+                names = (filename, filename.rsplit(".", 1)[0])
+
+            for name in dict.fromkeys(names):
+                if name in mapping_ids:
+                    # one video has many frames, and they all say the same
+                    # thing about it
+                    continue
+                mapping_ids[name] = item.get("post_ids", [])
+                labels[name] = name.rsplit(".", 1)[0]
+
+        # the label of each video is its post's, so the posts have to be read;
+        # the archive says in one place which dataset they are in
+        if from_dataset:
             try:
-                video_dataset = DataSet(key=dataset, db=self.db, modules=self.modules)
+                video_dataset = DataSet(key=from_dataset, db=self.db, modules=self.modules)
             except DataSetNotFoundException:
                 # Imported media datasets may not have the source on this instance
-                self.dataset.log(f"Could not find source dataset {dataset} on 4CAT for video frame labels")
-                continue
-            
+                self.dataset.log(f"Could not find source dataset {from_dataset} on 4CAT for video frame labels")
+                return labels
+
             source_dataset = video_dataset.nearest("*-search")
             if source_dataset is None:
                 # One type ignored a convention years ago...
@@ -239,11 +272,16 @@ class VideoTimelines(BasicProcessor):
             else:
                 mapper = lambda item: item.get("id")  # noqa: E731
 
+            # which videos were downloaded for each item
+            videos_by_post_id = {}
+            for video_name, post_ids in mapping_ids.items():
+                for post_id in post_ids:
+                    videos_by_post_id.setdefault(post_id, []).append(video_name)
+
             # There may not be a "nearest" source e.g. Media Imports
             if source_dataset is not None:
                 for item in source_dataset.iterate_items(self):
-                    for filename in urls:
-                        if item["id"] in mapping_ids[filename]:
-                            labels[filename] = mapper(item)
+                    for video_name in videos_by_post_id.get(normalize_post_id(item["id"]), []):
+                        labels[video_name] = mapper(item)
 
         return labels

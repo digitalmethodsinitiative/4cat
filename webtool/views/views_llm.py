@@ -7,7 +7,7 @@ import re
 from flask import Blueprint, render_template, flash, get_flashed_messages, redirect, url_for, request, g
 from flask_login import login_required
 
-from webtool.lib.helpers import setting_required, error
+from webtool.lib.helpers import setting_required
 from common.lib.llm.llm_client import LLMServerClient
 
 component = Blueprint("llm", __name__)
@@ -23,10 +23,10 @@ def llm_panel():
     Shows server status, available models, and controls to pull/delete/refresh
     models. Pull, delete, and refresh operations are queued as LLMServerManager
     jobs rather than run synchronously.
-    """
-    if not g.config.get("llm.access"):
-        return error(403, message="LLM access is not enabled on this server.")
 
+    Access is governed by the admin privilege alone. `llm.access` only decides
+    whether a user may *use* local (non-third-party) models in processors.
+    """
     servers = g.config.get("llm.servers", {})
     models = g.config.get("llm.available_models", {})
 

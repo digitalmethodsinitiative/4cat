@@ -5,7 +5,6 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import csv
-import json
 import shutil
 import zipfile
 
@@ -18,6 +17,7 @@ from backend.lib.processor import BasicProcessor
 from backend.lib.preset import ProcessorAdvancedPreset
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.helpers import UniqueFilenames
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -186,9 +186,22 @@ class VideoHasher(BasicProcessor):
         output_dir = self.dataset.get_staging_area()
 
         video_hashes = {}
-        video_metadata = None
-        total_possible_videos = max((min(self.source_dataset.num_rows - 1, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
+        video_metadata = self.get_media_metadata()
+        total_possible_videos = max((min(self.source_dataset.num_rows, max_videos) if max_videos != 0 else self.source_dataset.num_rows), 1)
         processed_videos = 0
+        skipped_videos = 0
+        # one name per video, which its collage is named after. The video's
+        # extension is part of the name, so clip.mp4 and clip.webm say which
+        # video they came from rather than one of them being given a `-1`
+        collage_filenames = UniqueFilenames(output_dir)
+
+        # the collages get metadata of their own, so a consumer can tell which
+        # video each one was made from without reading its name
+        collage_metadata = self.dataset.new_media_metadata(
+            processor_type=self.type,
+            from_dataset=((video_metadata.from_dataset if video_metadata else None)
+                          or self.source_dataset.key),
+        )
 
         self.dataset.update_status("Creating video hashes")
         for video in self.source_dataset.iterate_items(self, staging_area=staging_area):
@@ -198,14 +211,11 @@ class VideoHasher(BasicProcessor):
             if max_videos != 0 and processed_videos >= max_videos:
                 break
 
-            if video.file.name == '.metadata.json':
-                # Keep it and move on
-                with video.file.open() as file:
-                    video_metadata = json.load(file)
-                continue
-            elif video.file.name == "video_archive":
-                # yt-dlp file
-                continue
+            # read before the hashing, so a video that cannot be hashed still
+            # records which posts were counting on it
+            video_item = video_metadata.get_entry(video.file.name) if video_metadata else None
+            post_ids = video_item.get("post_ids", []) if video_item else []
+            source_url = video_item.get("url") if video_item else None
 
             try:
                 videohash = VideoHash(path=str(video.file), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
@@ -215,10 +225,21 @@ class VideoHasher(BasicProcessor):
                 return
             except FileNotFoundError:
                 self.dataset.update_status(f"Unable to find file {video.file.name}")
+                skipped_videos += 1
+                collage_metadata.add_failure(
+                    post_ids=post_ids, url=source_url, source_file=video.file.name,
+                    reason="file_missing",
+                    reason_description=f"{video.file.name} was not among the files read")
                 continue
             except FFmpegFailedToExtractFrames as e:
+                # one video ffmpeg cannot read is not the end of the run; the
+                # dataset finishes with a warning below
                 self.dataset.log(f"Unable to extract frame for {str(video.file)}: {e}")
-                self.dataset.finish_with_error(f"Unable to extract frame for {video.file.name} (see log for details)")
+                skipped_videos += 1
+                collage_metadata.add_failure(
+                    post_ids=post_ids, url=source_url, source_file=video.file.name,
+                    reason="no_frames_extracted",
+                    reason_description=f"ffmpeg could not read a frame from {video.file.name}: {e}")
                 continue
             except OSError:
                 self.dataset.finish_with_error("4CAT does not have the right privileges to access the video files.")
@@ -226,8 +247,18 @@ class VideoHasher(BasicProcessor):
 
             video_hashes[video.file.name] = {'videohash': videohash}
 
-            shutil.copy(videohash.collage_path, output_dir.joinpath(video.file.stem + '.jpg'))
-            video_hashes[video.file.name]['video_collage_filename'] = video.file.stem + '.jpg'
+            collage_name = collage_filenames.reserve_prefix(video.file.name, adds='.jpg')
+            collage_filename = f"{collage_name}.jpg"
+            shutil.copy(videohash.collage_path, output_dir.joinpath(collage_filename))
+            video_hashes[video.file.name]['video_collage_filename'] = collage_filename
+
+            collage_metadata.add_item(
+                collage_filename,
+                post_ids=post_ids,
+                url=source_url,
+                source_file=video.file.name,
+                extra={"video_hash": videohash.hash, "video_duration": videohash.video_duration},
+            )
 
             processed_videos += 1
             self.dataset.update_status(
@@ -245,16 +276,6 @@ class VideoHasher(BasicProcessor):
         rows = []
         annotations = []
         if video_metadata is None:
-            # Grab the metadata directly, if it exists but was skipped (e.g., not found prior to max_videos)
-            try:
-                metadata_path = self.extract_archived_file_by_name(".metadata.json", self.source_file, output_dir)
-            except FileNotFoundError:
-                metadata_path = None
-            if metadata_path:
-                with open(metadata_path) as file:
-                    video_metadata = json.load(file)
-
-        if video_metadata is None:
             self.dataset.log(
                 "No video metadata (i.e., from video downloader) found; unable to connect original posts. Saving video hashes only.")
 
@@ -270,43 +291,31 @@ class VideoHasher(BasicProcessor):
                 num_posts += 1
         else:
             self.dataset.update_status("Saving video hash results")
-            for url, data in video_metadata.items():
-                if not data.get("success"):
+            from_dataset = video_metadata.from_dataset
+            for filename, item in video_metadata.iter_entries():
+                if filename not in video_hashes:
                     continue
-                if "files" in data:
-                    files = data.get('files')
-                elif "filename" in data:
-                    files = [{"filename": data.get("filename"), "success": True}]
-                else:
-                    self.dataset.log(f"Metadata Error: {url} with {data}")
-                    continue
+                video_hash = video_hashes[filename].get('videohash')
+                post_ids = item.get("post_ids", [])
+                rows.append({
+                    'id': filename,
+                    'url': item.get("url", ""),
+                    "from_dataset": from_dataset,
+                    'video_hash': video_hash.hash,
+                    'video_duration': video_hash.video_duration,
+                    'video_count': len(post_ids),
+                    "post_ids": ','.join(str(p) for p in post_ids),
+                    'video_collage_filename': video_hashes[filename].get('video_collage_filename'),
+                })
+                if save_annotations:
+                    for item_id in post_ids:
+                        annotations.append({
+                            "label": "video-hash",
+                            "value": video_hash.hash,
+                            "item_id": item_id
+                        })
 
-                for file in files:
-                    if not file.get("success"):
-                        continue
-                    if file.get('filename') not in video_hashes:
-                        self.dataset.log(f"Metadata Error: {file.get('filename')} with {url} - {data}")
-                        continue
-                    video_hash = video_hashes[file.get('filename')].get('videohash')
-                    rows.append({
-                        'id': file.get('filename'),  # best if all datasets have unique identifier
-                        'url': url,
-                        "from_dataset": data.get("from_dataset"),
-                        'video_hash': video_hash.hash,
-                        'video_duration': video_hash.video_duration,
-                        'video_count': len(data.get('post_ids', [])),
-                        "post_ids": ','.join([str(post_id) for post_id in data.get("post_ids", [])]),
-                        'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
-                    })
-                    if save_annotations:
-                        for item_id in data.get("post_ids", []):
-                            annotations.append({
-                                "label": "video-hash",
-                                "value": video_hash.hash,
-                                "item_id": item_id
-                            })
-
-                    num_posts += 1
+                num_posts += 1
 
 
         writer = None
@@ -316,7 +325,8 @@ class VideoHasher(BasicProcessor):
                     writer = csv.DictWriter(outfile, fieldnames=row.keys())
                     writer.writeheader()
                 writer.writerow(row)
-                num_posts += 1
+
+        collage_metadata.write(output_dir)
 
         if save_annotations and annotations:
             self.dataset.update_status("Saving hashes as annotations to top dataset")
@@ -324,7 +334,9 @@ class VideoHasher(BasicProcessor):
 
         # Finish up
         self.dataset.update_status(f'Created {num_posts} video hashes and stored video collages')
-        self.write_archive_and_finish(output_dir, num_items=processed_videos)
+        warning = f"Could not hash {skipped_videos} of {skipped_videos + processed_videos} videos, " \
+                  f"see the dataset log for details." if skipped_videos else None
+        self.write_archive_and_finish(output_dir, num_items=processed_videos, warning=warning)
 
 
 class VideoHashNetwork(BasicProcessor):

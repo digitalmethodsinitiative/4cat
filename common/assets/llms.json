@@ -1,158 +1,187 @@
 [
   {
-    "model": "gpt-5.5",
-    "name": "[OpenAI] GPT-5.5",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.5",
-    "provider": "openai"
+    "model": "gpt-6-astra",
+    "name": "[OpenAI] GPT-6 Astra",
+    "model_card": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+    "provider": "openai",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "gpt-5.4",
-    "name": "[OpenAI] GPT-5.4",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.4",
-    "provider": "openai"
+    "model": "gpt-6.1.sol",
+    "name": "[OpenAI] GPT-6.1 Sol",
+    "model_card": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    "provider": "openai",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "gpt-5.4-mini",
-    "name": "[OpenAI] GPT-5.4 mini",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.4-mini",
-    "provider": "openai"
+    "model": "gpt-6.1-terra",
+    "name": "[OpenAI] GPT-6.1 Terra",
+    "model_card": "https://platform.openai.com/docs/models/gpt-6.1-terra",
+    "provider": "openai",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "gpt-5.4-nano",
-    "name": "[OpenAI] GPT-5.4 nano",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.4-nano",
-    "provider": "openai"
+    "model": "gpt-6-luna",
+    "name": "[OpenAI] GPT-6 Luna",
+    "model_card": "https://platform.openai.com/docs/models/gpt-6-luna",
+    "provider": "openai",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "gpt-5.5-pro",
-    "name": "[OpenAI] GPT-5.5 Pro",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.5-pro",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-5.4-pro",
-    "name": "[OpenAI] GPT-5.4 Pro",
-    "model_card": "https://platform.openai.com/docs/models/gpt-5.4-pro",
-    "provider": "openai"
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "name": "[OpenAI] GPT-4.1 mini",
-    "model_card": "https://platform.openai.com/docs/models/gpt-4.1-mini",
-    "provider": "openai"
-  },
-  {
-    "model": "gemini-3.1-pro-preview",
-    "name": "[Google] Gemini 3.1 Pro",
-    "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-pro",
-    "provider": "google"
-  },
-  {
-    "model": "gemini-3.5-flash",
-    "name": "[Google] Gemini 3.5 Flash",
-    "model_card": "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash",
-    "provider": "google"
-  },
-  {
-    "model": "gemini-3-flash-preview",
-    "name": "[Google] Gemini 3 Flash",
-    "model_card": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-flash",
-    "provider": "google"
-  },
-  {
-    "model": "gemini-3.1-flash-lite-preview",
-    "name": "[Google] Gemini 3.1 Flash Lite",
+    "model": "gemini-4-carbon",
+    "name": "[Google] Gemini 4 Carbon",
+    "model_card": "https://aistudio.google.com/docs/models/gemini-4-carbon",
     "provider": "google",
-    "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-flash-lite"
+    "supported_media_types": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ]
   },
   {
-    "model": "claude-fable-5",
-    "name": "[Anthropic] Claude Fable 5",
+    "model": "gemini-4-argon",
+    "name": "[Google] Gemini 4 Argon",
+    "model_card": "https://aistudio.google.com/docs/models/gemini-4-argon",
+    "provider": "google",
+    "supported_media_types": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ]
+  },
+  {
+    "model": "gemini-3.8-flash",
+    "name": "[Google] Gemini 3.8 Flash",
+    "model_card": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
+    "provider": "google",
+    "supported_media_types": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ]
+  },
+  {
+    "model": "gemini-3.5-flash-lite-preview",
+    "name": "[Google] Gemini 3.5 Flash Lite",
+    "model_card": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-5-flash-lite",
+    "provider": "google",
+    "supported_media_types": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ]
+  },
+  {
+    "model": "claude-fable-5-2",
+    "name": "[Anthropic] Claude Fable 5.2",
     "model_card": "https://www.anthropic.com/claude/fable",
-    "provider": "anthropic"
+    "provider": "anthropic",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "claude-opus-4-8",
-    "name": "[Anthropic] Claude Opus 4.8",
+    "model": "claude-opus-5-5",
+    "name": "[Anthropic] Claude Opus 5.5",
     "model_card": "https://www.anthropic.com/claude/opus",
-    "provider": "anthropic"
+    "provider": "anthropic",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "claude-opus-4-6",
-    "name": "[Anthropic] Claude Opus 4.6",
-    "model_card": "https://www.anthropic.com/claude/opus",
-    "provider": "anthropic"
-  },
-  {
-    "model": "claude-sonnet-4-6",
-    "name": "[Anthropic] Claude Sonnet 4.6 (latest)",
+    "model": "claude-sonnet-5-5",
+    "name": "[Anthropic] Claude Sonnet 5.5",
     "model_card": "https://www.anthropic.com/claude/sonnet",
-    "provider": "anthropic"
+    "provider": "anthropic",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "claude-4-5-haiku",
-    "name": "[Anthropic] Claude 4.5 Haiku (latest)",
+    "model": "claude-haiku-5-5",
+    "name": "[Anthropic] Claude 5.5 Haiku (latest)",
     "model_card": "https://www.anthropic.com/claude/haiku",
-    "provider": "anthropic"
+    "provider": "anthropic",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
-    "model": "magistral-small-2509",
-    "name": "[Mistral] Magistral Small 1.2 (25.09)",
-    "model_card": "https://docs.mistral.ai/models/magistral-small-1-2-25-09",
-    "provider": "mistral"
-  },
-  {
-    "model": "magistral-medium-2509",
-    "name": "[Mistral] Magistral Medium 1.2 (25.09)",
-    "model_card": "https://docs.mistral.ai/models/magistral-medium-1-2-25-09",
-    "provider": "mistral"
+    "model": "mistral-large-4",
+    "name": "[Mistral] Mistral Large 4",
+    "model_card": "https://docs.mistral.ai/models/mistral-large-4",
+    "provider": "mistral",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "mistral-small-2603",
     "name": "[Mistral] Mistral Small 4",
     "model_card": "https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03",
-    "provider": "mistral"
-  },
-  {
-    "model": "mistral-medium-3-5",
-    "name": "[Mistral] Mistral Medium 3.5",
-    "model_card": "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04",
-    "provider": "mistral"
-  },
-  {
-    "model": "mistral-large-2512",
-    "name": "[Mistral] Mistral Large 3 (25.12)",
-    "model_card": "https://docs.mistral.ai/models/mistral-large-3-25-12",
-    "provider": "mistral"
-  },
-  {
-    "model": "open-mistral-nemo-2407",
-    "name": "[Mistral] Mistral Nemo 12B",
-    "model_card": "https://docs.mistral.ai/models/mistral-nemo-12b-24-07",
-    "provider": "mistral"
+    "provider": "mistral",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "deepseek-v4-pro",
     "name": "[DeepSeek] DeepSeek V4 Pro",
     "model_card": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro",
-    "provider": "deepseek"
+    "provider": "deepseek",
+    "supported_media_types": [
+      "text"
+    ]
   },
   {
     "model": "deepseek-v4-flash",
     "name": "[DeepSeek] DeepSeek V4 Flash",
     "model_card": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash",
-    "provider": "deepseek"
+    "provider": "deepseek",
+    "supported_media_types": [
+      "text",
+      "image"
+    ]
   },
   {
     "model": "deepseek-chat",
     "name": "[DeepSeek] DeepSeek latest (non-reasoning)",
     "model_card": "https://api-docs.deepseek.com/quick_start/pricing",
-    "provider": "deepseek"
+    "provider": "deepseek",
+    "supported_media_types": [
+      "text"
+    ]
   },
   {
     "model": "deepseek-reasoner",
     "name": "[DeepSeek] DeepSeek latest (reasoning)",
     "model_card": "https://api-docs.deepseek.com/quick_start/pricing",
-    "provider": "deepseek"
+    "provider": "deepseek",
+    "supported_media_types": [
+      "text"
+    ]
   }
 ]

@@ -3,7 +3,6 @@ Create an image wall using categories.
 """
 import io
 import base64
-import json
 import math
 
 from svgwrite.image import Image as ImageElement
@@ -14,6 +13,7 @@ from svgwrite.text import Text
 
 from PIL import Image
 
+from common.lib.archive_metadata import PostIdMap
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -131,6 +131,36 @@ class ImageCategoryWallGenerator(BasicProcessor):
 
         return options
 
+    def map_collages_to_videos(self, image_dataset, staging_area):
+        """
+        Which collage image belongs to each video of a video hasher archive
+
+        The hasher writes a row of hashes per video, keyed by the video's own
+        file name, and a collage image named after it. The two names differ, so
+        each collage records the video it was made from as its `source_file`.
+
+        Collages written before they had metadata are named after the video
+        without its extension, and the video's name cannot be worked out from
+        that, so for those the commonest extension is assumed and a video that
+        was not an `.mp4` finds no collage.
+
+        :param DataSet image_dataset:  The video hasher dataset
+        :param Path staging_area:  Where its archive was unpacked
+        :return PostIdMap:  Video file name -> the collages made from it
+        """
+        metadata = self.get_media_metadata(image_dataset)
+        if not metadata:
+            return PostIdMap({filename.stem + ".mp4": [filename]
+                              for filename in staging_area.iterdir()})
+
+        collages = PostIdMap()
+        for filename, item in metadata.iter_entries():
+            source_file = item.get("source_file")
+            if source_file:
+                collages.setdefault(source_file, []).append(staging_area.joinpath(filename))
+
+        return collages
+
     @staticmethod
     def identity_dataset_types(source_dataset):
         """
@@ -188,24 +218,21 @@ class ImageCategoryWallGenerator(BasicProcessor):
 
         # Map post IDs to filenames
         if image_dataset.type == "video-hasher-1":
-            # We know the post ID is the filename.stem as this dataset is derived from the image dataset
-            filename_map = {filename.stem + ".mp4": [filename] for filename in staging_area.iterdir()}
+            filename_map = self.map_collages_to_videos(image_dataset, staging_area)
         elif special_case:
             # We know the post ID is the filename.stem as this dataset is derived from the image dataset
-            filename_map = {filename.stem: [filename] for filename in staging_area.iterdir()}
+            filename_map = PostIdMap({filename.stem: [filename] for filename in staging_area.iterdir()})
         else:
             # Use image metadata to map post IDs to filenames
-            with open(staging_area.joinpath('.metadata.json')) as file:
-                image_data = json.load(file)
-            filename_map = {}
+            metadata = self.get_media_metadata(image_dataset)
+            if metadata is None:
+                self.dataset.finish_with_error("No metadata file found")
+                return
+            filename_map = PostIdMap()
             # Images can belong to multiple posts; posts can have multiple images
-            for image in image_data.values():
-                if image.get("success"):
-                    for post_id in image.get("post_ids"):
-                        if post_id not in filename_map:
-                            filename_map[post_id] = [staging_area.joinpath(image.get("filename"))]
-                        else:
-                            filename_map[post_id].append(staging_area.joinpath(image.get("filename")))
+            for filename, item in metadata.iter_entries():
+                for post_id in item.get("post_ids", []):
+                    filename_map.setdefault(post_id, []).append(staging_area.joinpath(filename))
 
         # Organize posts into categories
         category_type = None

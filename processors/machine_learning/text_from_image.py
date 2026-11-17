@@ -125,15 +125,11 @@ class ImageTextDetector(BasicProcessor):
         # Collect filenames and metadata
         image_filenames = []
         skipped_images = 0
-        metadata_file = None
         staging_area = self.dataset.get_staging_area()
         for image in self.source_dataset.iterate_items(staging_area=staging_area, immediately_delete=False):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while unzipping images")
 
-            if image.file.name == ".metadata.json":
-                metadata_file = image.file.name
-                continue
             elif image.file.name.split('.')[-1]  in ["json", "log"]:
                 continue
             elif image.file.name.split('.')[-1] == "svg":
@@ -200,38 +196,18 @@ class ImageTextDetector(BasicProcessor):
         dmi_service_manager.process_results(output_dir)
 
         # Load the metadata from the archive
-        image_metadata = {}
-        if metadata_file is None:
-            try:
-                self.extract_archived_file_by_name(".metadata.json", self.source_file, staging_area)
-                metadata_exists = True
-            except FileNotFoundError:
-                self.dataset.update_status("No metadata file found")
-                metadata_exists = False
-        else:
-            # Previously extracted
-            metadata_exists = True
-
-        if metadata_exists:
-            with open(os.path.join(staging_area, '.metadata.json')) as file:
-                image_data = json.load(file)
-                for url, data in image_data.items():
-                    if data.get('success'):
-                        data.update({"url": url})
-                        image_metadata[data['filename']] = data
+        source_metadata = self.get_media_metadata()
+        if source_metadata is None:
+            self.dataset.update_status("No metadata file found")
 
         # Check if we need to collect data for updating the original dataset
         save_annotations = self.parameters.get("save_annotations", False)
         if save_annotations:
-            if not metadata_exists:
+            if source_metadata is None:
                 self.dataset.update_status("No metadata file found, cannot write to original dataset")
                 save_annotations = False
             else:
-                # Create filename to post id mapping
-                filename_to_post_id = {}
-                for url, data in image_data.items():
-                    if data.get("success"):
-                        filename_to_post_id[data.get("filename")] = data.get("post_ids")
+                filename_to_post_id = source_metadata.filename_to_post_ids()
                 post_id_to_results = {}
 
         # Save files as NDJSON, then use map_item for 4CAT to interact
@@ -251,7 +227,7 @@ class ImageTextDetector(BasicProcessor):
                         # Need to include filename as there may be many images to a single post
                         detected_text = '%s:"""%s"""' % (image_name, result_data.get('simplified_text', {}).get('raw_text', ''))
 
-                        post_ids = filename_to_post_id[image_name]
+                        post_ids = filename_to_post_id.get(image_name, [])
                         for post_id in post_ids:
                             # Posts can have multiple images
                             if post_id in post_id_to_results.keys():
@@ -262,7 +238,7 @@ class ImageTextDetector(BasicProcessor):
                     data = {
                         "id": image_name,
                         **result_data,
-                        "image_metadata": image_metadata.get(image_name, {}) if image_metadata else {},
+                        "image_metadata": (source_metadata.get_entry(image_name) or {}) if source_metadata else {},
                     }
                     outfile.write(json.dumps(data) + "\n")
 

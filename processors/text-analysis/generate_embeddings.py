@@ -145,9 +145,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 		# go through all archived token sets and vectorise them
 		models = 0
 		for tokens in self.source_dataset.iterate_items(self):
-			if tokens.file.name == '.token_metadata.json':
-				# Skip metadata
-				continue
 			# use the "list of lists" as input for the word2vec model
 			# by default the tokeniser generates one list of tokens per
 			# post... which may actually be preferable for short

@@ -136,6 +136,7 @@ Invocation (the plain `docker compose` command uses `docker-compose.yml`):
 - Python `>= 3.11` is required. Use modern Python features (e.g. `match`, `|` for union types) when appropriate.
 - Avoid adding dependencies unless clearly necessary. If a dependency is added, add it to the appropriate set in `setup.py` (`core_packages` or `processor_packages`) with a version pin.
 - Add comments only when logic is non-obvious.
+- Keep comments simple if possible, don't add too much fuzzy coding jargon.
 - Breaking changes are allowed when needed for correctness, maintainability, or delivery speed.
 - Prefer minimal, targeted changes over broad refactors unless a broader change is the best path.
 
@@ -178,6 +179,7 @@ Invocation (the plain `docker compose` command uses `docker-compose.yml`):
 - Tests mock `Database`, `ConfigManager`, `Job`, `JobQueue`, and `DataSet` extensively via `unittest.mock`. See fixtures in `test_modules.py` for patterns.
 - **After making changes**: at minimum run `pytest` to ensure all modules still load and pass validation. New processors/datasources must pass `test_processors`/`test_datasources`.
 - There are no integration or end-to-end tests. For complex logic, consider adding targeted unit tests.
+- Keep tests focused and maintainable, don't add too much bloat.
 - `ruff` is available as a dependency. Run `ruff check .` to lint changed files. `ruff.toml` sets which rules are checked — deliberately a small set, so that a new ruff release cannot change what passes. Its comments explain how to adopt further rules, one at a time. `.github/workflows/ruff.yml` pins the ruff version to match. Respect the tab-indentation convention.
 - Make sure to check whether you are on a Unix-like system (macOS/Linux) or Windows to choose the correct commands.
 

@@ -91,23 +91,38 @@ def unauthorized():
         return redirect(url_for("user.show_login"))
 
 
+# Run before ALL requests; ensures deactivated users are logged out and cannot access any page
+@component.before_app_request
+def log_out_deactivated_users():
+    """
+    Log out deactivated users
+
+    Runs before every request, not only those for this blueprint's routes, so
+    a deactivated account cannot be used anywhere; its datasets and other data
+    are kept. This also covers logging in: the request after a successful
+    login logs the user out again.
+
+    This hook runs before the app-wide `before_request` sets `g.config`, so it
+    cannot not render a template; the login page shows the message instead.
+    """
+    if request.path.startswith("/static/"):
+        return
+
+    if not (current_user and current_user.is_authenticated and current_user.is_deactivated):
+        return
+
+    flash("Your 4CAT account has been deactivated and you have been logged out.", "error")
+    logout_user()
+    return redirect(url_for("user.show_login"))
+
+
 @component.before_request
 def reroute_requests():
     """
     Sometimes the requested route should be overruled
     """
-
-    # Displays a 'sorry, no 4cat for you' message to banned or deactivated users.
-    if current_user and current_user.is_authenticated and current_user.is_deactivated:
-        message = "Your 4CAT account has been deactivated and you can no longer access this page."
-        if current_user.get_value("deactivated.reason"):
-            message += "\n\nThe following reason was recorded for your account's deactivation: *"
-            message += current_user.get_value("deactivated.reason") + "*"
-
-        return render_template("error.html", title="Your account has been deactivated", message=message), 403
-
     # ensures admins get to see the phone home screen at least once
-    elif current_user and current_user.is_authenticated and current_user.is_admin and \
+    if current_user and current_user.is_authenticated and current_user.is_admin and \
             request.url_rule and request.url_rule.endpoint not in ("static", "first_run_dialog"):
         wants_phone_home = not g.config.get("4cat.phone_home_asked", False)
         if wants_phone_home:

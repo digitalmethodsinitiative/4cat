@@ -6,6 +6,7 @@ import mimetypes
 from io import BytesIO
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import is_support_file
 from common.lib.exceptions import QueryParametersException, QueryNeedsExplicitConfirmationException
 from common.lib.user_input import UserInput
 from common.lib.helpers import andify
@@ -86,7 +87,7 @@ class SearchMedia(BasicProcessor):
                 # as they are, system files and folders are left out later
                 files = [f for f in files if not (
                         f["filename"].split("/")[-1].startswith(".")
-                        or SearchMedia.is_support_file(f["filename"])
+                        or is_support_file(f["filename"])
                         or f["filename"].split("/")[-1].startswith("__MACOSX")
                         or f["filename"].endswith(".DS_Store")
                         or f["filename"].endswith("/")  # sub-directory
@@ -119,7 +120,7 @@ class SearchMedia(BasicProcessor):
             # Check file types to ensure all are same type of media
             for file in uploaded_files:
                 # Support files are kept as they are, without a type check
-                if SearchMedia.is_support_file(file.filename):
+                if is_support_file(file.filename):
                     continue
 
                 # Warn on SVG files
@@ -200,12 +201,12 @@ class SearchMedia(BasicProcessor):
 
                             guessed_file_mime_type = mimetypes.guess_type(inner_file.filename)
                             file_media_type = guessed_file_mime_type[0].split('/')[0] if guessed_file_mime_type[0] else None
-                            is_support_file = SearchMedia.is_support_file(inner_file.filename)
+                            support_file = is_support_file(inner_file.filename)
 
                             # keep media files and support files; skip macOS
                             # clutter and anything else
                             clean_file_name = inner_file.filename.split("/")[-1]
-                            if (not is_support_file and file_media_type not in SearchMedia.accepted_file_types) \
+                            if (not support_file and file_media_type not in SearchMedia.accepted_file_types) \
                               or clean_file_name.startswith("__MACOSX") \
                               or inner_file.filename.startswith("__MACOSX"):
                                 print(f"skipping {clean_file_name} ({guessed_file_mime_type})")
@@ -214,14 +215,14 @@ class SearchMedia(BasicProcessor):
 
                             # support files are not media, so they neither set
                             # the dataset's media type nor count as files
-                            if not is_support_file:
+                            if not support_file:
                                 mime_type = file_media_type
 
                             # save inner file from the uploaded zip archive to the new zip with all files
                             new_filename = SearchMedia.get_safe_filename(inner_file.filename, new_zip_archive)
                             new_zip_archive.writestr(new_filename, inner_zip_archive.read(inner_file))
 
-                            if not is_support_file:
+                            if not support_file:
                                 saved_files += 1
                     continue
 
@@ -234,7 +235,7 @@ class SearchMedia(BasicProcessor):
                             break
                         dest_file.write(chunk)
 
-                if not SearchMedia.is_support_file(new_filename):
+                if not is_support_file(new_filename):
                     saved_files += 1
 
         # update the number of files in the dataset
@@ -262,25 +263,6 @@ class SearchMedia(BasicProcessor):
                     svg_warning += 1
         self.dataset.update_status(f"Uploaded {self.parameters.get('num_files')} files of type {self.parameters.get('media_type')}{'' if svg_warning == 0 else f' ({svg_warning} SVG files; see log)'}", is_final=True)
         self.dataset.finish(self.parameters.get("num_files"))
-
-    @staticmethod
-    def is_support_file(filename):
-        """
-        Check if a file is a non-media file that belongs with the media
-
-        Media archives made by 4CAT hold more than media: a .metadata.json
-        file that links each file to the item it was downloaded for, a
-        'video_archive' file in which yt-dlp notes which videos it downloaded,
-        and log files (e.g. from extracting video frames). When such an
-        archive is uploaded again, these files are kept in the dataset, but
-        they are not media, so they are not type-checked or counted as files.
-
-        :param str filename:  File name, can include folders (e.g. a path
-          inside a zip archive)
-        :return bool:
-        """
-        filename = filename.split("/")[-1]
-        return filename in (".metadata.json", "video_archive") or filename.endswith(".log")
 
     @staticmethod
     def get_safe_filename(filename, zip_archive=None):

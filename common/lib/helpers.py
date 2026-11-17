@@ -1374,7 +1374,8 @@ def readable_url(url):
     # encode what a URL cannot contain as it is, and what would be invisible
     return URL_ENCODED_CHARACTERS.sub(lambda match: quote(match.group(), safe=""), url)
 
-def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255, existing_filenames=None):
+def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255,
+                    existing_filenames_folded=None):
         """
         Determine filenames for saved files
 
@@ -1394,8 +1395,9 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         :param str default_ext:  Default extension to use if no filename can be
         extracted from the URL
         :param int max_bytes:  Maximum number of bytes for the filename
-        :param set existing_filenames:  Set of existing filenames to avoid
-        collisions with (in addition to those in the staging area, if provided).
+        :param set existing_filenames_folded:  Set of existing filenames to
+        avoid collisions with (in addition to those in the staging area, if
+        provided), each one put through `fold_filename` first.
         :return str:  Suitable file name
         """
         clean_filename = url.split("/")[-1].split("?")[0].split("#")[0]
@@ -1407,30 +1409,149 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
         # remove some problematic characters
         base_filename = re.sub(r"[:~]", "", base_filename)
 
-        if existing_filenames is None:
-            existing_filenames = set()
-        if type(existing_filenames) is not set:
-            # Could force set() here, but likely would be forcing in a loop
-            raise TypeError("existing_filenames must be a set")
+        return deduplicate_filename(base_filename, staging_area=staging_area, max_bytes=max_bytes,
+                                    existing_filenames_folded=existing_filenames_folded,
+                                    fallback_name=default_name, fallback_ext=default_ext)
 
-        # Split base filename into name and extension
-        if '.' in base_filename:
-            name_part, ext_part = base_filename.rsplit('.', 1)
-            ext_part = '.' + ext_part
-        else:
-            name_part = base_filename
-            ext_part = ''
 
-        # Truncate base filename if it exceeds max_bytes
-        if len(base_filename.encode('utf-8')) > max_bytes:
-            # Reserve space for extension
+WINDOWS_FORBIDS_IN_A_FILENAME = re.compile(r'[:?*"<>|\\/\x00-\x1f]')
+
+
+def filename_to_prefix(filename, fallback="file") -> str:
+    """
+    Turn a file's name into the start of a name for a file made from it
+
+    A processor that writes a file per item of another archive - frames out of
+    a video, audio out of a video - names what it writes after what it read, so
+    the two can be told apart by eye. It starts from a file name and has to end
+    up with one, so three things are seen to here:
+
+    - Characters Windows does not allow are replaced, because a file whose name
+      holds one of them cannot be written there at all. Control characters go
+      too.
+    - The dot before the extension becomes an underscore, so the name built
+      from it does not read as though it had two extensions: `clip.mp4` gives
+      `clip_mp4`, and `clip_mp4_frame_1.jpeg` has one extension rather than
+      looking like it has two. Only that last dot changes, so `my.video.mp4`
+      and `my_video.mp4` do not turn into one name.
+    - Dots and spaces at either end are dropped. Windows drops a dot at the
+      end, and a name starting with one is hidden from the researcher who
+      unpacks the archive.
+
+    Two names can still come out of this the same. For example, a video called.
+    `a.mp4` and a video with no extension called `a_mp4` both give `a_mp4`. Use
+    `UniqueFilenames.reserve_prefix` to get a unique version of those, which calls 
+    this and reserves what it returns.
+
+    :param str filename:  Name of the file the new one is made from
+    :param str fallback:  Name to fall back on when nothing usable is left,
+      as for a name that is nothing but dots
+    :return str:  Name to build another file's name out of
+    """
+    name = WINDOWS_FORBIDS_IN_A_FILENAME.sub("_", filename)
+    stem, _, extension = name.rpartition(".")
+    if stem and extension:
+        name = f"{stem}_{extension}"
+
+    return name.strip(". ") or fallback
+
+
+def fold_filename(filename) -> str:
+    """
+    Reduce a file name to what a file system may see as one name
+
+    Two names that reduce to the same text are two files on a Linux server and
+    one file on a Windows or macOS machine, so an archive holding both unpacks
+    short there, with no warning and no way for the server to have noticed.
+    Reducing both names and comparing those catches it while the archive is
+    still being written.
+
+    What is reduced, and why each one:
+
+    - Upper and lower case, because Windows and macOS do not tell them apart.
+      `casefold` rather than `lower`, which also makes `straße` and `STRASSE`
+      one name here.
+    - An accented letter written as one character, or as the plain letter
+      followed by a combining accent. macOS stores the second spelling and
+      treats both as one name, so `café` is one file there however it was
+      typed. Those two spellings cannot be told apart by eye, which is why
+      the tests for them write the characters out as escapes.
+    - Dots and spaces at the end of the name, because Windows drops them, so
+      `clip.` and `clip` are one name there.
+
+    The result is for comparing only. Never write a file under it: it is not
+    the name anybody asked for.
+
+    :param str filename:  Name to reduce
+    :return str:  The reduced name
+    """
+    # case first, then the accents, because folding the case of a decomposed
+    # letter leaves it decomposed
+    return unicodedata.normalize("NFC", filename.casefold()).rstrip(". ")
+
+
+def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=None, max_bytes=255,
+                         fallback_name="file", fallback_ext="", has_extension=True) -> str:
+    """
+    Make a filename unique within a directory
+
+    Returns `filename` unchanged if nothing has it yet, else the same name with
+    `-1`, `-2`, ... appended before the extension, truncating the name if the
+    result would exceed `max_bytes`. Takes a filename rather than a URL, so it
+    also serves names that are not derived from one - an audio file named after
+    its video, a folder of video frames - and names without an extension.
+
+    :param str filename:  The name to use if it is free
+    :param Path staging_area:  Directory to check for a file of this name; if
+      None, only `existing_filenames` is consulted
+    :param existing_filenames_folded:  Names already taken, each one put
+      through `fold_filename` first. A set, or a dict keyed by those names.
+      The caller holds and folds it; folding it here would mean redoing
+      every name on every call. `UniqueFilenames` keeps this track as it hands
+      names out.
+    :param int max_bytes:  Maximum number of bytes for the filename
+    :param str fallback_name:  Name to fall back on in the extreme case of an
+      extension that does not itself fit within `max_bytes`
+    :param str fallback_ext:  Extension to use in that same case
+    :param bool has_extension:  Whether the last dot in `filename` starts an
+      extension. Set it to False for a name that is all one piece, such as the
+      prefix built out of another file's name; avoids `my.video_mp4` read as
+      a name `my` with an extension `.video_mp4`.
+    :return str:  A name nothing else has
+    """
+    if existing_filenames_folded is None:
+        existing_filenames_folded = set()
+    if not isinstance(existing_filenames_folded, (set, frozenset, dict)):
+        # ensure passing something for membership checks
+        raise TypeError("existing_filenames_folded must be a set or a dict")
+
+    if not fold_filename(filename):
+        # a name of nothing but dots and spaces, which could strip to
+        # nothing at all. Names like this can come out of uploaded archives
+        filename = fallback_name + fallback_ext
+
+    # Split base filename into name and extension
+    if has_extension and '.' in filename:
+        name_part, ext_part = filename.rsplit('.', 1)
+        ext_part = '.' + ext_part
+    else:
+        name_part = filename
+        ext_part = ''
+
+    # Truncate base filename if it exceeds max_bytes
+    if len(filename.encode('utf-8')) > max_bytes:
+        # Reserve space for extension
+        available_bytes = max_bytes - len(ext_part.encode('utf-8'))
+        if available_bytes <= 0:
+            # If extension is too long, use minimal name
+            name_part = fallback_name
+            ext_part = fallback_ext
             available_bytes = max_bytes - len(ext_part.encode('utf-8'))
-            if available_bytes <= 0:
-                # If extension is too long, use minimal name
-                name_part = default_name
-                ext_part = default_ext
-                available_bytes = max_bytes - len(ext_part.encode('utf-8'))
-            
+
+        if available_bytes <= 0:
+            # No room for a name at all
+            name_part = "f"
+        else:
             # Truncate name part to fit
             name_bytes = name_part.encode('utf-8')
             if len(name_bytes) > available_bytes:
@@ -1438,47 +1559,205 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
                 while len(name_bytes) > available_bytes:
                     name_part = name_part[:-1]
                     name_bytes = name_part.encode('utf-8')
-            
-            base_filename = name_part + ext_part
 
-        filename = base_filename
+        filename = name_part + ext_part
 
-        if staging_area or existing_filenames:
-            # Ensure the filename is unique in the staging area
-            file_index = 1
+    if staging_area or existing_filenames_folded:
+        # Ensure the filename is unique in the staging area
+        file_index = 1
 
-            file_path = staging_area.joinpath(filename) if staging_area else None
-            
-            # Loop while collision in-memory OR on disk (if staging_area given)
-            while (filename in existing_filenames) or (staging_area and file_path.exists()):
-                # Calculate space needed for index suffix
-                index_suffix = f"-{file_index}"
-                
-                # Check if filename with index would exceed max_bytes
-                test_filename = name_part + index_suffix + ext_part
-                if len(test_filename.encode('utf-8')) > max_bytes:
-                    # Need to truncate name_part to make room for index
-                    available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
-                    if available_bytes <= 0:
-                        # Extreme case - use minimal name
-                        truncated_name = "f"
-                    else:
-                        # Truncate name_part to fit
-                        truncated_name = name_part
-                        name_bytes = truncated_name.encode('utf-8')
-                        while len(name_bytes) > available_bytes:
-                            truncated_name = truncated_name[:-1]
-                            name_bytes = truncated_name.encode('utf-8')
-                    
-                    filename = truncated_name + index_suffix + ext_part
+        file_path = staging_area.joinpath(filename) if staging_area else None
+
+        # Loop while collision in-memory OR on disk (if staging_area given)
+        while (fold_filename(filename) in existing_filenames_folded) \
+                or (staging_area and file_path.exists()):
+            # Calculate space needed for index suffix
+            index_suffix = f"-{file_index}"
+
+            # Check if filename with index would exceed max_bytes
+            test_filename = name_part + index_suffix + ext_part
+            if len(test_filename.encode('utf-8')) > max_bytes:
+                # Need to truncate name_part to make room for index
+                available_bytes = max_bytes - len((index_suffix + ext_part).encode('utf-8'))
+                if available_bytes <= 0:
+                    # Extreme case - use minimal name
+                    truncated_name = "f"
                 else:
-                    filename = test_filename
-                
-                file_index += 1
-                if staging_area:
-                    file_path = staging_area.joinpath(filename)
+                    # Truncate name_part to fit
+                    truncated_name = name_part
+                    name_bytes = truncated_name.encode('utf-8')
+                    while len(name_bytes) > available_bytes:
+                        truncated_name = truncated_name[:-1]
+                        name_bytes = truncated_name.encode('utf-8')
 
+                filename = truncated_name + index_suffix + ext_part
+            else:
+                filename = test_filename
+
+            file_index += 1
+            if staging_area:
+                file_path = staging_area.joinpath(filename)
+
+    return filename
+
+
+class UniqueFilenames:
+    """
+    Hands out names that nothing else in a directory has taken
+
+    Processors that write a file per item have to make sure two items cannot
+    claim the same name, or the second write destroys the first file and
+    whatever the archive's metadata said about it. Doing that by hand means
+    passing a set of names around *and* remembering to add to it, and
+    forgetting either is the bug. This keeps the two together: every name it
+    returns is recorded as taken.
+
+    Files already in the directory are taken too: it is read on construction,
+    and every name handed out afterwards is checked against it as well. That
+    second check is what catches a file written by something that never asked
+    for a name - yt-dlp naming its own download, a video copied out of an
+    earlier archive.
+
+    A name is free only if no name taken already reduces to the same text, as
+    `fold_filename` reduces it. Without that, an archive could be given both
+    `A.mp4` and `a.mp4` on a Linux server and lose one of them when a
+    researcher unpacks it on their own machine. Names are handed out as they
+    came and only compared reduced.
+
+    Record a name with `reserve`, `reserve_for_url`, `reserve_prefix` or
+    `claim`, never by adding to `taken` directly.
+
+    A name that has been reserved but not yet written exists only in this
+    object, so reserve a name before writing to it rather than relying on the
+    file being there.
+    """
+
+    def __init__(self, directory=None):
+        """
+        :param Path directory:  Directory the names are for. Files already in
+          it count as taken. May be None for a directory that does not exist
+          yet or when only this run's names matter.
+        """
+        self.directory = directory
+        # each reduced name, and the names handed out that reduce to it:
+        # `A.mp4` and `a.mp4` reduce to one text and are two names. A name is
+        # free when nothing reduces to it, and giving one up only frees its
+        # text once it was the last name holding it.
+        self.taken = {}
+        if directory is not None and directory.is_dir():
+            for item in directory.iterdir():
+                self._remember(item.name)
+
+    def reserve(self, filename, **kwargs) -> str:
+        """
+        Reserve a name, adding `-1`, `-2`, ... if it is taken
+
+        :param str filename:  The name to use if it is free. May be a plain
+          name without an extension, e.g. for a folder.
+        :param kwargs:  Passed on to `deduplicate_filename`
+        :return str:  The name reserved, which is `filename` if it was free
+        """
+        filename = deduplicate_filename(filename, staging_area=self.directory,
+                                        existing_filenames_folded=self.taken, **kwargs)
+        self._remember(filename)
         return filename
+
+    def reserve_for_url(self, url, **kwargs) -> str:
+        """
+        Reserve a name derived from a URL
+
+        :param str url:  URL the file is downloaded from
+        :param kwargs:  Passed on to `url_to_filename`, e.g. `default_ext`
+        :return str:  The name reserved
+        """
+        filename = url_to_filename(url, staging_area=self.directory,
+                                   existing_filenames_folded=self.taken, **kwargs)
+        self._remember(filename)
+        return filename
+
+    def reserve_prefix(self, filename, adds="", **kwargs) -> str:
+        """
+        Reserve the start of a name for the files made out of `filename`
+
+        For a processor that writes a file per item of another archive and
+        names what it writes after what it read (e.g. frames out of a video).
+        `filename_to_prefix` turns the source file's name into a name to build
+        on and reserves it here to keep source files colliding.
+
+        Returns a whole name rather than a name and an extension and reserves 
+        room for the extension and whatever the caller puts after it to be
+        within `max_bytes`.
+
+        :param str filename:  Name of the file the new ones are made from
+        :param str adds:  What the caller puts after the name it gets back,
+          e.g. `"_frame_0000001.jpeg"`
+        :param kwargs:  Passed on to `deduplicate_filename`
+        :return str:  The name reserved
+        """
+        max_bytes = kwargs.pop("max_bytes", 255) - len(adds.encode("utf-8"))
+        return self.reserve(filename_to_prefix(filename), has_extension=False,
+                            max_bytes=max_bytes, **kwargs)
+
+    def claim(self, filename) -> None:
+        """
+        Record a name that something else chose as taken
+
+        Not everything writing into the directory asks first: yt-dlp names its
+        own downloads, and a file copied out of an earlier archive keeps the
+        name it had there. Telling this about those names keeps them from being
+        handed out again.
+
+        :param str filename:  Name to record as taken
+        """
+        self._remember(filename)
+
+    def _remember(self, filename) -> None:
+        """
+        Record a name as taken, if it is not recorded already
+
+        A name recorded twice would have to be given up twice, and callers do
+        record one twice: yt-dlp reports a file once per postprocessor that
+        runs on it.
+
+        :param str filename:  Name to record
+        """
+        holders = self.taken.setdefault(fold_filename(filename), [])
+        if filename not in holders:
+            holders.append(filename)
+
+    def _release(self, filename) -> None:
+        """
+        Give up a name recorded as taken, if it was recorded here
+
+        A name this does not know is ignored: its reduced form belongs to
+        whichever name does hold it, which is why the names are kept and not
+        only counted.
+
+        :param str filename:  Name to give up
+        """
+        holders = self.taken.get(fold_filename(filename), [])
+        if filename not in holders:
+            return
+
+        holders.remove(filename)
+        if not holders:
+            del self.taken[fold_filename(filename)]
+
+    def replace(self, current, filename, **kwargs) -> str:
+        """
+        Give up a reserved name and reserve another instead
+
+        For a file that has to be renamed after it was written, e.g. because
+        its extension turned out to be wrong. Frees `current` for anything
+        else, so the name is not left blocked.
+
+        :param str current:  Name to give up
+        :param str filename:  Name to use instead, if it is free
+        :param kwargs:  Passed on to `deduplicate_filename`
+        :return str:  The name reserved
+        """
+        self._release(current)
+        return self.reserve(filename, **kwargs)
 
 
 def split_urls(url_string, allowed_schemes=None):

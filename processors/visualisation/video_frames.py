@@ -10,6 +10,7 @@ import oslex
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility, is_executable
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UniqueFilenames
 from common.lib.user_input import UserInput
 from processors.visualisation.download_videos import VideoDownloaderPlus
 
@@ -91,22 +92,41 @@ class VideoFrames(BasicProcessor):
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
+		# one name per video (folder) and frames. frames are named after the 
+		# video. No two frames in the archive can share a name: processors
+		# loops through all files and ignore folders (better to rely on metadata).
+		# The folders keep the frames tidy, but metadata stores `source_file`.
+		# UniqueFilenames ensures that the names are unique, even if two videos have
+		# or would have the same name (include extension for "clip.mp4" and "clip.webm").
+		frame_names = UniqueFilenames(output_directory)
+
+		# figure out the longest suffix that will be added to a frame name, so we can reserve enough space.
+		frame_pattern = "_frame_%07d.jpeg"
+		output_log_suffix = "_ffmpeg_output.log"
+		error_log_suffix = "_ffmpeg_error.log"
+		longest_name_added = max(frame_pattern % 10 ** 10, output_log_suffix, error_log_suffix, key=len)
+
 		total_possible_videos = self.source_dataset.num_rows
 		processed_videos = 0
+
+		# create metadata file so frames can be traced back to original videos/posts
+		source_metadata = self.get_media_metadata()
+		metadata = self.dataset.new_media_metadata(
+			processor_type=self.type,
+			from_dataset=((source_metadata.from_dataset if source_metadata else None)
+						  or self.source_dataset.key),
+		)
 
 		self.dataset.update_status("Extracting video frames")
 		for i, video in enumerate(self.source_dataset.iterate_items(self)):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
-			# Check for 4CAT's metadata JSON and copy it
-			if video.file.name == '.metadata.json':
-				shutil.copy(video.file, output_directory)
-				continue
-
-			vid_name = video.file.stem
-			video_dir = output_directory.joinpath(vid_name)
-			video_dir.mkdir(exist_ok=True)
+			# every video numbers its frames from 1, so the video's name is what
+			# tells one video's first frame from another's
+			frame_name = frame_names.reserve_prefix(video.file.name, adds=longest_name_added)
+			video_dir = output_directory.joinpath(frame_name)
+			video_dir.mkdir()
 
 			command = [
 				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
@@ -121,7 +141,7 @@ class VideoFrames(BasicProcessor):
 			if frame_size != 'no_modify':
 				command.extend(['-s', oslex.quote(frame_size)])
 
-			command.extend([str(video_dir.joinpath("video_frame_%07d.jpeg"))])
+			command.extend([str(video_dir.joinpath(f"{frame_name}{frame_pattern}"))])
 
 			self.dataset.log(" ".join(command))
 
@@ -131,22 +151,46 @@ class VideoFrames(BasicProcessor):
 			ffmpeg_output = result.stdout.decode("utf-8")
 			ffmpeg_error = result.stderr.decode("utf-8")
 
+			# ffmpeg names the video it was working on, so the log can hold
+			# anything the file name holds
 			if ffmpeg_output:
-				with open(video_dir.joinpath('ffmpeg_output.log'), 'w') as outfile:
+				with open(video_dir.joinpath(f"{frame_name}{output_log_suffix}"), 'w',
+						  encoding="utf-8") as outfile:
 					outfile.write(ffmpeg_output)
 
 			if ffmpeg_error:
-				with open(video_dir.joinpath('ffmpeg_error.log'), 'w') as outfile:
+				with open(video_dir.joinpath(f"{frame_name}{error_log_suffix}"), 'w',
+						  encoding="utf-8") as outfile:
 					outfile.write(ffmpeg_error)
 
 			if result.returncode != 0:
-				self.dataset.update_status(f"Unable to extract frames from video {vid_name} (see logs for details)")
+				self.dataset.update_status(
+					f"Unable to extract frames from video {video.file.name} (see logs for details)")
 				self.dataset.log('Error Return Code (%s) with video %s: %s' % (
-					str(result.returncode), vid_name, "\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
+					str(result.returncode), video.file.name,
+					"\n".join(ffmpeg_error.split('\n')[-2:]) if ffmpeg_error else ''))
 			else:
 				processed_videos += 1
 				self.dataset.update_status(
 					"Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
+
+			# every frame of a video stands for the items that video did
+			video_item = source_metadata.get_entry(video.file.name) if source_metadata else None
+			post_ids = video_item.get("post_ids", []) if video_item else []
+			source_url = video_item.get("url") if video_item else None
+
+			frames = sorted(video_dir.glob("*.jpeg"))
+			for frame in frames:
+				metadata.add_item(frame.name, post_ids=post_ids, url=source_url,
+								  source_file=video.file.name)
+
+			if not frames:
+				# ffmpeg can fail, but let's keep the items stay traceable
+				metadata.add_failure(
+					post_ids=post_ids, url=source_url, reason="no_frames_extracted",
+					reason_description=(f"ffmpeg exited with code {result.returncode}" if result.returncode
+										else "ffmpeg reported no error but wrote no frames"),
+					source_file=video.file.name)
 
 			self.dataset.update_progress(i / total_possible_videos)
 
@@ -156,6 +200,8 @@ class VideoFrames(BasicProcessor):
 		if not processed_videos:
 			self.dataset.finish_with_error("Unable to extract frames from any videos")
 			return
+
+		metadata.write(output_directory)
 
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)

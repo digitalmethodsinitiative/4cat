@@ -6,6 +6,7 @@ from yt_dlp import DownloadError
 
 from backend.lib.proxied_requests import FailedProxiedRequest
 from processors.visualisation import download_videos
+from common.lib.helpers import UniqueFilenames
 from processors.visualisation.download_videos import LiveVideoException, VideoDownloaderPlus
 from processors.visualisation.download_weibo_videos import WeiboVideoDownloader
 
@@ -75,6 +76,7 @@ def make_downloader(answers, media_request_headers=None):
     downloader.total_possible_videos = len(answers)
     downloader.warning_message = None
     downloader.flush_proxied_requests = MagicMock()
+    downloader.staging_filenames = UniqueFilenames()
 
     def iterate_proxied_requests(urls, **kwargs):
         downloader.request_options = kwargs
