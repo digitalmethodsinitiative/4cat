@@ -277,6 +277,8 @@ class SearchCustom(BasicProcessor):
                 sample = samples.pop(0)
                 try:
                     dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+                    # the other samples are only fall-backs for when this fails
+                    break
                 except csv.Error as e:
                     errors.append(str(e))
                     # try next sample
@@ -363,10 +365,10 @@ class SearchCustom(BasicProcessor):
                                            "are missing: %s" % ", ".join(incomplete_mapping))
 
         # the timestamp column needs to be parseable
-        timestamp_column = request.form.get("mapping-timestamp")
+        timestamp_column = column_mapping.get("mapping-timestamp")
         try:
             row = reader.__next__()
-            if timestamp_column not in row:
+            if not timestamp_column or timestamp_column not in row:
                 # incomplete row because we are analysing a sample
                 # stop parsing because no complete rows will follow
                 raise StopIteration
