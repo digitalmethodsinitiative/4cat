@@ -474,3 +474,48 @@ def test_characters_windows_forbids_include_control_characters():
 	"""A zero byte stops Python's own file calls before any file system sees it"""
 	assert filename_to_prefix("a\x00b.mp4") == "a_b_mp4"
 	assert filename_to_prefix("line\nbreak.mp4") == "line_break_mp4"
+
+
+def test_many_names_built_on_one_name_stay_cheap(monkeypatch):
+	"""
+	The image downloader asks for a name per URL before it downloads anything,
+	and a URL with no file name in it gives every one of them the same name to
+	start from. Counting from 1 each time meant the hundredth name tried
+	ninety-nine taken ones first, and each try reduces a name to compare it. So
+	the number of names reduced is the cost, and it is what is counted here.
+	"""
+	import common.lib.helpers as helpers
+
+	reduced = []
+	unwatched_fold = helpers.fold_filename
+
+	def counting_fold(filename):
+		reduced.append(filename)
+		return unwatched_fold(filename)
+
+	monkeypatch.setattr(helpers, "fold_filename", counting_fold)
+
+	names = UniqueFilenames()
+	handed_out = [names.reserve("file.png") for _ in range(200)]
+
+	assert len(set(handed_out)) == 200
+	# a handful of reductions per name. Counting from 1 every time would be
+	# more than twenty thousand for these two hundred names
+	assert len(reduced) < 200 * 10
+
+
+def test_a_name_given_up_leaves_a_gap_in_the_numbers(tmp_path):
+	"""
+	The count does not go back down when a name is given up, so the numbers can
+	skip one. The name itself is still free, for anything that asks for it.
+	"""
+	names = UniqueFilenames(tmp_path)
+	assert names.reserve("file.png") == "file.png"
+	assert names.reserve("file.png") == "file-1.png"
+
+	names.replace("file-1.png", "elsewhere.png")
+
+	# the count moved on, so the next name built on this one skips -1
+	assert names.reserve("file.png") == "file-2.png"
+	# but the name that was given up is free to ask for
+	assert names.reserve("file-1.png") == "file-1.png"
