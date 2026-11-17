@@ -6,7 +6,9 @@ from yt_dlp import DownloadError
 
 from backend.lib.proxied_requests import FailedProxiedRequest
 from processors.visualisation import download_videos
+from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UniqueFilenames
+from processors.visualisation.download_tiktok_video import TikTokVideoDownloader
 from processors.visualisation.download_videos import LiveVideoException, VideoDownloaderPlus
 from processors.visualisation.download_weibo_videos import WeiboVideoDownloader
 
@@ -60,13 +62,15 @@ class FakeSource:
         return dict(self.media_request_headers)
 
 
-def make_downloader(answers, media_request_headers=None):
+def make_downloader(answers, media_request_headers=None, processor=VideoDownloaderPlus):
     """
     A video downloader that gets the given answers, in order, for the links it requests
 
     What it asks for the links with is kept as `request_options`.
+
+    :param processor:  The video downloader to make, e.g. one for a single platform
     """
-    downloader = VideoDownloaderPlus.__new__(VideoDownloaderPlus)
+    downloader = processor.__new__(processor)
     downloader.source_dataset = FakeSource([], media_request_headers)
     downloader.dataset = MagicMock()
     downloader.config = MagicMock()
@@ -205,17 +209,18 @@ SETTINGS_ERROR = {"success": False, "site_error": False}
 DOWNLOADED = {"success": True, "site_error": False}
 
 
-def download_with_ytdlp(outcomes, tmp_path, in_preset=False):
+def download_with_ytdlp(outcomes, tmp_path, in_preset=False, processor=VideoDownloaderPlus):
     """
     Run the yt-dlp download step
 
     :param list outcomes:  What downloading each link with yt-dlp results in
-    :param bool in_preset:  Whether the downloader runs as part of a preset, e.g. for TikTok or Weibo
+    :param bool in_preset:  Whether the downloader runs as part of a preset, e.g. for Weibo
+    :param processor:  The video downloader to run, e.g. one for a single platform
     :return tuple:  The downloader and the step's results
     """
     urls = [f"https://www.youtube.com/watch?v={number}" for number in range(len(outcomes))]
     urls_dict = {url: {"success": False, "retry": True} for url in urls}
-    downloader = make_downloader([])
+    downloader = make_downloader([], processor=processor)
     downloader.is_running_in_preset = in_preset
     downloader._download_single_ytdlp = MagicMock(side_effect=outcomes)
     results = downloader._process_ytdlp_downloads(
@@ -232,7 +237,7 @@ def test_yt_dlp_errors_stop_after_five(tmp_path):
 
 
 def test_presets_do_not_suggest_changing_the_non_direct_setting(tmp_path):
-    # the TikTok and Weibo presets turn yt-dlp on themselves; users cannot change that
+    # the Weibo preset turns yt-dlp on itself; users cannot change that
     downloader, results = download_with_ytdlp([SITE_ERROR] * 5, tmp_path, in_preset=True)
 
     assert results["processed"] == 5
@@ -306,7 +311,7 @@ def collect_links(items, parameters):
 
 
 def test_posts_without_video_link_go_to_yt_dlp_by_default():
-    """As for TikTok, where every post that is left at this point has a video"""
+    """Where every post has a video, yt-dlp can find it on the page of a post without a video link"""
     urls, fallback_only = collect_links([VIDEO_POST, TEXT_POST], {"columns": ["video_url"], "_ytdlp_fallback_column": "url"})
 
     assert len(urls) == 1
@@ -323,6 +328,132 @@ def test_weibo_posts_without_video_are_left_out():
     # the video link is tried first; if it no longer works, yt-dlp gets the post's page
     assert [link_info["_ytdlp_fallback_url"] for link_info in urls.values()] == [VIDEO_POST["url"]]
     assert not fallback_only
+
+
+# --- TikTok ------------------------------------------------------------------------
+
+TIKTOK_VIDEO_POST = {"id": "7600000000000000001", "is_image_post": "no",
+                     "tiktok_url": "https://www.tiktok.com/@example/video/7600000000000000001"}
+# the link of an image post looks like a video's; only `is_image_post` tells them apart
+TIKTOK_IMAGE_POST = {"id": "7600000000000000002", "is_image_post": "yes",
+                     "tiktok_url": "https://www.tiktok.com/@example/video/7600000000000000002"}
+
+
+def collect_tiktok_links(items, parameters=None):
+    """
+    Collect the links the TikTok downloader would try
+
+    :return tuple:  Video links, and post URLs that only yt-dlp is asked about
+    """
+    downloader = make_downloader([], processor=TikTokVideoDownloader)
+    downloader.source_dataset = FakeSource(items)
+    downloader.parameters = parameters or {}
+    return downloader.collect_video_urls()
+
+
+def test_tiktok_posts_go_straight_to_yt_dlp():
+    # TikTok's own video links soon stop working, so none are tried as video files first
+    urls, yt_dlp_only = collect_tiktok_links([TIKTOK_VIDEO_POST, TIKTOK_IMAGE_POST])
+
+    assert urls == {}
+    assert yt_dlp_only == {TIKTOK_VIDEO_POST["tiktok_url"]: {"post_ids": {TIKTOK_VIDEO_POST["id"]}}}
+
+
+def test_tiktok_photo_links_are_left_out():
+    photo_post = {"id": "3", "tiktok_url": "https://www.tiktok.com/@example/photo/3"}
+
+    _, yt_dlp_only = collect_tiktok_links([TIKTOK_VIDEO_POST, photo_post])
+
+    assert list(yt_dlp_only) == [TIKTOK_VIDEO_POST["tiktok_url"]]
+
+
+def test_uploaded_tiktok_posts_use_the_chosen_column():
+    post = {"id": "4", "post_link": "https://www.tiktok.com/@example/video/4"}
+
+    _, yt_dlp_only = collect_tiktok_links([post], {"url_column": "post_link"})
+
+    assert list(yt_dlp_only) == [post["post_link"]]
+
+
+def test_tiktok_dataset_of_only_image_posts_says_so():
+    with pytest.raises(ProcessorException, match="image posts"):
+        collect_tiktok_links([TIKTOK_IMAGE_POST])
+
+
+def test_tiktok_downloader_always_uses_yt_dlp(monkeypatch):
+    monkeypatch.setattr(VideoDownloaderPlus, "process", lambda self: None)
+    downloader = TikTokVideoDownloader.__new__(TikTokVideoDownloader)
+    downloader.parameters = {"amount": 10}
+
+    downloader.process()
+
+    assert downloader.parameters["also_indirect"] == "all"
+
+
+def test_tiktok_downloader_does_not_suggest_changing_the_non_direct_setting(tmp_path):
+    # TikTok users are not offered that setting
+    downloader, results = download_with_ytdlp([SITE_ERROR] * 5, tmp_path, processor=TikTokVideoDownloader)
+
+    assert results["processed"] == 5
+    assert "non-direct" not in downloader.warning_message
+    assert "working links" in downloader.warning_message
+
+
+# what yt-dlp fails with, as the downloader records it
+REFUSED_VIDEO_FILE = "DownloadError: ERROR: unable to download video data: HTTP Error 403: Forbidden"
+REFUSED_PAGE = "DownloadError: ERROR: [TikTok] 1: Unable to download webpage: HTTP Error 403: Forbidden"
+NEEDS_LOGIN = "DownloadError: ERROR: [TikTok] 1: This post may not be comfortable for some audiences. Log in for access."
+
+
+def download_tiktok_post(errors, monkeypatch):
+    """
+    Download one TikTok post with yt-dlp
+
+    :param list errors:  What each yt-dlp attempt fails with, in order; None for a successful download
+    :return tuple:  The downloader, the result, the number of attempts, and what was noted for the post
+    """
+    url = TIKTOK_VIDEO_POST["tiktok_url"]
+    attempts = []
+
+    def attempt(self, url, ydl_opts, urls_dict):
+        error = errors[len(attempts)]
+        attempts.append(error)
+        if error is None:
+            return {"success": True, "site_error": False}
+        urls_dict[url]["error"] = error
+        return {"success": False, "site_error": True}
+
+    monkeypatch.setattr(VideoDownloaderPlus, "_download_single_ytdlp", attempt)
+    downloader = make_downloader([], processor=TikTokVideoDownloader)
+    urls_dict = {url: {}}
+    result = downloader._download_single_ytdlp(url, {}, urls_dict)
+    return downloader, result, len(attempts), urls_dict[url]
+
+
+def test_tiktok_refused_video_file_is_tried_once_more(monkeypatch):
+    # TikTok sometimes sends a post's page without the cookie its video servers ask for
+    downloader, result, attempts, url_info = download_tiktok_post([REFUSED_VIDEO_FILE, None], monkeypatch)
+
+    assert result["success"]
+    assert attempts == 2
+    assert "error" not in url_info
+    assert "trying once more" in downloader.dataset.log.call_args.args[0]
+
+
+def test_tiktok_refused_video_file_is_tried_only_once_more(monkeypatch):
+    _, result, attempts, url_info = download_tiktok_post([REFUSED_VIDEO_FILE] * 3, monkeypatch)
+
+    assert not result["success"]
+    assert attempts == 2
+    assert url_info["error"] == REFUSED_VIDEO_FILE
+
+
+@pytest.mark.parametrize("error", [REFUSED_PAGE, NEEDS_LOGIN])
+def test_other_tiktok_errors_are_not_tried_again(error, monkeypatch):
+    _, result, attempts, _ = download_tiktok_post([error, None], monkeypatch)
+
+    assert not result["success"]
+    assert attempts == 1
 
 
 # --- which downloader is offered ---------------------------------------------------
@@ -349,3 +480,10 @@ def test_weibo_datasets_get_the_weibo_downloader():
     assert not VideoDownloaderPlus.is_compatible_with(weibo, config=MagicMock())
     # other data sources still get the general one
     assert VideoDownloaderPlus.is_compatible_with(FakeDataset("douyin-search"), config=MagicMock())
+
+
+def test_tiktok_datasets_get_the_tiktok_downloader():
+    tiktok = FakeDataset("tiktok-search")
+
+    assert TikTokVideoDownloader.is_compatible_with(tiktok, config=MagicMock())
+    assert not VideoDownloaderPlus.is_compatible_with(tiktok, config=MagicMock())

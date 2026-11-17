@@ -96,8 +96,12 @@ class VideoDownloaderPlus(BasicProcessor):
     # (and preferred_followups below reuses it), so it stays a named attribute.
     followups = ["audio-extractor", "metadata-viewer", "video-scene-detector", "preset-scene-timelines", "video-stack", "preset-video-hashes", "video-hasher-1", "video-frames"]
 
-    # any collector's csv/ndjson output (except sources with their own downloaders), plus the tiktok-metadata helper
-    compatibility = Compatibility(is_collector=True, types={"tiktok-video-downloader-metadata"}, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search", "weibo-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
+    # any collector's csv/ndjson output (except sources with their own downloaders)
+    compatibility = Compatibility(is_collector=True, excluded_types={"tiktok-search", "tiktok-urls-search", "telegram-search", "weibo-search"}, extensions={"csv", "ndjson"}, preferred_followups=followups)
+
+    # Whether the person running this processor chooses if yt-dlp is used, with the "non-direct videos" option.
+    # Downloaders for one platform (e.g. TikTok) decide that themselves.
+    user_chooses_yt_dlp = True
 
     references = [
         "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
@@ -147,8 +151,8 @@ class VideoDownloaderPlus(BasicProcessor):
             "help": "Allow indirect downloads",
             "tooltip": "Allow users to choose to download videos linked indirectly (e.g. embedded in a linked tweet, link to a YouTube video). "
                        "Enabling all can be confusing for users and download more than intended. Video downloaders for "
-                       "specific data sources (TikTok, Weibo) may still use yt-dlp on that platform's post pages, to replace "
-                       "video links that no longer work."
+                       "specific data sources still use yt-dlp on that platform's post pages: always for TikTok, and for "
+                       "Weibo to replace video links that no longer work."
         },
         "video-downloader.allow-multiple": {
             "type": UserInput.OPTION_TOGGLE,
@@ -319,7 +323,11 @@ class VideoDownloaderPlus(BasicProcessor):
 
         if _preexisting_fallback_queue:
             num_fallback = len(_preexisting_fallback_queue)
-            self.dataset.update_status(f"Collected {len(urls)} urls, plus {num_fallback} post {'URL' if num_fallback == 1 else 'URLs'} to try with yt-dlp only.")
+            post_urls = f"{num_fallback} post {'URL' if num_fallback == 1 else 'URLs'}"
+            if urls:
+                self.dataset.update_status(f"Collected {len(urls)} urls, plus {post_urls} to try with yt-dlp only.")
+            else:
+                self.dataset.update_status(f"Collected {post_urls} to download with yt-dlp.")
         else:
             self.dataset.update_status('Collected %i urls.' % len(urls))
 
@@ -1374,8 +1382,9 @@ class VideoDownloaderPlus(BasicProcessor):
         if consecutive_errors < 5:
             return None
             
-        # in a preset (e.g. for TikTok or Weibo), the non-direct videos setting is not the user's to change
-        if also_indirect != "none" and not self.is_running_in_preset:
+        # in a preset (e.g. for Weibo) or a downloader for one platform (e.g. TikTok), the non-direct videos setting
+        # is not the user's to change
+        if also_indirect != "none" and self.user_chooses_yt_dlp and not self.is_running_in_preset:
             message = f"Downloaded {self.downloaded_videos} videos. Errors {consecutive_errors} consecutive times; try deselecting the non-direct videos setting"
         else:
             message = f"Downloaded {self.downloaded_videos} videos. Errors {consecutive_errors} consecutive times; check logs to ensure video URLs are working links and you are not being blocked."
