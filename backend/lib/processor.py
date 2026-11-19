@@ -16,6 +16,7 @@ from pathlib import PurePath, Path
 
 from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet, StatusType
+from common.lib.archive_metadata import is_support_file
 from common.lib.compatibility import Compatibility
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_commit, remove_nuls, send_email, hash_to_md5, looks_like_email_address
@@ -707,7 +708,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
           archive and deleted afterwards. If a folder, all files in the folder
           will be added and the folder will be deleted afterwards.
         :param int num_items: Items in the dataset. If None, the amount of
-          files added to the archive will be used.
+          files added to the archive will be used, leaving out the support
+          files (metadata, logs) that iterating the archive skips.
         :param int compression:  Type of compression to use. By default, files
           are not compressed, to speed up unarchiving.
         :param bool finish:  Finish the dataset/job afterwards or not?
@@ -728,7 +730,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
             for output_path in files:
                 zip.write(output_path, output_path.name)
                 output_path.unlink()
-                done += 1
+                if not is_support_file(output_path.name):
+                    # skip 4CAT added metadata and log files and only count dataset's actual items
+                    done += 1
 
         # delete temporary folder
         if is_folder:

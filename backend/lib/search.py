@@ -9,6 +9,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 
 from backend.lib.processor import BasicProcessor
+from common.lib.archive_metadata import is_support_file
 from common.lib.author_info import AuthorInfoReplacer
 from common.lib.helpers import strip_tags, remove_nuls, format_import_item
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
@@ -392,7 +393,9 @@ class Search(BasicProcessor, ABC):
 		:param filepath:  Where to store the archive
 		:return int:  Number of items
 		"""
-		num_items = len(os.listdir(items))
+		# skip 4CAT added metadata and log files and only count dataset's actual items
+		# Note: write_archive_and_finish() skips these files already but only when passing num_items; we do it here to return the count
+		num_items = len([file for file in os.listdir(items) if not is_support_file(file)])
 		self.write_archive_and_finish(items, None, zipfile.ZIP_STORED, False)
 		return num_items
 
