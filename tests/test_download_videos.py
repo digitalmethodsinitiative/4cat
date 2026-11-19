@@ -1,10 +1,13 @@
+from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 import requests
 from yt_dlp import DownloadError
+from yt_dlp.utils import ExistingVideoReached
 
-from backend.lib.proxied_requests import FailedProxiedRequest
+from backend.lib.proxied_requests import DelegatedRequestHandler, FailedProxiedRequest, NoProxiesAvailableError
 from processors.visualisation import download_videos
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UniqueFilenames
@@ -62,15 +65,33 @@ class FakeSource:
         return dict(self.media_request_headers)
 
 
+class FakeProxyPool:
+    """4CAT's shared proxies, lending out the same proxy every time"""
+    def __init__(self, proxy=DelegatedRequestHandler.PROXY_LOCALHOST):
+        self.proxy = proxy
+        self.borrowed_for = []
+
+    def refresh_settings(self, config):
+        pass
+
+    @contextmanager
+    def borrow_proxy(self, url, **kwargs):
+        self.borrowed_for.append(url)
+        yield self.proxy
+
+
 def make_downloader(answers, media_request_headers=None, processor=VideoDownloaderPlus):
     """
     A video downloader that gets the given answers, in order, for the links it requests
 
-    What it asks for the links with is kept as `request_options`.
+    What it asks for the links with is kept as `request_options`. yt-dlp
+    downloads borrow their proxy from `downloader.manager.proxy_delegator`, a
+    `FakeProxyPool`.
 
     :param processor:  The video downloader to make, e.g. one for a single platform
     """
     downloader = processor.__new__(processor)
+    downloader.manager = SimpleNamespace(proxy_delegator=FakeProxyPool())
     downloader.source_dataset = FakeSource([], media_request_headers)
     downloader.dataset = MagicMock()
     downloader.config = MagicMock()
@@ -286,6 +307,100 @@ def test_which_yt_dlp_errors_count(error, is_site_error, monkeypatch):
 
     assert not result["success"]
     assert result["site_error"] == is_site_error
+
+
+def test_no_usable_proxy_stops_the_yt_dlp_downloads(tmp_path):
+    # this would be the same for every following link
+    no_proxy = NoProxiesAvailableError("No proxy can be used for https://www.youtube.com/watch?v=0")
+    downloader, results = download_with_ytdlp([no_proxy, DOWNLOADED, DOWNLOADED], tmp_path)
+
+    assert downloader._download_single_ytdlp.call_count == 1
+    assert results["processed"] == 0
+    assert "no proxy" in downloader.warning_message
+
+
+# --- proxies for yt-dlp ------------------------------------------------------------
+
+class RecordingYoutubeDL:
+    """
+    yt-dlp, downloading a video without making requests
+
+    The options of every YoutubeDL that is made are kept in `made`. If
+    `already_downloaded` is set, the first download finds that the video was
+    downloaded before, as for a second link to the same video.
+    """
+    made = []
+    already_downloaded = False
+
+    def __init__(self, options):
+        self.options = options
+        RecordingYoutubeDL.made.append(options)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def extract_info(self, url, download=True):
+        info = {"_filename": "/staging/video.mp4", "extractor": "TikTok", "id": "1"}
+        if not download:
+            return info
+        if RecordingYoutubeDL.already_downloaded:
+            raise ExistingVideoReached()
+        for hook in self.options.get("progress_hooks", []):
+            hook({"status": "finished"})
+        for hook in self.options.get("postprocessor_hooks", []):
+            hook({"status": "finished", "info_dict": info})
+
+
+def download_post_with_ytdlp(proxy, monkeypatch, already_downloaded=False):
+    """
+    Download one post with yt-dlp, through the given borrowed proxy
+
+    :return tuple:  The options of each YoutubeDL that was made, and what was noted for the post
+    """
+    monkeypatch.setattr(RecordingYoutubeDL, "made", [])
+    monkeypatch.setattr(RecordingYoutubeDL, "already_downloaded", already_downloaded)
+    monkeypatch.setattr(download_videos.yt_dlp, "YoutubeDL", RecordingYoutubeDL)
+    downloader = make_downloader([])
+    downloader.manager.proxy_delegator.proxy = proxy
+    downloader.videos_downloaded_from_url = set()
+    downloader.yt_dlp_archive_map = {}
+    url = "https://www.tiktok.com/@user/video/1"
+    urls_dict = {url: {}}
+    ydl_opts = {"postprocessor_hooks": [downloader.yt_dlp_post_monitor],
+                "progress_hooks": [downloader.yt_dlp_monitor]}
+
+    result = downloader._download_single_ytdlp(url, ydl_opts, urls_dict)
+
+    assert downloader.manager.proxy_delegator.borrowed_for == [url]
+    assert "proxy" not in ydl_opts  # the options of the next link are left alone
+    return result, RecordingYoutubeDL.made, urls_dict[url]
+
+
+def test_yt_dlp_downloads_through_the_borrowed_proxy(monkeypatch):
+    result, made, url_info = download_post_with_ytdlp("http://user:secret@10.0.0.1:3128", monkeypatch)
+
+    assert result["success"]
+    assert made[0]["proxy"] == "http://user:secret@10.0.0.1:3128"
+    # as for direct downloads, the proxy is noted without its username and password
+    assert url_info["files"][0]["metadata"]["proxy"] == "http://10.0.0.1:3128"
+
+
+def test_yt_dlp_downloads_without_a_proxy_when_connecting_directly(monkeypatch):
+    result, made, url_info = download_post_with_ytdlp(DelegatedRequestHandler.PROXY_LOCALHOST, monkeypatch)
+
+    assert result["success"]
+    assert "proxy" not in made[0]
+    assert url_info["files"][0]["metadata"]["proxy"] == DelegatedRequestHandler.PROXY_LOCALHOST
+
+
+def test_looking_up_an_already_downloaded_video_uses_the_same_proxy(monkeypatch):
+    _, made, _ = download_post_with_ytdlp("http://10.0.0.1:3128", monkeypatch, already_downloaded=True)
+
+    assert len(made) == 2
+    assert made[1]["proxy"] == "http://10.0.0.1:3128"
 
 
 # --- which links are collected -----------------------------------------------------
