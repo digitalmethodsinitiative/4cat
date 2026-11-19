@@ -1375,7 +1375,7 @@ def readable_url(url):
     return URL_ENCODED_CHARACTERS.sub(lambda match: quote(match.group(), safe=""), url)
 
 def url_to_filename(url, staging_area=None, default_name="file", default_ext=".png", max_bytes=255,
-                    existing_filenames_folded=None):
+                    existing_filenames_folded=None, next_suffix=None):
         """
         Determine filenames for saved files
 
@@ -1411,7 +1411,8 @@ def url_to_filename(url, staging_area=None, default_name="file", default_ext=".p
 
         return deduplicate_filename(base_filename, staging_area=staging_area, max_bytes=max_bytes,
                                     existing_filenames_folded=existing_filenames_folded,
-                                    fallback_name=default_name, fallback_ext=default_ext)
+                                    fallback_name=default_name, fallback_ext=default_ext,
+                                    next_suffix=next_suffix)
 
 
 WINDOWS_FORBIDS_IN_A_FILENAME = re.compile(r'[:?*"<>|\\/\x00-\x1f]')
@@ -1491,7 +1492,8 @@ def fold_filename(filename) -> str:
 
 
 def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=None, max_bytes=255,
-                         fallback_name="file", fallback_ext="", has_extension=True) -> str:
+                         fallback_name="file", fallback_ext="", has_extension=True,
+                         next_suffix=None) -> str:
     """
     Make a filename unique within a directory
 
@@ -1517,6 +1519,9 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
       extension. Set it to False for a name that is all one piece, such as the
       prefix built out of another file's name; avoids `my.video_mp4` read as
       a name `my` with an extension `.video_mp4`.
+    :param dict next_suffix:  Next index to use for a name that has been used 
+      before, keyed by the folded name. If None, always start from 1. Avoids
+      starting from 1 every time.
     :return str:  A name nothing else has
     """
     if existing_filenames_folded is None:
@@ -1564,7 +1569,9 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
 
     if staging_area or existing_filenames_folded:
         # Ensure the filename is unique in the staging area
-        file_index = 1
+        base_key = fold_filename(name_part + ext_part)
+        # Use next_suffix to avoid starting from 1 every time for names that have been used before
+        file_index = 1 if next_suffix is None else next_suffix.get(base_key, 1)
 
         file_path = staging_area.joinpath(filename) if staging_area else None
 
@@ -1597,6 +1604,11 @@ def deduplicate_filename(filename, staging_area=None, existing_filenames_folded=
             file_index += 1
             if staging_area:
                 file_path = staging_area.joinpath(filename)
+
+        if next_suffix is not None and file_index > 1:
+            # Only store a name that something else already had 
+            # Note: `UniqueFilenames.replace` doesn't call this, so we could skip a number
+            next_suffix[base_key] = file_index
 
     return filename
 
@@ -1644,6 +1656,8 @@ class UniqueFilenames:
         # free when nothing reduces to it, and giving one up only frees its
         # text once it was the last name holding it.
         self.taken = {}
+        # track suffixes to avoid starting from 1 every time
+        self.next_suffix = {}
         if directory is not None and directory.is_dir():
             for item in directory.iterdir():
                 self._remember(item.name)
@@ -1658,7 +1672,8 @@ class UniqueFilenames:
         :return str:  The name reserved, which is `filename` if it was free
         """
         filename = deduplicate_filename(filename, staging_area=self.directory,
-                                        existing_filenames_folded=self.taken, **kwargs)
+                                        existing_filenames_folded=self.taken,
+                                        next_suffix=self.next_suffix, **kwargs)
         self._remember(filename)
         return filename
 
@@ -1671,7 +1686,8 @@ class UniqueFilenames:
         :return str:  The name reserved
         """
         filename = url_to_filename(url, staging_area=self.directory,
-                                   existing_filenames_folded=self.taken, **kwargs)
+                                   existing_filenames_folded=self.taken,
+                                   next_suffix=self.next_suffix, **kwargs)
         self._remember(filename)
         return filename
 
