@@ -1,2 +1,5 @@
+# This is a 4CAT instance - https://4cat.nl
+# Source code: https://github.com/digitalmethodsinitiative/4cat
+# Nothing here is meant to be indexed; most of it needs a login anyway.
 User-agent: *
 Disallow: /

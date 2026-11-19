@@ -6,6 +6,7 @@ import csv
 import io
 import json_stream
 import mimetypes
+import re
 from pathlib import Path
 from flask import (Blueprint, current_app, render_template, request, redirect, send_from_directory, flash,
                    get_flashed_messages, url_for, stream_with_context, g)
@@ -288,12 +289,18 @@ def get_result_legacy(query_file):
     # Handle favicon relative requests that get caught by this broad route
     if query_file.endswith('/favicon.ico') or query_file == 'favicon.ico':
         return redirect(url_for('static', filename='img/favicon/favicon.ico'))
-
-    import re
+    elif query_file.endswith('/robots.txt') or query_file == 'robots.txt':
+        return redirect(url_for("misc.robots"))
+    elif any(query_file in ['sitemap.xml']):
+        # don't even warn these
+        return error(404, error="File not found.")
+    
     # Parse dataset key from query_file if possible
     possible_keys = re.findall(r"[abcdef0-9]{32}", query_file)
     if not possible_keys:
-        g.log.warning(f"Query file {query_file} does not seem to contain a dataset key - cannot serve file.")
+        # Result file names always contain the dataset key, so a path without
+        # one was never a result link.
+        g.log.warning(f"Query file {query_file} does not contain a dataset key (cannot serve file).")
         return error(404, error="This link format is no longer supported. Please use the updated link from the dataset page.")
     
     # if for whatever reason there are multiple hashes in the filename,
