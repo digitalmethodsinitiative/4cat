@@ -15,7 +15,8 @@ from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached, MaxDownloadsReached
 
 from backend.lib.processor import BasicProcessor
-from backend.lib.proxied_requests import FailedProxiedRequest
+from backend.lib.proxied_requests import (DelegatedRequestHandler, FailedProxiedRequest, NoProxiesAvailableError,
+                                          remove_proxy_credentials)
 from common.lib.compatibility import Compatibility
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput, UniqueFilenames, sets_to_lists, split_urls, urls_in_text
@@ -181,6 +182,8 @@ class VideoDownloaderPlus(BasicProcessor):
         self.last_post_process_status = None
         self.warning_message = None
         self.yt_dlp_archive_map = None
+        # proxy of the current yt-dlp download, without its username and password
+        self.ytdlp_proxy = None
 
     @classmethod
     def get_options(cls, parent_dataset=None, config=None):
@@ -1013,6 +1016,10 @@ class VideoDownloaderPlus(BasicProcessor):
             "failed": 0,
         }
         
+        # yt-dlp borrows its proxies from the same pool as the direct
+        # downloads; read the proxy settings again, in case they were changed
+        self.manager.proxy_delegator.refresh_settings(self.config)
+
         for url in url_list:
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while downloading videos.")
@@ -1029,8 +1036,17 @@ class VideoDownloaderPlus(BasicProcessor):
             url_slug = self.staging_filenames.reserve(re.sub(r"[^0-9a-z]+", "_", url.lower())[:100])
             ydl_opts["outtmpl"] = str(results_path) + '/' + url_slug + '_%(autonumber)s.%(ext)s'
             
-            ytdlp_result = self._download_single_ytdlp(url, ydl_opts, urls_dict)
-            
+            try:
+                ytdlp_result = self._download_single_ytdlp(url, ydl_opts, urls_dict)
+            except NoProxiesAvailableError as e:
+                # this will not change for the next links, so stop here
+                urls_dict[url]["error"] = str(e)
+                self.dataset.log(str(e))
+                self.warning_message = f"Downloaded {self.downloaded_videos} videos. Stopped downloading with " \
+                                       f"yt-dlp, because no proxy could be used for it."
+                self.dataset.update_status(self.warning_message)
+                break
+
             results["processed"] += 1
             
             if ytdlp_result["success"]:
@@ -1052,7 +1068,41 @@ class VideoDownloaderPlus(BasicProcessor):
 
     def _download_single_ytdlp(self, url, ydl_opts, urls_dict):
         """
-        Download a single URL using YT-DLP
+        Download a single URL using YT-DLP, through one of 4CAT's proxies
+
+        yt-dlp makes its own requests, so it cannot go through 4CAT's queue of
+        proxied requests. Instead it borrows one proxy from the same pool for
+        the whole download. The page, the video file and anything ffmpeg
+        downloads for it then all come from the same address, and the pool's
+        limit per website still applies. Only http:// proxies are used: when
+        ffmpeg does the downloading (e.g. for some streams), it ignores other
+        kinds of proxy and connects directly.
+
+        :param str url: URL to download
+        :param dict ydl_opts: YT-DLP options
+        :param dict urls_dict: URLs dictionary to update
+        :return dict: Result dictionary with a `success` flag, and a `site_error` flag for failures that suggest the
+        website is not letting us download
+        """
+        with self.manager.proxy_delegator.borrow_proxy(url, only_schemes=("http://",),
+                                                       on_wait=self._stop_if_interrupted) as proxy:
+            ydl_opts = dict(ydl_opts)
+            if proxy != DelegatedRequestHandler.PROXY_LOCALHOST:
+                ydl_opts["proxy"] = proxy
+            self.ytdlp_proxy = remove_proxy_credentials(proxy)
+
+            return self._run_ytdlp(url, ydl_opts, urls_dict)
+
+    def _stop_if_interrupted(self):
+        """
+        Stop if the processor was interrupted, e.g. while waiting for a proxy
+        """
+        if self.interrupted:
+            raise ProcessorInterruptedException("Interrupted while downloading videos.")
+
+    def _run_ytdlp(self, url, ydl_opts, urls_dict):
+        """
+        Download a single URL using YT-DLP, with the given options
 
         :param str url: URL to download
         :param dict ydl_opts: YT-DLP options
@@ -1078,7 +1128,10 @@ class VideoDownloaderPlus(BasicProcessor):
                 self.dataset.log(f"Already downloaded video associated with: {url}")
                 # Try to retrieve info about the existing video
                 try:
-                    with yt_dlp.YoutubeDL({"socket_timeout": 30}) as ydl2:
+                    info_opts = {"socket_timeout": 30}
+                    if "proxy" in ydl_opts:
+                        info_opts["proxy"] = ydl_opts["proxy"]
+                    with yt_dlp.YoutubeDL(info_opts) as ydl2:
                         info2 = ydl2.extract_info(url, download=False)
                         if info2:
                             archive_key = info2.get('extractor') + info2.get('id')
@@ -1253,7 +1306,8 @@ class VideoDownloaderPlus(BasicProcessor):
             self.videos_downloaded_from_url.add(info_dict.get('_filename', {}))
             file = {
                 "filename": Path(info_dict.get('_filename')).name,
-                "metadata": info_dict,
+                # which proxy was used, without its username and password
+                "metadata": {**info_dict, "proxy": self.ytdlp_proxy} if self.ytdlp_proxy else info_dict,
                 "success": True
             }
             self.url_files[info_dict.get('_filename', {})] = file

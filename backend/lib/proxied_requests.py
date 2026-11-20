@@ -1,5 +1,6 @@
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 import threading
 from functools import wraps
 
@@ -311,6 +312,7 @@ class DelegatedRequestHandler:
         self.proxy_health = {}
         self.proxy_warnings_logged = set()
         self.all_proxies_failed_logged = False
+        self.nothing_to_lend_logged = False
         
         # Track proxies that should be removed but have active requests
         self.proxies_pending_removal = set()
@@ -367,6 +369,7 @@ class DelegatedRequestHandler:
         self.proxy_health = {}
         self.proxy_warnings_logged = set()
         self.all_proxies_failed_logged = False
+        self.nothing_to_lend_logged = False
         
         if num_proxies_restored > 0:
             self.log.debug(f"Proxy health reset: {num_proxies_restored} proxies restored")
@@ -576,19 +579,114 @@ class DelegatedRequestHandler:
                 # Localhost exists but unhealthy
                 raise NoProxiesAvailableError("All proxies including localhost are unhealthy")
         
-        # within the pool, find the least recently used healthy proxy that is available
-        sorted_by_cooloff = sorted(
-            healthy_proxies, key=lambda p: self.proxy_pool[p].last_used
-        )
-        for proxy_id in sorted_by_cooloff:
+        # None if all proxies are busy
+        return self._claim_least_recently_used(healthy_proxies, url)
+
+    @synchronized_method
+    def _claim_least_recently_used(self, proxy_urls, url):
+        """
+        Claim a place for a URL on the proxy that was used longest ago and has room
+
+        :param list proxy_urls:  Proxies to choose from
+        :param str url:  URL to claim a place for
+        :return SophisticatedFuturesProxy|None:  The proxy, or `None` if all of
+        them are busy
+        """
+        for proxy_id in sorted(proxy_urls, key=lambda p: self.proxy_pool[p].last_used):
             claimed_proxy = self.proxy_pool[proxy_id].proxy.claim_for(url)
             if claimed_proxy:
                 self.proxy_pool[proxy_id].last_used = time.time()
                 return claimed_proxy
-        
-        # All proxies busy
+
         return None
-    
+
+    # @contextmanager makes this function usable in a `with` block. The code up
+    # to `yield` runs when the block starts, the yielded value is what `as`
+    # gets, and the code after `yield` runs when the block ends.
+    @contextmanager
+    def borrow_proxy(self, url, only_schemes=None, on_wait=None, wait=0.1):
+        """
+        Borrow one proxy for a tool that makes its own requests, such as yt-dlp
+
+            with delegator.borrow_proxy(url) as proxy_url:
+                ...
+
+        Until the `with` block ends, the proxy counts as one running request
+        for the host of `url`, so the usual limits per host apply. If no proxy
+        can be used, the connection is direct, unless falling back to
+        localhost is turned off; then `NoProxiesAvailableError` is raised.
+
+        :param str url:  URL to borrow the proxy for
+        :param tuple only_schemes:  Only lend proxies whose URL starts with one
+        of these, e.g. `("http://",)`
+        :param callable on_wait:  Called before each wait for a busy proxy; it
+        can raise an exception to stop waiting
+        :param float wait:  Seconds to wait between tries
+        :return:  Yields the proxy URL, with any username and password, or
+        `PROXY_LOCALHOST`
+        """
+        def can_lend(proxy_url):
+            return not only_schemes or proxy_url == self.PROXY_LOCALHOST or proxy_url.lower().startswith(only_schemes)
+
+        # wait until a proxy has room for this host
+        while True:
+            with self.lock:
+                usable = [p for p in self.proxy_pool if can_lend(p) and self.proxy_health.get(p, True)
+                          and p not in self.proxies_pending_removal]
+                proxy = self._claim_least_recently_used(usable, url) if usable else None
+                if proxy:
+                    proxy.mark_request_started(url)
+                    break
+                if not usable:
+                    if any(can_lend(p) for p in self.proxy_pool):
+                        reason = "all proxies that could be used are unhealthy or being removed"
+                    else:
+                        reason = f"no proxy URL starts with {' or '.join(only_schemes)}"
+                    break
+
+            if on_wait:
+                on_wait()
+            time.sleep(wait)
+
+        if not proxy:
+            if not self.proxy_settings.get("proxies.allow-localhost-fallback", True):
+                raise NoProxiesAvailableError(f"No proxy can be used for {url}: {reason}, and falling back to a "
+                                              f"direct connection is turned off in the proxy settings")
+
+            if not self.nothing_to_lend_logged:
+                self.nothing_to_lend_logged = True
+                self.log.warning(f"No proxy can be used for {url}: {reason}. Connecting directly instead.")
+
+            # nothing was taken, so there is nothing to give back: when the
+            # block ends, the function stops here
+            yield self.PROXY_LOCALHOST
+            return
+
+        # the `with` block runs while the function waits at this `yield`;
+        # `finally` gives the proxy back, also when the block ends with an error
+        try:
+            yield proxy.proxy_url
+        finally:
+            with self.lock:
+                proxy.mark_request_finished(url)
+                self._remove_if_pending(proxy.proxy_url)
+
+    @synchronized_method
+    def _remove_if_pending(self, proxy_url):
+        """
+        Remove a proxy that is no longer in the settings, once nothing runs on it
+
+        :param str proxy_url:  Proxy URL
+        """
+        if proxy_url in self.proxies_pending_removal and proxy_url in self.proxy_pool:
+            # requests that are only cooling off do not keep the proxy
+            if not self.proxy_pool[proxy_url].proxy.has_active_requests():
+                del self.proxy_pool[proxy_url]
+                if proxy_url in self.proxy_health:
+                    del self.proxy_health[proxy_url]
+                self.proxies_pending_removal.discard(proxy_url)
+                self.log.info(f"Removed proxy {remove_proxy_credentials(proxy_url)} (completed all active requests)")
+
     @synchronized_method
     def _initialize_proxy_pool(self):
         """
@@ -650,16 +748,7 @@ class DelegatedRequestHandler:
                     url_metadata.proxied.proxy.mark_request_finished(url)
                     
                     # Clean up proxies pending removal if they have no more active requests
-                    proxy_url = url_metadata.proxied.proxy.proxy_url
-                    if proxy_url in self.proxies_pending_removal and proxy_url in self.proxy_pool:
-                        proxy_obj = self.proxy_pool[proxy_url].proxy
-                        # Check if proxy has truly active requests (not just cooling off)
-                        if not proxy_obj.has_active_requests():
-                            del self.proxy_pool[proxy_url]
-                            if proxy_url in self.proxy_health:
-                                del self.proxy_health[proxy_url]
-                            self.proxies_pending_removal.discard(proxy_url)
-                            self.log.info(f"Removed proxy {remove_proxy_credentials(proxy_url)} (completed all active requests)")
+                    self._remove_if_pending(url_metadata.proxied.proxy.proxy_url)
                     try:
                         response = url_metadata.proxied.request.result()
                         # annotate the response so processors can see which
