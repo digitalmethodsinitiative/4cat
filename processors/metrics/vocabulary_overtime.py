@@ -5,7 +5,7 @@ import re
 
 from backend.lib.processor import BasicProcessor
 from common.lib.compatibility import Compatibility
-from common.lib.helpers import UserInput, get_interval_descriptor
+from common.lib.helpers import UserInput, get_interval_descriptor, TermMatcher, get_term_match_option
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -77,7 +77,8 @@ class OvertimeAnalysis(BasicProcessor):
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "Custom vocabulary (separate with commas)"
-            }
+            },
+            "match": get_term_match_option()
         }
 
     def process(self):
@@ -117,12 +118,13 @@ class OvertimeAnalysis(BasicProcessor):
             vocabularies[custom_id] |= custom_vocabulary
 
         # compile into regex for quick matching
-        vocabulary_regexes = {}
+        vocabulary_matchers = {}
         for vocabulary_id in vocabularies:
             if not vocabularies[vocabulary_id]:
                 continue
-            vocabulary_regexes[vocabulary_id] = re.compile(
-                r"\b(" + "|".join([re.escape(term) for term in vocabularies[vocabulary_id] if term]) + r")\b")
+            vocabulary_matchers[vocabulary_id] = TermMatcher(
+                [re.escape(term) for term in vocabularies[vocabulary_id] if term],
+                match=self.parameters.get("match", "word"), flags=re.IGNORECASE)
 
         # if the results are partitioned, then it is useful to have a way to
         # compare the frequencies to the overall activity in the graph. This
@@ -130,7 +132,7 @@ class OvertimeAnalysis(BasicProcessor):
         # data.
         if partition and "wildcard" in self.parameters.get("vocabulary", []):
             vocabularies["everything"] = set()
-            vocabulary_regexes["everything"] = re.compile(r".*")
+            vocabulary_matchers["everything"] = TermMatcher([".*"], match="anywhere")
 
         # now for the real deal
         self.dataset.update_status("Reading source file")
@@ -150,13 +152,11 @@ class OvertimeAnalysis(BasicProcessor):
             # vocabulary, but else we'll have different ones we can
             # check separately
             for vocabulary_id in vocabularies:
-                if vocabulary_id not in vocabulary_regexes:
+                if vocabulary_id not in vocabulary_matchers:
                     continue
 
-                vocabulary_regex = vocabulary_regexes[vocabulary_id]
-
                 # check if we match
-                if not vocabulary_regex.findall(post["body"].lower()):
+                if not vocabulary_matchers[vocabulary_id].found_in(post["body"]):
                     continue
 
                 # determine what interval to save the frequency for
