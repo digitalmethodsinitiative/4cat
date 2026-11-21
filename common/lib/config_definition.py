@@ -652,13 +652,13 @@ config_definition = {
                 "type": UserInput.OPTION_TEXT,
                 "help": "Authentication Header",
                 "default": "",
-                "tooltip": "The HTTP header used to authenticate with the server (e.g. 'X-API-KEY', 'Authorization'). Passed with the Authentication Key as value.",
+                "tooltip": "The HTTP header used to authenticate with the server (e.g. 'X-API-KEY', 'Authorization'). Passed with the Authentication Key as value. For a bearer token you can write either 'Authorization' with 'Bearer <key>' as the value, or 'Authorization: Bearer' with just the key.",
             },
             "auth_key": {
                 "type": UserInput.OPTION_TEXT,
                 "default": "",
                 "help": "Authentication Key",
-                "tooltip": "The API key to access the LLM server, if required.",
+                "tooltip": "The API key to access the LLM server, if required. 'Bearer <key>' for bearer tokens.",
             },
         }
     },
@@ -762,6 +762,15 @@ config_definition = {
         "help": "Maximum images to show",
         "tooltip": "Maximum number of images to show in the image visualization tab of a dataset. This is to prevent "
                    "issues with large datasets.",
+    },
+    "embeddings.max_embeddings": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 100000,
+        "coerce_type": int,
+        "help": "Maximum embeddings to analyse",
+        "tooltip": "Maximum number of embeddings a single processor may read into memory at once, e.g. for clustering, "
+                   "or reducing dimensions, which need to hold every vector in memory at the same time. "
+                   "'0' means no limit.",
     }
 }
 
@@ -782,6 +791,7 @@ categories = {
     "ui": "User interface",
     "proxies": "Proxied HTTP requests",
     "image-visuals": "Image visualization",
+    "embeddings": "Embeddings",
     "extensions": "Extensions",
     "llm": "LLM servers"
 }

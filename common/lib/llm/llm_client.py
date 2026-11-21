@@ -12,6 +12,8 @@ from abc import abstractmethod
 import requests
 import re
 
+from common.lib.exceptions import LLMServerException
+
 class LLMServerClient:
     _headers = {}
     server_config = {}
@@ -59,14 +61,24 @@ class LLMServerClient:
 
         self.base_url = server_config["url"].rstrip("/")
         if self.base_url.endswith("v1"):
-            # get rid of the 'v1' - we'll add this in the path
-            self.base_url = f"{self.base_url[:-2]}"
+            # get rid of the 'v1' - we'll add this in the path.
+            self.base_url = self.base_url[:-2].rstrip("/")
 
         self._session = requests.Session()
         self._headers = {"Content-Type": "application/json"}
 
         if self.auth_type:
-            self._headers[self.auth_type] = self.auth_key
+            # Accept both "Authorization: Bearer" and just the bearer
+            header_name, _, value_prefix = self.auth_type.partition(":")
+            header_name = header_name.strip()
+            value_prefix = value_prefix.strip()
+
+            auth_value = self.auth_key or ""
+            if value_prefix and not auth_value.lower().startswith(value_prefix.lower()):
+                auth_value = f"{value_prefix} {auth_value}".strip()
+
+            if header_name:
+                self._headers[header_name] = auth_value
 
         self.log = log
 
@@ -77,7 +89,6 @@ class LLMServerClient:
         :return:  `False` if the server is not responding, or an HTTP status code.
         """
         try:
-            print(f"{self.base_url}{self._models_info_path}")
             r = self._session.get(
                 f"{self.base_url}{self._models_info_path}",
                 headers=self._headers,
@@ -129,8 +140,81 @@ class LLMServerClient:
             "server": self.server_config["_id"],
             "wrapper": self.server_config["type"],
             "supported_media_types": self.parse_supported_media_types(meta),
+            "supported_tasks": self.parse_supported_tasks(meta),
             "metadata": meta,
         }
+
+    def parse_supported_tasks(self, meta: dict) -> list[str]:
+        """
+        Derive the tasks a model can be used for from its metadata.
+
+        Most servers do not report this. An OpenAI-compatible `/v1/models` lists
+        an id and nothing else, so there is no capability field to read. So use the
+        model name as an imperfect fallback: if it contains "embed", it's an embedder;
+        otherwise, it's generative.
+
+        # todo: check if there's a more rigid way of separating later.
+
+        :param dict meta:  Model metadata, or `None` if unavailable.
+        :returns list[str]:  Supported tasks - `"generate"`, `"embed"`, or both.
+        """
+        try:
+            model_id = str(self.get_model_id(meta) or "")
+        except (KeyError, TypeError):
+            # nothing to go on so assume generative
+            return ["generate"]
+
+        return ["embed"] if "embed" in model_id.lower() else ["generate"]
+
+    @staticmethod
+    def as_descriptors(item_media) -> list:
+        """
+        Normalise one item's media to a list of descriptors.
+
+        :param item_media:  A descriptor, a list of them, or None
+        :return list:  Descriptors, possibly empty
+        """
+        if not item_media:
+            return []
+
+        return list(item_media) if isinstance(item_media, (list, tuple)) else [item_media]
+
+    def embed(self, model_id: str, inputs: list, media: list | None = None, timeout: int = 300,
+              text_as_instruction: bool = False, dimensions: int | None = None) -> list[list[float]]:
+        """
+        Embed one or more inputs, returning one vector per input.
+
+        Not done through LangChain since it doesn't support multimodal embeddings.
+        # todo: keep tabs on if/when this changes
+
+        A client that cannot embed media must raise an exception when `media` is given
+        rather than embedding the text alone.
+
+        :param str model_id:  Model ID *within this server's context* (i.e. a
+          `local_id`, not a global model ID).
+        :param list inputs:  Inputs to embed.
+        :param list media:  Optional media to embed, one entry per input and
+          paired by index, for servers that support multimodal embedding. Each
+          entry is a descriptor dict:
+
+              {"type": "video"|"image", "mime": "video/mp4", "data": "<base64>"}
+
+          or, in place of `data`, a `"url"` the server can fetch itself. Each
+          client translates this to whatever its own API expects.
+        :param int timeout:  Request timeout in seconds.
+        :param int dimensions:  Truncate each vector to this many dimensions,
+          for models trained with Matryoshka representation learning. `None`
+          keeps the model's full output.
+        :param bool text_as_instruction:  With media, treat `inputs[i]` as an
+
+          instruction that steers the embedding rather than as text to embed
+          along with the media. Clients without such a distinction ignore it.
+        :returns list[list[float]]:  One vector per input, in input order.
+        """
+        raise LLMServerException(
+            f"Embedding is not supported for {self.server_config.get('type', 'this')} connections, so the model "
+            f"'{model_id}' cannot be used to generate embeddings. Use a model on an Ollama or OpenAI-compatible "
+            f"connection instead.")
 
     def get_model_card_url(self, meta: dict) -> str:
         """
@@ -197,3 +281,83 @@ class LLMServerClient:
         domain = re.sub(r"^https?://", "", self.server_config["url"])
         domain = domain.rstrip("/")
         return f"{self.server_config['type']}://{domain}/{self.get_model_id(meta)}"
+
+
+def supports_task(model: dict, task: str = "generate") -> bool:
+    """
+    Check whether a model entry can be used for a given task.
+
+    :param dict model:  A single `llm.available_models` entry.
+    :param str task:  Task to check for - `"generate"` or `"embed"`.
+    :return bool:  Whether the model supports the task.
+    """
+    return task in model.get("supported_tasks", ["generate"])
+
+
+def get_available_models(config, task: str = "generate") -> dict:
+    """
+    Return which models are available to a particular user
+
+    :param config:  4CAT config reader (context-aware, so per-user `llm.access`
+      is respected)
+    :param str task:  Task the model must support - `"generate"` or `"embed"`.
+    :return dict:  `{model ID: model entry}`
+    """
+    available_models = config.get("llm.available_models", {})
+    enabled_model_ids = config.get("llm.enabled_models", [])
+    if not config.get("llm.access"):
+        enabled_model_ids = [_ for _ in enabled_model_ids if _.startswith("thirdparty")]
+
+    return {model_id: model for model_id, model in available_models.items()
+            if model_id in enabled_model_ids and supports_task(model, task)}
+
+
+def resolve_model(config, model_id: str, task: str = "generate") -> tuple:
+    """
+    Look up a model and its server, by the same rules the form offers them.
+
+    :param config:  4CAT config reader (context-aware)
+    :param str model_id:  ID of the model to look up
+    :param str task:  Task the model must support - `"generate"` or `"embed"`.
+    :return tuple:  `(model, server, None)`, or `(None, None, error message)`
+    """
+    models = get_available_models(config, task)
+
+    if model_id not in models:
+        return None, None, (f"The '{model_id}' model is not available. Ask an admin to enable it, or pick another "
+                            f"model.")
+
+    model = models[model_id]
+    server = config.get("llm.servers", {}).get(model["server"])
+    if not server:
+        return None, None, f"The LLM server for model '{model_id}' is no longer configured."
+
+    return model, server, None
+
+
+def get_model_library(config, task: str = "generate") -> dict:
+    """
+    Get the LLM models available for a given task, grouped by server.
+
+    :param config:  4CAT config reader (context-aware, so per-user `llm.access`
+      is respected)
+    :param str task:  Task the model must support - `"generate"` or `"embed"`.
+    :return dict:  `{server name: {model ID: model display name}}`, shaped for
+      a `UserInput.OPTION_CHOICE` option.
+    """
+    servers = config.get("llm.servers", {})
+
+    models_option = {}
+    for key, value in get_available_models(config, task).items():
+        # a model whose server was removed cannot be offered; skipping it keeps
+        # the processor's options page working instead of raising a KeyError
+        server = servers.get(value["server"])
+        if not server:
+            continue
+
+        if server["name"] not in models_option:
+            models_option[server["name"]] = {}
+
+        models_option[server["name"]][key] = value["name"]
+
+    return models_option

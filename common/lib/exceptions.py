@@ -168,3 +168,9 @@ class MetadataException(FourcatException):
     Raise when there is an issue with metadata
     """
     pass
+
+class LLMServerException(FourcatException):
+    """
+    Raise when an LLM server request fails or returns something unusable
+    """
+    pass

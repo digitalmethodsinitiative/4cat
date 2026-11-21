@@ -78,8 +78,69 @@
 			{% elif item.get("tiktok_url") and not pseudonymised %}
 			<a href="{{ item['tiktok_url'] | web_url }}" target="_blank"><span class="external-url" title="Go to original item"><i class="fas fa-external-link-alt"></i></span></a>
 			{% endif %}
+			<!-- Scroll to the item above or below, like TikTok's feed -->
+			<span class="item-nav">
+				<button type="button" class="item-nav-previous" title="Previous item"{% if item_index == 0 %} disabled{% endif %}><i class="fa-solid fa-chevron-up"></i></button>
+				<button type="button" class="item-nav-next" title="Next item"{% if item_index == items|length - 1 %} disabled{% endif %}><i class="fa-solid fa-chevron-down"></i></button>
+			</span>
 		</div>
 	</div>
 </div>
+
+{# This template is included once per item, but the script only needs to be on the page once #}
+{% if item_index == 0 %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+	const item_list = document.getElementById("explorer-items");
+	const items = Array.from(item_list.querySelectorAll(":scope > li.item"));
+	const videos = Array.from(item_list.querySelectorAll("video"));
+
+	item_list.addEventListener("click", (e) => {
+		const button = e.target.closest(".item-nav button");
+		if (!button) {
+			return;
+		}
+		const step = button.classList.contains("item-nav-next") ? 1 : -1;
+		const target = items[items.indexOf(button.closest("li.item")) + step];
+		if (target) {
+			target.scrollIntoView({behavior: "smooth", block: "start"});
+		}
+	});
+
+	// Only one video plays at a time, also when started by hand
+	videos.forEach((video) => {
+		video.loop = true;
+		video.addEventListener("play", () => {
+			videos.filter((other) => other !== video).forEach((other) => other.pause());
+		});
+	});
+
+	const play = (video) => {
+		if (video.dataset.autoMuted) {
+			video.muted = false;
+		}
+		video.play().catch(() => {
+			// browsers block autoplay with sound until the user has interacted with the page
+			video.muted = true;
+			video.dataset.autoMuted = "true";
+			video.play().catch(() => {});
+		});
+	};
+
+	// The active video is the one crossing the middle of the viewport. This
+	// also works for videos taller than the viewport.
+	const activate = new IntersectionObserver((entries) => {
+		entries.filter((entry) => entry.isIntersecting).forEach((entry) => play(entry.target));
+	}, {rootMargin: "-49% 0px -49% 0px"});
+	const deactivate = new IntersectionObserver((entries) => {
+		entries.filter((entry) => !entry.isIntersecting).forEach((entry) => entry.target.pause());
+	});
+	videos.forEach((video) => {
+		activate.observe(video);
+		deactivate.observe(video);
+	});
+});
+</script>
+{% endif %}
 
 

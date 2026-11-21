@@ -30,7 +30,7 @@ class ThirdPartyClient(LLMServerClient):
         :returns:       Ordered list of supported media type strings.
                         Returns `[]` when `meta` is `None`
         """
-        return meta.get("supported_media_types", ["text"])
+        return meta.get("supported_media_types", [])
 
     def format_display_name(self, meta: dict) -> str:
         """

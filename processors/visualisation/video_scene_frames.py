@@ -33,6 +33,7 @@ class VideoSceneFrames(BasicProcessor):
     title = "Extract key frames from each scene"  # title displayed in UI
     description = "For each scene identified, extracts a key frame (e.g. the first frame)."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
+    media_type = "image"
 
     # Allow on detected video scenes when ffmpeg is available
     compatibility = Compatibility(types={"video-scene-detector"}, required_settings={("video-downloader.ffmpeg_path", is_executable)}, preferred_followups=["video-timelines"])
