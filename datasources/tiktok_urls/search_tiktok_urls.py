@@ -271,6 +271,8 @@ class TikTokScraper:
                 url = None
                 while urls and url is None:
                     url = urls.pop(0)
+                    if not url:
+                        continue
                     url = url.replace("https://", "http://")  # https is finicky, lots of blocks
 
                     # Check if url already collected or should be retried
