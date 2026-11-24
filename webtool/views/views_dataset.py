@@ -291,7 +291,7 @@ def get_result_legacy(query_file):
         return redirect(url_for('static', filename='img/favicon/favicon.ico'))
     elif query_file.endswith('/robots.txt') or query_file == 'robots.txt':
         return redirect(url_for("misc.robots"))
-    elif any(query_file in ['sitemap.xml']):
+    elif query_file in ('sitemap.xml',):
         # don't even warn these
         return error(404, error="File not found.")
     
